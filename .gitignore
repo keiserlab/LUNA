@@ -1,0 +1,15 @@
+# Todos os arquivos:
+
+*.htaccess
+*.dat
+.project
+.pydevproject
+
+
+# Todos arquivos dos diretórios:
+
+tmp/
+www/system
+www/application/config
+www/data
+__pycache__
