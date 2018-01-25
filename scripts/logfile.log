@@ -1,0 +1,119 @@
+2018-01-24 00:56:08,735 - interaction.contact - ERROR - name 'Selection' is not defined
+Traceback (most recent call last):
+  File "/media/shared/UFMG/Workspace/nAPOLI_v2/scripts/interaction/contact.py", line 45, in get_contacts_for_entity
+    targetAtoms = Selection.unfold_entities([source], 'A')
+NameError: name 'Selection' is not defined
+2018-01-24 01:01:28,032 - interaction.contact - ERROR - <Chain id=A>
+Traceback (most recent call last):
+  File "/media/shared/UFMG/Workspace/nAPOLI_v2/scripts/interaction/contact.py", line 47, in get_contacts_for_entity
+    print(model[source.get_parent()].has_id(source.id))
+  File "/home/alexandrefassio/.local/lib/python3.5/site-packages/Bio/PDB/Entity.py", line 40, in __getitem__
+    return self.child_dict[id]
+KeyError: <Chain id=A>
+2018-01-24 01:02:32,164 - interaction.contact - ERROR - 'myResidue' object has no attribute 'get_entity_level'
+Traceback (most recent call last):
+  File "/media/shared/UFMG/Workspace/nAPOLI_v2/scripts/interaction/contact.py", line 49, in get_contacts_for_entity
+    validate_entity(model, source)
+  File "/media/shared/UFMG/Workspace/nAPOLI_v2/scripts/interaction/contact.py", line 42, in validate_entity
+    print(entity.get_entity_level)
+AttributeError: 'myResidue' object has no attribute 'get_entity_level'
+2018-01-24 01:02:38,528 - interaction.contact - ERROR - 'myResidue' object has no attribute 'get_entity_level'
+Traceback (most recent call last):
+  File "/media/shared/UFMG/Workspace/nAPOLI_v2/scripts/interaction/contact.py", line 49, in get_contacts_for_entity
+    validate_entity(model, source)
+  File "/media/shared/UFMG/Workspace/nAPOLI_v2/scripts/interaction/contact.py", line 42, in validate_entity
+    print(entity.get_entity_level)
+AttributeError: 'myResidue' object has no attribute 'get_entity_level'
+2018-01-24 01:07:37,470 - interaction.contact - ERROR - 'NoneType' object has no attribute 'get_level'
+Traceback (most recent call last):
+  File "/media/shared/UFMG/Workspace/nAPOLI_v2/scripts/interaction/contact.py", line 48, in get_contacts_for_entity
+    targetAtoms = Selection.unfold_entities([source], 'A')
+  File "/home/alexandrefassio/.local/lib/python3.5/site-packages/Bio/PDB/Selection.py", line 60, in unfold_entities
+    level = entity_list[0].get_level()
+AttributeError: 'NoneType' object has no attribute 'get_level'
+2018-01-24 01:21:11,525 - interaction.contact - INFO - Number of nearby atom(s) found: 127
+2018-01-24 01:21:25,199 - interaction.contact - INFO - Number of nearby residue(s) found: 26
+2018-01-24 01:21:31,099 - interaction.contact - INFO - Number of nearby chain(s) found: 1
+2018-01-24 01:22:04,352 - interaction.contact - INFO - Trying to select all contacts in the PDB file 1IL3
+2018-01-24 01:22:04,357 - interaction.contact - ERROR - a float is required
+Traceback (most recent call last):
+  File "/media/shared/UFMG/Workspace/nAPOLI_v2/scripts/interaction/contact.py", line 30, in all_contacts_nh_search
+    pairs = ns.search_all(radius, level)
+  File "/home/alexandrefassio/.local/lib/python3.5/site-packages/Bio/PDB/NeighborSearch.py", line 115, in search_all
+    self.kdt.all_search(radius)
+  File "/home/alexandrefassio/.local/lib/python3.5/site-packages/Bio/KDTree/KDTree.py", line 217, in all_search
+    self.neighbors = self.kdt.neighbor_search(radius)
+TypeError: a float is required
+2018-01-24 01:22:22,229 - interaction.contact - INFO - Trying to select all contacts in the PDB file 1IL3
+2018-01-24 01:22:22,234 - interaction.contact - ERROR - a float is required
+Traceback (most recent call last):
+  File "/media/shared/UFMG/Workspace/nAPOLI_v2/scripts/interaction/contact.py", line 30, in all_contacts_nh_search
+    pairs = ns.search_all(radius, level)
+  File "/home/alexandrefassio/.local/lib/python3.5/site-packages/Bio/PDB/NeighborSearch.py", line 115, in search_all
+    self.kdt.all_search(radius)
+  File "/home/alexandrefassio/.local/lib/python3.5/site-packages/Bio/KDTree/KDTree.py", line 217, in all_search
+    self.neighbors = self.kdt.neighbor_search(radius)
+TypeError: a float is required
+2018-01-24 01:22:44,506 - interaction.contact - INFO - Trying to select all contacts in the PDB file 1IL3
+2018-01-24 01:22:44,807 - interaction.contact - INFO - Number of nearby chain(s) found: 0
+2018-01-24 01:23:13,807 - interaction.contact - INFO - Number of nearby chain(s) found: 1
+2018-01-24 01:24:10,957 - interaction.contact - INFO - Number of nearby chain(s) found: 4
+2018-01-24 01:24:47,730 - interaction.contact - INFO - Number of nearby chain(s) found: 4
+2018-01-24 01:25:12,087 - interaction.contact - INFO - Number of nearby chain(s) found: 0
+2018-01-24 01:25:19,207 - interaction.contact - INFO - Number of nearby chain(s) found: 0
+2018-01-24 01:25:33,334 - interaction.contact - INFO - Number of nearby chain(s) found: 0
+2018-01-24 01:33:08,412 - interaction.contact - INFO - Trying to select all contacts in the PDB file 1BGA
+2018-01-24 01:33:10,372 - interaction.contact - INFO - Number of nearby atom(s) found: 534744
+2018-01-24 01:33:43,517 - interaction.contact - INFO - Trying to select all contacts in the PDB file 1BGA
+2018-01-24 01:33:46,741 - interaction.contact - INFO - Number of nearby chain(s) found: 5
+2018-01-24 01:34:38,367 - interaction.contact - INFO - Trying to select all contacts in the PDB file 1BGA
+2018-01-24 01:34:41,499 - interaction.contact - INFO - Number of nearby chain(s) found: 5
+2018-01-24 01:55:21,526 - interaction.contact - ERROR - cannot import name 'zip'
+Traceback (most recent call last):
+  File "/media/shared/UFMG/Workspace/nAPOLI_v2/scripts/interaction/contact.py", line 60, in get_contacts_for_entity
+    from itertools import zip
+ImportError: cannot import name 'zip'
+2018-01-24 01:55:45,529 - interaction.contact - ERROR - cannot import name 'zip'
+Traceback (most recent call last):
+  File "/media/shared/UFMG/Workspace/nAPOLI_v2/scripts/interaction/contact.py", line 60, in get_contacts_for_entity
+    from itertools import zip
+ImportError: cannot import name 'zip'
+2018-01-24 01:57:24,959 - interaction.contact - ERROR - cannot import name 'izip'
+Traceback (most recent call last):
+  File "/media/shared/UFMG/Workspace/nAPOLI_v2/scripts/interaction/contact.py", line 60, in get_contacts_for_entity
+    from itertools import izip as zip
+ImportError: cannot import name 'izip'
+2018-01-24 01:58:09,873 - interaction.contact - ERROR - cannot import name 'zip'
+Traceback (most recent call last):
+  File "/media/shared/UFMG/Workspace/nAPOLI_v2/scripts/interaction/contact.py", line 60, in get_contacts_for_entity
+    from itertools import zip
+ImportError: cannot import name 'zip'
+2018-01-24 02:03:16,133 - interaction.contact - ERROR - 'list' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "/media/shared/UFMG/Workspace/nAPOLI_v2/scripts/interaction/contact.py", line 87, in get_contacts_for_entity
+    pairs = combinations([entity], nearbyEntities)
+TypeError: 'list' object cannot be interpreted as an integer
+2018-01-24 02:14:16,958 - interaction.contact - INFO - Number of nearby residue(s) found: 5437
+2018-01-24 02:14:31,208 - interaction.contact - INFO - Number of nearby atom(s) found: 127146
+2018-01-24 02:14:38,910 - interaction.contact - INFO - Number of nearby chain(s) found: 1
+2018-01-24 02:15:07,791 - interaction.contact - INFO - Number of nearby residue(s) found: 5437
+2018-01-24 02:15:12,385 - interaction.contact - INFO - Number of nearby residue(s) found: 5437
+2018-01-24 02:15:23,497 - interaction.contact - INFO - Number of nearby residue(s) found: 2587
+2018-01-24 02:15:28,010 - interaction.contact - INFO - Number of nearby residue(s) found: 5437
+2018-01-24 02:15:33,276 - interaction.contact - INFO - Number of nearby residue(s) found: 38347
+2018-01-24 02:15:38,134 - interaction.contact - INFO - Number of nearby residue(s) found: 5437
+2018-01-24 02:15:42,101 - interaction.contact - INFO - Number of nearby residue(s) found: 5437
+2018-01-24 02:15:46,690 - interaction.contact - INFO - Number of nearby atom(s) found: 127146
+2018-01-24 02:16:16,977 - interaction.contact - INFO - Number of nearby residue(s) found: 26
+2018-01-24 02:16:22,822 - interaction.contact - INFO - Number of nearby residue(s) found: 26
+2018-01-24 02:22:52,525 - interaction.contact - ERROR - cannot import name 'get_entity_level_name'
+Traceback (most recent call last):
+  File "/media/shared/UFMG/Workspace/nAPOLI_v2/scripts/interaction/contact.py", line 44, in get_contacts_for_entity
+    from bio.entity_func import (get_entity_level_name,
+ImportError: cannot import name 'get_entity_level_name'
+2018-01-24 02:23:17,664 - interaction.contact - INFO - Number of nearby residue(s) found: 26
+2018-01-24 02:23:28,134 - interaction.contact - INFO - Number of nearby atom(s) found: 757
+2018-01-24 02:23:35,526 - interaction.contact - INFO - Number of nearby atom(s) found: 757
+2018-01-24 02:25:46,430 - interaction.contact - INFO - Number of nearby atom(s) found: 75
+2018-01-24 02:25:54,196 - interaction.contact - INFO - Number of nearby residue(s) found: 13
+2018-01-24 02:25:58,004 - interaction.contact - INFO - Number of nearby chain(s) found: 1
