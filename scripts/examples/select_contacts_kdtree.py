@@ -1,6 +1,5 @@
 from util import logging_ini
 
-from collections import namedtuple
 from os.path import (basename, splitext)
 from interaction.contact import *
 
