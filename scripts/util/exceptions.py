@@ -6,5 +6,21 @@ class ChainNotFoundError(KeyError):
     pass
 
 
-class ResidueNotFoundError(KeyError):
+class MoleculeNotFoundError(KeyError):
+    pass
+
+
+class IllegalArgumentError(ValueError):
+    pass
+
+
+class PDBNotReadError(IOError):
+    pass
+
+
+class InvalidSuperpositionFileError(ValueError):
+    pass
+
+
+class FileNotCreated(IOError):
     pass
