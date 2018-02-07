@@ -39,4 +39,4 @@ f3 = '../tmp/alignment/1BGA.pdb'
 m3 = parser.get_structure("algo", f3)[0]
 extractor = Extractor(m3)
 outF3 = '../tmp/icode/1BGA.chain%s.pdb' % chain
-extractor.extract_chains([chain], outF3)
+extractor.extract_residues([chain], outF3)
