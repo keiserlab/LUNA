@@ -3,6 +3,20 @@
 # license.  Please see the LICENSE file that should have been included
 # as part of this package.
 
+
+###################################################################
+
+# Modifications included by Alexandre Fassio (alexandrefassio@dcc.ufmg.br).
+# Date: 19/02/2018.
+
+# 1) Inherit inhouse modifications. Package: MyBio.
+# 2) Now it parses CONECT records.
+
+# Each line or block with modifications contain a MODBY tag.
+
+###################################################################
+
+
 """Parser for PDB files."""
 
 from __future__ import print_function
@@ -18,15 +32,12 @@ except ImportError:
 
 from Bio.File import as_handle
 
-from Bio.PDB.PDBExceptions import PDBConstructionException
-from Bio.PDB.PDBExceptions import PDBConstructionWarning
-
-# ALEXANDRE:
-# MOD: Added an own packet.method
-# BUG: The Bio.PDB.Residue has an error in Python 3 in comparative operations
-from bio.structure_builder import StructureBuilder
-
-from Bio.PDB.parse_pdb_header import _parse_pdb_header_list
+# MODBY: Alexandre Fassio
+# Inherit inhouse modifications. Package: MyBio.
+from MyBio.PDB.PDBExceptions import PDBConstructionException
+from MyBio.PDB.PDBExceptions import PDBConstructionWarning
+from MyBio.PDB.StructureBuilder import StructureBuilder
+from MyBio.PDB.parse_pdb_header import _parse_pdb_header_list
 
 
 # If PDB spec says "COLUMNS 18-20" this means line[17:20]
@@ -60,6 +71,9 @@ class PDBParser(object):
         else:
             self.structure_builder = StructureBuilder()
         self.header = None
+        # MODBY: Alexandre Fassio
+        # Now it parses CONECT records.
+        self.conects = None
         self.trailer = None
         self.line_counter = 0
         self.PERMISSIVE = bool(PERMISSIVE)
@@ -88,6 +102,11 @@ class PDBParser(object):
                 self._parse(handle.readlines())
 
             self.structure_builder.set_header(self.header)
+
+            # MODBY: Alexandre Fassio
+            # Now it parses CONECT records.
+            self.structure_builder.set_conects(self.conects)
+
             # Return the Structure instance
             structure = self.structure_builder.get_structure()
 
@@ -101,6 +120,12 @@ class PDBParser(object):
         """Return the trailer."""
         return self.trailer
 
+    # MODBY: Alexandre Fassio
+    # Now it parses CONECT records.
+    def get_conects(self):
+        """Return conects."""
+        return self.conects
+
     # Private methods
 
     def _parse(self, header_coords_trailer):
@@ -109,6 +134,10 @@ class PDBParser(object):
         self.header, coords_trailer = self._get_header(header_coords_trailer)
         # Parse the atomic data; return the PDB file trailer
         self.trailer = self._parse_coordinates(coords_trailer)
+
+        # MODBY: Alexandre Fassio
+        # Now it parses CONECT records.
+        self.conects = self._parse_conects(self.trailer)
 
     def _get_header(self, header_coords_trailer):
         """Get the header of the PDB file, return the rest (PRIVATE)."""
@@ -276,6 +305,85 @@ class PDBParser(object):
         # EOF (does not end in END or CONECT)
         self.line_counter = self.line_counter + local_line_counter
         return []
+
+    # MODBY: Alexandre Fassio
+    # Now it parses CONECT records.
+    def _parse_conects(self, trailer):
+        """Parse the CONECT record data in the PDB file (PRIVATE)."""
+        local_line_counter = 0
+        structure_builder = self.structure_builder
+
+        structure = structure_builder.structure
+        all_serial_numbers = set([a.get_serial_number()
+                                  for a in structure.get_atoms()])
+
+        conects = {}
+        local_line_counter = 0
+        for i in range(0, len(trailer)):
+            line = trailer[i].rstrip('\n')
+            record_type = line[0:6]
+
+            global_line_counter = self.line_counter + local_line_counter + 1
+
+            if record_type == "CONECT":
+                serial_numbers = [line[6:11], line[11:16], line[16:21],
+                                  line[21:26], line[26:31]]
+
+                try:
+                    orig_serial_number = int(serial_numbers[0].strip())
+                except Exception as e:
+                    warnings.warn("Serial number '%s' in CONECT record "
+                                  "is invalid. Line %d."
+                                  % (orig_serial_number, global_line_counter),
+                                  PDBConstructionWarning)
+                    continue
+                if (orig_serial_number not in all_serial_numbers):
+                    warnings.warn("Serial number '%s' in CONECT record "
+                                  "does not exist. Line %d."
+                                  % (orig_serial_number, global_line_counter),
+                                  PDBConstructionWarning)
+                    continue
+
+                bonded_atoms = set()
+                for serial_number in serial_numbers[1:]:
+                    serial_number = serial_number.strip()
+
+                    if (serial_number is ''):
+                        continue
+
+                    try:
+                        serial_number = int(serial_number)
+                    except Exception as e:
+                        warnings.warn("Serial number '%s' in CONECT record "
+                                      "is invalid. Line %d."
+                                      % (serial_number, global_line_counter),
+                                      PDBConstructionWarning)
+                        continue
+
+                    if (serial_number not in all_serial_numbers):
+                        warnings.warn("Serial number '%s' in CONECT record "
+                                      "does not exist. Line %d."
+                                      % (serial_number, global_line_counter),
+                                      PDBConstructionWarning)
+                        continue
+
+                    bonded_atoms.add(serial_number)
+
+                if (len(bonded_atoms) == 0):
+                    warnings.warn("No bonded atom were found in CONECT record."
+                                  " Line %d." % global_line_counter,
+                                  PDBConstructionWarning)
+                    continue
+                else:
+                    orig_bonded_atoms = (conects[orig_serial_number]
+                                         if orig_serial_number in conects
+                                         else [])
+
+                    orig_bonded_atoms += list(bonded_atoms)
+                    conects[orig_serial_number] = orig_bonded_atoms
+
+            local_line_counter += 1
+        return conects
 
     def _handle_PDB_exception(self, message, line_counter):
         """Handle exception (PRIVATE).
