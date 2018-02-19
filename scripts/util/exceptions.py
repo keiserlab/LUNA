@@ -24,3 +24,7 @@ class InvalidSuperpositionFileError(ValueError):
 
 class FileNotCreated(IOError):
     pass
+
+
+class FingerprintNotCreated(RuntimeError):
+    pass
