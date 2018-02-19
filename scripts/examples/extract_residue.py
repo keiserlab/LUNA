@@ -1,5 +1,5 @@
-from bio.PDBParser import PDBParser
-from bio.pdb import Extractor
+from MyBio.PDB.PDBParser import PDBParser
+from MyBio.extractor import Extractor
 
 parser = PDBParser(PERMISSIVE=True)
 

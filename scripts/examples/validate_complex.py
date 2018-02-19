@@ -3,7 +3,7 @@ from input.util import entry_format
 from input.existance_validator import *
 
 from os.path import (basename, splitext)
-from bio.pdb_parser import PDBParser
+from MyBio.PDB.PDBParser import PDBParser
 
 parser = PDBParser(PERMISSIVE=1)
 

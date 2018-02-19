@@ -1,8 +1,8 @@
 from util import logging_ini
 from align.tmalign import align_2struct
 
-from Bio.PDB.PDBParser import PDBParser
-from Bio.PDB import StructureAlignment
+from MyBio.PDB.PDBParser import PDBParser
+from MyBio.PDB import StructureAlignment
 
 import os.path
 

@@ -7,8 +7,8 @@ logger = logging.getLogger(__name__)
 def all_contacts_nh_search(model, radius=7, level='A'):
 
     try:
-        from bio.entity_func import get_entity_level_name
-        from Bio.PDB import NeighborSearch
+        from MyBio.entity_func import get_entity_level_name
+        from MyBio.PDB.NeighborSearch import NeighborSearch
 
         if (level == 'S' or level == 'M' or level == 'C'):
             raise EntityLevelError("Minimum entity level to be chosen is: "
@@ -39,9 +39,8 @@ def all_contacts_nh_search(model, radius=7, level='A'):
 def get_contacts_for_entity(model, source, target=None, radius=7, level='A'):
 
     try:
-        from bio.entity_func import (get_entity_level_name,
-                                     get_parent_by_level)
-        from Bio.PDB import (Selection, NeighborSearch)
+        from MyBio.entity_func import get_entity_level_name
+        from MyBio.PDB import (Selection, NeighborSearch)
         from itertools import product
 
         if (level == 'S' or level == 'M' or level == 'C'):
@@ -64,8 +63,8 @@ def get_contacts_for_entity(model, source, target=None, radius=7, level='A'):
         ns = NeighborSearch(targetAtoms)
 
         entities = set()
-        for atom in sourceAtoms:
-            entity = get_parent_by_level(atom, level)
+        for atom in sourceAtoms:            
+            entity = atom.get_parent_by_level(level)
 
             nearbyEntities = ns.search(atom.coord, radius, level)
             pairs = set(product([entity], nearbyEntities))

@@ -2,12 +2,12 @@ from util import logging_ini
 from align.tmalign import (align_2struct, extract_chain_from_sup,
                            remove_sup_files)
 
-from Bio.PDB.PDBParser import PDBParser
-from Bio.PDB.PDBIO import PDBIO
+from MyBio.PDB.PDBParser import PDBParser
+from MyBio.PDB.PDBIO import PDBIO
 
 from os.path import basename
 
-from bio.pdb import Extractor
+from MyBio.extractor import Extractor
 
 parser = PDBParser(PERMISSIVE=True, QUIET=True)
 

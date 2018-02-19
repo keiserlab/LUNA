@@ -1,6 +1,6 @@
 from util import logging_ini
 
-from bio.pdb import *
+from MyBio.version_control import *
 
 pdbId = "1IL8"
 outputPath = "."

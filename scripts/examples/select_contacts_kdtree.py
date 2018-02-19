@@ -3,7 +3,7 @@ from util import logging_ini
 from os.path import (basename, splitext)
 from interaction.contact import *
 
-from bio.pdb_parser import PDBParser
+from MyBio.PDB.PDBParser import PDBParser
 
 parser = PDBParser(PERMISSIVE=1)
 
