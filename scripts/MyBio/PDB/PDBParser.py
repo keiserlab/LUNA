@@ -47,7 +47,8 @@ class PDBParser(object):
     """Parse a PDB file and return a Structure object."""
 
     def __init__(self, PERMISSIVE=True, get_header=False,
-                 structure_builder=None, QUIET=False):
+                 structure_builder=None, QUIET=False,
+                 FIX_ATOM_NAME_CONFLICT=False):
         """Create a PDBParser object.
 
         The PDB parser call a number of standard methods in an aggregated
@@ -78,6 +79,7 @@ class PDBParser(object):
         self.line_counter = 0
         self.PERMISSIVE = bool(PERMISSIVE)
         self.QUIET = bool(QUIET)
+        self.FIX_ATOM_NAME_CONFLICT = FIX_ATOM_NAME_CONFLICT
 
     # Public methods
 
@@ -167,6 +169,8 @@ class PDBParser(object):
         current_segid = None
         current_residue_id = None
         current_resname = None
+
+        conflicts = {}
         for i in range(0, len(coords_trailer)):
             line = coords_trailer[i].rstrip('\n')
             record_type = line[0:6]
@@ -258,6 +262,25 @@ class PDBParser(object):
                         self._handle_PDB_exception(message, global_line_counter)
                 # init atom
                 try:
+                    if self.FIX_ATOM_NAME_CONFLICT:
+                        if (structure_builder.residue.has_id(name)):
+                            conflict_key = (structure_builder.residue, name)
+                            if (conflict_key in conflicts):
+                                atual_error = conflicts[conflict_key] + 1
+                            else:
+                                atual_error = 1
+
+                            # Replace atom name.
+                            name += str(atual_error)                            
+                            # Replace fullname (atom name + spaces).
+                            parts = [' '] * 4
+                            replace_ini = 0 if len(name) == 4 else 1
+                            replace_end = len(name) + 1
+                            parts[replace_ini:replace_end] = name
+                            fullname = ''.join(parts)
+                            
+                            conflicts[conflict_key] = atual_error
+
                     structure_builder.init_atom(name, coord, bfactor, occupancy, altloc,
                                                 fullname, serial_number, element)
                 except PDBConstructionException as message:
