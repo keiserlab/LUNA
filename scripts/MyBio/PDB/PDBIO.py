@@ -96,6 +96,7 @@ class PDBIO(object):
             element = "  "
 
         name = atom.get_fullname().strip()
+
         # Pad atom name if:
         #     - smaller than 4 characters
         # AND - is not C, N, O, S, H, F, P, ..., one letter elements

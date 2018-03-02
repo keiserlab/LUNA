@@ -30,8 +30,7 @@ import warnings
 from MyBio.PDB.Structure import Structure
 from MyBio.PDB.Model import Model
 from MyBio.PDB.Chain import Chain
-from MyBio.PDB.Residue import Residue
-from MyBio.PDB.Residue import DisorderedResidue
+from MyBio.PDB.Residue import (Residue, DisorderedResidue)
 from MyBio.PDB.Atom import Atom, DisorderedAtom
 
 from MyBio.PDB.PDBExceptions import PDBConstructionException
