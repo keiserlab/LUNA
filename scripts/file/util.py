@@ -1,19 +1,29 @@
 from os.path import (basename, splitext)
 
 
-def get_file_format(path):
-    return generic_splitext(path)[1][1:]
+def get_file_format(path, maxsplit=None):
+    return generic_splitext(path, maxsplit)[1][1:]
 
 
-def get_filename(path):
+def get_filename(path, maxsplit=None):
     return generic_splitext(path)[0]
 
 
-def generic_splitext(path):
-    filename, fileExt = splitext(basename(path))
-    while '.' in filename:
-        filename, tḿpFileExt = splitext(filename)
-        fileExt = tḿpFileExt + fileExt
+def generic_splitext(path, maxsplit=None):
+    filename = basename(path)
+
+    numExt = filename.count('.') + 1
+    if (maxsplit is None or maxsplit < 1):
+        maxsplit = numExt
+    else:
+        maxsplit = min(maxsplit, numExt)
+
+    filename, fileExt = splitext(filename)
+    maxsplit -= 1
+    while maxsplit > 0:
+        filename, tmpFileExt = splitext(filename)
+        fileExt = tmpFileExt + fileExt
+        maxsplit -= 1
 
     return (filename, fileExt)
 
