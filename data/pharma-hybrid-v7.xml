@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Pharmacophore configuration file -->
+
+<PharmacophoreFingerprintConfiguration Version ="0.3" schemaLocation="pharmacophores.xsd">
+
+     <PharmacophoreDefinition>
+
+        <Search StereoCareChecking="false"/>
+
+        <Functions>
+          <Function ID="formalcharge" Class="chemaxon.util.expression.function.AtomProperties">
+              <Param Name="property" Value="charge"/>
+              <Param Name="pH" Value="7"/>          
+          </Function>            
+        </Functions>
+        <Plugins>
+          <Plugin ID="acceptor" Class="chemaxon.marvin.calculations.HBDAPlugin">
+            <Param Name="type" Value="acc"/>
+            <Param Name="pH" Value="7"/>
+          </Plugin>
+          <Plugin ID="donor" Class="chemaxon.marvin.calculations.HBDAPlugin">
+            <Param Name="type" Value="don"/>
+            <Param Name="pH" Value="7"/>
+          </Plugin>
+          <Plugin ID="ioncharge" Class="chemaxon.marvin.calculations.IonChargePlugin">
+            <Param Name="pH" Value="7"/>
+          </Plugin>    
+        </Plugins>
+
+        <Mols>
+            <Mol ID="pos" Structure="[*+]"/>
+            <Mol ID="nitro" Structure="[O:2]~[N:1]=[O:3]"/>
+            <Mol ID="amine" Structure="C[N:1]"/>
+            <Mol ID="tertamine" Structure="C[N:1](C)C"/>
+            <Mol ID="aniline" Structure="c[N:1]"/>
+            <Mol ID="amide" Structure="[#7:1][C,P,S:2]=O"/>
+            <Mol ID="hydrazine" Structure="NN"/>
+            <Mol ID="phenylhydrazine" Structure="c[N:1][N:2]"/>
+            <Mol ID="hydrazide" Structure="[#7:1]NC=O"/>
+            <Mol ID="amidine" Structure="[#7:2][C,P,S:1]=[N:3]"/>
+
+            <Mol ID="neg" Structure="[*-]"/>
+            <Mol ID="carbox" Structure="[H][O:3][C:1]=[O:2]"/>
+            <Mol ID="carboxylate" Structure="[H][O:3][C:1]=[O:2]"/>
+            <Mol ID="carboxylateIon" Structure="[O-:3][C:1]=[O:2]"/>
+            <Mol ID="sulfonyl" Structure="[H][O:3][S:1](=[O:2])=[O:4]"/>
+            <Mol ID="sulfonate" Structure="[O-:3][S:1](=[O:4])=[O:2]"/>
+            <Mol ID="phosphonyl" Structure="[H][O:4][P:1]([O:2])=[O:3]"/>
+            <Mol ID="phosphonate" Structure="[O:4][P:1]([O-:2])=[O:3]"/>
+
+            <Mol ID="sulfurWithSixBonds" Structure="[Sv6]"/>
+
+            <Mol ID="arom" Structure="[*;a]"/>
+            <Mol ID="aromCarb" Structure="[c]"/>  
+
+            <!-- A carbon bound (all types of bond) to a nitrogen or oxygen -->
+            <Mol ID="nonHydropCarbon" Structure="[#6:1]~[#7,#8]"/>  
+
+            <Mol ID="cx" Structure="[C,F,Cl,Br,I,At]"/>
+            <Mol ID="nos" Structure="[#7,#8,#16]"/>
+            <Mol ID="pyr" Structure="[nX3]"/>
+
+            <!-- An hetero atom: any atom that is not Carbon or Hydrogen -->
+            <Mol ID="qh" Structure="[!#1!#6:1][H]"/>
+        </Mols>
+
+        <Pharmacophores>
+            <AtomSet ID="Aromatic" Symbol="r">arom</AtomSet>
+            <AtomSet ID="Cationic" Symbol="+">
+                <![CDATA[ !neg && ((formalcharge() > 0) || (ioncharge() > 0.4) || (nitro:1) || (pos) || ((amine:1 || hydrazine || amidine:2,3) && !(tertamine:1 || amide:1 || aniline:1 || phenylhydrazine:2))) ]]>
+            </AtomSet>
+            <AtomSet ID="Anionic" Symbol="-">
+                <![CDATA[ !pos && ((formalcharge() < 0) || (ioncharge() < -0.4) || (nitro:2,3) || (neg) || carbox:2,3 || carboxylate:2,3 || carboxylateIon:2,3 || sulfonyl:2,3,4 || sulfonate || phosphonyl:2,3,4 || phosphonate) ]]>
+            </AtomSet>
+            <AtomSet ID="HydrogenBondDonor" Symbol="d">
+                <![CDATA[ donor() || qh:1 ]]>
+            </AtomSet>
+            <AtomSet ID="HydrogenBondAcceptor" Symbol="a">
+                <![CDATA[ acceptor() || ( nos && !tertamine:1 && !pyr && !amide:1,2 && !aniline:1 && !sulfonyl:1 && !sulfonate:1 && !{Cationic} && !nitro:1 && !sulfurWithSixBonds ) ]]>
+            </AtomSet>
+            <AtomSet ID="Hydrophobic" Symbol="h">
+                <![CDATA[ (aromCarb || (cx && !{Aromatic})) && !nonHydropCarbon:1 && !{Cationic} && !{Anionic} && !{HydrogenBondDonor} && !{HydrogenBondAcceptor} ]]>
+            </AtomSet>            
+        </Pharmacophores>
+
+        <PharmacophoreFingerprintParameters
+            MinimalDistance="1"
+            MaximalDistance="10"
+        />
+            
+    </PharmacophoreDefinition>
+
+    <StandardizerConfiguration Version ="0.1">
+        <Actions>		
+            <Removal ID="keepOne" Method="keepLargest" Measure="molMass"/>
+            <Action ID="aromatize" Act="aromatize"/>
+        </Actions>
+    </StandardizerConfiguration>
+
+    <ScreeningConfiguration>
+        <PharmacophorePointColors>
+            <Color Symbol="+" Value="#cc0000"/>
+            <Color Symbol="-" Value="#0000cc"/>
+            <Color Symbol="r" Value="#00ff00"/>
+            <Color Symbol="h" Value="#000000"/>
+            <Color Symbol="d" Value="#0000ff"/>
+            <Color Symbol="a" Value="#ff0000"/>
+            <Color Symbol="a/d" Value="#ff00ff"/>
+            <Color Symbol="+/d" Value="#cc6666"/>
+            <Color Symbol="-/a" Value="#ff99cc"/>
+            <Color Symbol="a/r" Value="#ffcc00"/>
+            <Color Symbol="d/r" Value="#00ccff"/>
+            <Color Symbol="h/r" Value="#339933"/>
+            <Color Symbol="-/a/d" Value="#33ffff"/>
+            <Color Symbol="other" Value="#cc9900"/>
+            <Color Symbol="empty" Value="#cccccc"/>
+        </PharmacophorePointColors>        
+        
+        <ParametrizedMetrics>
+            <ParametrizedMetric Name="Tanimoto" ActiveFamily="Generic" 
+                Metric="Tanimoto" Threshold="0.2"/>
+            <ParametrizedMetric Name="Euclidean" ActiveFamily="Generic" 
+                Metric="Euclidean" Threshold="15" />
+        </ParametrizedMetrics>        
+    </ScreeningConfiguration>
+    
+</PharmacophoreFingerprintConfiguration>

@@ -1,0 +1,13 @@
+
+
+
+DefineFeature NitroGroup [$(N(=O)(~O))]
+  Family PosIonizable
+  Weights 1.0
+EndFeature
+
+AtomType NitroGroup [$(O(=N~O)),$(O(~N=O))]
+DefineFeature NitroGroup [{NitroGroup}]
+  Family NegIonizable
+  Weights 1.0
+EndFeature
