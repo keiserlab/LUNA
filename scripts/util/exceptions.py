@@ -28,3 +28,7 @@ class FileNotCreated(IOError):
 
 class FingerprintNotCreated(RuntimeError):
     pass
+
+
+class InvalidFileFormat(ValueError):
+    pass
