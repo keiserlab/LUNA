@@ -1,10 +1,12 @@
+import logging
+logger = logging.getLogger(__name__)
+
+
 class VersionControl():
 
     def __init__(self):
         from MyBio.PDB.PDBList import PDBList
         from urllib.error import URLError, HTTPError
-        import logging
-        logger = logging.getLogger(__name__)
 
         pdbl = PDBList()
         try:
