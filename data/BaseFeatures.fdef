@@ -24,8 +24,8 @@ AtomType NAcceptor [$([N;H0]#[C&v4])]
 AtomType NAcceptor [N&v3;H0;$(Nc)]
 
 # removes thioether and nitro oxygen
-AtomType ChalcAcceptor [O;H0;v2;!$(O=N-*)] 
-Atomtype ChalcAcceptor [O;-;!$(*-N=O)] 
+AtomType ChalcAcceptor [O;H0;v2;!$(O=N-*)]
+Atomtype ChalcAcceptor [O;-;!$(*-N=O)]
 
 # Removed aromatic sulfur from ChalcAcceptor definition
 Atomtype ChalcAcceptor [o;+0]
@@ -113,8 +113,8 @@ EndFeature
 #
 # Note that with the aromatics, it's important to include the ring-size queries along with
 # the aromaticity query for two reasons:
-#   1) Much of the current feature-location code assumes that the feature point is 
-#      equidistant from the atoms defining it. Larger definitions like: a1aaaaaaaa1 will actually 
+#   1) Much of the current feature-location code assumes that the feature point is
+#      equidistant from the atoms defining it. Larger definitions like: a1aaaaaaaa1 will actually
 #      match things like 'o1c2cccc2ccc1', which have an aromatic unit spread across multiple simple
 #      rings and so don't fit that requirement.
 #   2) It's *way* faster.
@@ -152,7 +152,7 @@ EndFeature
 
 # hydrophobic features
 # any carbon that is not bonded to a polar atom is considered a hydrophobe
-# 
+#
 # 23.11.2007 (GL): match any bond (not just single bonds); add #6 at
 #  beginning to make it more efficient
 AtomType Carbon_Polar [#6;$([#6]~[#7,#8,#9])]
@@ -259,3 +259,16 @@ DefineFeature XAcceptorGroup [{OxygenInCarboGroup}]
   Family HalogenAcceptor
   Weights 1.0
 EndFeature
+
+
+
+DefineFeature DonorAtom [!$([#6,H0,-,-2,-3])]
+  Family Donor
+  Weights 1.0
+EndFeature
+
+DefineFeature AcceptorAtom [!$([#6,F,Cl,Br,I,o,s,nX3,#7v5,#15v5,#16v4,#16v6,*+1,*+2,*+3])]
+  Family Acceptor
+  Weights 1.0
+EndFeature
+
