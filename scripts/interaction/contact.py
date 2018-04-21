@@ -63,7 +63,7 @@ def get_contacts_for_entity(model, source, target=None, radius=7, level='A'):
         ns = NeighborSearch(targetAtoms)
 
         entities = set()
-        for atom in sourceAtoms:            
+        for atom in sourceAtoms:
             entity = atom.get_parent_by_level(level)
 
             nearbyEntities = ns.search(atom.coord, radius, level)

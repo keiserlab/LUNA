@@ -1,7 +1,9 @@
+import re
+
+
 class EntryValidator:
 
     def __init__(self, pattern):
-        import re
         self.regex = re.compile(pattern, flags=0)
 
     def is_valid(self, entry):
