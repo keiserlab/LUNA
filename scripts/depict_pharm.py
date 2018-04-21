@@ -76,7 +76,7 @@ for t in tmpColors:
     colors[t] = tuple(tmpColors[t])
 
 
-for mol in mols:    
+for mol in mols:
     rwm = Chem.RWMol(mol)
 
     drawer = rdMolDraw2D.MolDraw2DSVG(800, 600)
@@ -101,7 +101,7 @@ for mol in mols:
         types = atomTypes[a]
         centroid = list(rwm.GetConformer().GetAtomPosition(a))
 
-        if (len(types) == 1):        
+        if (len(types) == 1):
             pos = centroid
             atmIdx = add_atom(rwm, centroid)
             highlight[atmIdx] = colors[types[0]]
@@ -122,8 +122,8 @@ for mol in mols:
 
 
     atoms = [x for x in highlight]
-    
-    opts.flagCloseContactsDist = -1000    
+
+    opts.flagCloseContactsDist = -1000
 
     opts.legendFontSize = 20
     opts.padding = 0.2
