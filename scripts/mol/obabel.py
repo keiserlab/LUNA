@@ -86,6 +86,7 @@ def convert_molecule(infile, output, infileFormat=None,
     logger.info("Trying to convert the file '%s' to '%s'." % (infile, output))
 
     try:
+        # It raises an error if it is not valid.
         try_validate_file(infile)
 
         if (infileFormat is None):
