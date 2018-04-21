@@ -6,10 +6,11 @@
 ###################################################################
 
 # Modifications included by Alexandre Fassio (alexandrefassio@dcc.ufmg.br).
-# Date: 19/02/2018.
+# Date: 08/03/2018.
 
 # 1) Inherit inhouse modifications. Package: MyBio.
 # 2) StructureBuilder now parses CONECT records.
+# 3) set_structure now creates a new Structure object with the same Id as the original structure.
 
 # Each line or block with modifications contain a MODBY tag.
 
@@ -128,7 +129,7 @@ class PDBIO(object):
 
     # Public methods
 
-    def set_structure(self, pdb_object):            
+    def set_structure(self, pdb_object):
         # MODBY: Alexandre Fassio
         # Get the Structure object.
         parent_struct = pdb_object.get_parent_by_level(level='S')
@@ -140,7 +141,9 @@ class PDBIO(object):
             structure = pdb_object
         else:
             sb = StructureBuilder()
-            sb.init_structure('pdb')
+            # MODBY: Alexandre
+            # Keeps the id from the original structure.
+            sb.init_structure(parent_struct.id)
             sb.init_seg(' ')
             # Build parts as necessary
             if pdb_object.level == "M":
