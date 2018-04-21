@@ -24,9 +24,17 @@ def calc_euclidean_distance(p1, p2):
     return distance.euclidean(p1, p2)
 
 
+def norm_vector(p1, p2):
+    p1 = p1 / np.linalg.norm(p1)
+    p2 = p2 / np.linalg.norm(p2)
+    return p2 - p1
+
+
 def calc_angle(p1, p2):
     cosAngle = np.dot(p1, p2) / (np.linalg.norm(p1) * np.linalg.norm(p2))
-    return math.degrees(math.acos(cosAngle))
+    arcosAngle = np.arccos(np.clip(cosAngle, -1, 1))
+    return np.degrees(arcosAngle)
+    # return math.degrees(math.acos(cosAngle))
 
 
 def to_quad1(angle):
@@ -38,3 +46,9 @@ def to_quad1(angle):
         return 360 - angle
     else:
         return angle
+
+
+def get_point_in_line(p1, p2, d):
+    v = p2 - p1
+    u = v / np.linalg.norm(v)
+    return p1 + d * u
