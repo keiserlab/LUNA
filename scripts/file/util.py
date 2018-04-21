@@ -1,4 +1,11 @@
-from os.path import (basename, splitext)
+from os.path import (basename, exists, isdir, splitext)
+from os import makedirs
+from shutil import rmtree
+
+from util.exceptions import DirectoryAlreadyExists
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 def get_file_format(path, maxsplit=None):
@@ -29,9 +36,6 @@ def generic_splitext(path, maxsplit=None):
 
 
 def generate_json_file(json_data, outputFile):
-    import logging
-    logger = logging.getLogger(__name__)
-
     try:
         import simplejson as json
         logger.info("Module 'simplejson' imported.")
@@ -49,8 +53,24 @@ def generate_json_file(json_data, outputFile):
         raise
 
 
+def create_directory(path, clear=False):
+    try:
+        if not exists(path):
+            makedirs(path)
+        elif clear:
+            clear_directory(path)
+        else:
+            raise DirectoryAlreadyExists("The directory '%s' already exists."
+                                         % path)
+    except OSError as e:
+        logger.exception(e)
+        raise
+
+
 def clear_directory(path):
-    import os, shutil
-    
-    if (os.path.isdir(path)):
-        shutil.rmtree(path)
+    if isdir(path):
+        try:
+            rmtree(path)
+        except OSError as e:
+            logger.exception(e)
+            raise
