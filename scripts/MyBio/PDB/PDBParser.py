@@ -3,21 +3,28 @@
 # license.  Please see the LICENSE file that should have been included
 # as part of this package.
 
-
+"""
 ###################################################################
 
-# Modifications included by Alexandre Fassio (alexandrefassio@dcc.ufmg.br).
-# Date: 19/02/2018.
+Modifications included by Alexandre Fassio (alexandrefassio@dcc.ufmg.br).
+    Date: 05/03/2018.
 
-# 1) Inherit inhouse modifications. Package: MyBio.
-# 2) Now it parses CONECT records.
+1) Inherit inhouse modifications. Package: MyBio.
+2) Now it parses CONECT records.
+3) Added an option to PDBParser to correct conflicts in atom names.
+    These conflicts can occur mainly when hydrogen atoms are added by OpenBabel.
+    In this situation, all hydrogens have the name "H".
+4) Added an option to PDBParser to correct flags that were incorrectly set by OpenBabel.
+    When OpenBabel adds Hydrogen atoms, it does not set HETATM for hydrogen atoms from heteroatoms.
+5) Added an option to correct all OpenBabel errors.
 
-# Each line or block with modifications contain a MODBY tag.
+
+Each line or block with modifications contain a MODBY tag.
 
 ###################################################################
+"""
 
-
-"""Parser for PDB files."""
+# Parser for PDB files.
 
 from __future__ import print_function
 
@@ -42,13 +49,14 @@ from MyBio.PDB.parse_pdb_header import _parse_pdb_header_list
 
 # If PDB spec says "COLUMNS 18-20" this means line[17:20]
 
-
 class PDBParser(object):
     """Parse a PDB file and return a Structure object."""
 
     def __init__(self, PERMISSIVE=True, get_header=False,
                  structure_builder=None, QUIET=False,
-                 FIX_ATOM_NAME_CONFLICT=False):
+                 FIX_ATOM_NAME_CONFLICT=False,
+                 FIX_OBABEL_FLAGS=False,
+                 FIX_ALL_OBABEL_ERRORS=False):
         """Create a PDBParser object.
 
         The PDB parser call a number of standard methods in an aggregated
@@ -79,7 +87,19 @@ class PDBParser(object):
         self.line_counter = 0
         self.PERMISSIVE = bool(PERMISSIVE)
         self.QUIET = bool(QUIET)
+
+        if FIX_ALL_OBABEL_ERRORS:
+            FIX_ATOM_NAME_CONFLICT = True
+            FIX_OBABEL_FLAGS = True
+        # MODBY: Alexandre Fassio
+        # Correct conflicts in atom names.
         self.FIX_ATOM_NAME_CONFLICT = FIX_ATOM_NAME_CONFLICT
+        # MODBY: Alexandre Fassio
+        # Correct flags that were incorrectly set by OpenBabel.
+        self.FIX_OBABEL_FLAGS = FIX_OBABEL_FLAGS
+        # MODBY: Alexandre Fassio
+        # Correct all OpenBabel errors.
+        self.FIX_ALL_OBABEL_ERRORS = FIX_ALL_OBABEL_ERRORS
 
     # Public methods
 
@@ -201,6 +221,18 @@ class PDBParser(object):
                     serial_number = 0
                 resseq = int(line[22:26].split()[0])  # sequence identifier
                 icode = line[26]  # insertion code
+
+                # MODBY: Alexandre Fassio
+                # Correct flags that were incorrectly set by OpenBabel.
+                if (self.FIX_OBABEL_FLAGS):
+                    # Incorrect flags are set only for added hydrogen atoms
+                    if (name == "H"):
+                        child_dict = structure_builder.model[chainid].child_dict
+                        # If this hydrogen belongs to water molecule or to a ligand
+                        if ((resname == "HOH" or resname == "WAT") or
+                           (("H_%s" % resname, resseq, icode) in child_dict)):
+                            record_type = "HETATM"
+
                 if record_type == "HETATM":  # hetero atom flag
                     if resname == "HOH" or resname == "WAT":
                         hetero_flag = "W"
@@ -208,6 +240,7 @@ class PDBParser(object):
                         hetero_flag = "H"
                 else:
                     hetero_flag = " "
+
                 residue_id = (hetero_flag, resseq, icode)
                 # atomic coordinates
                 try:
@@ -262,8 +295,10 @@ class PDBParser(object):
                         self._handle_PDB_exception(message, global_line_counter)
                 # init atom
                 try:
+                    # MODBY: Alexandre Fassio
+                    # Correct conflicts in atom names.
                     if self.FIX_ATOM_NAME_CONFLICT:
-                        if (structure_builder.residue.has_id(name)):
+                        if structure_builder.residue.has_id(name):
                             conflict_key = (structure_builder.residue, name)
                             if (conflict_key in conflicts):
                                 atual_error = conflicts[conflict_key] + 1
@@ -271,14 +306,13 @@ class PDBParser(object):
                                 atual_error = 1
 
                             # Replace atom name.
-                            name += str(atual_error)                            
+                            name += str(atual_error)
                             # Replace fullname (atom name + spaces).
                             parts = [' '] * 4
                             replace_ini = 0 if len(name) == 4 else 1
                             replace_end = len(name) + 1
                             parts[replace_ini:replace_end] = name
                             fullname = ''.join(parts)
-                            
                             conflicts[conflict_key] = atual_error
 
                     structure_builder.init_atom(name, coord, bfactor, occupancy, altloc,
