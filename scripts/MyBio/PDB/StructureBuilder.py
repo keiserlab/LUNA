@@ -3,18 +3,24 @@
 # license.  Please see the LICENSE file that should have been included
 # as part of this package.
 
-
+"""
 ###################################################################
 
 # Modifications included by Alexandre Fassio (alexandrefassio@dcc.ufmg.br).
-# Date: 19/02/2018.
+# Date: 05/03/2018.
 
 # 1) Inherit inhouse modifications. Package: MyBio.
 # 2) StructureBuilder now keeps information of CONECT records.
+# 3) Identify hetero residues already added to a chain. 
+     If a hetero residue id already exists, i.e., a target residue was already added to the 
+     current chain, the algorithm checks if this residue has the same name as the already 
+     existing one. If so, all atoms from the target residue will be included as part of the 
+     already existing one, otherwise, a new residue will be created.
 
 # Each line or block with modifications contain a MODBY tag.
 
 ###################################################################
+"""
 
 
 """Consumer class that builds a Structure object.
@@ -189,6 +195,24 @@ class StructureBuilder(object):
                     disordered_residue.disordered_add(duplicate_residue)
                     disordered_residue.disordered_add(new_residue)
                     self.residue = disordered_residue
+                    return
+        else:
+            # MODBY: Alexandre Fassio
+            # Identify hetero residues already added to a chain. 
+            if self.chain.has_id(res_id):
+                # There already is a hetero residue with the id (field, resseq, icode).
+                # It can occur when hydrogen atoms are added in the final of the PDB file.
+                warnings.warn("WARNING: Residue ('%s', %i, '%s') "
+                              "redefined at line %i."
+                              % (field, resseq, icode, self.line_counter),
+                              PDBConstructionWarning)
+                duplicate_residue = self.chain[res_id]
+                if resname == duplicate_residue.resname:
+                    warnings.warn("WARNING: Residue ('%s', %i, '%s','%s')"
+                                  " already defined with the same name at line  %i."
+                          % (field, resseq, icode, resname, self.line_counter),
+                          PDBConstructionWarning)
+                    self.residue = duplicate_residue
                     return
         self.residue = Residue(res_id, resname, self.segid)
         self.chain.add(self.residue)
