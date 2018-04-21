@@ -1,5 +1,8 @@
 from util.exceptions import FingerprintNotCreated
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class FingerprintGenerator():
 
@@ -15,6 +18,7 @@ class FingerprintGenerator():
         try:
             return FingerprintMols.FingerprintMol(self.molecule)
         except Exception as e:
+            logger.exception(e)
             raise FingerprintNotCreated("Fingerprint could not be created.")
 
     def maccs_keys_fp(self):
@@ -23,6 +27,7 @@ class FingerprintGenerator():
         try:
             return MACCSkeys.GenMACCSKeys(self.molecule)
         except Exception as e:
+            logger.exception(e)
             raise FingerprintNotCreated("Fingerprint could not be created.")
 
     def atom_pairs_fp(self):
@@ -31,6 +36,7 @@ class FingerprintGenerator():
         try:
             return Pairs.GetAtomPairFingerprint(self.molecule)
         except Exception as e:
+            logger.exception(e)
             raise FingerprintNotCreated("Fingerprint could not be created.")
 
     def torsion_fp(self):
@@ -39,6 +45,7 @@ class FingerprintGenerator():
         try:
             return Pairs.GetAtomPairFingerprint(self.molecule)
         except Exception as e:
+            logger.exception(e)
             raise FingerprintNotCreated("Fingerprint could not be created.")
 
     def morgan_fp(self, radius=2, nBits=2048, features=True, type=1):
@@ -76,7 +83,7 @@ class FingerprintGenerator():
                                            "Available options are 1, 2, or 3."
                                            % str(type))
         except Exception as e:
-            print(e)
+            logger.exception(e)
             raise FingerprintNotCreated("Fingerprint could not be created.")
 
     def pharm2d_fp(self, sigFactory=None):
@@ -90,7 +97,7 @@ class FingerprintGenerator():
 
             return Generate.Gen2DFingerprint(self.molecule, sigFactory)
         except Exception as e:
-            print(e)
+            logger.exception(e)
             raise FingerprintNotCreated("Fingerprint could not be created.")
 
 
@@ -148,7 +155,7 @@ def prepare_fp_params(fpFunction, fpOpt):
     return params
 
 
-def generate_fp_for_mols(mols, fpFunction=None, fpOpt=None):
+def generate_fp_for_mols(mols, fpFunction=None, fpOpt=None, critical=False):
     from util.exceptions import IllegalArgumentError
     import logging
     logger = logging.getLogger(__name__)
@@ -180,7 +187,9 @@ def generate_fp_for_mols(mols, fpFunction=None, fpOpt=None):
             logger.info("Molecule at position %d failed. Name: %s" %
                         (idx, mol.GetProp("_Name")))
             logger.exception(e)
-            pass
+
+            if (critical):
+                raise
 
     logger.info("%d fingerprint(s) created." % len(fpMols))
 
