@@ -32,3 +32,11 @@ class FingerprintNotCreated(RuntimeError):
 
 class InvalidFileFormat(ValueError):
     pass
+
+
+class InvalidNapoliEntry(ValueError):
+    pass
+
+
+class DirectoryAlreadyExists(OSError):
+    pass
