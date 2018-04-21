@@ -1,13 +1,18 @@
 from util.exceptions import IllegalArgumentError
 from file.validator import is_directory_valid
 
-from MyBio.PDB.Select import Select
+from MyBio.PDB.PDBList import PDBList
+from MyBio.PDB.PDBIO import Select
+from MyBio.PDB.PDBIO import PDBIO
+from util.exceptions import FileNotCreated
+
+from io import StringIO
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-def download_pdb(pdbId, outputPath="."):
+def download_pdb(pdbId, outputPath=".", overwrite=False):
     """Download a PDB file from RCSB.org.
 
         @param pdbId: 4-symbols structure Id from PDB (e.g. 3J92).
@@ -16,18 +21,16 @@ def download_pdb(pdbId, outputPath="."):
         @param outputPath: put the PDB file in this directory.
         @type  outputPath: string
     """
-    from MyBio.PDB.PDBList import PDBList
 
     logger.info("Trying to download the PDB '%s' and store it at the "
                 "directory '%s'." % (pdbId, outputPath))
 
     try:
-
         if (pdbId is not None and pdbId.strip() != ""):
             if (is_directory_valid(outputPath)):
                 pdbl = PDBList()
                 pdbl.retrieve_pdb_file(pdbId, pdir=outputPath,
-                                       file_format="pdb", overwrite=True)
+                                       file_format="pdb", overwrite=overwrite)
         else:
             raise IllegalArgumentError("Inform a non empty PDB id")
 
@@ -71,9 +74,6 @@ def try_save_2pdb(pdbObject, outputFile, selector=Select()):
         @param selector: a filtering definition. DEFAULT: extracts everything
         @type selector: Select
     """
-    from MyBio.PDB.PDBIO import PDBIO
-    from util.exceptions import FileNotCreated
-
     try:
         io = PDBIO()
         io.set_structure(pdbObject)
@@ -83,3 +83,16 @@ def try_save_2pdb(pdbObject, outputFile, selector=Select()):
         logger.exception(e)
         raise FileNotCreated("PDB file '%s' could not be created."
                              % outputFile)
+
+
+def pdb_object_2block(entity, select=Select(),
+                      preserve_atom_numbering=True,
+                      write_conects=True):
+
+    fh = StringIO()
+    io = PDBIO()
+    io.set_structure(entity)
+    io.save(fh, select=select, preserve_atom_numbering=preserve_atom_numbering,
+            write_conects=write_conects)
+    fh.seek(0)
+    return ''.join(fh.readlines())
