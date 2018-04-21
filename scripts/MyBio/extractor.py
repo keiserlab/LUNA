@@ -1,5 +1,5 @@
-from pdb.util import try_save_2pdb
-from pdb.selector import (ChainSelector, ResidueSelector)
+from MyBio.util import try_save_2pdb
+from MyBio.selector import (ChainSelector, ResidueSelector)
 
 import logging
 logger = logging.getLogger(__name__)
@@ -10,9 +10,6 @@ class Extractor():
     """
 
     def __init__(self, entity):
-        self.entity = entity
-
-    def set_entity(self, entity):
         self.entity = entity
 
     def extract_chains(self, chains, outputFile):
