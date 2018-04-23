@@ -18,6 +18,10 @@ class AtomGroup():
         return [a.get_serial_number() for a in self.atoms]
 
     @property
+    def compound(self):
+        return self.atoms[0].get_parent()
+
+    @property
     def centroid(self):
         return self._centroid
 
