@@ -514,9 +514,10 @@ class DependentInteractions:
 
     def get_dependent_interactions(self, interactions):
 
-        dependentInteractions = set()
-
+        hbondSet = set()
+        attracSet = set()
         h2oPairs = defaultdict(dict)
+        dependentInteractions = set()
 
         for interaction in interactions:
             if interaction.type == "Hydrogen bond":
@@ -537,8 +538,11 @@ class DependentInteractions:
                     if secondKey not in h2oPairs[h2oKey]:
                         h2oPairs[h2oKey][secondKey] = interaction
 
-        for h2oKey in h2oPairs:
+                hbondSet.add(interaction)
+            elif interaction.type == "Attractive":
+                attracSet.add(interaction)
 
+        for h2oKey in h2oPairs:
             compPairs = combinations(h2oPairs[h2oKey].keys(), 2)
 
             for (comp1, comp2) in compPairs:
@@ -579,16 +583,38 @@ class DependentInteractions:
 
                 dependentInteractions.add(iType)
 
-                # print(comp1.chemicalFeatures, comp2.chemicalFeatures)
-                # print(h2oKey.atoms[0].get_parent())
-                # print(compParent1, compParent2)
-                # print(comp1, comp2)
-                # print()
+        # It will try to match Hydrogen bonds and Attractive interactions
+        # involving the same chemical groups to attribute salt bridges.
+        sbGroups = set()
+        for (hbond, attractive) in product(hbondSet, attracSet):
 
-        print(len(dependentInteractions))
-        exit()
+            condA = (attractive.comp1.has_atom(hbond.comp1.atoms[0]) and
+                     attractive.comp2.has_atom(hbond.comp2.atoms[0]))
 
+            condB = (attractive.comp1.has_atom(hbond.comp2.atoms[0]) and
+                     attractive.comp2.has_atom(hbond.comp1.atoms[0]))
 
+            # If an acceptor atom belongs to a negative group, and the donor
+            # to a positive group (and vice-versa), it means that the
+            # interaction occurs between the same meioties.
+            # However, just one condition should occur. For, example,
+            # it is not possible that an acceptor atom belongs to a negative
+            # and positive group at the same time.
+            if condA ^ condB:
+
+                key1 = (attractive.comp1, attractive.comp2)
+                key2 = (attractive.comp2, attractive.comp1)
+
+                if key1 in sbGroups or key2 in sbGroups:
+                    continue
+
+                sbGroups.add(key1)
+                params = {"dependOf": [hbond, attractive]}
+                iType = InteractionType(attractive.comp1, attractive.comp2,
+                                        "Salt bridge", params)
+                dependentInteractions.add(iType)
+
+        return dependentInteractions
 
 
 def calc_all_interactions(targetCompGroups, nearbyCompGroups,
@@ -618,7 +644,7 @@ def calc_all_interactions(targetCompGroups, nearbyCompGroups,
                 interactions.extend(iTypeList)
 
     diCalc = DependentInteractions()
-    diCalc.get_dependent_interactions(interactions)
+    dependInter = diCalc.get_dependent_interactions(interactions)
 
     exit()
 
