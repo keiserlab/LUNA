@@ -34,15 +34,16 @@ from util.config_parser import Config
 from database.loader import *
 from database.napoli_model import *
 from database.helpers import *
-from database.util import (default_interaction_filters, prepare_complex_entries)
+from database.util import (default_interaction_filters,
+                           prepare_complex_entries)
 
 from data.summary import *
-from data.frequency import *
 
 from os.path import exists
 
 import logging
 logger = logging.getLogger(__name__)
+
 
 class NAPOLI_PLI:
 
@@ -110,22 +111,22 @@ class NAPOLI_PLI:
                         % workingPath)
 
             # Set the LOG file at the working path
-            logfile = "%s/napoli.log" % workingPath
-            filehandler = logging.FileHandler(logfile, 'a')
-            formatter = logging.Formatter('%(asctime)s - %(name)s - '
-                                          '%(levelname)s - %(filename)s - '
-                                          '%(funcName)s - %(lineno)d => '
-                                          '%(message)s')
-            filehandler.setFormatter(formatter)
-            # Remove the existing file handlers
-            for hdlr in logger.handlers[:]:
-                if isinstance(hdlr, logger.FileHander):
-                    logger.removeHandler(hdlr)
-            logger.addHandler(filehandler)      # set the new handler
-            # Set the log level to INFO, DEBUG as the default is ERROR
-            logger.setLevel("INFO")
+            # logfile = "%s/napoli.log" % workingPath
+            # filehandler = logging.FileHandler(logfile, 'a')
+            # formatter = logging.Formatter('%(asctime)s - %(name)s - '
+            #                               '%(levelname)s - %(filename)s - '
+            #                               '%(funcName)s - %(lineno)d => '
+            #                               '%(message)s')
+            # filehandler.setFormatter(formatter)
+            # # Remove the existing file handlers
+            # for hdlr in logger.handlers[:]:
+            #     if isinstance(hdlr, logger.FileHander):
+            #         logger.removeHandler(hdlr)
+            # logger.addHandler(filehandler)      # set the new handler
+            # # Set the log level to INFO, DEBUG as the default is ERROR
+            # logger.setLevel("INFO")
 
-            logger.info("Logs will be saved in '%s'." % logfile)
+            # logger.info("Logs will be saved in '%s'." % logfile)
 
             if self.JOB_CODE:
                 logger.info("The project id '%s' was informed. "
@@ -147,7 +148,6 @@ class NAPOLI_PLI:
             logger.info("PDB files will be obtained from and/or downloaded "
                         "to '%s'." % pdbPath)
 
-
             ##########################################################
             if self.DB_CONF_FILE:
                 step = "Preparing database"
@@ -167,12 +167,15 @@ class NAPOLI_PLI:
                 db.new_mapper(Complex, "complex")
 
                 # TODO: Get the project ID in the DB.
-                projectRow = db.session.query(Project).filter(Project.job_code == self.JOB_CODE).one()
+                projectRow = (db.session
+                              .query(Project)
+                              .filter(Project.job_code == self.JOB_CODE).one())
                 projectId = projectRow.id
 
                 interTypeRows = db.session.query(InterType).all()
                 interIdByType = {r.type: r.id for r in interTypeRows}
-                interFilters = default_interaction_filters(interIdByType, self.INTERACTION_CONF)
+                interFilters = default_interaction_filters(interIdByType,
+                                                           self.INTERACTION_CONF)
 
                 compTypeRows = db.session.query(CompoundType).all()
                 compIdByType = {r.type: r.id for r in compTypeRows}
@@ -184,7 +187,8 @@ class NAPOLI_PLI:
                     dbComplexes = ComplexManager(db).get_complexes(projectId)
                     self.COMPLEXES = prepare_complex_entries(dbComplexes)
 
-            logger.info("Number of complexes to be processed: %d." % len(self.COMPLEXES))
+            logger.info("Number of complexes to be processed: %d." %
+                        len(self.COMPLEXES))
 
             if self.ADD_HYDROG:
                 if self.PH:
@@ -207,16 +211,18 @@ class NAPOLI_PLI:
                                   FIX_ATOM_NAME_CONFLICT=True,
                                   FIX_OBABEL_FLAGS=True)
 
-            # featFactory = ChemicalFeatures.BuildFeatureFactory(self.ATOM_PROP_FILE)
-            # sigFactory = SigFactory(featFactory, minPointCount=2,
-            #                         maxPointCount=3,
-            #                         trianglePruneBins=False)
-            # sigFactory.SetBins([(0, 2), (2, 5), (5, 8)])
-            # sigFactory.Init()
+            featFactory = (ChemicalFeatures
+                           .BuildFeatureFactory(self.ATOM_PROP_FILE))
 
-            # featExtractor = FeatureExtractor(featFactory)
+            sigFactory = SigFactory(featFactory, minPointCount=2,
+                                    maxPointCount=3,
+                                    trianglePruneBins=False)
+            sigFactory.SetBins([(0, 2), (2, 5), (5, 8)])
+            sigFactory.Init()
 
-            # boundaryConf = InteractionConf({"boundary_cutoff": 7})
+            featExtractor = FeatureExtractor(featFactory)
+
+            boundaryConf = InteractionConf({"boundary_cutoff": 7})
 
             fingerprints = []
 
@@ -229,8 +235,6 @@ class NAPOLI_PLI:
                               self.ATOM_PROP_FILE == DEFAULT_ATOM_PROP_FILE and
                               self.PH is None and
                               self.DB_CONF_FILE is not None)
-            print(getInterFromDB)
-            exit()
             ##########################################################
 
             for pliComplex in self.COMPLEXES:
@@ -277,19 +281,29 @@ class NAPOLI_PLI:
                     # User has defined a specific directory.
                     if self.PDB_PATH:
                         pdbFile = "%s/%s.pdb" % (pdbPath, pliComplex.pdb)
+                        # If the file does not exist or is invalid.
                         if is_file_valid(pdbFile) is False:
                             raise FileNotFoundError("The PDB file '%s' was "
                                                     "not found." % pdbFile)
                     # If none DB conf. was defined try to download the PDB.
+                    # Here, pdbPath is equal to the workingPdbPath
                     elif self.DB_CONF_FILE is None:
-                        pdbFile = "%s/pdb%s.ent" % (pdbPath,
+                        pdbFile = "%s/pdb%s.ent" % (workingPdbPath,
                                                     pliComplex.pdb.lower())
-                        download_pdb(pliComplex.pdb, pdbPath)
+                        download_pdb(pliComplex.pdb, workingPdbPath)
                     else:
-                        # TODO: check if PDB is updated on the DB
                         pdbFile = "%s/pdb%s.ent" % (pdbPath,
                                                     pliComplex.pdb.lower())
-                        pass
+
+                        # If the file does not exist or is invalid, it is
+                        # better to download a new PDB file at the working path.
+                        if not is_file_valid(pdbFile):
+                            pdbFile = "%s/pdb%s.ent" % (workingPdbPath,
+                                                        pliComplex.pdb.lower())
+                            download_pdb(pliComplex.pdb, workingPdbPath)
+                        else:
+                            # TODO: check if PDB is updated on the DB
+                            pass
 
                     #####################################
                     step = "Prepare protein structure"
@@ -356,6 +370,7 @@ class NAPOLI_PLI:
                         allInter = calc_all_interactions(targetGroups,
                                                          nearbyGroups,
                                                          conf=boundaryConf)
+                        exit()
 
                         # Then it applies a filtering function.
                         filteredInter = filter_interactions(allInter,
