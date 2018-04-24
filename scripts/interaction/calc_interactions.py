@@ -6,6 +6,8 @@ from operator import (le, ge)
 from itertools import (combinations, product)
 from collections import defaultdict
 
+from util.exceptions import IllegalArgumentError
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -119,14 +121,12 @@ class DefaultInteractionConf(InteractionConf):
 
 class InteractionCalculator():
 
-    def __init__(self, interConf=None, funcs=None):
-        if (interConf is None):
-            interConf = {}
-
+    def __init__(self, interConf=DefaultInteractionConf(), funcs=None):
         self.interConf = interConf
 
         if (funcs is None):
             funcs = self._default_functions()
+
         self._funcs = funcs
 
     @property
@@ -149,8 +149,6 @@ class InteractionCalculator():
                 ("HalogenDonor", "Aromatic"): self.calc_xbond_pi}
 
     def calc_inter(self, group1, group2, feat1, feat2):
-        from util.exceptions import IllegalArgumentError
-
         func = self.get_function(feat1, feat2)
         if (func is None):
             raise IllegalArgumentError("Does not exist a corresponding"
@@ -174,7 +172,7 @@ class InteractionCalculator():
             if (self.is_within_boundary(ccDist,
                                         "max_dist_cation_pi_inter", le)):
 
-                params = {"cc_dist": ccDist}
+                params = {"dist_cation_pi_inter": ccDist}
                 iType = InteractionType(group1, group2,
                                         "Cation-pi interaction", params)
 
@@ -196,9 +194,9 @@ class InteractionCalculator():
                 vectorCC = ring2.centroid - ring1.centroid
                 dispAngle1 = iu.to_quad1(iu.calc_angle(ring1.normal, vectorCC))
 
-                # If the angle criterias was not defined, a specific
+                # If the angle criteria were not defined, a specific
                 # Pi-stacking definition is not possible as it depends
-                # on angle criterias. Therefore, a more general classification
+                # on angle criteria. Therefore, a more general classification
                 # is used instead, i.e., all interactions will be Pi-stacking.
                 if ("min_dihed_ang_pi_pi_inter" not in self.interConf.conf and
                         "max_disp_ang_pi_pi_inter" not in self.interConf.conf):
@@ -207,16 +205,16 @@ class InteractionCalculator():
                     if (self.is_within_boundary(dihedralAngle,
                                                 "min_dihed_ang_pi_pi_inter", ge)):
                         interType = "Edge-to-face pi-stacking"
+                    elif (self.is_within_boundary(dispAngle1,
+                                                  "max_disp_ang_pi_pi_inter", le)):
+                        interType = "Face-to-face pi-stacking"
                     else:
-                        if (self.is_within_boundary(dispAngle1,
-                                                    "max_disp_ang_pi_pi_inter", le)):
-                            interType = "Face-to-face pi-stacking"
-                        else:
-                            interType = "Parallel-displaced pi-stacking"
+                        interType = "Parallel-displaced pi-stacking"
 
-                params = {"cc_dist": ccDist,
-                          "dihed_angle": dihedralAngle,
-                          "disp_angle": dispAngle1}
+                params = {"cc_dist_pi_pi_inter": ccDist,
+                          "dihed_ang_pi_pi_inter": dihedralAngle,
+                          "disp_ang_pi_pi_inter": dispAngle1}
+
                 iType = InteractionType(ring1, ring2,
                                         interType, params)
 
@@ -234,7 +232,7 @@ class InteractionCalculator():
             if (self.is_within_boundary(ccDist,
                                         "max_dist_hydrop_inter", le)):
 
-                params = {"cc_dist": ccDist}
+                params = {"dist_hydrop_inter": ccDist}
                 iType = InteractionType(group1, group2,
                                         "Hydrophobic", params)
 
@@ -283,10 +281,10 @@ class InteractionCalculator():
 
                         if (self.is_within_boundary(cxaAngle,
                                                     "min_cxa_ang_xbond_inter", ge)):
-                            params = {}
-                            params["xa_dist"] = xaDist
-                            params["cxa_angle"] = cxaAngle
-                            params["disp_angle"] = dispAngle
+
+                            params = {"xc_dist_xbond_inter": xaDist,
+                                      "disp_ang_xbond_inter": dispAngle,
+                                      "cxa_ang_xbond_inter": cxaAngle}
 
                             iType = InteractionType(donorGroup, ringGroup,
                                                     "Halogen bond", params)
@@ -349,10 +347,9 @@ class InteractionCalculator():
                         validXARAngles.append(xarAngle)
 
                 for anglePair in product(validCXAAngles, validXARAngles):
-                    params = {}
-                    params["xa_dist"] = xaDist
-                    params["cxa_angle"] = anglePair[0]
-                    params["xar_angle"] = anglePair[1]
+                    params = {"xa_dist_xbond_inter": xaDist,
+                              "cxa_ang_xbond_inter": anglePair[0],
+                              "xar_ang_xbond_inter": anglePair[1]}
 
                     iType = InteractionType(donorGroup, acceptorGroup,
                                             "Halogen bond", params)
@@ -385,11 +382,10 @@ class InteractionCalculator():
 
                     if (self.is_within_boundary(haDist,
                                                 "max_ha_dist_hb_inter", le)):
-                        params = {}
-                        params["da_dist"] = daDist
-                        params["ha_dist"] = -1
-                        params["dha_angle"] = -1
 
+                        params = {"da_dist_hb_inter": daDist,
+                                  "ha_dist_hb_inter": -1,
+                                  "dha_ang_hb_inter": -1}
                         iType = InteractionType(donorGroup, acceptorGroup,
                                                 "Hydrogen bond", params)
 
@@ -412,10 +408,9 @@ class InteractionCalculator():
                                 self.is_within_boundary(dhaAngle,
                                                         "min_dha_ang_hb_inter", ge)):
 
-                                params = {}
-                                params["da_dist"] = daDist
-                                params["ha_dist"] = haDist
-                                params["dha_angle"] = dhaAngle
+                                params = {"da_dist_hb_inter": daDist
+                                          "ha_dist_hb_inter": haDist
+                                          "dha_ang_hb_inter": dhaAngle}
 
                                 iType = InteractionType(donorGroup, acceptorGroup,
                                                         "Hydrogen bond", params)
@@ -434,9 +429,7 @@ class InteractionCalculator():
             if (self.is_within_boundary(ccDist,
                                         "max_dist_attract_inter", le)):
 
-                params = {}
-                params["cc_dist"] = ccDist
-
+                params = {"dist_attract_inter": ccDist}
                 iType = InteractionType(group1, group2,
                                         "Attractive", params)
 
@@ -454,9 +447,7 @@ class InteractionCalculator():
             if (self.is_within_boundary(ccDist,
                                         "max_dist_repuls_inter", le)):
 
-                params = {}
-                params["cc_dist"] = ccDist
-
+                params = {"dist_repuls_inter": ccDist}
                 iType = InteractionType(group1, group2,
                                         "Repulsive", params)
 
@@ -519,6 +510,8 @@ class DependentInteractions:
         h2oPairs = defaultdict(dict)
         dependentInteractions = set()
 
+        # TODO: break code into two functions: Water bridged and SB
+
         for interaction in interactions:
             if interaction.type == "Hydrogen bond":
                 compParent1 = interaction.comp1.atoms[0].get_parent()
@@ -546,8 +539,8 @@ class DependentInteractions:
             compPairs = combinations(h2oPairs[h2oKey].keys(), 2)
 
             for (comp1, comp2) in compPairs:
-                compParent1 = comp1.atoms[0].get_parent()
-                compParent2 = comp2.atoms[0].get_parent()
+                compParent1 = comp1.compound
+                compParent2 = comp2.compound
 
                 isSameEntity = compParent1 == compParent2
                 if (self.IGNORE_SAME_ENTITY and isSameEntity):
@@ -615,6 +608,184 @@ class DependentInteractions:
                 dependentInteractions.add(iType)
 
         return dependentInteractions
+
+
+class InteractionFilter:
+
+    def __init__(self, inter_conf=DefaultInteractionConf(),
+                 funcs=None, use_inter_criteria=True,
+                 ignore_same_entity=True,
+                 ignore_prot_prot=True,
+                 ignore_prot_lig=False,
+                 ignore_lig_lig=True,
+                 ignore_h2o_pairs=True,
+                 positive_list=[]):
+
+        self.inter_conf = inter_conf
+
+        if funcs is None:
+            funcs = self._default_functions()
+        self._funcs = funcs
+
+        self.use_inter_criteria = use_inter_criteria
+        self.ignore_same_entity = ignore_same_entity
+        self.ignore_prot_prot = ignore_prot_prot
+        self.ignore_prot_lig = ignore_prot_lig
+        self.ignore_lig_lig = ignore_lig_lig
+        self.ignore_h2o_pairs = ignore_h2o_pairs
+        self.positive_list = positive_list
+
+        @property
+        def funcs(self):
+            return self._funcs
+
+        def _default_functions(self):
+            return {"Hydrogen bond": self.filter_hbond,
+                    "Attractive": self.filter_attractive,
+                    "Cation-pi": self.filter_cation_pi,
+                    "Edge-to-face pi-stacking": self.filter_pi_pi,
+                    "Face-to-face pi-stacking": self.filter_pi_pi,
+                    "Parallel-displaced pi-stacking": self.filter_pi_pi,
+                    "Pi-stacking": self.filter_pi_pi,
+                    "Hydrophobic": self.filter_hydrop,
+                    "Halogen bond": self.filter_xbond,
+                    "Repulsive": self.filter_repulsive}
+
+        def filter_inter(self, interaction):
+
+            if interaction in positive_list:
+                return True
+
+            compParent1 = interaction.comp1.compound
+            compParent2 = interaction.comp2.compound
+
+            isSameEntity = compParent1 == compParent2
+            if self.ignore_same_entity and isSameEntity:
+                return False
+
+            isProtProt = (compParent1.get_id()[0] == " " and
+                          compParent2.get_id()[0] == " ")
+            if (self.ignore_prot_prot and isProtProt):
+                return False
+
+            isProtLig = ((compParent1.get_id()[0] == " " and
+                          compParent2.get_id()[0].startswith("H_")) or
+                         (compParent1.get_id()[0].startswith("H_") and
+                          compParent2.get_id()[0] == " "))
+            if (self.ignore_prot_lig and isProtLig):
+                return False
+
+            isLigLig = (compParent1.get_id()[0].startswith("H_") and
+                        compParent2.get_id()[0].startswith("H_"))
+            if (self.ignore_lig_lig and isLigLig):
+                return False
+
+            isH2OPair = (compParent1.get_id()[0] == "W" or
+                         compParent2.get_id()[0] == "W")
+            if (self.IGNORE_H2O_PAIRS and isH2OPair):
+                return False
+
+            if (use_inter_criteria is False or
+                    interaction.type not in self.funcs):
+                return True
+            else:
+                func = self.funcs[interaction.type]
+
+                return func(interaction)
+
+        def filter_hbond(interaction):
+            isValid = False
+
+            if self.is_within_boundary(interaction.da_dist_hb_inter,
+                                       "max_da_dist_hb_inter", le):
+
+                if (interaction.ha_dist_hb_inter == -1 and
+                        interaction.dha_ang_hb_inter == -1):
+                    # If the angle DHA and the distance HA is equal -1, it is
+                    # expected that the molecules to be water molecules. "
+                    if (comp1.compound.get_id()[0] == "W" or
+                            comp2.compound.get_id()[0] == "W")
+
+                        ha_dist = interaction.da_dist_hb_inter - 1
+                        if (self.is_within_boundary(ha_dist,
+                                                    "max_ha_dist_hb_inter", le)):
+                            isValid = True
+                else:
+                    if (self.is_within_boundary(interaction.ha_dist_hb_inter,
+                                                "max_ha_dist_hb_inter", le) and
+                        self.is_within_boundary(interaction.dha_ang_hb_inter,
+                                                "min_dha_ang_hb_inter", ge)):
+                            isValid = True
+
+        def filter_attractive(interaction):
+            return self.is_within_boundary(interaction.dist_attract_inter,
+                                           "max_dist_attract_inter", le)
+
+        def filter_cation_pi(interaction):
+            return self.is_within_boundary(interaction.dist_cation_pi_inter,
+                                           "max_dist_cation_pi_inter", le)
+
+        def filter_pi_pi(interaction):
+            isValid = False
+            if self.is_within_boundary(interaction.cc_dist_pi_pi_inter,
+                                       "max_cc_dist_pi_pi_inter", le):
+
+                # If the angle criteria were not defined, it is not possible
+                # to test if the interaction fits the requirements.
+                # So, it is better to not filter out the interaction.
+                if ("min_dihed_ang_pi_pi_inter" not in self.interConf.conf and
+                        "max_disp_ang_pi_pi_inter" not in self.interConf.conf):
+                    isValid = True
+                else:
+                    if self.is_within_boundary(interaction.dihed_ang_pi_pi_inter,
+                                               "min_dihed_ang_pi_pi_inter", ge):
+                        # It overwrites a general Pi-stacking interaction.
+                        interaction.type = "Edge-to-face pi-stacking"
+                        isValid = True
+                    elif self.is_within_boundary(interaction.disp_ang_pi_pi_inter,
+                                                 "max_disp_ang_pi_pi_inter", le):
+                        # It overwrites a general Pi-stacking interaction.
+                        interaction.type = "Face-to-face pi-stacking"
+                        isValid = True
+                    else:
+                        # It overwrites a general Pi-stacking interaction.
+                        interaction.type = "Parallel-displaced pi-stacking"
+                        isValid = True
+
+            return isValid
+
+        def filter_hydrop(interaction):
+            return self.is_within_boundary(interaction.dist_hydrop_inter,
+                                           "max_dist_hydrop_inter", le)
+
+        def filter_xbond(interaction):
+            # Halogen bond involving a PI system (aromatic ring)
+            if (interaction.comp1 == "Aromatic" or
+                    interaction.comp2 == "Aromatic"):
+                return (self.is_within_boundary(interaction.xc_dist_xbond_inter,
+                                                "max_xc_dist_xbond_inter", le) and
+                        self.is_within_boundary(interaction.disp_ang_xbond_inter,
+                                                "max_disp_ang_xbond_inter", le) and
+                        self.is_within_boundary(interaction.cxa_ang_xbond_inter,
+                                                "min_cxa_ang_xbond_inter", ge))
+            # Classical halogen bond, i.e., does not envolve a PI system
+            else:
+                return (self.is_within_boundary(interaction.xa_dist_xbond_inter,
+                                                "max_xa_dist_xbond_inter", le) and
+                        self.is_within_boundary(interaction.cxa_ang_xbond_inter,
+                                                "min_cxa_ang_xbond_inter", ge) and
+                        self.is_within_boundary(interaction.xar_ang_xbond_inter,
+                                                "min_xar_ang_xbond_inter", ge))
+
+        def filter_repulsive(interaction):
+            return self.is_within_boundary(interaction.dist_repuls_inter,
+                                           "max_dist_repuls_inter", le)
+
+        def is_within_boundary(self, value, key, func):
+            if key not in self.inter_conf.conf:
+                return True
+            else:
+                return func(value, self.interConf.conf[key])
 
 
 def calc_all_interactions(targetCompGroups, nearbyCompGroups,
