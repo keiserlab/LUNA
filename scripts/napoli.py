@@ -18,7 +18,7 @@ from rdkit.Chem.rdDepictor import Compute2DCoords
 # Get nearby molecules (contacts)
 from interaction.contact import get_contacts_for_entity
 from interaction.calc_interactions import (calc_all_interactions,
-                                           filter_interactions,
+                                           apply_interaction_criteria,
                                            InteractionConf)
 
 from mol.groups import find_compound_groups
@@ -57,7 +57,7 @@ class NAPOLI_PLI:
                  PDB_TEMPLATE=None,
                  ATOM_PROP_FILE=DEFAULT_ATOM_PROP_FILE,
                  INTERACTION_CONF=DEFAULT_INTERACTION_CONF,
-                 FIlTERED_INTERACTIONS=True,
+                 SAVE_ALL_INTERACTIONS=True,
                  PH=None,
                  FINGERPRINT_FUNC="pharm2d_fp",
                  SIMILARITY_FUNC="BulkTanimotoSimilarity",
@@ -73,7 +73,7 @@ class NAPOLI_PLI:
         self.PDB_TEMPLATE = PDB_TEMPLATE
         self.ATOM_PROP_FILE = ATOM_PROP_FILE
         self.INTERACTION_CONF = INTERACTION_CONF
-        self.FIlTERED_INTERACTIONS = FIlTERED_INTERACTIONS
+        self.SAVE_ALL_INTERACTIONS = SAVE_ALL_INTERACTIONS
         self.PH = PH
         self.ADD_HYDROG = True
         self.FINGERPRINT_FUNC = FINGERPRINT_FUNC
@@ -82,9 +82,8 @@ class NAPOLI_PLI:
         self.RUN_UNTIL_STEP = RUN_UNTIL_STEP
 
     def run(self):
-
+        # TODO: Create functions for reduce the amount of code in the run()
         try:
-
             if self.JOB_CODE and not self.DB_CONF_FILE:
                 raise IllegalArgumentError("You informed a project id, but "
                                            "none DB configuration file was "
@@ -166,7 +165,6 @@ class NAPOLI_PLI:
                 db.new_mapper(Project, "project")
                 db.new_mapper(Complex, "complex")
 
-                # TODO: Get the project ID in the DB.
                 projectRow = (db.session
                               .query(Project)
                               .filter(Project.job_code == self.JOB_CODE).one())
@@ -220,9 +218,9 @@ class NAPOLI_PLI:
             sigFactory.SetBins([(0, 2), (2, 5), (5, 8)])
             sigFactory.Init()
 
-            featExtractor = FeatureExtractor(featFactory)
+            feat_extractor = FeatureExtractor(featFactory)
 
-            boundaryConf = InteractionConf({"boundary_cutoff": 7})
+            boundary_conf = InteractionConf({"boundary_cutoff": 7})
 
             fingerprints = []
 
@@ -238,7 +236,6 @@ class NAPOLI_PLI:
             ##########################################################
 
             for pliComplex in self.COMPLEXES:
-
                 try:
                     entry = pliComplex.to_string(ENTRIES_SEPARATOR)
                     myBioLigand = ("H_%s" % pliComplex.ligName,
@@ -307,6 +304,8 @@ class NAPOLI_PLI:
 
                     #####################################
                     step = "Prepare protein structure"
+                    # TODO: Distinguish between files that need to remove hydrogens (NMR, for example).
+                    # TODO: Add parameter to force remove hydrogens (user marks it)
                     if self.ADD_HYDROG:
                         prepPdbFile = "%s/%s.H.pdb" % (workingPdbPath,
                                                        pliComplex.pdb)
@@ -329,10 +328,10 @@ class NAPOLI_PLI:
 
                     ##########################################################
                     step = "Generate structural fingerprint"
-                    ligSel = ResidueSelector({ligand})
-                    ligBlock = pdb_object_2block(structure, ligSel,
-                                                 write_conects=False)
-                    rdLig = MolFromPDBBlock(ligBlock)
+                    lig_sel = ResidueSelector({ligand})
+                    lig_block = pdb_object_2block(structure, lig_sel,
+                                                  write_conects=False)
+                    rdLig = MolFromPDBBlock(lig_block)
                     rdLig.SetProp("_Name", entry)
                     fpOpt = {"sigFactory": sigFactory}
                     fp = generate_fp_for_mols([rdLig], self.FINGERPRINT_FUNC,
@@ -341,47 +340,63 @@ class NAPOLI_PLI:
 
                     ##########################################################
                     step = "Calculate interactions"
-                    nearbyResidues = get_contacts_for_entity(structure[0],
-                                                             ligand,
-                                                             level='R')
+                    nb_compounds = get_contacts_for_entity(structure[0],
+                                                           ligand,
+                                                           level='R')
 
-                    compounds = set([x[1] for x in nearbyResidues])
-                    groupsByCompounds = {}
+                    compounds = set([x[1] for x in nb_compounds])
+                    grps_by_compounds = {}
                     for comp in compounds:
-                        groups = find_compound_groups(comp, featExtractor)
-                        groupsByCompounds[comp] = groups
+                        groups = find_compound_groups(comp, feat_extractor)
+                        grps_by_compounds[comp] = groups
 
-                    targetGroups = [groupsByCompounds[x]
-                                    for x in groupsByCompounds
-                                    if x.get_id()[0] != " "]
-                    nearbyGroups = [groupsByCompounds[x]
-                                    for x in groupsByCompounds
-                                    if x != ligand]
+                    trgt_grps = [grps_by_compounds[x]
+                                 for x in grps_by_compounds
+                                 if x.get_id()[0] != " "]
+                    nb_grps = [grps_by_compounds[x]
+                               for x in grps_by_compounds
+                               if x != ligand]
 
                     #TODO: Selecionar da base de dados se o usuario nao submeteu PDBs.
 
-                    if self.FIlTERED_INTERACTIONS:
+                    if self.SAVE_ALL_INTERACTIONS:
                         # First it calculates all interactions using a
                         # boundary limit. When using a database, it is
                         # useful to save all potential interactions.
                         # So, it is possible to filter interactions
                         # faster than recalculate them for each
                         # modification in the interaction criteria.
-                        allInter = calc_all_interactions(targetGroups,
-                                                         nearbyGroups,
-                                                         conf=boundaryConf)
-                        exit()
+                        all_inter = calc_all_interactions(trgt_grps,
+                                                          nb_grps,
+                                                          conf=boundary_conf)
+
+                        interactionTypes = count_interaction_types(all_inter)
+                        # print(interactionTypes)
 
                         # Then it applies a filtering function.
-                        filteredInter = filter_interactions(allInter,
-                                                            conf=self.INTERACTION_CONF)
-                        dbInteractions = allInter
+                        filtered_inter = apply_interaction_criteria(all_inter,
+                                                                    conf=self.INTERACTION_CONF)
+
+                        # for i in filtered_inter:
+                        #     print("################")
+                        #     print(i.type, i.comp1.compound, i.comp1.atoms,
+                        #                   i.comp2.compound, i.comp2.atoms)
+                        #     print()
+                        #     print()
+                        # exit()
+
+                        interactionTypes = count_interaction_types(filtered_inter)
+                        print(interactionTypes)
+                        print()
+                        exit()
+
+                        dbInteractions = all_inter
                     else:
                         # It filters the interactions by using a cutoff at once.
-                        filteredInter = calc_all_interactions(targetGroups,
-                                                              nearbyGroups,
-                                                              conf=self.INTERACTION_CONF)
-                        dbInteractions = filteredInter
+                        filtered_inter = calc_all_interactions(trgt_grps,
+                                                               nb_grps,
+                                                               conf=self.INTERACTION_CONF)
+                        dbInteractions = filtered_inter
 
                     ##########################################################
                     if self.DB_CONF_FILE:
@@ -395,7 +410,7 @@ class NAPOLI_PLI:
 
                     ##########################################################
                     step = "Calculate atom type statistics"
-                    ligandGroups = groupsByCompounds[ligand]
+                    ligandGroups = grps_by_compounds[ligand]
                     groupTypes = count_group_types(ligandGroups, compIdByType)
 
                     if self.DB_CONF_FILE:
@@ -407,7 +422,7 @@ class NAPOLI_PLI:
 
                     ##########################################################
                     step = "Calculate interaction type statistics"
-                    interactionTypes = count_interaction_types(filteredInter, interIdByType)
+                    interactionTypes = count_interaction_types(filtered_inter, interIdByType)
 
                     if self.DB_CONF_FILE:
                         for typeId in interactionTypes:
@@ -431,10 +446,10 @@ class NAPOLI_PLI:
             # # pdbExtractor = Extractor(structure[0][pliComplex.chain])
             # # ligandPdbFile = "%s/%s.pdb" % (workingPdbPath, entry)
             # # pdbExtractor.extract_residues([ligandBio], ligandPdbFile)
-            # ligSel = ResidueSelector({ligand})
-            # ligBlock = pdb_object_2block(structure, ligSel,
+            # lig_sel = ResidueSelector({ligand})
+            # lig_block = pdb_object_2block(structure, lig_sel,
             #                              write_conects=False)
-            # rdLig = MolFromPDBBlock(ligBlock)
+            # rdLig = MolFromPDBBlock(lig_block)
             # Compute2DCoords(rdLig)
 
         except Exception as e:
