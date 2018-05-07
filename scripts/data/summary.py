@@ -1,37 +1,42 @@
 from collections import defaultdict
 
 
-def count_group_types(compound, keyMap={}):
-    groupTypes = defaultdict(int)
+def count_group_types(compound, key_map={}):
+    grp_types = defaultdict(int)
 
     for group in compound.atomGroups:
         for feature in group.chemicalFeatures:
-
             key = feature.name
-            if keyMap:
-                if feature.name in keyMap:
-                    key = keyMap[feature.name]
+            if key_map:
+                if feature.name in key_map:
+                    key = key_map[feature.name]
                 else:
                     continue
 
-            groupTypes[key] += 1
+            grp_types[key] += 1
 
-    return groupTypes
+    return grp_types
 
 
-def count_interaction_types(interactions, keyMap={}):
+def count_interaction_types(interactions, key_map={}):
 
-    interactionTypes = defaultdict(int)
+    interaction_types = defaultdict(int)
+    seen_pairs = set()
+    for i in interactions:
+        pair_key1 = (i.type, i.comp1, i.comp2)
+        pair_key2 = (i.type, i.comp2, i.comp1)
 
-    for interaction in interactions:
+        if pair_key1 in seen_pairs or pair_key2 in seen_pairs:
+            continue
 
-        key = interaction.type
-        if keyMap:
-            if interaction.type in keyMap:
-                key = keyMap[interaction.type]
+        seen_pairs.add(pair_key1)
+        key = i.type
+        if key_map:
+            if i.type in key_map:
+                key = key_map[i.type]
             else:
                 continue
 
-        interactionTypes[key] += 1
+        interaction_types[key] += 1
 
-    return interactionTypes
+    return interaction_types
