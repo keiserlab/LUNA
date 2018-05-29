@@ -1,33 +1,54 @@
+class Ligand(object):
+    pass
+
+
+class LigandEstablishInteraction(object):
+    pass
+
+
 class Project(object):
     pass
 
 
-class Complex(object):
-    pass
+class LigandEntry(object):
+
+    def __init__(self, pdb_id, chain_id, lig_name=None, lig_num=None,
+                 lig_icode=None, cluster=None, status_id=None,
+                 process_error_id=None, inter_proj_id=None):
+
+        self.pdb_id = pdb_id
+        self.chain_id = chain_id
+        self.lig_name = lig_name
+        self.lig_num = lig_num
+        self.lig_icode = lig_icode
+        self.cluster = cluster
+        self.status_id = status_id
+        self.process_error_ir = process_error_id
+        self.inter_proj_id = inter_proj_id
 
 
-class ComplexInter(object):
+class LigandEntryHasInteractions(object):
     pass
 
 
 class CompTypeCount(object):
 
-    def __init__(self, complex_id, complex_inter_proj_id,
+    def __init__(self, ligand_entry_id, inter_proj_id,
                  compound_type_id, total):
 
-        self.complex_id = complex_id
-        self.complex_inter_proj_id = complex_inter_proj_id
+        self.ligand_entry_id = ligand_entry_id
+        self.inter_proj_id = inter_proj_id
         self.compound_type_id = compound_type_id
         self.total = total
 
 
 class InterTypeCount(object):
 
-    def __init__(self, complex_id, complex_inter_proj_id,
+    def __init__(self, ligand_entry_id, inter_proj_id,
                  inter_type_id, total):
 
-        self.complex_id = complex_id
-        self.complex_inter_proj_id = complex_inter_proj_id
+        self.ligand_entry_id = ligand_entry_id
+        self.inter_proj_id = inter_proj_id
         self.inter_type_id = inter_type_id
         self.total = total
 
@@ -39,7 +60,7 @@ class InterType(object):
 class Interaction(object):
 
     def __init__(self, group_id1, group_id2, inter_type_id,
-                 pdb_id=None, da_dist_hb_inter=None,
+                 da_dist_hb_inter=None,
                  ha_dist_hb_inter=None, dha_ang_hb_inter=None,
                  dist_repuls_inter=None, dist_attract_inter=None,
                  cc_dist_pi_pi_inter=None, dihed_ang_pi_pi_inter=None,
@@ -52,7 +73,6 @@ class Interaction(object):
         self.group_id1 = group_id1
         self.group_id2 = group_id2
         self.inter_type_id = inter_type_id
-        self.pdb_id = pdb_id
 
         self.da_dist_hb_inter = da_dist_hb_inter
         self.ha_dist_hb_inter = ha_dist_hb_inter
@@ -88,15 +108,15 @@ class CompoundType(object):
 
 class Group(object):
 
-    def __init__(self, orig_comp_pdb, orig_comp_chain, orig_comp_name,
-                 orig_comp_num, orig_comp_icode, name,
+    def __init__(self, comp_pdb_id, comp_chain_id, comp_name,
+                 comp_num, comp_icode, name,
                  coord_x, coord_y, coord_z):
 
-        self.orig_comp_pdb = orig_comp_pdb
-        self.orig_comp_chain = orig_comp_chain
-        self.orig_comp_name = orig_comp_name
-        self.orig_comp_num = orig_comp_num
-        self.orig_comp_icode = orig_comp_icode
+        self.comp_pdb_id = comp_pdb_id
+        self.comp_chain_id = comp_chain_id
+        self.comp_name = comp_name
+        self.comp_num = comp_num
+        self.comp_icode = comp_icode
         self.name = name
         self.coord_x = coord_x
         self.coord_y = coord_y
@@ -125,5 +145,9 @@ class Atom(object):
         self.coord_z = coord_z
 
 
-class PDB(object):
+class Structure(object):
+    pass
+
+
+class Status(object):
     pass
