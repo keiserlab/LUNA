@@ -40,3 +40,7 @@ class InvalidNapoliEntry(ValueError):
 
 class DirectoryAlreadyExists(OSError):
     pass
+
+
+class DuplicateEntry(ValueError):
+    pass
