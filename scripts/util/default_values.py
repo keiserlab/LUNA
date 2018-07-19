@@ -1,9 +1,14 @@
-from interaction.calc_interactions import DefaultInteractionConf
+from interaction.calc_interactions import (DefaultInteractionConf,
+                                           InteractionConf)
+from mol.depiction import ColorPallete
+
+from MyBio.PDB.PDBParser import PDBParser
 
 ENTRIES_SEPARATOR = ":"
 
-NAPOLI_PATH = "/media/shared/UFMG/Workspace/nAPOLI_v2/tmp/nAPOLI"
-DEFAULT_PDB_PATH = "%s/public/pdb" % NAPOLI_PATH
+DEFAULT_NAPOLI_PATH = "/media/shared/UFMG/Workspace/nAPOLI_v2/tmp/nAPOLI"
+DEFAULT_PDB_PATH = "%s/public/pdb" % DEFAULT_NAPOLI_PATH
+DEFAULT_TMP_FILES = "%s/public/tmp" % DEFAULT_NAPOLI_PATH
 
 DEFAULT_DB_CONF_FILE = "../data/.mysql.ini"
 
@@ -11,21 +16,24 @@ DEFAULT_ATOM_PROP_FILE = "../data/BaseFeatures.fdef"
 
 DEFAULT_INTERACTION_CONF = DefaultInteractionConf()
 
-# PLI_DEFAULT_VALUES = {
-#     "pdbPath": None,
-#     "dbConf": "../data/.mysql.ini",
-#     "overwritePath": False,
+BOUNDARY_CONF = InteractionConf({"boundary_cutoff": 7})
 
-#     "pdbTemplate": None,
-#     "chainTemplate": None,
+PDB_PARSER = PDBParser(PERMISSIVE=True,
+                       QUIET=True,
+                       FIX_ATOM_NAME_CONFLICT=True,
+                       FIX_OBABEL_FLAGS=True)
 
-#     "atomPropFile": "../data/BaseFeatures.fdef",
-#     "interCriteria": DefaultInteractionConf(),
-#     "overviewFirstThenFilter": True,
-#     "ph": 7,
+NMR_METHODS = ["SOLID-STATE NMR", "SOLUTION NMR"]
 
-#     "fpFunction": "pharm2d_fp",
-
-#     "runFromStep": 1,
-#     "runUntilStep": -1
-# }
+DEFAULT_ATOM_TYPES_COLOR = ColorPallete({
+    "Acceptor": (252, 141, 89),
+    "Donor": (145, 191, 219),
+    "Aromatic": (224, 243, 248),
+    "Hydrophobic": (254, 224, 144),
+    "Hydrophobe": (254, 224, 144),
+    "LumpedHydrophobe": (254, 224, 144),
+    "PosIonizable": (69, 117, 180),
+    "NegIonizable": (215, 48, 3),
+    "HalogenAcceptor": (215, 48, 3),
+    "HalogenDonor": (215, 48, 3),
+})
