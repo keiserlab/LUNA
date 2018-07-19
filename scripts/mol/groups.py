@@ -1,3 +1,16 @@
+from MyBio.PDB.PDBIO import PDBIO
+from MyBio.selector import ResidueSelector
+from interaction.contact import get_contacts_for_entity
+from mol.vicinity_atom import VicinityAtom
+from mol.coordinates import (Coordinate, NeighbourhoodCoordinates)
+
+from rdkit.Chem import MolFromMolBlock
+from openbabel import (OBMolAtomIter, OBAtomAtomIter)
+
+from collections import defaultdict
+from pybel import readstring
+from io import StringIO
+
 
 class AtomGroup():
 
@@ -48,10 +61,18 @@ class CompoundGroups():
     def __init__(self, myBioPDBResidue, atomGroups=None):
         self.residue = myBioPDBResidue
 
-        if (atomGroups is None):
+        if atomGroups is None:
             atomGroups = []
-
         self.atomGroups = atomGroups
+
+    @property
+    def summary(self):
+        summary = defaultdict(int)
+        for grp in self.atomGroups:
+            for feature in grp.chemicalFeatures:
+                summary[feature] += 1
+
+        return summary
 
     def add_group(self, group):
         self.atomGroups += [group]
@@ -59,20 +80,6 @@ class CompoundGroups():
 
 def find_compound_groups(myBioPDBResidue, featureExtractor, ph=None,
                          hasExplicitHydrogen=False):
-
-    from MyBio.PDB.PDBIO import PDBIO
-    from MyBio.selector import ResidueSelector
-    from interaction.contact import get_contacts_for_entity
-    from mol.vicinity_atom import VicinityAtom
-    from mol.coordinates import (Coordinate, NeighbourhoodCoordinates)
-
-    from rdkit.Chem import MolFromMolBlock
-    from rdkit.Chem.rdDepictor import Compute2DCoords
-
-    from openbabel import (OBMolAtomIter, OBAtomAtomIter)
-
-    from pybel import readstring
-    from io import StringIO
 
     COV_CUTOFF = 1.99999999999
 
@@ -141,7 +148,6 @@ def find_compound_groups(myBioPDBResidue, featureExtractor, ph=None,
             targetAtoms[atom.get_serial_number()] = vicinityAtom
 
     compoundGroups = CompoundGroups(myBioPDBResidue)
-
     for gKey in groupFeatures:
         groupObj = groupFeatures[gKey]
 
