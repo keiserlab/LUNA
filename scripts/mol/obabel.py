@@ -1,6 +1,10 @@
 from file.validator import (is_file_valid,
                             try_validate_file)
 
+from subprocess import Popen, PIPE
+from file.util import get_file_format
+from util.exceptions import (FileNotCreated, InvalidFileFormat)
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -18,9 +22,6 @@ def mol_2svg_obabel(infile, output, opt=None):
         @type opt: dictionary
         @example opt: {"C": None, "e": None, "P": 500, "d": None}
     """
-    from subprocess import Popen, PIPE
-    from util.exceptions import FileNotCreated
-
     logger.info("Trying to generate a 2D diagram to the file '%s'." % infile)
 
     try:
@@ -79,10 +80,6 @@ def convert_molecule(infile, output, infileFormat=None,
         @type opt: dictionary
         @example opt: {"p": 7, "AddPolarH": None, c": None, "error-level": 5}
     """
-    from subprocess import Popen, PIPE
-    from file.util import get_file_format
-    from util.exceptions import (FileNotCreated, InvalidFileFormat)
-
     logger.info("Trying to convert the file '%s' to '%s'." % (infile, output))
 
     try:
@@ -118,8 +115,9 @@ def convert_molecule(infile, output, infileFormat=None,
         p = Popen(args, stdout=PIPE, stderr=PIPE)
         stdout, stderr = p.communicate()
 
-        isMolConverted = stderr.decode().strip() == "1 molecule converted"
-        if (not is_file_valid(output) or not isMolConverted):
+        output_lines = stderr.decode().strip().split("\n")
+        is_mol_converted = output_lines[-1] != "0 molecule converted"
+        if (not is_file_valid(output) or not is_mol_converted):
             raise FileNotCreated("File '%s' not converted to '%s'."
                                  % (infile, output))
         else:
