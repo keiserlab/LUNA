@@ -98,6 +98,14 @@ class Interaction(object):
         self.cov_dist = cov_dist
 
 
+class RCSBInteraction(Interaction):
+    pass
+
+
+class ProjectInteraction(Interaction):
+    pass
+
+
 class InterDependInter(object):
     pass
 
@@ -149,5 +157,70 @@ class Structure(object):
     pass
 
 
+class ExperimentalTechnique(object):
+    pass
+
+
 class Status(object):
     pass
+
+
+class ProjectStep(object):
+    pass
+
+
+class ProjectType(object):
+    pass
+
+
+class ProjectStepDetail(object):
+
+    def __init__(self, project_id, proj_step_id, status_id=None,
+                 warning=None, progress_perc=None):
+
+        self.project_id = project_id
+        self.proj_step_id = proj_step_id
+        self.status_id = status_id
+        self.warning = warning
+        self.progress_perc = progress_perc
+
+
+class ProjectStepMessage(object):
+
+    def __init__(self, project_id, proj_step_id,
+                 status_id=None, message=None, is_critical=None):
+        self.project_id = project_id
+        self.proj_step_id = proj_step_id
+        self.status_id = status_id
+        self.message = message
+
+        # TODO: Verificar se vou remover esse parametro.
+        self.is_critical = is_critical
+
+
+class LigandEntryHasStepMessage(object):
+    pass
+
+
+class InterTypeFreqByCluster(object):
+
+    def __init__(self, inter_proj_id, inter_type_id, cluster,
+                 inter_count, ligand_count, cumulative_num):
+        self.inter_proj_id = inter_proj_id
+        self.inter_type_id = inter_type_id
+        self.cluster = cluster
+        self.inter_count = inter_count
+        self.ligand_count = ligand_count
+        self.cumulative_num = cumulative_num
+
+
+class CompTypeFreqByCluster(object):
+
+    def __init__(self, inter_proj_id, compound_type_id, cluster,
+                 comp_count, ligand_count, cumulative_num):
+        self.inter_proj_id = inter_proj_id
+        self.compound_type_id = compound_type_id
+        self.cluster = cluster
+        self.comp_count = comp_count
+        self.ligand_count = ligand_count
+        self.cumulative_num = cumulative_num
