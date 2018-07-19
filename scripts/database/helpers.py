@@ -1,7 +1,5 @@
 from database.napoli_model import *
 
-from sqlalchemy.orm import relationship
-
 import logging
 logger = logging.getLogger(__name__)
 
@@ -16,9 +14,10 @@ class MapperConfiguration():
 
 class Manager:
 
-    def __init__(self, db, mapper_list):
+    def __init__(self, db, mapper_list=None):
         self._db = db
 
+        mapper_list = mapper_list or []
         for conf in mapper_list:
             self.db.new_mapper(conf.table_class,
                                conf.table_name,
@@ -31,14 +30,13 @@ class Manager:
 
 class LigandEntryManager(Manager):
 
-    def __init__(self, db):
-        mapper_conf = MapperConfiguration(LigandEntry, "ligand_entry")
-        super().__init__(db, [mapper_conf])
+    def __init__(self, db, mapper_list=None):
+        super().__init__(db, mapper_list)
 
-    def get_entries(self, projectId):
+    def get_entries(self, project_id):
         ligand_entries = (self.db.session
                           .query(LigandEntry)
-                          .filter(LigandEntry.inter_proj_id == projectId)
+                          .filter(LigandEntry.inter_proj_project_id == project_id)
                           .all())
 
         return ligand_entries
@@ -46,27 +44,8 @@ class LigandEntryManager(Manager):
 
 class InteractionManager(Manager):
 
-    def __init__(self, db, mapper_list):
-        mapper_list.append(MapperConfiguration(InterType, "inter_type"))
-        mapper_list.append(MapperConfiguration(InterDependInter, "inter_depend_inter"))
-        mapper_list.append(MapperConfiguration(GroupCompoundType, "group_compound_type"))
-        mapper_list.append(MapperConfiguration(CompoundType, "compound_type"))
-        mapper_list.append(MapperConfiguration(GroupAtom, "group_atom"))
-        mapper_list.append(MapperConfiguration(Atom, "atom"))
-
-        grp_comp_type_tbl = db.get_table("group_compound_type")
-        grp_atom_tbl = db.get_table("group_atom")
-        grp_properties = {
-            "compound_types": relationship(CompoundType,
-                                           secondary=grp_comp_type_tbl,
-                                           backref='group'),
-            "atoms": relationship(Atom,
-                                  secondary=grp_atom_tbl,
-                                  backref='group')
-        }
-        mapper_list.append(MapperConfiguration(Group, "group",
-                                               properties=grp_properties))
-
+    def __init__(self, db, mapper_list=None, interClass=Interaction):
+        self.interaction = interClass
         super().__init__(db, mapper_list)
 
     def insert_interactions(self, interactions, ligand_entity):
@@ -152,10 +131,10 @@ class InteractionManager(Manager):
         if ("dependOf" in params):
             del params["dependOf"]
 
-        dbInteraction = Interaction(group_id1=g1.id,
-                                    group_id2=g2.id,
-                                    inter_type_id=dbInterType[0].id,
-                                    **params)
+        dbInteraction = self.interaction(group_id1=g1.id,
+                                         group_id2=g2.id,
+                                         inter_type_id=dbInterType[0].id,
+                                         **params)
 
         if ligand_entity:
             dbInteraction.ligand_entities.append(ligand_entity)
@@ -216,52 +195,8 @@ class InteractionManager(Manager):
 
 class RCSBInteractionManager(InteractionManager):
 
-    def __init__(self, db):
-        mapper_list = []
-        mapper_list.append(MapperConfiguration(LigandEstablishInteraction,
-                                               "ligand_establish_interaction"))
-
-        ligand_inter_tbl = db.get_table("ligand_establish_interaction")
-        inter_inter_tbl = db.get_table("inter_depend_inter")
-        inter_tbl = db.get_table("interaction")
-        group_tbl = db.get_table("group")
-
-        # TODO: colocar join com tipo de interações
-        # TODO: colocar join com tipo de átomos
-        inter_properties = {
-            "dependencies": relationship(Interaction,
-                                         primaryjoin=(inter_tbl.c.id ==
-                                                      inter_inter_tbl.c.interaction_id),
-                                         secondaryjoin=(inter_tbl.c.id ==
-                                                        inter_inter_tbl.c.interaction_id1),
-                                         secondary=inter_inter_tbl,
-                                         backref='interaction'),
-            "ligand_entities": relationship(Ligand,
-                                            secondary=ligand_inter_tbl,
-                                            backref='interaction'),
-            "group1": relationship(Group,
-                                   backref='interactions1',
-                                   primaryjoin=(inter_tbl.c.group_id1 ==
-                                                group_tbl.c.id)),
-            "group2": relationship(Group,
-                                   backref='interactions2',
-                                   primaryjoin=(inter_tbl.c.group_id2 ==
-                                                group_tbl.c.id)),
-            "inter_type": relationship(InterType)
-        }
-        mapper_list.append(MapperConfiguration(Interaction, inter_tbl,
-                                               properties=inter_properties))
-
-        ligand_tbl = db.get_table("ligand")
-        ligand_properties = {
-            "interactions": relationship(Interaction,
-                                         secondary=ligand_inter_tbl,
-                                         backref='ligand')
-        }
-        mapper_list.append(MapperConfiguration(Ligand, ligand_tbl,
-                                               properties=ligand_properties))
-
-        super().__init__(db, mapper_list)
+    def __init__(self, db, mapper_list=None):
+        super().__init__(db, mapper_list, RCSBInteraction)
 
     def select_interactions(self, join_filter, inter_filters):
 
@@ -300,57 +235,7 @@ class RCSBInteractionManager(InteractionManager):
 
 class ProjectInteractionManager(InteractionManager):
 
-    def __init__(self, db):
-        mapper_list = []
-        mapper_list.append(MapperConfiguration(LigandEntry, "ligand_entry"))
-        mapper_list.append(MapperConfiguration(LigandEntryHasInteractions,
-                                               "ligand_entry_has_interactions"))
+    def __init__(self, db, mapper_list=None):
+        super().__init__(db, mapper_list, ProjectInteraction)
 
-        ligand_inter_tbl = db.get_table("ligand_entry_has_interactions")
-        inter_inter_tbl = db.get_table("inter_depend_inter")
-        inter_tbl = db.get_table("interaction")
-        inter_properties = {
-            "dependencies": relationship(Interaction,
-                                         primaryjoin=(inter_tbl.c.id ==
-                                                      inter_inter_tbl.c.interaction_id),
-                                         secondaryjoin=(inter_tbl.c.id ==
-                                                        inter_inter_tbl.c.interaction_id1),
-                                         secondary=inter_inter_tbl,
-                                         backref='interaction'),
-            "ligand_entities": relationship(LigandEntry,
-                                            secondary=ligand_inter_tbl,
-                                            backref='interaction')
-        }
-        mapper_list.append(MapperConfiguration(Interaction, inter_tbl,
-                                               properties=inter_properties))
-
-        super().__init__(db, mapper_list)
-
-
-    # def select_interactions(self, filterRules):
-    #     query = self.db.session.query(Interaction)
-
-    #     interactions = set()
-
-    #     for filterRule in filterRules:
-    #         inter = query.filter(*filterRule.rules).all()
-    #         interactions.update(inter)
-
-    #     invalidInteractions = set()
-    #     for dbInter in interactions:
-    #         if dbInter.dependencies:
-    #             hasAllDependencies = True
-    #             for dbRequiredInter in dbInter.dependencies:
-    #                 if dbRequiredInter not in interactions:
-    #                     hasAllDependencies = False
-    #                     break
-
-    #             if not hasAllDependencies:
-    #                 invalidInteractions.add(dbInter)
-
-    #     interactions.difference_update(invalidInteractions)
-
-    #     return interactions
-
-
-
+    # Specific methods for interaction management.
