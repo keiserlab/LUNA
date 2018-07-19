@@ -7,33 +7,37 @@ from MyBio.PDB.PDBIO import PDBIO
 from util.exceptions import FileNotCreated
 
 from io import StringIO
+from shutil import move as rename_pdb_file
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-def download_pdb(pdbId, outputPath=".", overwrite=False):
+def download_pdb(pdb_id, output_path=".", output_file=None, overwrite=False):
     """Download a PDB file from RCSB.org.
 
-        @param pdbId: 4-symbols structure Id from PDB (e.g. 3J92).
+        @param pdb_id: 4-symbols structure Id from PDB (e.g. 3J92).
         @type pdb_code: string
 
-        @param outputPath: put the PDB file in this directory.
-        @type  outputPath: string
+        @param output_path: put the PDB file in this directory.
+        @type  output_path: string
     """
-
     logger.info("Trying to download the PDB '%s' and store it at the "
-                "directory '%s'." % (pdbId, outputPath))
+                "directory '%s'." % (pdb_id, output_path))
 
     try:
-        if (pdbId is not None and pdbId.strip() != ""):
-            if (is_directory_valid(outputPath)):
+        pdb_id = pdb_id.lower()
+        if (pdb_id is not None and pdb_id.strip() != ""):
+            if (is_directory_valid(output_path)):
                 pdbl = PDBList()
-                pdbl.retrieve_pdb_file(pdbId, pdir=outputPath,
+                pdbl.retrieve_pdb_file(pdb_id, pdir=output_path,
                                        file_format="pdb", overwrite=overwrite)
+
+                if output_file:
+                    pdb_file = '%s/pdb%s.ent' % (output_path, pdb_id)
+                    rename_pdb_file(pdb_file, output_file)
         else:
             raise IllegalArgumentError("Inform a non empty PDB id")
-
     except Exception as e:
         logger.exception(e)
         raise
