@@ -1,6 +1,15 @@
-from util.exceptions import FingerprintNotCreated
+from util.exceptions import (FingerprintNotCreated, IllegalArgumentError)
+from rdkit.Chem.Fingerprints import FingerprintMols
+from rdkit.Chem import MACCSkeys
+from rdkit.Chem.AtomPairs import Pairs
+from rdkit.Chem import AllChem
+from rdkit.Chem.Pharm2D import Generate
+from rdkit.Chem import ChemicalFeatures
+from rdkit.Chem.Pharm2D.SigFactory import SigFactory
 
+import re
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -13,8 +22,6 @@ class FingerprintGenerator():
         self.molecule = mol
 
     def topological_fp(self):
-        from rdkit.Chem.Fingerprints import FingerprintMols
-
         try:
             return FingerprintMols.FingerprintMol(self.molecule)
         except Exception as e:
@@ -22,8 +29,6 @@ class FingerprintGenerator():
             raise FingerprintNotCreated("Fingerprint could not be created.")
 
     def maccs_keys_fp(self):
-        from rdkit.Chem import MACCSkeys
-
         try:
             return MACCSkeys.GenMACCSKeys(self.molecule)
         except Exception as e:
@@ -31,8 +36,6 @@ class FingerprintGenerator():
             raise FingerprintNotCreated("Fingerprint could not be created.")
 
     def atom_pairs_fp(self):
-        from rdkit.Chem.AtomPairs import Pairs
-
         try:
             return Pairs.GetAtomPairFingerprint(self.molecule)
         except Exception as e:
@@ -40,8 +43,6 @@ class FingerprintGenerator():
             raise FingerprintNotCreated("Fingerprint could not be created.")
 
     def torsion_fp(self):
-        from rdkit.Chem.AtomPairs import Pairs
-
         try:
             return Pairs.GetAtomPairFingerprint(self.molecule)
         except Exception as e:
@@ -60,9 +61,6 @@ class FingerprintGenerator():
                             3: GetMorganFingerprint
             @type int
         """
-        from rdkit.Chem import AllChem
-        from util.exceptions import IllegalArgumentError
-
         try:
             if (type == 1):
                 return AllChem.GetMorganFingerprintAsBitVect(self.molecule,
@@ -87,10 +85,6 @@ class FingerprintGenerator():
             raise FingerprintNotCreated("Fingerprint could not be created.")
 
     def pharm2d_fp(self, sigFactory=None):
-
-        from rdkit.Chem.Pharm2D import Generate
-        from util.exceptions import IllegalArgumentError
-
         try:
             if (sigFactory is None):
                 raise IllegalArgumentError("SigFactory object is obligatory.")
@@ -102,35 +96,30 @@ class FingerprintGenerator():
 
 
 def available_fp_functions():
-    import re
-
     regex = re.compile(".*([a-zA-Z]+)_fp", flags=0)
     funcs = list(filter(regex.match, dir(FingerprintGenerator)))
 
     return funcs
 
 
-def prepare_morgan_fp(fpOpt):
+def prepare_morgan_fp(fp_opt):
     params = {}
-    if ("radius" in fpOpt):
-        params["radius"] = fpOpt["radius"]
-    if ("nBits" in fpOpt):
-        params["nBits"] = fpOpt["nBits"]
-    if ("features" in fpOpt):
-        params["features"] = fpOpt["features"]
-    if ("type" in fpOpt):
-        params["type"] = fpOpt["type"]
+    if ("radius" in fp_opt):
+        params["radius"] = fp_opt["radius"]
+    if ("nBits" in fp_opt):
+        params["nBits"] = fp_opt["nBits"]
+    if ("features" in fp_opt):
+        params["features"] = fp_opt["features"]
+    if ("type" in fp_opt):
+        params["type"] = fp_opt["type"]
 
     return params
 
 
-def prepare_pharm2d_fp(fpOpt):
-    from rdkit.Chem import ChemicalFeatures
-    from rdkit.Chem.Pharm2D.SigFactory import SigFactory
-
+def prepare_pharm2d_fp(fp_opt):
     params = {}
-    if ("sigFactory" in fpOpt):
-        sigFactory = fpOpt["sigFactory"]
+    if ("sigFactory" in fp_opt):
+        sigFactory = fp_opt["sigFactory"]
     else:
         fdefName = 'data/MinimalFeatures.fdef'
         featFactory = ChemicalFeatures.BuildFeatureFactory(fdefName)
@@ -143,29 +132,25 @@ def prepare_pharm2d_fp(fpOpt):
     return params
 
 
-def prepare_fp_params(fpFunction, fpOpt):
+def prepare_fp_params(fp_function, fp_opt):
 
-    if (fpFunction == "pharm2d_fp" and type(fpOpt) is dict):
-        params = prepare_pharm2d_fp(fpOpt)
-    elif (fpFunction == "morgan_fp" and type(fpOpt) is dict):
-        params = prepare_morgan_fp(fpOpt)
+    if (fp_function == "pharm2d_fp" and type(fp_opt) is dict):
+        params = prepare_pharm2d_fp(fp_opt)
+    elif (fp_function == "morgan_fp" and type(fp_opt) is dict):
+        params = prepare_morgan_fp(fp_opt)
     else:
         params = {}
 
     return params
 
 
-def generate_fp_for_mols(mols, fpFunction=None, fpOpt=None, critical=False):
-    from util.exceptions import IllegalArgumentError
-    import logging
-    logger = logging.getLogger(__name__)
-
+def generate_fp_for_mols(mols, fp_function=None, fp_opt=None, critical=False):
     funcs = available_fp_functions()
-    if (fpFunction not in funcs):
+    if (fp_function not in funcs):
         raise IllegalArgumentError("Fingerprint function not available.")
 
-    if (fpFunction is None):
-        fpFunction = "pharm2d_fp"
+    if (fp_function is None):
+        fp_function = "pharm2d_fp"
 
         logger.info("No fingerprint function was defined.")
         logger.info("The default fingerprint type will be used: 2D "
@@ -174,14 +159,14 @@ def generate_fp_for_mols(mols, fpFunction=None, fpOpt=None, critical=False):
     logger.info("Trying to generate fingerprints for %d molecules."
                 % len(mols))
 
-    params = prepare_fp_params(fpFunction, fpOpt)
+    params = prepare_fp_params(fp_function, fp_opt)
     fpg = FingerprintGenerator()
 
     fpMols = []
     for idx, mol in enumerate(mols):
         try:
             fpg.set_molecule(mol)
-            fp = getattr(fpg, fpFunction)(**params)
+            fp = getattr(fpg, fp_function)(**params)
             fpMols.append({"fp": fp, "mol": mol.GetProp("_Name")})
         except Exception as e:
             logger.info("Molecule at position %d failed. Name: %s" %
