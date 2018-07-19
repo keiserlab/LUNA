@@ -7,10 +7,16 @@
 ###################################################################
 
 # Modifications included by Alexandre Fassio (alexandrefassio@dcc.ufmg.br).
-# Date: 19/02/2018.
 
+# Date: 19/02/2018.
 # 1) The module __lt__ was overwritten to allow sorting in Python 3
 # 2) Inherit inhouse modifications. Package: MyBio.
+
+# Data: 21/02/2018.
+# 1) Added function to check if a residue is a water molecule.
+# 2) Added function to check if a residue is an hetero group.
+# 3) Added function to check if a residue is an amino acid.
+# 4) Added function to check if a residue is a nucleic acid.
 
 # Each line or block with modifications contain a MODBY tag.
 
@@ -27,6 +33,7 @@ from Bio import BiopythonDeprecationWarning
 # Inherit inhouse modifications. Package: MyBio.
 from MyBio.PDB.PDBExceptions import PDBConstructionException
 from MyBio.PDB.Entity import Entity, DisorderedEntityWrapper
+from Bio.PDB.Polypeptide import is_aa
 
 
 _atom_name_dict = {}
@@ -116,6 +123,29 @@ class Residue(Entity):
         """Return 1 if the residue contains disordered atoms."""
         return self.disordered
 
+    # MODBY: Alexandre Fassio
+    # Check if a residue is a water.
+    def is_water(self):
+        """Return 1 if the residue is a water molecule."""
+        return self.get_id()[0] == "W"
+
+    # MODBY: Alexandre Fassio
+    # Check if a residue is an hetero group.
+    def is_hetatm(self):
+        """Return 1 if the residue is an hetero group."""
+        return self.get_id()[0].startswith("H_")
+
+    # MODBY: Alexandre Fassio
+    # Check if a residue is an amino acid.
+    def is_aminoacid(self):
+        """Return 1 if the residue is an amino acid."""
+        return is_aa(self.resname)
+
+    # MODBY: Alexandre Fassio
+    # Check if a residue is a nucleic acid.
+    def is_nucleic_acid(self):
+        return self.get_id()[0] == " " and not self.is_aminoacid()
+
     def get_resname(self):
         return self.resname
 
@@ -143,6 +173,16 @@ class Residue(Entity):
                      BiopythonDeprecationWarning)
         for a in self:
             yield a
+
+    # MODBY: Alexandre Fassio
+    # Returns a unique tuple from Structure to Residue
+    def get_deep_id(self):
+        pdb_id = self.get_parent_by_level('S').get_id()
+        chain = self.get_parent().get_id()
+        resname = self.get_resname()
+        hetflag, resseq, icode = self.get_id()
+
+        return (pdb_id, chain, resname, resseq, icode)
 
 
 class DisorderedResidue(DisorderedEntityWrapper):
