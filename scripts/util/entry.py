@@ -35,6 +35,20 @@ class LigandEntry():
 
         return sep.join(entry)
 
+    def is_hetatm(self):
+        return self.lig_name and self.lig_num
+
+    def get_biopython_key(self):
+        if self.is_hetatm():
+            if self.lig_name == "HOH" or self.lig_name == "WAT":
+                key = ("W", self.lig_num, self.lig_icode)
+            else:
+                key = ("H_%s" % self.lig_name, self.lig_num, self.lig_icode)
+        else:
+            key = self.chain_id
+
+        return key
+
     def __repr__(self):
         return '<LigandEntry: %s>' % self.to_string(self.separator)
 
@@ -52,6 +66,7 @@ class DBLigandEntry(LigandEntry):
 class EntryValidator:
 
     def __init__(self, pattern):
+        self.pattern = pattern
         self.regex = re.compile(pattern, flags=0)
 
     def is_valid(self, entry):
@@ -60,21 +75,25 @@ class EntryValidator:
 
 class PLIEntryValidator(EntryValidator):
 
-    def __init__(self, uploadFormat=False):
-        pattern = '^\w{4}:\w:\w{1,3}:\-?\d+$'
+    def __init__(self, free_filename_format=False):
 
-        if (uploadFormat):
-            pattern = '^\w+(\w|\-)*:\w:\w{1,3}:\-?\d+$'
+        # If the PDB filename is not necessarily equal to the PDB id format.
+        if free_filename_format:
+            pattern = '^\w+(\w|\-)*:\w:\w{1,3}:\-?\d+[a-zA-z]?$'
+        else:
+            pattern = '^\w{4}:\w:\w{1,3}:\-?\d+[a-zA-z]?$'
 
-        super(PLIEntryValidator, self).__init__(pattern)
+        super().__init__(pattern)
 
 
 class PPIEntryValidator(EntryValidator):
 
-    def __init__(self, uploadFormat=False):
-        pattern = '^\w{4}:\w$'
+    def __init__(self, free_filename_format=False):
 
-        if (uploadFormat):
+        # If the PDB filename is not necessarily equal to the PDB id format.
+        if free_filename_format:
             pattern = '^\w+(\w|\-)*:\w$'
+        else:
+            pattern = '^\w{4}:\w$'
 
-        super(PPIEntryValidator, self).__init__(pattern)
+        super().__init__(pattern)
