@@ -1,3 +1,5 @@
+import util.stringcase as case
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -8,7 +10,6 @@ class ChemicalFeature():
         self.name = name
 
     # Special methods
-
     def __repr__(self):
         return "<Feature=%s>" % self.name
 
@@ -24,6 +25,10 @@ class ChemicalFeature():
     def __ne__(self, other):
         """Overrides the default implementation (unnecessary in Python 3)"""
         return not self.__eq__(other)
+
+    def format_name(self, case_func="sentencecase"):
+        func = getattr(case, case_func)
+        return func(self.name)
 
 
 class FeatureExtractor():
@@ -66,7 +71,7 @@ class FeatureExtractor():
         for f in perceivedFeatures:
             atomIds = sorted(list(f.GetAtomIds()))
 
-            if (atomMap is not None):
+            if atomMap is not None:
                 tmpAtomIds = []
                 for i in range(0, len(atomIds)):
                     if (atomIds[i] in atomMap):
