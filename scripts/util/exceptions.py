@@ -44,3 +44,7 @@ class DirectoryAlreadyExists(OSError):
 
 class DuplicateEntry(ValueError):
     pass
+
+
+class ProcessingFailed(RuntimeError):
+    pass
