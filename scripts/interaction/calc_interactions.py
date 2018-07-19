@@ -309,6 +309,7 @@ class InteractionCalculator():
         acceptorAtom = acceptorGroup.atoms[0]
 
         # Recover only carbon coordinates
+        # TODO: adicionar S, P aqui
         xCarbonCoords = [x for x in donorAtom.nbCoords.coords
                          if x.atomicNumber == 6]
 
@@ -379,10 +380,8 @@ class InteractionCalculator():
 
                 if donorAtom.get_parent().get_id()[0] == "W":
                     haDist = daDist - 1
-
                     if (self.is_within_boundary(haDist,
                                                 "max_ha_dist_hb_inter", le)):
-
                         params = {"da_dist_hb_inter": daDist,
                                   "ha_dist_hb_inter": -1,
                                   "dha_ang_hb_inter": -1}
@@ -620,7 +619,7 @@ class InteractionFilter:
                  ignore_prot_lig=False,
                  ignore_lig_lig=True,
                  ignore_h2o_pairs=True,
-                 positive_list=[]):
+                 positive_list=None):
 
         self.inter_conf = inter_conf
 
@@ -635,6 +634,9 @@ class InteractionFilter:
         self.ignore_prot_lig = ignore_prot_lig
         self.ignore_lig_lig = ignore_lig_lig
         self.ignore_h2o_pairs = ignore_h2o_pairs
+
+        if positive_list is None:
+            positive_list = []
         self.positive_list = positive_list
 
     @property
