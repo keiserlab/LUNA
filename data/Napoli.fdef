@@ -1,3 +1,7 @@
+########################################################################################
+#                                  Atom type definition                                #
+#
+#
 AtomType NegAtom [*;-1,-2,-3]
 AtomType PosAtom [*;+1,+2,+3]
 
@@ -19,10 +23,9 @@ AtomType BasicNH0 [$([N;H0&+0]([{Alkyl}])([{Alkyl}])[{Alkyl}])]
 
 #
 # Capture: Nitrogen of amidines and similar compounds
+# For more information about this rule, see feature definition for Amidine in Positive ionizable
 #
-AtomType AmidineN [$([#7]-C(=[#7]))]
-
-#[#7:2][C,P,S:1]=[N:3]
+AtomType AmidineN [N;!{AmideLikeN};$(N=[CX3][N;!{AmideLikeN}]),$(N[CX3]=[N;!{AmideLikeN}])]
 
 #
 # Capture: Nitrogen of nitro groups and similar compounds
@@ -48,11 +51,12 @@ AtomType NitroLikeO [$([O-]-[N+])]
 # I removed $([NH2]S(=O)(=O)c) from the rule. It seems that this group is not a strong acid so that even Good and Oprea have not considered such moiety.
 # Good AC, Oprea TI. Optimization of CAMD techniques 3. Virtual screening enrichment studies: a help or hindrance in tool selection? Journal of Computer-Aided Molecular Design. 2008;22:169–78.
 # Ballatore C, Huryn DM, Smith AB. Carboxylic Acid (Bio)Isosteres in Drug Design. ChemMedChem. 2013;8:385–95.
+#
 # 1st constraint: acyl sulfonamide
 # 2nd constraint: barbiturates/thiazolidinediones/rhodanine...
 #
 # OBS: I removed general sulfonamide constraint ("$([NH,NH0-1](S(=O)(=O))c)") from this atom definition.
-#      I did it, because the sulfonamides are weakly acid (pKa=~10) and depend on appropriate substituents to lower the pKa.
+#      I did it because the sulfonamides are weakly acid (pKa=~10) and depend on appropriate substituents to lower the pKa.
 #      Then, I prefer to let their N to be donor atoms, i.e., the N will not be considered always deprotonated.
 #      REF: Ballatore C, Huryn DM, Smith AB. Carboxylic Acid (Bio)Isosteres in Drug Design. ChemMedChem. 2013;8:385–95
 #
@@ -61,7 +65,7 @@ AtomType AcidicN  [$([NH,NH0-1](S(=O)(=O))(C(=O))),$([NH1,NH0-1;R](C(=O))(C(=[O,
 #
 # Adapted from RDKit (Marcus Kossner)
 # A tertiary amine tends to be protonated at pH 7, so, we consider that its nitrogen would have a hydrogen.
-# Amide-likes and amidines also have an amine-like Nitrogen. However, these nitrogens do not have a high basicity in order to be protonated.
+# Amide-likes and amidines could also have a tertiary nitrogen. However, these nitrogens do not have a high basicity in order to be protonated.
 #
 DefineFeature TertiaryAmineN [$([Nv3](-C)(-C)-C);!{AmideLikeN};!{AmidineN}]
   Family Donor
@@ -81,16 +85,40 @@ EndFeature
 #
 # Capture: Hydroxyl from acid groups containing S, O and P (sulfonic and sulfunic acids, carboxylic acids, etc).
 # This constraint also cover thioketones, i.e., compounds with a double bonded S, instead of a double bonded O.
+#
 AtomType AcidicHydroxyl [$([O][C,S,P](=[O,S]))]
-DefineFeature DonorAtom [N!H0v3,N!H0+v4,nH+0&!{TetrazoleN},OH+0,SH+0;!{AcidicN};!{AcidicHydroxyl}]
+DefineFeature DonorAtom [N!H0v3,N!H0+v4,nH+0&!{TetrazoleN},OH2v2,OH+0,SH+0;!{AcidicN};!{AcidicHydroxyl}]
   Family Donor
   Weights 1.0
 EndFeature
 
 
+########################################################################################
+#                                    Halogen donor                                     #
+#
+DefineFeature XDonor [$([Cl,Br,I;X1]-[#6])]
+  Family HalogenDonor
+  Weights 1.0
+EndFeature
+
 
 ########################################################################################
-#                                  Hydrogen acceptor                                   #
+#                                   Chalcogen donor                                    #
+#
+# Sigma-holes exist when an electronegative atom is bound to Carbon.
+# Clark T. σ-Holes. Wiley Interdisciplinary Reviews: Computational Molecular Science. 2013;3:13–20.
+# Beno BR, Yeung K-S, Bartberger MD, Pennington LD, Meanwell NA. A Survey of the Role of Noncovalent Sulfur Interactions in Drug Design. Journal of Medicinal Chemistry. 2015;58:4383–438.
+#
+DefineFeature YDonor [$([#16;v2;H0]-,:[#6])]
+  Family ChalcogenDonor
+  Weights 1.0
+EndFeature
+
+
+########################################################################################
+#                                Hydrogen   acceptor                                   #
+#                                Halogen    acceptor                                   #
+#                                Chalcogen  acceptor                                   #
 #
 #
 # Joule JA, Mills K. Heterocyclic chemistry. 5th ed. Hoboken, N.J: Wiley; 2009.
@@ -98,7 +126,7 @@ EndFeature
 # Sudmeier JL, Bradshaw EM, Haddad KEC, Day RM, Thalhauser CJ, Bullock PA, et al. Identification of Histidine Tautomers in Proteins by 2D 1 H/ 13 C δ2 One-Bond Correlated NMR. Journal of the American Chemical Society. 2003;125:8430–1.
 #
 DefineFeature TautomerRingAcceptorN [$([n;H1]n),$([n;H1]cn);!{TetrazoleN}]
-  Family AcceptorTautomer
+  Family Acceptor
   Weights 1.0
 EndFeature
 
@@ -108,24 +136,24 @@ EndFeature
 #
 AtomType AromaticN [n;+0;H0;!X3]
 DefineFeature AromaticN [{AromaticN}]
-  Family AromaticN
+  Family Acceptor
   Weights 1.0
 EndFeature
 
 DefineFeature AcceptorN [N;v3;!{PosAtom};!{AnilineLikeN};!{AmideLikeN};!{AmidineN};!{NitroLikeN};!{BasicNH2};!{BasicNH1};!{BasicNH0}]
-  Family AcceptorN
+  Family Acceptor
   Weights 1.0
 EndFeature
 
 #
+# Capture: Not aromatic oxygens and sulfurs.
 # Identification of Biological Activity Profiles Using Substructural Analysis and Genetic Algorithms – Gillet, Willett and Bradshaw
 # http://www.daylight.com/dayhtml_tutorials/languages/smarts/smarts_examples.html#H_BOND
 #
 DefineFeature ChalcAcceptor [O,$([S;!v4;!v6])]
-  Family AcceptorOS
+  Family Acceptor
   Weights 1.0
 EndFeature
-
 
 
 ########################################################################################
@@ -137,6 +165,7 @@ EndFeature
 # Kubinyi H. Hydrogen Bonding: The Last Mystery in Drug Design? In: Testa B, van de Waterbeemd H, Folkers G, Guy R, editors. Pharmacokinetic Optimization in Drug Research. Zürich: Verlag Helvetica Chimica Acta; 2001. p. 513–24. doi:10.1002/9783906390437.ch28.
 # Nobeli I, Price SL, Lommerse JPM, Taylor R. Hydrogen bonding properties of oxygen and nitrogen acceptors in aromatic heterocycles. Journal of Computational Chemistry. 18:2060–74.
 # Desiraju GR, Steiner T. The weak hydrogen bond: in structural chemistry and biology. first publ. in paperback. Oxford: Oxford University Press; 2001.
+#
 DefineFeature WeakAcceptorO [o,s;+0]
   Family WeakAcceptor
   Weights 1.0
@@ -157,13 +186,6 @@ DefineFeature WeakAcceptorF [F;$(F-[#6]);!$(FC[F,Cl,Br,I])]
 EndFeature
 
 
-# OBS: it seems that aromatic compounds containing Sulfur and Nitrogen does not behave as a sulfur.
-# Nitrogen tends to be the unique acceptor
-#Competition of chalcogen bond, halogen bond, and hydrogen bond in SCSAHOX and SeCSeAHOX (X = Cl and Br) complexes
-#Competition between X‚‚‚H‚‚‚Y Intramolecular Hydrogen Bonds and X‚‚‚‚Y (X ) O, S, and Y ) Se, Te) Chalcogen-Chalcogen Interactions
-#
-
-
 ########################################################################################
 #                                  Weak hydrogen donor                                 #
 #
@@ -175,29 +197,15 @@ DefineFeature WeakDonorC [#6;!H0]
   Weights 1.0
 EndFeature
 
-########################################################################################
-#                                    Halogen donor                                     #
-#
-DefineFeature XDonor [$([Cl,Br,I;X1]-[#6])]
-  Family HalogenDonor
-  Weights 1.0
-EndFeature
-
-
-
 
 ########################################################################################
 #                                 Positive ionizable                                   #
 #
-
 #
 # Capture: Amines
 # !{AnilineLikeN} constraint so we don't match aniline (or similar) groups
 #
-##########################################################################################
-# TODO: está capturando AMIDE aqui? Será? Testar, porque aparentemente não está não.
 # TODO: Are we going to consider unsaturated chains like ethenamine, ethynamine, 4-(cyclohex-1-en-1-yl)morpholine as Basic amines?
-##########################################################################################
 #
 DefineFeature BasicGroup [{BasicNH2},{BasicNH1},{BasicNH0};!{AnilineLikeN}]
   Family PositiveIonizable
@@ -205,9 +213,14 @@ DefineFeature BasicGroup [{BasicNH2},{BasicNH1},{BasicNH0};!{AnilineLikeN}]
 EndFeature
 
 #
-# Adapted from RDKit
+# Rule adapted from RDKit and Langer et. al. (2006).
+# Langer T, Hoffmann RD, editors. Pharmacophores and pharmacophore searches. Weinheim: WILEY-VCH; 2006.
+#
+# Obs: in the RDKit, the authors exclude guanidine nitrogens bonded to formyl groups, which is like an amide substructure (N-C=O).
+# However, I decided to keep a general rule like other tools (Arpeggio, PLIP, etc) because such a formyl group does not influence so much the guanidine group. Moreover, by capturing a guanidine group, which is an important group, we are matching a positively charged region which could be optimized.
 #
 # We do not match any aromatic systems here.
+#
 DefineFeature Guanidine N[CH0X3](=N)N
   Family PositiveIonizable
   Weights 1.0,1.0,1.0,1.0
@@ -215,29 +228,45 @@ EndFeature
 
 #
 # We do not match any aromatic systems here.
+# Amidine substructures when part of an aromatic ring are composed of 2 or more different groups.
+# So, the behavior should not be considered the same as the one from an amidine.
 #
-DefineFeature Amidine [N;!{AmideLikeN}]=[CX3]([N;H1,H2;!{AmideLikeN}])
+# Rule adapted from RDKit and Langer et. al. (2006).
+# Langer T, Hoffmann RD, editors. Pharmacophores and pharmacophore searches. Weinheim: WILEY-VCH; 2006.
+#
+# Differently from Langer et. al. we also capture tertiary amidines. Ref: "DOI:10.1021/ma2027484"
+#
+DefineFeature Amidine [N;!{AmideLikeN}]=[CX3][N;!{AmideLikeN}]
   Family PositiveIonizable
   Weights 1.0,1.0,1.0
 EndFeature
 
+#
+# Capture: 4-aminopyridines
+#
 DefineFeature Aminopyridine4 Nc1cc[nH0]cc1
   Family PositiveIonizable
   Weights 1.0,1.0,1.0,1.0,1.0,1.0,1.0
 EndFeature
 
+#
+# Capture: 2-aminopyridines
+#
 DefineFeature Aminopyridine2 Nc1cccc[nH0]1
   Family PositiveIonizable
   Weights 1.0,1.0,1.0,1.0,1.0,1.0,1.0
 EndFeature
 
+#
+# Capture: Imidazoles
+#
 DefineFeature Imidazole [n;R1]1[c;R1][n;R1][c;R1][c;R1]1
   Family PositiveIonizable
   Weights 1.0,1.0,1.0,1.0,1.0
 EndFeature
 
 #
-# Captures: any positive atom
+# Capture: any positive atom
 # !$([O-]-[N+]) constraint so we don't match nitro (or similar) groups
 #
 DefineFeature PosAtom [{PosAtom};!{NegAtom};!{NitroLikeN}]
@@ -246,12 +275,10 @@ DefineFeature PosAtom [{PosAtom};!{NegAtom};!{NitroLikeN}]
 EndFeature
 
 
-
 ########################################################################################
 #                                 Negative ionizable                                   #
-
 #
-# Captures: Carboxylic acid and Carboxylate
+# Capture: Carboxylic acid and Carboxylate
 # It also captures thiocarboxylic acids
 #
 DefineFeature CarboxGroup C(=[O,S])-[O;H1,H0&-1]
@@ -260,17 +287,15 @@ DefineFeature CarboxGroup C(=[O,S])-[O;H1,H0&-1]
 EndFeature
 
 #
-# Captures: Tetrazole
+# Capture: Tetrazole
 #
 DefineFeature Tetrazole c1nnn[nH,n-1]1
     Family NegativeIonizable
     Weights 1.0,1.0,1.0,1.0,1.0
 EndFeature
 
-#O=C1CC(=O)NC(=O)N1
-
 #
-# Captures: Barbiturates
+# Capture: Barbiturates
 #
 # Good AC, Oprea TI. Optimization of CAMD techniques 3. Virtual screening enrichment studies: a help or hindrance in tool selection? Journal of Computer-Aided Molecular Design. 2008;22:169–78.
 DefineFeature Barbiturate O=C1CC(=O)[NH1,NH0-1;R]C(=O)[NH1,NH0-1;R]1
@@ -279,7 +304,7 @@ DefineFeature Barbiturate O=C1CC(=O)[NH1,NH0-1;R]C(=O)[NH1,NH0-1;R]1
 EndFeature
 
 #
-# Captures: Thiazolidinediones and rhodanines
+# Capture: Thiazolidinediones and rhodanines
 #
 # Good AC, Oprea TI. Optimization of CAMD techniques 3. Virtual screening enrichment studies: a help or hindrance in tool selection? Journal of Computer-Aided Molecular Design. 2008;22:169–78.
 DefineFeature ThiazolidinedioneGroup O=C1[NH1,NH0-1;R]C(=[O,S])[SX2H0R]C1
@@ -288,7 +313,7 @@ DefineFeature ThiazolidinedioneGroup O=C1[NH1,NH0-1;R]C(=[O,S])[SX2H0R]C1
 EndFeature
 
 #
-# Captures: Diformamide-like
+# Capture: Diformamide-like
 #
 # Generic constraint for barbiturates/thiazolidinediones...
 #
@@ -297,7 +322,6 @@ DefineFeature Diformamide [NH1,NH0-1;R](C(=O))(C(=O))
     Family NegativeIonizable
     Weights 1.0,1.0,1.0,1.0,1.0
 EndFeature
-# AtomType AcidicN  [$([NH,NH0-1](S(=O)(=O))(C(=O))),$([NH,NH0-1](S(=O)(=O))c),$([NH1,NH0-1;R](C(=O))(C(=O)))]
 
 
 ########################################################################################
@@ -312,21 +336,21 @@ EndFeature
 # Böhm S, Exner O. Acidity of hydroxamic acids and amides. Org Biomol Chem. 2003;1:1176–80.
 # Ballatore C, Huryn DM, Smith AB. Carboxylic Acid (Bio)Isosteres in Drug Design. ChemMedChem. 2013;8:385–95.
 #
-# Captures: Hydroxamic acids and Hydroxamic O-anion
+# Capture: Hydroxamic acids and Hydroxamic O-anion
 #
 DefineFeature Hydroxamic_O_anion C(=O)[NX3]-[O;H1,H0&-1]
   Family NegativeIonizable
   Weights 1.0,1.0,1.0,1.0
 EndFeature
 #
-# Captures: Hydroxamic N-anion (1st resonance form)
+# Capture: Hydroxamic N-anion (1st resonance form)
 #
 DefineFeature Hydroxamic_N_anion C(=O)[N-1]-[OH1]
   Family NegativeIonizable
   Weights 1.0,1.0,1.0,1.0
 EndFeature
 #
-# Captures: Hydroxamic N-anion (2nd resonance form)
+# Capture: Hydroxamic N-anion (2nd resonance form)
 #
 DefineFeature Hydroxamic_N_anion2 C(-[O-1])=N-[OH1]
   Family NegativeIonizable
@@ -334,14 +358,13 @@ DefineFeature Hydroxamic_N_anion2 C(-[O-1])=N-[OH1]
 EndFeature
 ########################################################################################
 
-
 ########################################################################################
 #                                                                                      #
 #                                 Sulfur groups                                        #
 #                                                                                      #
 ########################################################################################
 #
-# Captures: Sulfuric acids and Sulfates
+# Capture: Sulfuric acids and Sulfates
 # It also captures Thioketones, i.e., compounds with a double bonded S, instead of a double bonded O.
 # It has higher priority over SulfonicGroup.
 # If this rule is placed after SulfonicGroup, the RDKit will match two SulfonicGroup
@@ -352,7 +375,7 @@ DefineFeature Sulfuric S(=[O,S])(=O)(-O)-[O;H1,H0&-1]
 EndFeature
 
 #
-# Captures: Sulfonic acids and Sulfonate
+# Capture: Sulfonic acids and Sulfonate
 # It also captures Thioketones, i.e., compounds with a double bonded S, instead of a double bonded O.
 # It has higher priority over SulfinicGroup.
 # If this rule is placed after SulfinicGroup, the RDKit will match two SulfinicGroup
@@ -363,7 +386,7 @@ DefineFeature SulfonicGroup S(=[O,S])(=O)-[O;H1,H0&-1]
 EndFeature
 
 #
-# Captures: Sulfinic acid and Sulfinate
+# Capture: Sulfinic acid and Sulfinate
 # It also captures Thioketones, i.e., compounds with a double bonded S, instead of a double bonded O.
 #
 DefineFeature SulfinicGroup S(=[O,S])-[O;H1,H0&-1]
@@ -372,7 +395,7 @@ DefineFeature SulfinicGroup S(=[O,S])-[O;H1,H0&-1]
 EndFeature
 
 #
-# Captures: Sulfonamides
+# Capture: Sulfonamides
 #
 # Anderson RJ, Groundwater PW, Todd A, editors. Antibacterial agents: chemistry, mode of action, mechanisms of resistance, and clinical applications. Chichester, West Sussex: John Wiley & Sons; 2012.
 # Good AC, Oprea TI. Optimization of CAMD techniques 3. Virtual screening enrichment studies: a help or hindrance in tool selection? Journal of Computer-Aided Molecular Design. 2008;22:169–78.
@@ -393,8 +416,6 @@ DefineFeature Sulfonamide [N;!H0,H0&-1]S(=O)(=O)
   Weights 1.0,1.0,1.0,1.0
 EndFeature
 
-#$([NH,NH0-1](S(=O)(=O))c)
-
 ########################################################################################
 
 
@@ -405,7 +426,7 @@ EndFeature
 #                                                                                      #
 ########################################################################################
 #
-# Captures: Phosphoric acids and phosphates.
+# Capture: Phosphoric acids and phosphates.
 # It also captures Thioketones, i.e., compounds with a double bonded S, instead of a double bonded O.
 # It has higher priority over PhosphonicGroup.
 # If this rule is placed after PhosphonicGroup, the RDKit will match two PhosphonicGroups
@@ -416,7 +437,7 @@ DefineFeature PhosphoricGroup P(=[O,S])(-O)(-O)-[O;H1,H0&-1]
 EndFeature
 
 #
-# Captures: Phosphonic acids and phosphonate.
+# Capture: Phosphonic acids and phosphonate.
 # It also captures Thioketones, i.e., compounds with a double bonded S, instead of a double bonded O.
 # It has higher priority over PhosphinicGroup.
 # If this rule is placed after PhosphinicGroup, the RDKit will match two PhosphinicGroups
@@ -427,7 +448,7 @@ DefineFeature PhosphonicGroup P(=[O,S])(-O)-[O;H1,H0&-1]
 EndFeature
 
 #
-# Captures: Phosphinic acid (Hypophosphorous acid) and Phosphinate
+# Capture: Phosphinic acid (Hypophosphorous acid) and Phosphinate
 # It also captures Thioketones, i.e., compounds with a double bonded S, instead of a double bonded O.
 #
 DefineFeature PhosphinicGroup [P](=[O,S])-[O;H1,H0&-1]
@@ -437,7 +458,7 @@ EndFeature
 ########################################################################################
 
 #
-# Captures: any negative atom not captured by the previous rules.
+# Capture: any negative atom not captured by the previous rules.
 # !$([O-]-[N+]) constraint so we don't match nitro (or similar) groups
 #
 DefineFeature NegAtom [{NegAtom};!{PosAtom};!{NitroLikeO}]
@@ -447,12 +468,98 @@ EndFeature
 
 
 
+########################################################################################
+#                               Negative dipole - Nucleophile                          #
+#
+
+# OBS: all rules were obtained departing from Pauline et. al. (2005)
+# Ref: Paulini R, Müller K, Diederich F. Orthogonal multipolar interactions in structural chemistry and biology. Angew Chem Int Ed Engl. 2005;44:1788–805.
+
+# Halogens
+AtomType NucleophilicAtom [$([F,Cl,Br,I;X1]-[#6])]
+
+# Carbonyl oxygen
+AtomType NucleophilicAtom [$(O=[#6])]
+
+# Cyano/Nitrile nitrogen
+AtomType NucleophilicAtom [$(N#C)]
+
+# Nitro group nitrogen: *-NO2
+AtomType NucleophilicAtom [$(O=[N;D3;+][O-]),$([O-][N;D3;+]=O)]
+
+# R2NO group oxygen
+# R cannot be a hydrogen.
+# NO is N=O or N-O
+AtomType NucleophilicAtom [$(O~[n;H0;X3])]
+
+# Sulfonyl and Sulfinyl-like oxygen: C2S=O
+AtomType NucleophilicAtom [$(O=[S;v4,v6]([#6])[#6])]
+
+# Imine nitrogen: C2N
+# It includes aromatic imines
+AtomType NucleophilicAtom [$([#7;X2](=,:[#6;X3])(-,:[#6]))]
+
+# Ether oxygen: C2O
+AtomType NucleophilicAtom [$([#8;v2]([#6])[#6])]
+
+# Thioether sulfur: C2S
+AtomType NucleophilicAtom [$([#16;v2]([#6])[#6])]
+
+# Alcohol oxygen
+AtomType NucleophilicAtom [$([O;v2;H1][#6])]
+
+# Water oxygen
+AtomType NucleophilicAtom [$([O;v2;H2])]
+
+DefineFeature Nucleophile [{NucleophilicAtom}]
+    Family Nucleophile
+    Weights 1.0
+EndFeature
 
 
+########################################################################################
+#                              Positive dipole - Eletrophile                           #
+#
 
+# All rules were obtained departing from Pauline et. al. (2005)
+# Ref: Paulini R, Müller K, Diederich F. Orthogonal multipolar interactions in structural chemistry and biology. Angew Chem Int Ed Engl. 2005;44:1788–805.
 
+# Carbonyl
+DefineFeature EletrophileCarbonyl *-[#6;X3](-*)=O
+    Family Eletrophile
+    Weights 1.0,1.0,1.0,1.0
+EndFeature
 
+# Amidine and guanidine: R-CN2.
+DefineFeature EletrophileAmidine [N;!{AmideLikeN}]=[CX3]([C,N])[N;!{AmideLikeN}]
+    Family Eletrophile
+    Weights 1.0,1.0,1.0,1.0
+EndFeature
 
+# Amidine carbon containing one Hydrogen
+# In this case, it is only possible to capture three atoms, i.e., the plane will be obtained just departing these three atoms.
+DefineFeature EletrophileAmidine2 [N;!{AmideLikeN}]=[CX3][N;!{AmideLikeN}]
+    Family Eletrophile
+    Weights 1.0,1.0,1.0
+EndFeature
+
+# Cyano/Nitrile
+DefineFeature EletrophileNitrile [$(C#N)]
+    Family Eletrophile
+    Weights 1.0
+EndFeature
+
+# Nitro group
+DefineFeature EletrophileNitro O=[N;D3;+](-*)[O-]
+    Family Eletrophile
+    Weights 1.0,1.0,1.0,1.0
+EndFeature
+
+# Halogen carbon
+DefineFeature EletrophileHalogen [$([#6]-[F,Cl,Br,I;X1])]
+    Family Eletrophile
+    Weights 1.0
+EndFeature
 
 
 
@@ -463,3 +570,67 @@ EndFeature
 ########################################################################################
 #
 #Li,Be,Na,Mg,Al,K,Ca,Sc,Ti,V,Cr,Mn,Fe,Co,Ni,Cu,Zn,Ga,Rb,Sr,Y,Zr,Nb,Mo,Tc,Ru,Rh,Pd,Ag,Cd,In,Sn,Cs,Ba,La,Ce,Pr,Nd,Pm,Sm,Eu,Gd,Tb,Dy,Ho,Er,Tm,Yb,Lu,Hf,Ta,W,Re,Os,Ir,Pt,Au,Hg,Tl,Pb,Bi,Po,Fr,Ra,Ac,Th,Pa,U,Np,Pu,Am,Cm,Bk,Cf
+
+
+
+########################################################################################
+#                                   Aromatic rings                                     #
+#
+
+# Obtained from RDKit
+
+# aromatic rings of various sizes:
+#
+# Note that with the aromatics, it's important to include the ring-size queries along with
+# the aromaticity query for two reasons:
+#   1) Much of the current feature-location code assumes that the feature point is
+#      equidistant from the atoms defining it. Larger definitions like: a1aaaaaaaa1 will actually
+#      match things like 'o1c2cccc2ccc1', which have an aromatic unit spread across multiple simple
+#      rings and so don't fit that requirement.
+#   2) It's *way* faster.
+# 21.1.2008 (GL): update ring membership tests to reflect corrected meaning of
+# "r" in SMARTS parser
+#
+AtomType AromR4 [a;r4,!R1&r3]
+DefineFeature Arom4 [{AromR4}]1:[{AromR4}]:[{AromR4}]:[{AromR4}]:1
+ Family Aromatic
+ Weights 1.0,1.0,1.0,1.0
+EndFeature
+AtomType AromR5 [a;r5,!R1&r4,!R1&r3]
+DefineFeature Arom5 [{AromR5}]1:[{AromR5}]:[{AromR5}]:[{AromR5}]:[{AromR5}]:1
+ Family Aromatic
+ Weights 1.0,1.0,1.0,1.0,1.0
+EndFeature
+AtomType AromR6 [a;r6,!R1&r5,!R1&r4,!R1&r3]
+DefineFeature Arom6 [{AromR6}]1:[{AromR6}]:[{AromR6}]:[{AromR6}]:[{AromR6}]:[{AromR6}]:1
+ Family Aromatic
+ Weights 1.0,1.0,1.0,1.0,1.0,1.0
+EndFeature
+AtomType AromR7 [a;r7,!R1&r6,!R1&r5,!R1&r4,!R1&r3]
+DefineFeature Arom7 [{AromR7}]1:[{AromR7}]:[{AromR7}]:[{AromR7}]:[{AromR7}]:[{AromR7}]:[{AromR7}]:1
+ Family Aromatic
+ Weights 1.0,1.0,1.0,1.0,1.0,1.0,1.0
+EndFeature
+AtomType AromR8 [a;r8,!R1&r7,!R1&r6,!R1&r5,!R1&r4,!R1&r3]
+DefineFeature Arom8 [{AromR8}]1:[{AromR8}]:[{AromR8}]:[{AromR8}]:[{AromR8}]:[{AromR8}]:[{AromR8}]:[{AromR8}]:1
+ Family Aromatic
+ Weights 1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+EndFeature
+
+
+
+########################################################################################
+#                                      Hydrophobic                                     #
+#
+# Obtained from RDKit
+# any carbon that is not bonded to a polar atom is considered a hydrophobic
+#
+AtomType Carbon_Polar [#6;$([#6]~[#7,#8,#9])]
+AtomType Carbon_NonPolar [#6;+0;!{Carbon_Polar}]
+
+AtomType Hphobe [s,S&H0&v2,Br,I,Cl,F,At,{Carbon_NonPolar};+0]
+
+DefineFeature Hphobe [{Hphobe}]
+ Family Hydrophobic
+  Weights 1.0
+EndFeature
