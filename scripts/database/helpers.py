@@ -50,98 +50,86 @@ class InteractionManager(Manager):
 
     def insert_interactions(self, interactions, ligand_entity):
         # Create a copy of the interactions to modify the list.
-        auxList = list(interactions)
+        aux_list = list(interactions)
 
-        interInDB = {}
+        inter_in_db = {}
         # Control if an interaction with dependents failed once.
         retries = set()
-        while auxList:
-            interaction = auxList.pop(0)
+        while aux_list:
+            interaction = aux_list.pop(0)
 
             # If an interaction has dependecies, i.e., it depends on
             # any other interaction to exist.
             # It occurs, for example, in Water-bridged hydrogen bonds
             # as this interaction depends on two or more hydrogen bonds
             # to exist.
-            if "dependOf" in interaction.params:
-                dependOfInter = interaction.params["dependOf"]
-                existDependencies = True
-                invalidDependencies = False
-                for requiredInter in dependOfInter:
-                    if requiredInter not in interInDB:
-                        existDependencies = False
+            if "depend_of" in interaction.params:
+                depend_of_inters = interaction.params["depend_of"]
+                exist_dependencies = True
+                invalid_dependencies = False
+                for required_inter in depend_of_inters:
+                    if required_inter not in inter_in_db:
+                        exist_dependencies = False
                     else:
-                        if interInDB[requiredInter] is None:
-                            invalidDependencies = True
+                        if inter_in_db[required_inter] is None:
+                            invalid_dependencies = True
 
                 # If any required interaction is invalid,
                 # it does not add the current interaction
-                if invalidDependencies:
-                    logger.info("The interaction '%s' depend on some invalid "
-                                "interactions: %s." %
-                                (interaction, str(dependOfInter)))
+                if invalid_dependencies:
+                    logger.info("The interaction '%s' depend on some invalid interactions: %s."
+                                % (interaction, str(depend_of_inters)))
 
                 # If all required interactions has already
                 # been added to the DB.
-                if existDependencies:
-                    dbRequiredInteractions = ([interInDB[x]
-                                               for x in dependOfInter])
+                if exist_dependencies:
+                    dbReqInters = ([inter_in_db[x] for x in depend_of_inters])
+                    dbInter = self.new_interaction(interaction, ligand_entity)
 
-                    dbInteraction = self.new_interaction(interaction,
-                                                         ligand_entity)
-
-                    if dbInteraction:
-                        dbInteraction.dependencies = dbRequiredInteractions
+                    if dbInter:
+                        dbInter.dependencies = dbReqInters
                     else:
-                        logger.info("The interaction '%s' does "
-                                    "not have a valid type." % interaction)
+                        logger.info("The interaction '%s' does not have a valid type." % interaction)
                 else:
                     # If the interaction is in the 'retries' list
                     # it means that it is the second try to the
                     # same interaction. So, ignore it.
                     if interaction in retries:
-                        logger.info("The interaction '%s' depend on not "
-                                    "existing interactions: %s." %
-                                    (interaction, str(dependOfInter)))
+                        logger.info("The interaction '%s' depend on not existing interactions: %s."
+                                    % (interaction, str(depend_of_inters)))
                     else:
                         retries.add(interaction)
-                        auxList.append(interaction)
+                        aux_list.append(interaction)
             else:
-                dbInteraction = self.new_interaction(interaction,
-                                                     ligand_entity)
-                if dbInteraction is None:
-                    logger.info("The interaction '%s' does "
-                                "not have a valid type." % interaction)
+                dbInter = self.new_interaction(interaction, ligand_entity)
+                if dbInter is None:
+                    logger.info("The interaction '%s' does not have a valid type." % interaction)
 
-                interInDB[interaction] = dbInteraction
+                inter_in_db[interaction] = dbInter
 
         # Approve all insertions.
         self.db.approve_session()
 
     def new_interaction(self, interaction, ligand_entity):
-        g1 = self.new_atom_group(interaction.comp1)
-        g2 = self.new_atom_group(interaction.comp2)
+        g1 = self.new_atom_group(interaction.atm_grp1)
+        g2 = self.new_atom_group(interaction.atm_grp2)
 
         interType = interaction.type
-        dbInterType = (self.db.session.query(InterType).
-                       filter(InterType.type == interType).
-                       all())
+        dbInterType = (self.db.session.query(InterType).filter(InterType.type == interType).all())
 
         params = dict(interaction.params)
-        if ("dependOf" in params):
-            del params["dependOf"]
+        if ("depend_of" in params):
+            del params["depend_of"]
 
-        dbInteraction = self.interaction(group_id1=g1.id,
-                                         group_id2=g2.id,
-                                         inter_type_id=dbInterType[0].id,
-                                         **params)
+        dbInter = self.interaction(group_id1=g1.id, group_id2=g2.id,
+                                   inter_type_id=dbInterType[0].id, **params)
 
         if ligand_entity:
-            dbInteraction.ligand_entities.append(ligand_entity)
+            dbInter.ligand_entities.append(ligand_entity)
 
-        self.db.session.add(dbInteraction)
+        self.db.session.add(dbInter)
 
-        return dbInteraction
+        return dbInter
 
     def new_atom_group(self, group):
         oriComp = group.atoms[0].get_parent()
@@ -151,26 +139,22 @@ class InteractionManager(Manager):
                          comp_name=oriComp.get_parent_by_level('R').resname,
                          comp_num=oriComp.get_parent_by_level('R').get_id()[1],
                          comp_icode=oriComp.get_parent_by_level('R').get_id()[2],
-                         name="",
-                         coord_x=group.centroid[0],
-                         coord_y=group.centroid[1],
-                         coord_z=group.centroid[2])
+                         name="", coord_x=group.centroid[0], coord_y=group.centroid[1], coord_z=group.centroid[2])
+
         self.db.session.add(db_group)
 
         # TODO: o nome dos grupos esta ficando como?
-        featureNames = [x.name for x in group.chemicalFeatures]
+        features = [x.name for x in group.chemicalFeatures]
 
-        # If the 'featureNames' list is empty or has non-existing values,
+        # If the 'features' list is empty or has non-existing values,
         # the DB selection will return an empty list.
         # The chemical features can be empty if the group does not match
         # any chemical definition.
         # Despite it, two atoms can establish an interaction of some type,
         # e.g., a Covalent bond.
-        dbChemicalFeatures = (self.db.session.query(CompoundType).
-                              filter(CompoundType.type.in_(featureNames)).
-                              all())
+        dbFeatures = (self.db.session.query(CompoundType).filter(CompoundType.type.in_(features)).all())
 
-        for dbObj in dbChemicalFeatures:
+        for dbObj in dbFeatures:
             db_group.compound_types.append(dbObj)
 
         for atom in group.atoms:
@@ -180,13 +164,8 @@ class InteractionManager(Manager):
         return db_group
 
     def new_atom(self, atom):
-        db_atom = Atom(name=atom.name,
-                       serial_number=atom.serial_number,
-                       altloc=atom.altloc,
-                       element=atom.element,
-                       coord_x=atom.coord[0],
-                       coord_y=atom.coord[1],
-                       coord_z=atom.coord[2])
+        db_atom = Atom(name=atom.name, serial_number=atom.serial_number, altloc=atom.altloc,
+                       element=atom.element, coord_x=atom.coord[0], coord_y=atom.coord[1], coord_z=atom.coord[2])
 
         self.db.session.add(db_atom)
 

@@ -1,10 +1,10 @@
 from MyBio.PDB.PDBIO import PDBIO
 from MyBio.selector import ResidueSelector
-from interaction.contact import get_contacts_for_entity
-from mol.vicinity_atom import VicinityAtom
-from mol.coordinates import (Coordinate, NeighbourhoodCoordinates)
 
-import interaction.plane_regression as plane
+import mol.interaction.math as imath
+from mol.interaction.contact import get_contacts_for_entity
+from mol.neighborhood import NbAtom
+from mol.coordinates import (Coordinate, NeighbourhoodCoordinates)
 
 from rdkit.Chem import MolFromMolBlock
 from openbabel import (OBMolAtomIter, OBAtomAtomIter)
@@ -13,16 +13,14 @@ from collections import defaultdict
 from pybel import readstring
 from io import StringIO
 
-import interaction.util as iu
-
 
 class AtomGroup():
 
     def __init__(self, atoms, features, interactions=None, recursive=True):
         self.atoms = atoms
         self.features = features
-        self.coords = iu.get_coordinatesnp(atoms)
-        self._centroid = iu.calc_centroidnp(self.coords)
+        self.coords = imath.atom_coordinates(atoms)
+        self._centroid = imath.centroid(self.coords)
         self._normal = None
 
         if interactions is None:
@@ -61,14 +59,14 @@ class AtomGroup():
         target_interactions = []
 
         for i in self.interactions:
-            if i.comp1 == atm_grp or i.comp2 == atm_grp:
+            if i.atm_grp1 == atm_grp or i.atm_grp2 == atm_grp:
                 target_interactions.append(i)
 
         return target_interactions
 
     def _calc_normal(self):
         if self._normal is None:
-            self._normal = plane.calc_normal(self.coords)
+            self._normal = imath.calc_normal(self.coords)
 
     def __repr__(self):
         return '<AtomGroup: [%s]' % ', '.join([str(x) for x in self.atoms])
@@ -159,8 +157,8 @@ def find_compound_groups(mybio_residue, feature_extractor, ph=None, has_explicit
         # Ignore hydrogen atoms
         if (atm.element != "H"):
             nb_coords = nb_coords_by_atm[atm.get_serial_number()]
-            vicinity_atom = VicinityAtom(atm, nb_coords)
-            trgt_atms[atm.get_serial_number()] = vicinity_atom
+            nb_atom = NbAtom(atm, nb_coords)
+            trgt_atms[atm.get_serial_number()] = nb_atom
 
     comp_grps = CompoundGroups(mybio_residue)
     for key in group_features:

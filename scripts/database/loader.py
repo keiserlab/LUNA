@@ -38,35 +38,31 @@ class DBLoader():
             try:
                 # Engine: mysql-python
                 self._engine = create_engine('mysql+mysqldb://%s:%s@%s:%i/%s' %
-                                             (self._user, self._passwd,
-                                              self._host, self._port,
-                                              self._db)
-                                             )
+                                             (self._user, self._passwd, self._host, self._port, self._db))
                 self._metadata = MetaData(self._engine)
             except Exception as e:
                 logger.exception(e)
                 raise
 
-    def get_table(self, tableName, autoload=True):
-        return Table(tableName, self._metadata, autoload=autoload)
+    def get_table(self, tbl_name, autoload=True):
+        return Table(tbl_name, self._metadata, autoload=autoload)
 
-    def new_mapper(self, targetClass, table, properties=None):
+    def new_mapper(self, trgt_class, table, properties=None):
         # Return if already mapped
-        if inspect(targetClass, raiseerr=False):
+        if inspect(trgt_class, raiseerr=False):
             return
 
         if isinstance(table, str):
-            table = self.get_table(tableName=table, autoload=True)
+            table = self.get_table(tbl_name=table, autoload=True)
 
         if not isinstance(table, Table):
-            raise IllegalArgumentError("Parameter 'table' should be a "
-                                       "table name or a Table object.")
+            raise IllegalArgumentError("Parameter 'table' should be a table name or a Table object.")
 
         # TODO: check if table exists
         if (properties is None):
-            mapper(targetClass, table)
+            mapper(trgt_class, table)
         else:
-            mapper(targetClass, table, properties=properties)
+            mapper(trgt_class, table, properties=properties)
 
     def new_session(self):
         if (self._session is None):

@@ -1,3 +1,5 @@
+from Bio.PDB.Polypeptide import is_aa
+
 from sqlalchemy import inspect
 from sqlalchemy.orm import relationship
 
@@ -5,14 +7,11 @@ from database.napoli_model import *
 from database.filters import FilterRules
 from database.helpers import MapperConfiguration
 
-from util.entry import DBLigandEntry
-
-from Bio.PDB.Polypeptide import is_aa
-
-from interaction.calc_interactions import InteractionType
+from mol.entry import DBLigandEntry
+from mol.interaction.type import InteractionType
 from mol.groups import AtomGroup
-from mol.vicinity_atom import VicinityAtom
-from mol.chemical_feature import ChemicalFeature
+from mol.neighborhood import NbAtom
+from mol.features import ChemicalFeature
 
 
 def object_as_dict(obj):
@@ -172,7 +171,7 @@ def format_db_atoms(mybio_residue, db_atoms):
     atoms = []
     for db_atom in db_atoms:
         mybio_atom = mybio_residue[db_atom.name]
-        atoms.append(VicinityAtom(mybio_atom, []))
+        atoms.append(NbAtom(mybio_atom, []))
 
     return atoms
 

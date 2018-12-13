@@ -66,10 +66,8 @@ def ligand_pharm_figure(rdmol, atm_types, output, colors=None):
     opts.useBWAtomPalette()
 
     drawer.SetFontSize(0.5)
-    drawer.DrawMolecule(rwm, highlightAtoms=atoms,
-                        highlightAtomColors=highlight,
-                        highlightBonds=[],
-                        legend=rdmol.GetProp("_Name"))
+    drawer.DrawMolecule(rwm, highlightAtoms=atoms, highlightAtomColors=highlight,
+                        highlightBonds=[], legend=rdmol.GetProp("_Name"))
     drawer.FinishDrawing()
     svg = drawer.GetDrawingText().replace('svg:', '')
 

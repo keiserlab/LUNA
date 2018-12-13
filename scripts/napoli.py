@@ -1,8 +1,9 @@
-from util.entry import (DBLigandEntry, PLIEntryValidator)
-
 from util.default_values import *
-
-from file.util import create_directory
+from util.exceptions import *
+from util.file import (create_directory, is_file_valid, get_filename, get_unique_filename)
+from util.logging import new_logging_file
+from util.config_parser import Config
+from util.function import func_call_2str
 
 from MyBio.util import (download_pdb, pdb_object_2block)
 from MyBio.selector import ResidueSelector
@@ -13,54 +14,36 @@ from rdkit.Chem import MolFromPDBBlock
 from rdkit.Chem.rdDepictor import Compute2DCoords
 
 # Get nearby molecules (contacts)
-from interaction.contact import get_contacts_for_entity
-from interaction.calc_interactions import (calc_all_interactions,
-                                           apply_interaction_criteria,
-                                           InteractionConf)
+from mol.interaction.contact import get_contacts_for_entity
+from mol.interaction.calc_interactions import (calc_all_interactions, apply_interaction_criteria)
 
-from interaction.calc import InteractionCalculator
-from interaction.conf import InteractionConf
+from mol.interaction.calc import InteractionCalculator
+from mol.interaction.conf import InteractionConf
 
+from mol.entry import (DBLigandEntry, PLIEntryValidator)
 from mol.groups import find_compound_groups
 from mol.fingerprint import generate_fp_for_mols
-from mol.chemical_feature import FeatureExtractor
-from mol.obabel import convert_molecule
+from mol.features import FeatureExtractor
+from mol.wrappers.obabel import convert_molecule
 from mol.clustering import cluster_fps_butina
 from mol.depiction import ligand_pharm_figure
-from mol.shell import (ShellGenerator, Fingerprint)
+from mol.interaction.fp.shell import (ShellGenerator, Fingerprint)
 
-from analysis.residues import InteractingResidues
+from analysis.residues import (InteractingResidues, get_interacting_residues)
+from analysis.summary import *
 
-from file.validator import is_file_valid
-
-from util.exceptions import *
 from sqlalchemy.orm.exc import NoResultFound
-
-from util.config_parser import Config
 
 from database.loader import *
 from database.napoli_model import *
 from database.helpers import *
-from database.util import (get_ligand_tbl_join_filter,
-                           default_interaction_filters,
-                           format_db_ligand_entries,
-                           format_db_interactions,
-                           object_as_dict,
-                           get_default_mappers_list)
-
-from util.logging import new_logging_file
-
-from analysis.summary import *
-from analysis.residues import get_interacting_residues
+from database.util import (get_ligand_tbl_join_filter, default_interaction_filters,
+                           format_db_ligand_entries, format_db_interactions,
+                           object_as_dict, get_default_mappers_list)
 
 from os.path import exists
-
 from collections import defaultdict
-
-from file.util import (get_filename, get_unique_filename)
-
 from functools import wraps
-from util.function import func_call_2str
 
 
 class StepControl:

@@ -33,15 +33,13 @@ def get_interacting_residues(interactions, targets, key_map={}):
     res_inter_atm = set()
 
     for i in interactions:
-        if (i.comp1.compound in targets and
-                i.comp2.compound.is_aminoacid()):
-            res.add(i.comp2.compound)
-            res_inter.add((i.comp2.compound, i.type))
-            res_inter_atm.add((i.comp2.compound, i.type, i.comp2))
-        elif (i.comp2.compound in targets and
-                i.comp1.compound.is_aminoacid()):
-            res.add(i.comp1.compound)
-            res_inter.add((i.comp1.compound, i.type))
-            res_inter_atm.add((i.comp1.compound, i.type, i.comp1))
+        if (i.atm_grp1.compound in targets and i.atm_grp2.compound.is_aminoacid()):
+            res.add(i.atm_grp2.compound)
+            res_inter.add((i.atm_grp2.compound, i.type))
+            res_inter_atm.add((i.atm_grp2.compound, i.type, i.atm_grp2))
+        elif (i.atm_grp2.compound in targets and i.atm_grp1.compound.is_aminoacid()):
+            res.add(i.atm_grp1.compound)
+            res_inter.add((i.atm_grp1.compound, i.type))
+            res_inter_atm.add((i.atm_grp1.compound, i.type, i.atm_grp1))
 
     return InteractingResidues(res, res_inter, res_inter_atm)

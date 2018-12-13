@@ -146,7 +146,23 @@ class InteractionCalculator():
                 ("PosIonizable", "PosIonizable"): self.calc_repulsive,
                 ("PosIonizable", "Aromatic"): self.calc_cation_pi,
                 ("HalogenDonor", "HalogenAcceptor"): self.calc_xbond,
-                ("HalogenDonor", "Aromatic"): self.calc_xbond_pi}
+                ("HalogenDonor", "Aromatic"): self.calc_xbond_pi,
+
+                ("NegativelyIonizable", "PositivelyIonizable"): self.calc_attractive,
+                ("NegativelyIonizable", "NegativelyIonizable"): self.calc_repulsive,
+                ("PositivelyIonizable", "PositivelyIonizable"): self.calc_repulsive,
+                ("PositivelyIonizable", "Aromatic"): self.calc_cation_pi,
+                }
+
+                # TODO: Incluir:
+                # Acceptor - XDonor
+                # Acceptor - YDonor
+                # Anion - pi system
+                # Weak donor - acceptor
+                # Weak donor - weak acceptor
+                # Hydrogen bond with pi system
+                # weak donor - pi system
+
 
     def calc_inter(self, group1, group2, feat1, feat2):
         func = self.get_function(feat1, feat2)
@@ -326,7 +342,12 @@ class InteractionCalculator():
                 validCXAAngles = []
                 # XA vector is always the same
                 xaVect = acceptorGroup.centroid - donorGroup.centroid
-                # Defining angle CXY
+
+                # TODO: Porque eu estou percorrendo o vetor de Carbonos ligados ao halogênio?
+                # Isso não faz sentido. Irá existir somente 1 carbono por vez.
+                # TODO: Tentar entender isso.
+
+                # Defining the angle CXA
                 for carbonCoord in xCarbonCoords:
                     xcVect = carbonCoord.coord - donorGroup.centroid
                     cxaAngle = iu.calc_angle(xcVect, xaVect)
@@ -335,7 +356,7 @@ class InteractionCalculator():
                         validCXAAngles.append(cxaAngle)
 
                 # Interaction model: C-X ---- A-R
-                # Defining angle RYX
+                # Defining angle RAX
                 validXARAngles = []
                 # AX vector is always the same
                 axVect = donorGroup.centroid - acceptorGroup.centroid

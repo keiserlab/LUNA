@@ -100,3 +100,13 @@ def pdb_object_2block(entity, select=Select(),
             write_conects=write_conects)
     fh.seek(0)
     return ''.join(fh.readlines())
+
+
+def get_entity_level_name():
+    return {
+        "A": "atom",
+        "R": "residue",
+        "C": "chain",
+        "M": "model",
+        "S": "structure"
+    }

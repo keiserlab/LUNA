@@ -33,13 +33,12 @@ def count_interaction_types(interactions, targets=None, key_map={}):
     for i in interactions:
         contain_trgts = True
         if targets is not None:
-            if (i.comp1.compound not in targets and
-                    i.comp2.compound not in targets):
+            if (i.atm_grp1.compound not in targets and i.atm_grp2.compound not in targets):
                 contain_trgts = False
 
         if contain_trgts:
-            pair_key1 = (i.type, i.comp1, i.comp2)
-            pair_key2 = (i.type, i.comp2, i.comp1)
+            pair_key1 = (i.type, i.atm_grp1, i.atm_grp2)
+            pair_key2 = (i.type, i.atm_grp2, i.atm_grp1)
 
             if pair_key1 in seen_pairs or pair_key2 in seen_pairs:
                 continue
