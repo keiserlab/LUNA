@@ -4,6 +4,8 @@ from interaction.contact import get_contacts_for_entity
 from mol.vicinity_atom import VicinityAtom
 from mol.coordinates import (Coordinate, NeighbourhoodCoordinates)
 
+import interaction.plane_regression as plane
+
 from rdkit.Chem import MolFromMolBlock
 from openbabel import (OBMolAtomIter, OBAtomAtomIter)
 
@@ -11,24 +13,25 @@ from collections import defaultdict
 from pybel import readstring
 from io import StringIO
 
+import interaction.util as iu
+
 
 class AtomGroup():
 
-    def __init__(self, atoms, chemicalFeatures):
-        import interaction.util as iu
-
+    def __init__(self, atoms, features, interactions=None, recursive=True):
         self.atoms = atoms
-        self.chemicalFeatures = chemicalFeatures
+        self.features = features
         self.coords = iu.get_coordinatesnp(atoms)
         self._centroid = iu.calc_centroidnp(self.coords)
         self._normal = None
-        self._isNormalCalculated = False
 
-    def has_atom(self, atom):
-        return atom in self.atoms
+        if interactions is None:
+            interactions = []
+        self.interactions = interactions
 
-    def get_serial_numbers(self):
-        return [a.get_serial_number() for a in self.atoms]
+        if recursive:
+            for a in self.atoms:
+                a.add_atom_group(self)
 
     @property
     def compound(self):
@@ -40,17 +43,32 @@ class AtomGroup():
 
     @property
     def normal(self):
-        if self._isNormalCalculated is False:
+        if self._normal is None:
             self._calc_normal()
 
         return self._normal
 
-    def _calc_normal(self):
-        import interaction.plane_regression as plane
+    def has_atom(self, atom):
+        return atom in self.atoms
 
-        if self._isNormalCalculated is False:
+    def contain_group(self, atm_grp):
+        return set(atm_grp.atoms).issubset(set(self.atoms))
+
+    def get_serial_numbers(self):
+        return [a.get_serial_number() for a in self.atoms]
+
+    def get_interactions_with(self, atm_grp):
+        target_interactions = []
+
+        for i in self.interactions:
+            if i.comp1 == atm_grp or i.comp2 == atm_grp:
+                target_interactions.append(i)
+
+        return target_interactions
+
+    def _calc_normal(self):
+        if self._normal is None:
             self._normal = plane.calc_normal(self.coords)
-            self._isNormalCalculated = True
 
     def __repr__(self):
         return '<AtomGroup: [%s]' % ', '.join([str(x) for x in self.atoms])
@@ -58,114 +76,110 @@ class AtomGroup():
 
 class CompoundGroups():
 
-    def __init__(self, myBioPDBResidue, atomGroups=None):
-        self.residue = myBioPDBResidue
+    def __init__(self, mybio_residue, atm_grps=None):
+        self.residue = mybio_residue
 
-        if atomGroups is None:
-            atomGroups = []
-        self.atomGroups = atomGroups
+        if atm_grps is None:
+            atm_grps = []
+
+        self.atm_grps = atm_grps
 
     @property
     def summary(self):
         summary = defaultdict(int)
-        for grp in self.atomGroups:
-            for feature in grp.chemicalFeatures:
+        for grp in self.atm_grps:
+            for feature in grp.features:
                 summary[feature] += 1
 
         return summary
 
     def add_group(self, group):
-        self.atomGroups += [group]
+        atm_grps = set(self.atm_grps + [group])
+        self.atm_grps = list(atm_grps)
 
 
-def find_compound_groups(myBioPDBResidue, featureExtractor, ph=None,
-                         hasExplicitHydrogen=False):
+def find_compound_groups(mybio_residue, feature_extractor, ph=None, has_explicit_hydrogen=False):
 
     COV_CUTOFF = 1.99999999999
 
-    model = myBioPDBResidue.get_parent_by_level('M')
-    proximal = get_contacts_for_entity(entity=model, source=myBioPDBResidue,
+    model = mybio_residue.get_parent_by_level('M')
+    proximal = get_contacts_for_entity(entity=model, source=mybio_residue,
                                        radius=COV_CUTOFF, level='R')
 
-    covResidues = set()
+    cov_residues = set()
     for pair in proximal:
-        if (pair[1] != myBioPDBResidue):
-            covResidues.add(pair[1])
+        if (pair[1] != mybio_residue):
+            cov_residues.add(pair[1])
 
-    resSel = ResidueSelector(list(covResidues) + [myBioPDBResidue])
+    res_sel = ResidueSelector(list(cov_residues) + [mybio_residue])
 
     fh = StringIO()
     io = PDBIO()
     io.set_structure(model)
-    io.save(fh, select=resSel, preserve_atom_numbering=True,
-            write_conects=True)
+    io.save(fh, select=res_sel, preserve_atom_numbering=True, write_conects=True)
     fh.seek(0)
-    pdbBlock = ''.join(fh.readlines())
+    pdb_block = ''.join(fh.readlines())
 
-    obMol = readstring("pdb", pdbBlock)
+    obMol = readstring("pdb", pdb_block)
     if (ph is not None):
         obMol.OBMol.AddHydrogens(True, True, ph)
 
-    atomMap = {}
-    hydrogCoords = {}
+    atm_map = {}
+    nb_coords_by_atm = {}
 
-    filteredOBAtom = [a for a in OBMolAtomIter(obMol.OBMol)
-                      if a.GetAtomicNum() != 1]
+    filtered_obAtom = [a for a in OBMolAtomIter(obMol.OBMol)
+                       if a.GetAtomicNum() != 1]
 
-    isWater = myBioPDBResidue.get_id()[0] == "W"
-    for idx, obAtom in enumerate(filteredOBAtom):
+    for idx, obAtom in enumerate(filtered_obAtom):
         # Ignore hydrogen atoms
         if (obAtom.GetAtomicNum() != 1):
             obResidue = obAtom.GetResidue()
             serialNumber = obResidue.GetSerialNum(obAtom)
-            atomMap[idx] = serialNumber
+            atm_map[idx] = serialNumber
 
-            nbCoordinates = []
-            if (isWater is False):
-                for nbObAtom in OBAtomAtomIter(obAtom):
-                    coords = Coordinate(nbObAtom.GetX(),
-                                        nbObAtom.GetY(),
-                                        nbObAtom.GetZ(),
-                                        atomicNumber=nbObAtom.GetAtomicNum())
+            nb_coords = []
+            if (not mybio_residue.is_water()):
+                for nb_obAtom in OBAtomAtomIter(obAtom):
+                    coords = Coordinate(nb_obAtom.GetX(),
+                                        nb_obAtom.GetY(),
+                                        nb_obAtom.GetZ(),
+                                        atomicNumber=nb_obAtom.GetAtomicNum())
 
-                    nbCoordinates.append(coords)
+                    nb_coords.append(coords)
 
-            hydrogCoords[serialNumber] \
-                = NeighbourhoodCoordinates(nbCoordinates)
+            nb_coords_by_atm[serialNumber] = NeighbourhoodCoordinates(nb_coords)
 
-    molBlock = obMol.write('mol')
+    mol_block = obMol.write('mol')
+    rdMol = MolFromMolBlock(mol_block)
 
-    rdMol = MolFromMolBlock(molBlock)
+    group_features = feature_extractor.get_features_by_groups(rdMol, atm_map)
 
-    groupFeatures = featureExtractor.get_features_by_groups(rdMol, atomMap)
-
-    targetAtoms = {}
-    for atom in myBioPDBResidue.get_atoms():
+    trgt_atms = {}
+    for atm in mybio_residue.get_atoms():
         # Ignore hydrogen atoms
-        if (atom.element != "H"):
-            nbCoords = hydrogCoords[atom.get_serial_number()]
-            vicinityAtom = VicinityAtom(atom, nbCoords)
-            targetAtoms[atom.get_serial_number()] = vicinityAtom
+        if (atm.element != "H"):
+            nb_coords = nb_coords_by_atm[atm.get_serial_number()]
+            vicinity_atom = VicinityAtom(atm, nb_coords)
+            trgt_atms[atm.get_serial_number()] = vicinity_atom
 
-    compoundGroups = CompoundGroups(myBioPDBResidue)
-    for gKey in groupFeatures:
-        groupObj = groupFeatures[gKey]
+    comp_grps = CompoundGroups(mybio_residue)
+    for key in group_features:
+        grp_obj = group_features[key]
 
-        isGroupValid = True
+        is_grp_valid = True
         atoms = []
-        for atomIdx in groupObj["atomIds"]:
-            if (atomIdx not in targetAtoms):
-                isGroupValid = False
+        for atm_idx in grp_obj["atomIds"]:
+            if (atm_idx not in trgt_atms):
+                is_grp_valid = False
                 break
             else:
-                atoms.append(targetAtoms[atomIdx])
+                atoms.append(trgt_atms[atm_idx])
 
         # This group has atoms that do not belong to the target residue.
-        if (isGroupValid is False):
+        if (is_grp_valid is False):
             continue
 
-        atomGroup = AtomGroup(atoms, groupObj["features"])
+        atm_grp = AtomGroup(atoms, grp_obj["features"], recursive=True)
+        comp_grps.add_group(atm_grp)
 
-        compoundGroups.add_group(atomGroup)
-
-    return compoundGroups
+    return comp_grps
