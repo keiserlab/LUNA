@@ -19,13 +19,13 @@ def perceive_formal_charge(rdAtom):
                 formalCharge = 1
         # Carbon
         elif atomicNum == 6:
-            if valence == 3:            
+            if valence == 3:
                 hasPolarNeighbor = False
                 for neighbor in rdAtom.GetNeighbors():
                     # Polar neighbor: N, O or S
                     if neighbor.GetAtomicNum() in (7, 8, 16):
                         hasPolarNeighbor = True
-                        break              
+                        break
                 if hasPolarNeighbor is True:
                     formalCharge = 1
                 else:
@@ -81,6 +81,10 @@ def perceive_formal_charge(rdAtom):
         elif atomicNum == 5:
             if valence == 4:
                 formalCharge = 1
+        else:
+            # Partial charge > 0.4 => +1
+            # Partial charge < 0.4 => -1
+            # Consider bins or rounding
 
 
     return formalCharge
@@ -94,12 +98,12 @@ def perceive_formal_charge(rdAtom):
 
 
 
-            
-                
+
+
             # Sulfur
-                # If the valence is 1, the formal charge is -1, 
-                # if the valence is three the formal charge is +1, 
-                # if the valence is 5, the formal charge is -1, 
+                # If the valence is 1, the formal charge is -1,
+                # if the valence is three the formal charge is +1,
+                # if the valence is 5, the formal charge is -1,
                 # if the valence is four and the degree is four the charge is +2.
 
 

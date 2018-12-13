@@ -19,6 +19,6 @@ def new_logging_file(filename):
     # Set the new handler
     logger.addHandler(fh)
     # Set the log level to INFO, DEBUG as the default is ERROR
-    logger.setLevel("INFO")
+    logger.setLevel("WARNING")
 
     return logger

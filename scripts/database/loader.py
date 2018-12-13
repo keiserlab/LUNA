@@ -24,6 +24,15 @@ class DBLoader():
 
         self._start()
 
+    @property
+    def session(self):
+        self.new_session()
+        return self._session
+
+    @property
+    def metadata(self):
+        return self._metadata
+
     def _start(self):
         if (self._engine is None):
             try:
@@ -74,12 +83,3 @@ class DBLoader():
             logger.exception(e)
         finally:
             self.remove_session()
-
-    @property
-    def session(self):
-        self.new_session()
-        return self._session
-
-    @property
-    def metadata(self):
-        return self._metadata
