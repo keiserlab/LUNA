@@ -18,14 +18,18 @@ from interaction.calc_interactions import (calc_all_interactions,
                                            apply_interaction_criteria,
                                            InteractionConf)
 
+from interaction.calc import InteractionCalculator
+from interaction.conf import InteractionConf
+
 from mol.groups import find_compound_groups
 from mol.fingerprint import generate_fp_for_mols
 from mol.chemical_feature import FeatureExtractor
 from mol.obabel import convert_molecule
 from mol.clustering import cluster_fps_butina
 from mol.depiction import ligand_pharm_figure
+from mol.shell import (ShellGenerator, Fingerprint)
 
-from data.residues import InteractingResidues
+from analysis.residues import InteractingResidues
 
 from file.validator import is_file_valid
 
@@ -46,14 +50,14 @@ from database.util import (get_ligand_tbl_join_filter,
 
 from util.logging import new_logging_file
 
-from data.summary import *
-from data.residues import get_interacting_residues
+from analysis.summary import *
+from analysis.residues import get_interacting_residues
 
 from os.path import exists
 
 from collections import defaultdict
 
-from file.util import get_filename
+from file.util import (get_filename, get_unique_filename)
 
 from functools import wraps
 from util.function import func_call_2str
@@ -212,8 +216,9 @@ class InteractionsProject:
                                   "The function __call__() is an abstract "
                                   "method.")
 
-    def init_logging_file(self):
-        logging_filename = "%s/%s.log" % (DEFAULT_TMP_FILES, self.job_code)
+    def init_logging_file(self, logging_filename=None):
+        if not logging_filename:
+            logging_filename = get_unique_filename(DEFAULT_TMP_FILES)
 
         logger = new_logging_file(logging_filename)
         if logger:
@@ -331,34 +336,35 @@ class InteractionsProject:
 
             if not exists(new_pdb_file):
                 run_obabel = False
-                if self.has_submitted_files:
-                    run_obabel = True
-                else:
-                    db_structure = (self.db.session
-                                    .query(Structure)
-                                    .filter(Structure.pdb_id == pdb_id)
-                                    .first())
+                # if self.has_submitted_files:
+                #     run_obabel = True
+                # else:
+                #     db_structure = (self.db.session
+                #                     .query(Structure)
+                #                     .filter(Structure.pdb_id == pdb_id)
+                #                     .first())
 
-                    if db_structure:
-                        # If the method is not a NMR type, which,
-                        # in general, already have hydrogens
-                        if db_structure.experimental_tech.name != "NMR":
-                            run_obabel = True
-                    else:
-                        try:
-                            PDB_PARSER.get_structure(pdb_id, pdb_file)
-                            if PDB_PARSER.get_header():
-                                if "structure_method" in PDB_PARSER.get_header():
-                                    method = (PDB_PARSER.get_header()["structure_method"])
-                                    # If the method is not a NMR type, which,
-                                    # in general, already have hydrogens
-                                    if method.upper() not in NMR_METHODS:
-                                        run_obabel = True
-                            else:
-                                run_obabel = True
-                        except Exception:
-                            run_obabel = True
+                #     if db_structure:
+                #         # If the method is not a NMR type, which,
+                #         # in general, already have hydrogens
+                #         if db_structure.experimental_tech.name != "NMR":
+                #             run_obabel = True
+                #     else:
+                #         try:
+                #             PDB_PARSER.get_structure(pdb_id, pdb_file)
+                #             if PDB_PARSER.get_header():
+                #                 if "structure_method" in PDB_PARSER.get_header():
+                #                     method = (PDB_PARSER.get_header()["structure_method"])
+                #                     # If the method is not a NMR type, which,
+                #                     # in general, already have hydrogens
+                #                     if method.upper() not in NMR_METHODS:
+                #                         run_obabel = True
+                #             else:
+                #                 run_obabel = True
+                #         except Exception:
+                #             run_obabel = True
 
+                # TODO: REMOVE
                 run_obabel = True
                 if run_obabel:
                     # First, it removes all hydrogen atoms.
@@ -988,9 +994,239 @@ class DB_PLI_Project(InteractionsProject):
 class Local_PLI_Project(InteractionsProject):
 
     def __init__(self,
+                 entries,
                  working_path,
-                 db_conf=None):
-        pass
+                 keep_all_potential_inter=True,
+                 has_submitted_files=False,
+                 **kwargs):
+
+        self.keep_all_potential_inter = keep_all_potential_inter
+
+        self.project_type = "PLI analysis"
+        self.has_submitted_files = has_submitted_files
+
+        super().__init__(working_path=working_path,
+                         entries=entries,
+                         **kwargs)
+
+    def __call__(self):
+
+        # TODO: verificar o numero de entradas
+
+        # TODO: Definir as mensagens de descrição para o usuário
+        # TODO: colocar wrapers em cada função
+
+        self.prepare_project_path()
+        self.init_logging_file("%s/%s" % (self.working_path, "logging.log"))
+
+        self.set_pharm_objects()
+
+        free_filename_format = self.has_submitted_files
+        self.entry_validator = PLIEntryValidator(free_filename_format)
+
+        fingerprints = []
+
+        comp_type_count_by_entry = {}
+        inter_type_count_by_entry = {}
+        inter_res_by_entry = {}
+
+        # Loop over each entry.
+        for ligand_entry in self.entries:
+            self.current_entry = ligand_entry
+
+            # Check if the entry is in the correct format.
+            # It also accepts entries whose pdb_id is defined by
+            # the filename.
+            self.validate_entry_format(ligand_entry)
+
+            pdb_file = self.get_pdb_file(ligand_entry.pdb_id)
+
+            # TODO: resolver o problema dos hidrogenios.
+            #       Vou adicionar hidrogenio a pH 7?
+            #       Usuario vai poder definir pH?
+            #       Obabel gera erro com posicoes alternativas
+
+            # TODO: está dando erro na entrada 3QL8
+            pdb_file = self.add_hydrogen(pdb_file)
+
+            structure = PDB_PARSER.get_structure(ligand_entry.pdb_id, pdb_file)
+            ligand = self.get_target_entity(structure, ligand_entry)
+
+            grps_by_compounds = self.perceive_chemical_groups(structure[0],
+                                                              ligand)
+            src_grps = [grps_by_compounds[x] for x in grps_by_compounds
+                        if x.get_id()[0] != " "]
+            trgt_grps = [grps_by_compounds[x] for x in grps_by_compounds
+                         if x != ligand]
+
+            # if self.keep_all_potential_inter:
+            #     # TODO: calcular ponte de hidrogenio fraca
+            #     # TODO: detectar interações covalentes
+            #     # TODO: detectar complexos metalicos
+            #     # TODO: detectar CLASH
+
+            #     # TODO: add an option to accept hydrogen bonds when H was not added, in this case use only distances.
+            #     all_inter = calc_all_interactions(src_grps,
+            #                                       trgt_grps,
+            #                                       conf=BOUNDARY_CONF)
+
+            #     # Then it applies a filtering function.
+            #     filtered_inter = apply_interaction_criteria(all_inter,
+            #                                                 conf=self.interaction_conf)
+            #     inter_to_be_stored = all_inter
+            # else:
+            #     # It filters the interactions by using a cutoff at once.
+            #     filtered_inter = calc_all_interactions(src_grps,
+            #                                            trgt_grps,
+            #                                            conf=self.interaction_conf)
+            #     inter_to_be_stored = filtered_inter
+
+            # TODO: remove lines
+            x = {}
+            res = structure[0]["A"][(" ", 81, " ")]
+            x[res] = grps_by_compounds[res]
+
+            res = structure[0]["A"][(" ", 83, " ")]
+            x[res] = grps_by_compounds[res]
+
+            res = structure[0]["A"][(" ", 82, " ")]
+            x[res] = grps_by_compounds[res]
+
+            x[ligand] = grps_by_compounds[ligand]
+
+            grps_by_compounds = x
+
+            neighborhood = [ag for c in grps_by_compounds.values() for ag in c.atomGroups]
+
+            res_to_inter = [x for x in grps_by_compounds.values()]
+
+            print("Before interactions")
+
+            # res_to_inter = src_grps + trgt_grps
+            filtered_inter = calc_all_interactions(res_to_inter,
+                                                   res_to_inter,
+                                                   conf=self.interaction_conf,
+                                                   add_proximal=True)
+
+            print("Interactions finished!!")
+
+            shells = ShellGenerator(7, 1, include_proximal=True)
+            sm = shells.create_shells(neighborhood)
+
+            fp_length = 1024
+            fp_length = 128
+            fp = Fingerprint(sm.get_identifiers(), sm.shell_nbits)
+
+            folded_fp = fp.fold(fp_length)
+
+            # count = defaultdict(int)
+            # for i in fp.indices:
+            #     count[i] += 1
+
+            # for k in count:
+            #     print(k, count[k])
+            exit()
+
+            #
+            # Count the number of compound types for each ligand
+            #
+            # comp_type_count = count_group_types(grps_by_compounds[ligand])
+            # comp_type_count_by_entry[ligand_entry] = comp_type_count
+
+            #
+            # Count the number of interactions for each type
+            #
+            # inter_type_count = count_interaction_types(filtered_inter,
+            #                                            {ligand})
+            # inter_type_count_by_entry[ligand_entry] = inter_type_count
+
+            # TODO: Atualizar outros scripts que verificam se um residuo é proteina ou nao.
+            #       Agora temos uma função propria dentro de Residue.py
+            # interacting_residues = get_interacting_residues(filtered_inter,
+                                                            # {ligand})
+            # inter_res_by_entry[ligand_entry] = interacting_residues
+
+            # PAREI AQUI:
+            # PROXIMO PASSO: contabilizar pra cada cluster o numero de ligantes que interagem com o residuo
+
+
+            # TODO: Definir uma regĩao em volta do ligante pra ser o sitio ativo
+            # TODO: Contar pra cada sitio o numero de cada tipo de grupo
+            # TODO: Contar pra cada sitio o numero de interacoes
+
+            # Select ligand and read it in a RDKit molecule object
+            rdmol_lig = self.get_rdkit_mol(structure[0], ligand,
+                                           ligand_entry.to_string(ENTRIES_SEPARATOR))
+
+            # Generate fingerprint for the ligand
+            fp = self.get_fingerprint(rdmol_lig)
+            fingerprints.append(fp)
+
+            # print()
+            print(fp["fp"])
+            # print()
+            # print(fp["fp"].ToBitString())
+            exit()
+
+            # self.generate_ligand_figure(rdmol_lig, grps_by_compounds[ligand])
+
+        # TODO: Remover entradas repetidas
+        # TODO: remover Entradas que derem erro
+
+        # Clusterize ligands by using the Botina clustering method.
+        # clusters = self.clusterize_ligands(fingerprints)
+
+        # comp_type_freq_by_cluster = defaultdict(int)
+        # inter_type_freq_by_cluster = defaultdict(int)
+        # inter_res_freq_by_cluster = defaultdict(InteractingResidues)
+
+        # for ligand_entry in self.entries:
+        #     cluster_id = clusters[ligand_entry.to_string(ENTRIES_SEPARATOR)]
+
+        #     # TODO: REMOVER
+        #     cluster_id = 1
+
+        #     # Get the ligand entry to update the cluster information
+        #     if self.get_entries_from_db is False:
+        #         db_ligand_entity = self.recover_ligand_entry(ligand_entry)
+        #     else:
+        #         db_ligand_entity = db_lig_entries_by_id[ligand_entry.id]
+
+        #     db_ligand_entity.cluster = cluster_id
+
+        #     comp_type_count = comp_type_count_by_entry[ligand_entry]
+        #     # self.update_freq_by_cluster(comp_type_count, cluster_id,
+        #                                 # comp_type_freq_by_cluster)
+
+        #     inter_type_count = inter_type_count_by_entry[ligand_entry]
+            # self.update_freq_by_cluster(inter_type_count, cluster_id,
+                                        # inter_type_freq_by_cluster
+
+            # TODO: Pra continuar fazendo isso vou precisar do alinhamento.
+            # Vou fazer um alinhamento ficticio
+            # self.update_res_freq_by_cluster(interacting_residues,
+            #                                 inter_res_freq_by_cluster[cluster_id])
+
+            # print("#######")
+            # print(ligand_entry)
+            # for k in interacting_residues.level1:
+            #     print(k, k.__str__)
+            # print()
+            # for k in inter_res_freq_by_cluster[cluster_id].level1:
+            #     print(k, inter_res_freq_by_cluster[cluster_id].level1[k])
+            # print()
+            # print()
+
+        # TODO: alinhar proteína com o template
+        # TODO: inserir alinhamento no BD
+
+        # TODO: Calcular a frequencia dos residuos
+        # TODO: Adicionar informações de frequencia no banco
+
+    def update_res_freq_by_cluster(self, interacting_residues,
+                                   inter_res_freq):
+        inter_res_freq.update(interacting_residues)
+
 
 class NAPOLI_PLI:
 
@@ -1420,8 +1656,8 @@ class NAPOLI_PLI:
                                 filtered_inter = format_db_interactions(structure, db_interactions)
 
                                 logger.info("%d pre-computed interaction(s) found in the "
-                                               "database for the entry '%s'."
-                                               % (len(filtered_inter), entry_str))
+                                            "database for the entry '%s'."
+                                            % (len(filtered_inter), entry_str))
 
                                 calculate_interactions = False
                             else:
@@ -1479,7 +1715,7 @@ class NAPOLI_PLI:
                             for typeId in grp_types:
                                 db.session.add(CompTypeCount(ligand_entry.id, projectId,
                                                              typeId, grp_types[typeId]))
-                            #TODO: Remover comentario
+                            # TODO: Remover comentario
                             db.approve_session()
 
                         ##########################################################
