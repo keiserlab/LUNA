@@ -92,6 +92,14 @@ DefineFeature DonorAtom [N!H0v3,N!H0+v4,nH+0&!{TetrazoleN},OH2v2,OH+0,SH+0;!{Aci
   Weights 1.0
 EndFeature
 
+#
+# Capture: Ketene acetal oxygen
+#
+DefineFeature KeteneAcetalO [$([O;H1,H0&-1]-[#6;X3]-,:[#8])]
+  Family Donor
+  Weights 1.0
+EndFeature
+
 
 ########################################################################################
 #                                    Halogen donor                                     #
@@ -192,7 +200,7 @@ EndFeature
 # Capture: Carbons bonded to hydrogens
 # Desiraju GR, Steiner T. The weak hydrogen bond: in structural chemistry and biology. first publ. in paperback. Oxford: Oxford University Press; 2001.
 #
-DefineFeature WeakDonorC [#6;!H0]
+DefineFeature WeakDonor [#6;!H0]
   Family WeakDonor
   Weights 1.0
 EndFeature
@@ -208,7 +216,7 @@ EndFeature
 # TODO: Are we going to consider unsaturated chains like ethenamine, ethynamine, 4-(cyclohex-1-en-1-yl)morpholine as Basic amines?
 #
 DefineFeature BasicGroup [{BasicNH2},{BasicNH1},{BasicNH0};!{AnilineLikeN}]
-  Family PositiveIonizable
+  Family PositivelyIonizable
   Weights 1.0
 EndFeature
 
@@ -222,7 +230,7 @@ EndFeature
 # We do not match any aromatic systems here.
 #
 DefineFeature Guanidine N[CH0X3](=N)N
-  Family PositiveIonizable
+  Family PositivelyIonizable
   Weights 1.0,1.0,1.0,1.0
 EndFeature
 
@@ -237,7 +245,7 @@ EndFeature
 # Differently from Langer et. al. we also capture tertiary amidines. Ref: "DOI:10.1021/ma2027484"
 #
 DefineFeature Amidine [N;!{AmideLikeN}]=[CX3][N;!{AmideLikeN}]
-  Family PositiveIonizable
+  Family PositivelyIonizable
   Weights 1.0,1.0,1.0
 EndFeature
 
@@ -245,7 +253,7 @@ EndFeature
 # Capture: 4-aminopyridines
 #
 DefineFeature Aminopyridine4 Nc1cc[nH0]cc1
-  Family PositiveIonizable
+  Family PositivelyIonizable
   Weights 1.0,1.0,1.0,1.0,1.0,1.0,1.0
 EndFeature
 
@@ -253,7 +261,7 @@ EndFeature
 # Capture: 2-aminopyridines
 #
 DefineFeature Aminopyridine2 Nc1cccc[nH0]1
-  Family PositiveIonizable
+  Family PositivelyIonizable
   Weights 1.0,1.0,1.0,1.0,1.0,1.0,1.0
 EndFeature
 
@@ -261,16 +269,16 @@ EndFeature
 # Capture: Imidazoles
 #
 DefineFeature Imidazole [n;R1]1[c;R1][n;R1][c;R1][c;R1]1
-  Family PositiveIonizable
+  Family PositivelyIonizable
   Weights 1.0,1.0,1.0,1.0,1.0
 EndFeature
 
 #
-# Capture: any positive atom
-# !$([O-]-[N+]) constraint so we don't match nitro (or similar) groups
+# Capture: any positive atom not adjacent to a negative atom.
+# Rule adapted from Langer et. al. (2006).
 #
-DefineFeature PosAtom [{PosAtom};!{NegAtom};!{NitroLikeN}]
-    Family PositiveIonizable
+DefineFeature PosAtom [{PosAtom};!$(*~[{NegAtom}])]
+    Family PositivelyIonizable
     Weights 1.0
 EndFeature
 
@@ -282,7 +290,15 @@ EndFeature
 # It also captures thiocarboxylic acids
 #
 DefineFeature CarboxGroup C(=[O,S])-[O;H1,H0&-1]
-    Family NegativeIonizable
+    Family NegativelyIonizable
+    Weights 1.0,1.0,1.0
+EndFeature
+
+#
+# Capture: Ketene acetal like compounds, including cyclic ones
+#
+DefineFeature KeteneAcetalGroup [O;H1,H0&-1]-[#6;X3]-,:[#8]
+    Family NegativelyIonizable
     Weights 1.0,1.0,1.0
 EndFeature
 
@@ -290,7 +306,7 @@ EndFeature
 # Capture: Tetrazole
 #
 DefineFeature Tetrazole c1nnn[nH,n-1]1
-    Family NegativeIonizable
+    Family NegativelyIonizable
     Weights 1.0,1.0,1.0,1.0,1.0
 EndFeature
 
@@ -299,7 +315,7 @@ EndFeature
 #
 # Good AC, Oprea TI. Optimization of CAMD techniques 3. Virtual screening enrichment studies: a help or hindrance in tool selection? Journal of Computer-Aided Molecular Design. 2008;22:169–78.
 DefineFeature Barbiturate O=C1CC(=O)[NH1,NH0-1;R]C(=O)[NH1,NH0-1;R]1
-    Family NegativeIonizable
+    Family NegativelyIonizable
     Weights 1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
 EndFeature
 
@@ -308,7 +324,7 @@ EndFeature
 #
 # Good AC, Oprea TI. Optimization of CAMD techniques 3. Virtual screening enrichment studies: a help or hindrance in tool selection? Journal of Computer-Aided Molecular Design. 2008;22:169–78.
 DefineFeature ThiazolidinedioneGroup O=C1[NH1,NH0-1;R]C(=[O,S])[SX2H0R]C1
-    Family NegativeIonizable
+    Family NegativelyIonizable
     Weights 1.0,1.0,1.0,1.0,1.0,1.0,1.0
 EndFeature
 
@@ -319,7 +335,7 @@ EndFeature
 #
 # Good AC, Oprea TI. Optimization of CAMD techniques 3. Virtual screening enrichment studies: a help or hindrance in tool selection? Journal of Computer-Aided Molecular Design. 2008;22:169–78.
 DefineFeature Diformamide [NH1,NH0-1;R](C(=O))(C(=O))
-    Family NegativeIonizable
+    Family NegativelyIonizable
     Weights 1.0,1.0,1.0,1.0,1.0
 EndFeature
 
@@ -339,21 +355,21 @@ EndFeature
 # Capture: Hydroxamic acids and Hydroxamic O-anion
 #
 DefineFeature Hydroxamic_O_anion C(=O)[NX3]-[O;H1,H0&-1]
-  Family NegativeIonizable
+  Family NegativelyIonizable
   Weights 1.0,1.0,1.0,1.0
 EndFeature
 #
 # Capture: Hydroxamic N-anion (1st resonance form)
 #
 DefineFeature Hydroxamic_N_anion C(=O)[N-1]-[OH1]
-  Family NegativeIonizable
+  Family NegativelyIonizable
   Weights 1.0,1.0,1.0,1.0
 EndFeature
 #
 # Capture: Hydroxamic N-anion (2nd resonance form)
 #
 DefineFeature Hydroxamic_N_anion2 C(-[O-1])=N-[OH1]
-  Family NegativeIonizable
+  Family NegativelyIonizable
   Weights 1.0,1.0,1.0,1.0
 EndFeature
 ########################################################################################
@@ -370,7 +386,7 @@ EndFeature
 # If this rule is placed after SulfonicGroup, the RDKit will match two SulfonicGroup
 #
 DefineFeature Sulfuric S(=[O,S])(=O)(-O)-[O;H1,H0&-1]
-    Family NegativeIonizable
+    Family NegativelyIonizable
     Weights 1.0,1.0,1.0,1.0,1.0
 EndFeature
 
@@ -381,7 +397,7 @@ EndFeature
 # If this rule is placed after SulfinicGroup, the RDKit will match two SulfinicGroup
 #
 DefineFeature SulfonicGroup S(=[O,S])(=O)-[O;H1,H0&-1]
-    Family NegativeIonizable
+    Family NegativelyIonizable
     Weights 1.0,1.0,1.0,1.0
 EndFeature
 
@@ -390,7 +406,7 @@ EndFeature
 # It also captures Thioketones, i.e., compounds with a double bonded S, instead of a double bonded O.
 #
 DefineFeature SulfinicGroup S(=[O,S])-[O;H1,H0&-1]
-    Family NegativeIonizable
+    Family NegativelyIonizable
     Weights 1.0,1.0,1.0
 EndFeature
 
@@ -405,14 +421,14 @@ EndFeature
 # Ballatore C, Huryn DM, Smith AB. Carboxylic Acid (Bio)Isosteres in Drug Design. ChemMedChem. 2013;8:385–95.
 #
 DefineFeature AcylSulfonamide [NH,NH0-1](S(=O)(=O))(C(=O))
-  Family AcylSulfonamide
+  Family NegativelyIonizable
   Weights 1.0,1.0,1.0,1.0,1.0,1.0
 EndFeature
 #
 # General sulfonamides
 #
 DefineFeature Sulfonamide [N;!H0,H0&-1]S(=O)(=O)
-  Family NegativeIonizable
+  Family NegativelyIonizable
   Weights 1.0,1.0,1.0,1.0
 EndFeature
 
@@ -432,7 +448,7 @@ EndFeature
 # If this rule is placed after PhosphonicGroup, the RDKit will match two PhosphonicGroups
 #
 DefineFeature PhosphoricGroup P(=[O,S])(-O)(-O)-[O;H1,H0&-1]
-    Family NegativeIonizable
+    Family NegativelyIonizable
     Weights 1.0,1.0,1.0,1.0,1.0
 EndFeature
 
@@ -443,7 +459,7 @@ EndFeature
 # If this rule is placed after PhosphinicGroup, the RDKit will match two PhosphinicGroups
 #
 DefineFeature PhosphonicGroup P(=[O,S])(-O)-[O;H1,H0&-1]
-    Family NegativeIonizable
+    Family NegativelyIonizable
     Weights 1.0,1.0,1.0,1.0
 EndFeature
 
@@ -452,45 +468,53 @@ EndFeature
 # It also captures Thioketones, i.e., compounds with a double bonded S, instead of a double bonded O.
 #
 DefineFeature PhosphinicGroup [P](=[O,S])-[O;H1,H0&-1]
-    Family NegativeIonizable
-    Weights 1.0,1.0,1.0
+    Family NegativelyIonizable
+    Weights 1.0,1.0,1.
 EndFeature
 ########################################################################################
 
 #
-# Capture: any negative atom not captured by the previous rules.
-# !$([O-]-[N+]) constraint so we don't match nitro (or similar) groups
+# Capture: any negative atom not adjacent to a negative atom.
+# Rule adapted from Langer et. al. (2006).
 #
-DefineFeature NegAtom [{NegAtom};!{PosAtom};!{NitroLikeO}]
-    Family NegativeIonizable
+DefineFeature NegAtom [{NegAtom};!$(*~[{PosAtom}])]
+    Family NegativelyIonizable
     Weights 1.0
 EndFeature
-
 
 
 ########################################################################################
 #                               Negative dipole - Nucleophile                          #
 #
 
-# OBS: all rules were obtained departing from Pauline et. al. (2005)
-# Ref: Paulini R, Müller K, Diederich F. Orthogonal multipolar interactions in structural chemistry and biology. Angew Chem Int Ed Engl. 2005;44:1788–805.
+# All rules were obtained departing from Pauline et. al. (2005)
+# Ref: Paulini R, Müller K, Diederich F. Orthogonal multipolar interactions in structural chemistry and biology.
 
 # Halogens
 AtomType NucleophilicAtom [$([F,Cl,Br,I;X1]-[#6])]
 
-# Carbonyl oxygen
+# Carbonyl oxygen and oxygens double bonded to carbons.
 AtomType NucleophilicAtom [$(O=[#6])]
+
+# Negative carboxylic acid oxygen
+AtomType NucleophilicAtom [$([O;H1,H0&-1]-C=[O,S])]
+
+# Ketene acetal oxygen
+AtomType NucleophilicAtom [$([O;H1,H0&-1]-[#6;X3]-,:[#8])]
 
 # Cyano/Nitrile nitrogen
 AtomType NucleophilicAtom [$(N#C)]
 
-# Nitro group nitrogen: *-NO2
+# R3N
+AtomType NucleophilicAtom [N;X3;H0]
+
+# Nitro/Nitrate group oxygen: *-NO2
 AtomType NucleophilicAtom [$(O=[N;D3;+][O-]),$([O-][N;D3;+]=O)]
 
 # R2NO group oxygen
 # R cannot be a hydrogen.
 # NO is N=O or N-O
-AtomType NucleophilicAtom [$(O~[n;H0;X3])]
+AtomType NucleophilicAtom [$(O~[#7;H0;X3])]
 
 # Sulfonyl and Sulfinyl-like oxygen: C2S=O
 AtomType NucleophilicAtom [$(O=[S;v4,v6]([#6])[#6])]
@@ -498,6 +522,9 @@ AtomType NucleophilicAtom [$(O=[S;v4,v6]([#6])[#6])]
 # Imine nitrogen: C2N
 # It includes aromatic imines
 AtomType NucleophilicAtom [$([#7;X2](=,:[#6;X3])(-,:[#6]))]
+
+# Tautomeric nitrogen from aromatic imine: C2N
+AtomType NucleophilicAtom [$([n;H1](c)cn)]
 
 # Ether oxygen: C2O
 AtomType NucleophilicAtom [$([#8;v2]([#6])[#6])]
@@ -518,59 +545,33 @@ EndFeature
 
 
 ########################################################################################
-#                              Positive dipole - Eletrophile                           #
+#                              Positive dipole - Electrophile                          #
 #
-
+#
 # All rules were obtained departing from Pauline et. al. (2005)
-# Ref: Paulini R, Müller K, Diederich F. Orthogonal multipolar interactions in structural chemistry and biology. Angew Chem Int Ed Engl. 2005;44:1788–805.
-
-# Carbonyl
-DefineFeature EletrophileCarbonyl *-[#6;X3](-*)=O
-    Family Eletrophile
-    Weights 1.0,1.0,1.0,1.0
-EndFeature
-
-# Amidine and guanidine: R-CN2.
-DefineFeature EletrophileAmidine [N;!{AmideLikeN}]=[CX3]([C,N])[N;!{AmideLikeN}]
-    Family Eletrophile
-    Weights 1.0,1.0,1.0,1.0
-EndFeature
-
-# Amidine carbon containing one Hydrogen
-# In this case, it is only possible to capture three atoms, i.e., the plane will be obtained just departing these three atoms.
-DefineFeature EletrophileAmidine2 [N;!{AmideLikeN}]=[CX3][N;!{AmideLikeN}]
-    Family Eletrophile
-    Weights 1.0,1.0,1.0
-EndFeature
-
-# Cyano/Nitrile
-DefineFeature EletrophileNitrile [$(C#N)]
-    Family Eletrophile
-    Weights 1.0
-EndFeature
-
-# Nitro group
-DefineFeature EletrophileNitro O=[N;D3;+](-*)[O-]
-    Family Eletrophile
-    Weights 1.0,1.0,1.0,1.0
-EndFeature
-
-# Halogen carbon
-DefineFeature EletrophileHalogen [$([#6]-[F,Cl,Br,I;X1])]
-    Family Eletrophile
-    Weights 1.0
-EndFeature
-
-
-
-########################################################################################
-#                                                                                      #
-#                                     Metals                                           #
-#                                                                                      #
-########################################################################################
+# Ref: Paulini R, Müller K, Diederich F. Orthogonal multipolar interactions in structural chemistry and biology.
 #
-#Li,Be,Na,Mg,Al,K,Ca,Sc,Ti,V,Cr,Mn,Fe,Co,Ni,Cu,Zn,Ga,Rb,Sr,Y,Zr,Nb,Mo,Tc,Ru,Rh,Pd,Ag,Cd,In,Sn,Cs,Ba,La,Ce,Pr,Nd,Pm,Sm,Eu,Gd,Tb,Dy,Ho,Er,Tm,Yb,Lu,Hf,Ta,W,Re,Os,Ir,Pt,Au,Hg,Tl,Pb,Bi,Po,Fr,Ra,Ac,Th,Pa,U,Np,Pu,Am,Cm,Bk,Cf
 
+# Carbonyl carbon and carbons double bonded to oxygens.
+AtomType ElectrophilicAtom [$([#6]=O)]
+
+# Cyano/Nitrile carbon
+AtomType ElectrophilicAtom [$(C#N)]
+
+# Amidine/Guanidine carbon: R-CN2
+AtomType ElectrophilicAtom [$([CX3](=[N;!{AmideLikeN}])[N;!{AmideLikeN}])]
+
+# Nitro/Nitrate nitrogen: *-NO2
+# Reference: G. P. A. Yap, I. Alkorta, N. Jagerovic , J. Elguero (2004)
+AtomType ElectrophilicAtom [$([N;D3;+](=O)[O-])]
+
+# Halogens
+AtomType ElectrophilicAtom [$([#6]-[F,Cl,Br,I;X1])]
+
+DefineFeature Electrophile [{ElectrophilicAtom}]
+    Family Electrophile
+    Weights 1.0
+EndFeature
 
 
 ########################################################################################
@@ -632,5 +633,19 @@ AtomType Hphobe [s,S&H0&v2,Br,I,Cl,F,At,{Carbon_NonPolar};+0]
 
 DefineFeature Hphobe [{Hphobe}]
  Family Hydrophobic
+  Weights 1.0
+EndFeature
+
+
+
+########################################################################################
+#                                                                                      #
+#                                     Metals                                           #
+#                                                                                      #
+########################################################################################
+#
+#
+DefineFeature Metal [#3,#4,#11,#12,#13,#19,#20,#21,#22,#23,#24,#25,#26,#27,#28,#29,#30,#31,#37,#38,#39,#40,#41,#42,#43,#44,#45,#46,#47,#48,#49,#50,#55,#56,#57,#58,#59,#60,#61,#62,#63,#64,#65,#66,#67,#68,#69,#70,#71,#72,#73,#74,#75,#76,#77,#78,#79,#80,#81,#82,#83,#84,#87,#88,#89,#90,#91,#92,#93,#94,#95,#96,#97,#98,#99,#100,#101,#102,#103,#104,#105,#106,#107,#108,#109,#110,#111,#112,#113,#114,#115,#116]
+  Family Metal
   Weights 1.0
 EndFeature
