@@ -1,4 +1,8 @@
 from collections import defaultdict
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 def count_group_types(compound, key_map={}):
@@ -6,11 +10,15 @@ def count_group_types(compound, key_map={}):
 
     for group in compound.atomGroups:
         for feature in group.chemicalFeatures:
-            key = feature.name
+            key = feature.format_name()
             if key_map:
-                if feature.name in key_map:
-                    key = key_map[feature.name]
+                if key in key_map:
+                    key = key_map[key]
                 else:
+                    logger.warning("Does not exist a corresponding "
+                                   "mapping to the key '%s'. "
+                                   "It will be ignored."
+                                   % key)
                     continue
 
             grp_types[key] += 1
@@ -23,13 +31,13 @@ def count_interaction_types(interactions, targets=None, key_map={}):
     interaction_types = defaultdict(int)
     seen_pairs = set()
     for i in interactions:
-        contain_trgt = True
+        contain_trgts = True
         if targets is not None:
             if (i.comp1.compound not in targets and
                     i.comp2.compound not in targets):
-                contain_trgt = False
+                contain_trgts = False
 
-        if contain_trgt:
+        if contain_trgts:
             pair_key1 = (i.type, i.comp1, i.comp2)
             pair_key2 = (i.type, i.comp2, i.comp1)
 
