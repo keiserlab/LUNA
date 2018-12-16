@@ -1,8 +1,5 @@
-from file.validator import (is_file_valid,
-                            try_validate_file)
-
+from util.file import (is_file_valid, try_validate_file, get_file_format)
 from subprocess import Popen, PIPE
-from file.util import get_file_format
 from util.exceptions import (FileNotCreated, InvalidFileFormat)
 
 import logging

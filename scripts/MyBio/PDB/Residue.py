@@ -142,8 +142,8 @@ class Residue(Entity):
         return is_aa(self.resname)
 
     # MODBY: Alexandre Fassio
-    # Check if a residue is a nucleic acid.
-    def is_nucleic_acid(self):
+    # Check if a residue is a nucleotide.
+    def is_nucleotide(self):
         return self.get_id()[0] == " " and not self.is_aminoacid()
 
     def get_resname(self):

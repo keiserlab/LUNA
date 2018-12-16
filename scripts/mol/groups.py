@@ -3,8 +3,8 @@ from MyBio.selector import ResidueSelector
 
 import mol.interaction.math as imath
 from mol.interaction.contact import get_contacts_for_entity
-from mol.neighborhood import NbAtom
-from mol.coordinates import (Coordinate, NeighbourhoodCoordinates)
+from mol.neighborhood import (NbAtom, NbCoordinates)
+from mol.coord import Coordinate
 
 from rdkit.Chem import MolFromMolBlock
 from openbabel import (OBMolAtomIter, OBAtomAtomIter)
@@ -138,14 +138,12 @@ def find_compound_groups(mybio_residue, feature_extractor, ph=None, has_explicit
             nb_coords = []
             if (not mybio_residue.is_water()):
                 for nb_obAtom in OBAtomAtomIter(obAtom):
-                    coords = Coordinate(nb_obAtom.GetX(),
-                                        nb_obAtom.GetY(),
-                                        nb_obAtom.GetZ(),
-                                        atomicNumber=nb_obAtom.GetAtomicNum())
+                    coords = Coordinate(nb_obAtom.GetX(), nb_obAtom.GetY(), nb_obAtom.GetZ(),
+                                        atomic_num=nb_obAtom.GetAtomicNum())
 
                     nb_coords.append(coords)
 
-            nb_coords_by_atm[serialNumber] = NeighbourhoodCoordinates(nb_coords)
+            nb_coords_by_atm[serialNumber] = NbCoordinates(nb_coords)
 
     mol_block = obMol.write('mol')
     rdMol = MolFromMolBlock(mol_block)

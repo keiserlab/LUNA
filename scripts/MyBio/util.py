@@ -1,5 +1,5 @@
 from util.exceptions import IllegalArgumentError
-from file.validator import is_directory_valid
+from util.file import is_directory_valid
 
 from MyBio.PDB.PDBList import PDBList
 from MyBio.PDB.PDBIO import Select

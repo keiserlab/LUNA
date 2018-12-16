@@ -1,10 +1,14 @@
-from os.path import (basename, exists, isdir, splitext)
+from os.path import (basename, exists, isdir, isfile, splitext)
 from os import makedirs
 from shutil import rmtree
 
 from util.exceptions import DirectoryAlreadyExists
 
+import string
+import random
 import logging
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -76,15 +80,27 @@ def clear_directory(path):
             raise
 
 
-def validate_filesystem(path, type):
-    import os.path
+def new_filename(size=32, chars=string.ascii_uppercase + string.digits):
+    return ('').join((random.choice(chars) for i in range(size)))
 
-    if os.path.exists(path) is False:
+
+def get_unique_filename(path, size=32, chars=string.ascii_uppercase + string.digits, retries=5):
+    filename = None
+    for r in range(retries):
+        filename = '%s/%s' % (path, new_filename(size, chars))
+        if not exists(filename):
+            break
+
+    return filename
+
+
+def validate_filesystem(path, type):
+    if exists(path) is False:
         raise FileNotFoundError("File or directory '%s' does not exist" % path)
 
-    if type == "file" and os.path.isfile(path) is False:
+    if type == "file" and isfile(path) is False:
         raise IsADirectoryError("'%s' is not a file" % path)
-    elif type == "directory" and os.path.isdir(path) is False:
+    elif type == "directory" and isdir(path) is False:
         raise NotADirectoryError("'%s' is not a directory" % path)
 
 

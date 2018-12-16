@@ -1,18 +1,14 @@
-from util.default_values import (DEFAULT_PROXIMAL_INTERACTION_LABEL, DEFAULT_CHEMICAL_FEATURES_IDS,
-                                 DEFAULT_INTERACTIONS_IDS)
+from util.exceptions import (BitsValueError, ShellCenterNotFound)
+from util.default_values import (CHEMICAL_FEATURES_IDS, INTERACTIONS_IDS)
 
 from Bio.KDTree import KDTree
 
 from rdkit.DataStructs.cDataStructs import (ExplicitBitVect, SparseBitVect)
 
-from interaction.calc_interactions import InteractionType
 from itertools import (chain, product)
 from collections import defaultdict
 
-from mol.pymol.wrapper import PymolWrapper
-from mol.pymol.util import mybio_entity_2selection
-
-from util.exceptions import (BitsValueError, ShellCenterNotFound)
+from mol.wrappers.pymol import (PymolWrapper, mybio_to_pymol_selection)
 
 from scipy.sparse import (issparse, csr_matrix)
 
@@ -21,7 +17,7 @@ import mmh3
 import logging
 
 # TODO: Remove
-from file.util import get_unique_filename
+from util.file import get_unique_filename
 
 logger = logging.getLogger(__name__)
 
@@ -76,8 +72,8 @@ class PymolShellViwer:
             self.wrapper.set("dot_color", "red")
 
             # Compound view (residue, ligand, etc)
-            self.wrapper.show([("sticks", mybio_entity_2selection(shell.central_atm_grp.compound))])
-            self.wrapper.color([("gray", mybio_entity_2selection(shell.central_atm_grp.compound) + " AND elem C")])
+            self.wrapper.show([("sticks", mybio_to_pymol_selection(shell.central_atm_grp.compound))])
+            self.wrapper.color([("gray", mybio_to_pymol_selection(shell.central_atm_grp.compound) + " AND elem C")])
 
             self.wrapper.set("sphere_scale", shell.radius, {"selection": centroid_name})
             self.wrapper.set("sphere_transparency", 0.7, {"selection": centroid_name})
@@ -87,8 +83,8 @@ class PymolShellViwer:
                 obj1_name = "Group_%s" % hash(inter.comp1)
                 obj2_name = "Group_%s" % hash(inter.comp2)
 
-                self.wrapper.show([("sticks", mybio_entity_2selection(inter.comp1.compound)),
-                                   ("sticks", mybio_entity_2selection(inter.comp2.compound))])
+                self.wrapper.show([("sticks", mybio_to_pymol_selection(inter.comp1.compound)),
+                                   ("sticks", mybio_to_pymol_selection(inter.comp2.compound))])
 
                 self.wrapper.add_pseudoatom(obj1_name, {"vdw": 1, "pos": list(inter.comp1.centroid)})
                 self.wrapper.add_pseudoatom(obj2_name, {"vdw": 1, "pos": list(inter.comp2.centroid)})
@@ -343,7 +339,7 @@ class Shell:
         self._atom_groups.add(central_atm_grp)
 
         if not feature_mapper:
-            default_dict = {**DEFAULT_CHEMICAL_FEATURES_IDS, **DEFAULT_INTERACTIONS_IDS}
+            default_dict = {**CHEMICAL_FEATURES_IDS, **INTERACTIONS_IDS}
             # TODO: Built a class for managing the feature maps.
             # TODO: Attribute a unique id for each new feature.
             # feature_mapper = defaultdict(lambda: -1, default_dict)
@@ -376,7 +372,7 @@ class Shell:
     def previous_shell(self):
         shell = self._manager.get_previous_shell(self.central_atm_grp, self.level)
         if shell is None:
-            raise ShellCenterNotFound("No previous shell centered in %s was found." % self.central_atm_grp)
+            raise ShellCenterNotFound("No previous shell centered in '%s' was found." % self.central_atm_grp)
 
         return shell
 
@@ -525,6 +521,7 @@ class ShellGenerator:
                         shells_to_plot = list(sm.get_shells_by_center(atm_grp).values())
                         output_file = "%s_level-%d_Sphere-%d" % (filename, level, shell.identifier)
                         psv.create_session(shells_to_plot, output_file)
+                        del(psv)
                     # exit()
                 else:
                     shell = Shell(atm_grp, level, radius, manager=sm, seed=self.seed, np_dtype=self.np_dtype)

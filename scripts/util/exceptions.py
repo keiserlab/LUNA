@@ -48,3 +48,11 @@ class DuplicateEntry(ValueError):
 
 class ProcessingFailed(RuntimeError):
     pass
+
+
+class BitsValueError(ValueError):
+    pass
+
+
+class ShellCenterNotFound(KeyError):
+    pass

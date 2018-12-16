@@ -1,6 +1,6 @@
 from pymol import cmd
 from pymol import util
-from file.util import (get_filename, get_file_format)
+from util.file import (get_filename, get_file_format)
 
 
 class PymolWrapper:

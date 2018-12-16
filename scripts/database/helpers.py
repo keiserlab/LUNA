@@ -63,11 +63,10 @@ class InteractionManager(Manager):
             # It occurs, for example, in Water-bridged hydrogen bonds
             # as this interaction depends on two or more hydrogen bonds
             # to exist.
-            if "depend_of" in interaction.params:
-                depend_of_inters = interaction.params["depend_of"]
+            if interaction.required_interactions:
                 exist_dependencies = True
                 invalid_dependencies = False
-                for required_inter in depend_of_inters:
+                for required_inter in interaction.required_interactions:
                     if required_inter not in inter_in_db:
                         exist_dependencies = False
                     else:
@@ -77,13 +76,13 @@ class InteractionManager(Manager):
                 # If any required interaction is invalid,
                 # it does not add the current interaction
                 if invalid_dependencies:
-                    logger.info("The interaction '%s' depend on some invalid interactions: %s."
-                                % (interaction, str(depend_of_inters)))
+                    logger.info("The interaction '%s' depends on some invalid interactions: %s."
+                                % (interaction, str(interaction.required_interactions)))
 
                 # If all required interactions has already
                 # been added to the DB.
                 if exist_dependencies:
-                    dbReqInters = ([inter_in_db[x] for x in depend_of_inters])
+                    dbReqInters = ([inter_in_db[x] for x in interaction.required_interactions])
                     dbInter = self.new_interaction(interaction, ligand_entity)
 
                     if dbInter:
@@ -96,7 +95,7 @@ class InteractionManager(Manager):
                     # same interaction. So, ignore it.
                     if interaction in retries:
                         logger.info("The interaction '%s' depend on not existing interactions: %s."
-                                    % (interaction, str(depend_of_inters)))
+                                    % (interaction, str(interaction.required_interactions)))
                     else:
                         retries.add(interaction)
                         aux_list.append(interaction)
@@ -118,8 +117,8 @@ class InteractionManager(Manager):
         dbInterType = (self.db.session.query(InterType).filter(InterType.type == interType).all())
 
         params = dict(interaction.params)
-        if ("depend_of" in params):
-            del params["depend_of"]
+        if "depends_on" in params:
+            del params["depends_on"]
 
         dbInter = self.interaction(group_id1=g1.id, group_id2=g2.id,
                                    inter_type_id=dbInterType[0].id, **params)

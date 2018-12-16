@@ -140,7 +140,7 @@ class InteractionCalculator:
                     if not self.inter_filter.is_valid_pair(atm_grp1, atm_grp2):
                         continue
 
-                params = {"depend_of": [h2o_pairs[h2o_key][atm_grp1], h2o_pairs[h2o_key][atm_grp2]]}
+                params = {"depends_on": [h2o_pairs[h2o_key][atm_grp1], h2o_pairs[h2o_key][atm_grp2]]}
 
                 inter = InteractionType(atm_grp1, atm_grp2, "Water-bridged hydrogen bond", params)
 
@@ -175,7 +175,7 @@ class InteractionCalculator:
                         continue
 
                 sb_groups.add(key1)
-                params = {"depend_of": [hbond, attractive]}
+                params = {"depends_on": [hbond, attractive]}
 
                 inter = InteractionType(attractive.atm_grp1, attractive.atm_grp2, "Salt bridge", params)
                 dependent_interactions.add(inter)
@@ -544,18 +544,18 @@ def apply_interaction_criteria(interactions, conf=DefaultInteractionConf(),
     keep_inter = set()
     remove_inter = set()
     for i in filtered_inter:
-        if "depend_of" in i.params:
+        if "depends_on" in i.params:
             remove = False
-            for di in i.depend_of:
+            for di in i.depends_on:
                 if di not in aux_set:
                     remove = True
                     break
 
             if remove:
-                remove_inter.update(set(i.depend_of))
+                remove_inter.update(set(i.depends_on))
                 aux_set.remove(i)
             else:
-                keep_inter.update(set(i.depend_of))
+                keep_inter.update(set(i.depends_on))
 
     for i in remove_inter:
         if i in aux_set and i not in keep_inter:

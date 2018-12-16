@@ -7,7 +7,7 @@ from database.napoli_model import *
 from database.filters import FilterRules
 from database.helpers import MapperConfiguration
 
-from mol.entry import DBLigandEntry
+from mol.entry import DBEntry
 from mol.interaction.type import InteractionType
 from mol.groups import AtomGroup
 from mol.neighborhood import NbAtom
@@ -157,11 +157,7 @@ def default_interaction_filters(interIdByType, interConf):
 def format_db_ligand_entries(db_ligand_entries):
     entries = []
     for db_entry in db_ligand_entries:
-        new_entry = DBLigandEntry(db_entry.id,
-                                  db_entry.pdb_id,
-                                  db_entry.chain_id,
-                                  db_entry.lig_name,
-                                  db_entry.lig_num)
+        new_entry = DBEntry(db_entry.id, db_entry.pdb_id, db_entry.chain_id, db_entry.lig_name, db_entry.lig_num)
         entries.append(new_entry)
 
     return entries

@@ -1,37 +1,3 @@
-import numpy as np
-
-
-class Coordinate():
-
-    def __init__(self, x, y, z, atomic_num=None, atom_num=None):
-        self._coord = (x, y, z)
-        self.atomic_num = atomic_num
-        self.atom_num = atom_num
-
-    def __repr__(self):
-        return ("<Coordinate x=%.3f, y=%.3f, z=%.3f>" % (self.x, self.y, self.z))
-
-    @property
-    def x(self):
-        return self._coord[0]
-
-    @property
-    def y(self):
-        return self._coord[1]
-
-    @property
-    def z(self):
-        return self._coord[2]
-
-    @property
-    def coord(self):
-        return self._coord
-
-    @coord.setter
-    def coord(self, xyz):
-        self._coord = np.array(xyz)
-
-
 class NbCoordinates():
 
     def __init__(self, coords):
@@ -44,17 +10,26 @@ class NbCoordinates():
 
 class NbAtom():
 
-    def __init__(self, myBioPDBAtom, neighbourCoords):
+    def __init__(self, myBioPDBAtom, nb_coods, atm_grps=None):
         self._atom = myBioPDBAtom
-        self._nbCoords = neighbourCoords
+        self._nb_coords = nb_coods
+        self._atm_grps = atm_grps or []
 
     @property
-    def nbCoords(self):
-        return self._nbCoords
+    def nb_coords(self):
+        return self._nb_coords
 
     @property
-    def numNeighbours(self):
-        return self._nbCoords.size
+    def num_neighbours(self):
+        return self._nb_coords.size
+
+    @property
+    def atm_grps(self):
+        return self._atm_grps
+
+    def add_atom_group(self, group):
+        atm_grps = set(self.atm_grps + [group])
+        self._atm_grps = list(atm_grps)
 
     def __getattr__(self, attr):
         return getattr(self._atom, attr)

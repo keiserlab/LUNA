@@ -3,23 +3,27 @@ from Bio.SeqRecord import SeqRecord
 from Bio.Align import MultipleSeqAlignment
 from Bio.Alphabet import generic_protein
 
-from file.validator import (is_directory_valid, is_file_valid)
+from MyBio.util import (try_parse_from_pdb, try_save_2pdb)
+
+from util.file import (is_directory_valid, is_file_valid)
 from util.exceptions import InvalidSuperpositionFileError
 
 import math
-import os.path
+import glob
 import subprocess
+import os.path
+from os import remove
 
 import logging
 logger = logging.getLogger(__name__)
 
+
 TMALIGN = "/bin/tmalign"
 
 
-def run_tmalign(file1, file2, outputPath, tmalign):
+def run_tmalign(file1, file2, output_path, tmalign):
 
-    logger.info("Trying to execute the command: '%s %s %s'.",
-                tmalign, file1, file2)
+    logger.info("Trying to execute the command: '%s %s %s'." % (tmalign, file1, file2))
 
     for fname in (file1, file2):
         if not os.path.isfile(fname):
@@ -27,34 +31,32 @@ def run_tmalign(file1, file2, outputPath, tmalign):
             raise FileNotFoundError("Missing file: %s", fname)
 
     try:
-        if (outputPath is not None and outputPath.strip() != ""):
-            if (is_directory_valid(outputPath)):
+        if (output_path is not None and output_path.strip() != ""):
+            if (is_directory_valid(output_path)):
                 logger.info("The superposition files will be saved "
-                            "at the directory '%s'" % outputPath)
+                            "at the directory '%s'" % output_path)
 
                 filename = os.path.split(os.path.basename(file1))[1]
-                outputFile = "%s/%s.sup" % (outputPath, filename)
-                args = [tmalign, file1, file2, "-o", outputFile]
+                output_file = "%s/%s.sup" % (output_path, filename)
+                args = [tmalign, file1, file2, "-o", output_file]
         else:
             args = [tmalign, file1, file2]
 
         output = subprocess.check_output(args)
     except subprocess.CalledProcessError as e:
-        logger.exception("%s TMalign failed (returned %s):\n%s"
-                         % (e.returncode, e.output))
+        logger.exception("%s TMalign failed (returned %s):\n%s" % (e.returncode, e.output))
 
-        raise RuntimeError("TMalign failed for PDB files: %s %s"
-                           % (file1, file2))
+        raise RuntimeError("TMalign failed for PDB files: %s %s" % (file1, file2))
 
     return output.decode()
 
 
-def get_seq_records(tmOutput, refId, eqvId):
+def get_seq_records(tm_output, ref_id, eqv_id):
     """Create a pair of SeqRecords from TMalign output."""
 
     logger.info("Parsing the TMalign output.")
 
-    lines = tmOutput.splitlines()
+    lines = tm_output.splitlines()
 
     # Extract the TM-score (measure of structure similarity)
     # Take the mean of the (two) given TM-scores -- not sure which is reference
@@ -81,83 +83,74 @@ def get_seq_records(tmOutput, refId, eqvId):
 
     refSeq, eqvSeq = lastLines[1].strip(), lastLines[3].strip()
 
-    return (SeqRecord(Seq(refSeq), id=refId,
-                      description="TMalign TM-score=%f" % tmScore),
-            SeqRecord(Seq(eqvSeq), id=eqvId,
-                      description="TMalign TM-score=%f" % tmScore),
-            )
+    return (SeqRecord(Seq(refSeq), id=ref_id, description="TMalign TM-score=%f" % tmScore),
+            SeqRecord(Seq(eqvSeq), id=eqv_id, description="TMalign TM-score=%f" % tmScore))
 
 
-def align_2struct(file1, file2, outputPath=None, tmalign=None):
+def align_2struct(file1, file2, output_path=None, tmalign=None):
 
     if (tmalign is None):
         tmalign = TMALIGN
 
-    tmOutput = run_tmalign(file1, file2, outputPath, tmalign)
+    output = run_tmalign(file1, file2, output_path, tmalign)
 
-    tmSeqPair = get_seq_records(tmOutput, file1, file2)
+    seq_pair = get_seq_records(output, file1, file2)
 
-    alignment = MultipleSeqAlignment(tmSeqPair, generic_protein)
+    alignment = MultipleSeqAlignment(seq_pair, generic_protein)
 
     return alignment
 
 
-def extract_chain_from_sup(supFile, extractChain, newChainName,
-                           outputFile, QUIET=False):
+def extract_chain_from_sup(sup_file, extract_chain, new_chain_id, output_file, QUIET=False):
     """ Extract a chain from the superposition file generated with TMAlign.
         TMAlign modifies the name of the chains, so it is highly
         recommended to rename a chain's name before to create the output file.
 
-        @param supFile: a superposition file generated with TMAlign.
-        @type supFile: string
+        @param sup_file: a superposition file generated with TMAlign.
+        @type sup_file: string
 
-        @param extractChain: target chain to be extracted.
-        @type extractChain: string
+        @param extract_chain: target chain to be extracted.
+        @type extract_chain: string
 
-        @param newChainName: the new name to the extracted chain.
-        @type newChainName: string
+        @param new_chain_id: the new name to the extracted chain.
+        @type new_chain_id: string
 
-        @param outputFile: the name to the extracted PDB file.
-        @type  outputFile: string
+        @param output_file: the name to the extracted PDB file.
+        @type  output_file: string
 
         @param QUIET: mutes warning messages generated by Biopython.
         @type QUIET: boolean
     """
-    from MyBio.util import (try_parse_from_pdb, try_save_2pdb)
-
     if (QUIET):
         try:
             import warnings
             warnings.filterwarnings("ignore")
-            logger.info("Quiet mode activated. From now on, "
-                        "no warning will be printed.")
+            logger.info("Quiet mode activated. From now on, no warning will be printed.")
         except Exception:
             logger.warning("Quiet mode could not be activated.")
 
     try:
-        if (is_file_valid(supFile)):
-            logger.info("Trying to parse the file '%s'." % supFile)
+        if (is_file_valid(sup_file)):
+            logger.info("Trying to parse the file '%s'." % sup_file)
 
-            structure = try_parse_from_pdb("SUP", supFile)
+            structure = try_parse_from_pdb("SUP", sup_file)
 
             model = structure[0]
             if (len(model.child_list) != 2):
-                raise InvalidSuperpositionFileError("This structure has %d"
-                                                    " chains."
-                                                    " The file generated"
-                                                    " by TMAlign must have"
-                                                    " 2 chains."
-                                                    % len(model.child_list))
+                raise InvalidSuperpositionFileError("This structure has %d chains. The file generated "
+                                                    "by TMAlign must have 2 chains." % len(model.child_list))
 
-            chainToRemove = 'B' if (extractChain == "A") else "A"
+            chainToRemove = 'B' if (extract_chain == "A") else "A"
             model.detach_child(chainToRemove)
-            if (extractChain != newChainName):
-                model[extractChain].id = newChainName
+            if (extract_chain != new_chain_id):
+                model[extract_chain].id = new_chain_id
             logger.info("Modifications completed.")
 
-            logger.info("Now, it will try to parse the file '%s'." % supFile)
-            try_save_2pdb(structure, outputFile)
-            logger.info("File '%s' created successfully." % outputFile)
+            logger.info("Now, it will try to parse the file '%s'." % sup_file)
+
+            try_save_2pdb(structure, output_file)
+
+            logger.info("File '%s' created successfully." % output_file)
     except Exception as e:
         logger.exception(e)
         raise
@@ -169,13 +162,9 @@ def remove_sup_files(path):
         @param path: a path to remove superposition files.
         @type path: string
     """
-    import glob
-    from os import remove
-
     try:
         if (is_directory_valid(path)):
-            targets = ['*.sup', '*.sup_atm', '*.sup_all',
-                       '*.sup_all_atm', '*.sup_all_atm_lig']
+            targets = ['*.sup', '*.sup_atm', '*.sup_all', '*.sup_all_atm', '*.sup_all_atm_lig']
 
             for target in targets:
                 files = glob.glob('%s/%s' % (path, target))

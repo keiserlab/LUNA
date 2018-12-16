@@ -19,8 +19,8 @@ class InteractionType():
     def required_interactions(self):
         interactions = []
 
-        if "depend_of" in self._params:
-            interactions = self._params["depend_of"]
+        if "depends_on" in self._params:
+            interactions = self._params["depends_on"]
 
         return interactions
 

@@ -1,31 +1,24 @@
-from interaction.calc_interactions import (DefaultInteractionConf,
-                                           InteractionConf)
+from mol.interaction.conf import (DefaultInteractionConf, InteractionConf)
 from mol.depiction import ColorPallete
 
 from MyBio.PDB.PDBParser import PDBParser
 
 ENTRIES_SEPARATOR = ":"
 
-DEFAULT_NAPOLI_PATH = "/media/data/Workspace/nAPOLI_v2/tmp/nAPOLI"
-DEFAULT_PDB_PATH = "%s/public/pdb" % DEFAULT_NAPOLI_PATH
-DEFAULT_TMP_FILES = "%s/public/tmp" % DEFAULT_NAPOLI_PATH
-
-DEFAULT_DB_CONF_FILE = "../data/.mysql.ini"
-
-DEFAULT_ATOM_PROP_FILE = "../data/Napoli.fdef"
-
-DEFAULT_INTERACTION_CONF = DefaultInteractionConf()
+NAPOLI_PATH = "/media/data/Workspace/nAPOLI_v2/tmp/nAPOLI"
+PDB_PATH = "%s/public/pdb" % NAPOLI_PATH
+TMP_FILES = "%s/public/tmp" % NAPOLI_PATH
+DB_CONF_FILE = "../data/.mysql.ini"
+ATOM_PROP_FILE = "../data/Napoli.fdef"
+INTERACTION_CONF = DefaultInteractionConf()
 
 BOUNDARY_CONF = InteractionConf({"boundary_cutoff": 7})
 
-PDB_PARSER = PDBParser(PERMISSIVE=True,
-                       QUIET=True,
-                       FIX_ATOM_NAME_CONFLICT=True,
-                       FIX_OBABEL_FLAGS=True)
+PDB_PARSER = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=True)
 
 NMR_METHODS = ["SOLID-STATE NMR", "SOLUTION NMR"]
 
-DEFAULT_ATOM_TYPES_COLOR = ColorPallete({
+ATOM_TYPES_COLOR = ColorPallete({
     "Acceptor": (252, 141, 89),
     "Donor": (145, 191, 219),
     "Aromatic": (224, 243, 248),
@@ -38,7 +31,7 @@ DEFAULT_ATOM_TYPES_COLOR = ColorPallete({
     "HalogenDonor": (215, 48, 3),
 })
 
-DEFAULT_CHEMICAL_FEATURES_IDS = {
+CHEMICAL_FEATURES_IDS = {
     "Aromatic": 1,
     "Acceptor": 2,
     "Donor": 3,
@@ -59,7 +52,7 @@ DEFAULT_CHEMICAL_FEATURES_IDS = {
     "Chalcogen donor": 19
 }
 
-DEFAULT_INTERACTIONS_IDS = {
+INTERACTIONS_IDS = {
     "Proximal": 0,
     "Hydrogen bond": 1,
     "Attractive": 2,

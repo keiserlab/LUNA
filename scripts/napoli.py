@@ -19,8 +19,9 @@ from mol.interaction.calc_interactions import (calc_all_interactions, apply_inte
 
 from mol.interaction.calc import InteractionCalculator
 from mol.interaction.conf import InteractionConf
+from mol.interaction.filter import InteractionFilter
 
-from mol.entry import (DBLigandEntry, PLIEntryValidator)
+from mol.entry import (DBEntry, PLIEntryValidator)
 from mol.groups import find_compound_groups
 from mol.fingerprint import generate_fp_for_mols
 from mol.features import FeatureExtractor
@@ -113,8 +114,7 @@ class ExceptionWrapper(object):
                             get_default_message = False
 
                     if get_default_message:
-                        desc = ("Running function: %s."
-                                % func_call_2str(func, *args, **kwargs))
+                        desc = ("Running function: %s." % func_call_2str(func, *args, **kwargs))
                 proj_obj.logger.info(desc)
 
                 # If the object is an instance of a project.
@@ -160,13 +160,13 @@ class InteractionsProject:
     def __init__(self,
                  entries,
                  working_path,
-                 pdb_path=DEFAULT_PDB_PATH,
+                 pdb_path=PDB_PATH,
                  has_submitted_files=False,
                  overwrite_path=False,
                  db_conf_file=None,
                  pdb_template=None,
-                 atom_prop_file=DEFAULT_ATOM_PROP_FILE,
-                 interaction_conf=DEFAULT_INTERACTION_CONF,
+                 atom_prop_file=ATOM_PROP_FILE,
+                 interaction_conf=INTERACTION_CONF,
                  ph=7,
                  is_to_add_hydrog=True,
                  fingerprint_func="pharm2d_fp",
@@ -201,7 +201,7 @@ class InteractionsProject:
 
     def init_logging_file(self, logging_filename=None):
         if not logging_filename:
-            logging_filename = get_unique_filename(DEFAULT_TMP_FILES)
+            logging_filename = get_unique_filename(TMP_FILES)
 
         logger = new_logging_file(logging_filename)
         if logger:
@@ -286,9 +286,7 @@ class InteractionsProject:
     def validate_entry_format(self, ligand_entry):
         entry_str = ligand_entry.to_string(ENTRIES_SEPARATOR)
         if not self.entry_validator.is_valid(entry_str):
-            raise InvalidNapoliEntry("Entry '%s' does not match "
-                                     "the nAPOLI entry format."
-                                     % entry_str)
+            raise InvalidNapoliEntry("Entry '%s' does not match the nAPOLI entry format." % entry_str)
 
     def get_pdb_file(self, pdb_id):
         pdb_file = "%s/%s.pdb" % (self.pdb_path, pdb_id)
@@ -305,8 +303,8 @@ class InteractionsProject:
                 download_pdb(pdb_id=pdb_id, output_path=working_pdb_path,
                              output_file=pdb_file)
             except Exception as e:
-                raise FileNotCreated("PDB file '%s' was not created."
-                                     % pdb_file) from e
+                logger.exception(e)
+                raise FileNotCreated("PDB file '%s' was not created." % pdb_file) from e
 
         return pdb_file
 
@@ -519,14 +517,14 @@ class InteractionsProject:
         for atm in rdmol.GetAtoms():
             atm_map[atm.GetPDBResidueInfo().GetSerialNumber()] = atm.GetIdx()
 
-        for grp in group_types.atomGroups:
+        for grp in group_types.atm_grps:
             for atm in grp.atoms:
                 atm_id = atm_map[atm.serial_number]
                 atm_types[atm_id].update(set(grp.chemicalFeatures))
 
         output = "%s/figures/%s.svg" % (self.working_path,
                                         rdmol.GetProp("_Name"))
-        ligand_pharm_figure(rdmol, atm_types, output, DEFAULT_ATOM_TYPES_COLOR)
+        ligand_pharm_figure(rdmol, atm_types, output, ATOM_TYPES_COLOR)
 
     def clusterize_ligands(self, fingerprints):
         fps_only = [x["fp"] for x in fingerprints]
@@ -599,17 +597,10 @@ class InteractionsProject:
 
 # POPULATE RCSB.
 class RCSB_PLI_Population(InteractionsProject):
-    def __init__(self,
-                 entries,
-                 working_path,
-                 db_conf_file,
-                 **kwargs):
+    def __init__(self, entries, working_path, db_conf_file, **kwargs):
 
-        super().__init__(entries=entries,
-                         working_path=working_path,
-                         db_conf_file=db_conf_file,
-                         has_submitted_files=False,
-                         **kwargs)
+        super().__init__(entries=entries, working_path=working_path, db_conf_file=db_conf_file,
+                         has_submitted_files=False, **kwargs)
 
     def __call__(self):
         self.init_logging_file()
@@ -663,36 +654,25 @@ class RCSB_PLI_Population(InteractionsProject):
         # If this entry does not exist in the database,
         # raise an error.
         if db_ligand_entity is None:
-            message = ("Entry '%s' does not exist in the "
-                       "table 'ligand'."
-                       % ligand_entry.to_string(ENTRIES_SEPARATOR))
+            message = ("Entry '%s' does not exist in the table 'ligand'." % ligand_entry.to_string(ENTRIES_SEPARATOR))
             raise InvalidNapoliEntry(message)
 
         # If there are already interactions to this entry,
         # raise an error.
         elif status_by_id[db_ligand_entity.status_id] == "AVAILABLE":
-            raise DuplicateEntry("Interactions to the entry "
-                                 "'%s' already exists in "
-                                 "the database."
+            raise DuplicateEntry("Interactions to the entry '%s' already exists in the database."
                                  % ligand_entry.to_string(ENTRIES_SEPARATOR))
 
 
 class DB_PLI_Project(InteractionsProject):
 
-    def __init__(self,
-                 db_conf_file,
-                 job_code,
-                 working_path=None,
-                 entries=None,
-                 keep_all_potential_inter=True,
-                 has_submitted_files=False,
-                 **kwargs):
+    def __init__(self, db_conf_file, job_code, working_path=None, entries=None, keep_all_potential_inter=True,
+                 has_submitted_files=False, **kwargs):
 
         self.job_code = job_code
 
         if not working_path:
-            working_path = "%s/projects/%s" % (DEFAULT_NAPOLI_PATH,
-                                               job_code)
+            working_path = "%s/projects/%s" % (NAPOLI_PATH, job_code)
 
         # If entries were not informed, get it from the database.
         self.get_entries_from_db = (entries is None)
@@ -702,10 +682,7 @@ class DB_PLI_Project(InteractionsProject):
         self.project_type = "PLI analysis"
         self.has_submitted_files = has_submitted_files
 
-        super().__init__(db_conf_file=db_conf_file,
-                         working_path=working_path,
-                         entries=entries,
-                         **kwargs)
+        super().__init__(db_conf_file=db_conf_file, working_path=working_path, entries=entries, **kwargs)
 
     def __call__(self):
 
@@ -743,18 +720,14 @@ class DB_PLI_Project(InteractionsProject):
         db_inter_types = self.db.session.query(InterType).all()
         inter_type_id_map = {r.type: r.id for r in db_inter_types}
 
-        # The calculus of interactions depend on the pharmacophore
-        # definition (ATOM_PROP_FILE) and the pH (PH).
-        # Thus, if the user has kept such values unchanged and has
-        # not uploaded any PDB file, nAPOLI can try to select the
-        # pre-computed interactions from a database.
-        is_inter_params_default = (self.pdb_path is DEFAULT_PDB_PATH and
-                                   self.atom_prop_file == DEFAULT_ATOM_PROP_FILE and
-                                   self.ph == 7 and
-                                   self.db_conf_file is not None)
+        # The calculus of interactions depend on the pharmacophore definition (ATOM_PROP_FILE) and the pH (PH).
+        # Thus, if the user has kept such values unchanged and has not uploaded any PDB file, nAPOLI can try to
+        # select the pre-computed interactions from a database.
+        is_inter_params_default = (self.pdb_path is PDB_PATH and
+                                   self.atom_prop_file == ATOM_PROP_FILE and
+                                   self.ph == 7 and self.db_conf_file is not None)
         if is_inter_params_default:
-            logger.info("Default configuration was kept unchanged. "
-                        "nAPOLI will try to select pre-computed "
+            logger.info("Default configuration was kept unchanged. nAPOLI will try to select pre-computed "
                         "interactions from the defined database")
 
         fingerprints = []
@@ -832,8 +805,7 @@ class DB_PLI_Project(InteractionsProject):
                     inter_to_be_stored = filtered_inter
 
                 # TODO: Remover comentario
-                # proj_inter_manager.insert_interactions(inter_to_be_stored,
-                                                       # db_ligand_entity)
+                # proj_inter_manager.insert_interactions(inter_to_be_stored, db_ligand_entity)
 
             # TODO: Ou uso STORE ou INSERT. Tenho que padronizar
 
@@ -853,8 +825,7 @@ class DB_PLI_Project(InteractionsProject):
                                                        {ligand},
                                                        inter_type_id_map)
             # Store the count into the DB
-            # self.store_interaction_statistics(ligand_entry.id,
-                                              # inter_type_count)
+            # self.store_interaction_statistics(ligand_entry.id, inter_type_count)
             inter_type_count_by_entry[ligand_entry] = inter_type_count
 
             # TODO: Atualizar outros scripts que verificam se um residuo é proteina ou nao.
@@ -872,8 +843,7 @@ class DB_PLI_Project(InteractionsProject):
             # TODO: Contar pra cada sitio o numero de interacoes
 
             # Select ligand and read it in a RDKit molecule object
-            rdmol_lig = self.get_rdkit_mol(structure[0], ligand,
-                                           ligand_entry.to_string(ENTRIES_SEPARATOR))
+            rdmol_lig = self.get_rdkit_mol(structure[0], ligand, ligand_entry.to_string(ENTRIES_SEPARATOR))
 
             # Generate fingerprint for the ligand
             fp = self.get_fingerprint(rdmol_lig)
@@ -906,17 +876,14 @@ class DB_PLI_Project(InteractionsProject):
             db_ligand_entity.cluster = cluster_id
 
             comp_type_count = comp_type_count_by_entry[ligand_entry]
-            # self.update_freq_by_cluster(comp_type_count, cluster_id,
-                                        # comp_type_freq_by_cluster)
+            # self.update_freq_by_cluster(comp_type_count, cluster_id, comp_type_freq_by_cluster)
 
             inter_type_count = inter_type_count_by_entry[ligand_entry]
-            # self.update_freq_by_cluster(inter_type_count, cluster_id,
-                                        # inter_type_freq_by_cluster
+            # self.update_freq_by_cluster(inter_type_count, cluster_id, inter_type_freq_by_cluster
 
             # TODO: Pra continuar fazendo isso vou precisar do alinhamento.
             # Vou fazer um alinhamento ficticio
-            # self.update_res_freq_by_cluster(interacting_residues,
-            #                                 inter_res_freq_by_cluster[cluster_id])
+            # self.update_res_freq_by_cluster(interacting_residues, inter_res_freq_by_cluster[cluster_id])
 
             # print("#######")
             # print(ligand_entry)
@@ -946,11 +913,9 @@ class DB_PLI_Project(InteractionsProject):
         inter_res_freq.update(interacting_residues)
 
     def recover_ligand_entry(self, ligand_entry):
-        if isinstance(ligand_entry, DBLigandEntry) is False:
-            raise InvalidNapoliEntry("Entry '%s' is not a DBLigandEntry "
-                                     "object. So, nAPOLI cannot obtain "
-                                     "an id information for this ligand "
-                                     "entry and no database update will be "
+        if isinstance(ligand_entry, DBEntry) is False:
+            raise InvalidNapoliEntry("Entry '%s' is not a DBEntry object. So, nAPOLI cannot obtain "
+                                     "an id information for this ligand entry and no database update will be "
                                      "possible." % entry_str)
 
         db_ligand_entity = (self.db.session
@@ -967,8 +932,7 @@ class DB_PLI_Project(InteractionsProject):
         # If this entry does not exist in the database,
         # raise an error.
         if db_ligand_entity is None:
-            message = ("Entry '%s' does not exist in the database."
-                       % ligand_entry.to_string(ENTRIES_SEPARATOR))
+            message = ("Entry '%s' does not exist in the database." % ligand_entry.to_string(ENTRIES_SEPARATOR))
             raise InvalidNapoliEntry(message)
 
         return db_ligand_entity
@@ -976,21 +940,14 @@ class DB_PLI_Project(InteractionsProject):
 
 class Local_PLI_Project(InteractionsProject):
 
-    def __init__(self,
-                 entries,
-                 working_path,
-                 keep_all_potential_inter=True,
-                 has_submitted_files=False,
-                 **kwargs):
+    def __init__(self, entries, working_path, keep_all_potential_inter=True, has_submitted_files=False, **kwargs):
 
         self.keep_all_potential_inter = keep_all_potential_inter
 
         self.project_type = "PLI analysis"
         self.has_submitted_files = has_submitted_files
 
-        super().__init__(working_path=working_path,
-                         entries=entries,
-                         **kwargs)
+        super().__init__(working_path=working_path, entries=entries, **kwargs)
 
     def __call__(self):
 
@@ -1035,12 +992,9 @@ class Local_PLI_Project(InteractionsProject):
             structure = PDB_PARSER.get_structure(ligand_entry.pdb_id, pdb_file)
             ligand = self.get_target_entity(structure, ligand_entry)
 
-            grps_by_compounds = self.perceive_chemical_groups(structure[0],
-                                                              ligand)
-            src_grps = [grps_by_compounds[x] for x in grps_by_compounds
-                        if x.get_id()[0] != " "]
-            trgt_grps = [grps_by_compounds[x] for x in grps_by_compounds
-                         if x != ligand]
+            grps_by_compounds = self.perceive_chemical_groups(structure[0], ligand)
+            src_grps = [grps_by_compounds[x] for x in grps_by_compounds if x.get_id()[0] != " "]
+            trgt_grps = [grps_by_compounds[x] for x in grps_by_compounds if x != ligand]
 
             # if self.keep_all_potential_inter:
             #     # TODO: calcular ponte de hidrogenio fraca
@@ -1065,34 +1019,37 @@ class Local_PLI_Project(InteractionsProject):
             #     inter_to_be_stored = filtered_inter
 
             # TODO: remove lines
-            x = {}
-            res = structure[0]["A"][(" ", 81, " ")]
-            x[res] = grps_by_compounds[res]
+            # x = {}
+            # res = structure[0]["A"][(" ", 81, " ")]
+            # x[res] = grps_by_compounds[res]
 
-            res = structure[0]["A"][(" ", 83, " ")]
-            x[res] = grps_by_compounds[res]
+            # res = structure[0]["A"][(" ", 83, " ")]
+            # x[res] = grps_by_compounds[res]
 
-            res = structure[0]["A"][(" ", 82, " ")]
-            x[res] = grps_by_compounds[res]
+            # res = structure[0]["A"][(" ", 82, " ")]
+            # x[res] = grps_by_compounds[res]
 
-            x[ligand] = grps_by_compounds[ligand]
+            # x[ligand] = grps_by_compounds[ligand]
 
-            grps_by_compounds = x
+            # grps_by_compounds = x
 
-            neighborhood = [ag for c in grps_by_compounds.values() for ag in c.atomGroups]
+            # neighborhood = [ag for c in grps_by_compounds.values() for ag in c.atm_grps]
 
-            res_to_inter = [x for x in grps_by_compounds.values()]
+            # res_to_inter = [x for x in grps_by_compounds.values()]
 
             print("Before interactions")
 
-            # res_to_inter = src_grps + trgt_grps
-            filtered_inter = calc_all_interactions(res_to_inter,
-                                                   res_to_inter,
-                                                   conf=self.interaction_conf,
-                                                   add_proximal=True)
+            # filtered_inter = calc_all_interactions(src_grps, trgt_grps, conf=self.interaction_conf)
 
-            print("Interactions finished!!")
+            inter_filter = InteractionFilter.new_pli_filter(inter_conf=self.interaction_conf)
+            # TODO: test it to see how it works the shell
+            # inter_filter = InteractionFilter.new_pli_filter(inter_conf=self.interaction_conf,
+            #                                                 ignore_h2o_h2o=False)
 
+            ic = InteractionCalculator(inter_conf=self.interaction_conf, inter_filter=inter_filter)
+            new_inters = ic.calc_interactions(src_grps, trgt_grps)
+
+            neighborhood = [ag for ag in grps_by_compounds[ligand].atm_grps]
             shells = ShellGenerator(7, 1, include_proximal=True)
             sm = shells.create_shells(neighborhood)
 
@@ -1222,8 +1179,8 @@ class NAPOLI_PLI:
                  db_conf_file=None,
                  populate_rcsb_tables=False,
                  pdb_template=None,
-                 atom_prop_file=DEFAULT_ATOM_PROP_FILE,
-                 interaction_conf=DEFAULT_INTERACTION_CONF,
+                 atom_prop_file=ATOM_PROP_FILE,
+                 interaction_conf=INTERACTION_CONF,
                  # force_calc_interactions=False,
                  save_all_interactions=True,
                  ph=None,
@@ -1295,8 +1252,7 @@ class NAPOLI_PLI:
             if self.working_path:
                 working_path = self.working_path
             else:
-                working_path = "%s/projects/%s" % (DEFAULT_NAPOLI_PATH,
-                                                   self.job_code)
+                working_path = "%s/projects/%s" % (NAPOLI_PATH, self.job_code)
 
             working_pdb_path = "%s/pdbs" % working_path
             create_directory(working_path, self.overwrite_path)
@@ -1338,7 +1294,7 @@ class NAPOLI_PLI:
                 if self.db_conf_file is None:
                     pdb_path = working_pdb_path
                 else:
-                    pdb_path = DEFAULT_PDB_PATH
+                    pdb_path = PDB_PATH
             else:
                 pdb_path = self.pdb_path
 
@@ -1444,7 +1400,7 @@ class NAPOLI_PLI:
             # not uploaded any PDB file, nAPOLI can try to select the
             # pre-computed interactions from a database.
             is_inter_params_default = (self.pdb_path is None and
-                                       self.atom_prop_file == DEFAULT_ATOM_PROP_FILE and
+                                       self.atom_prop_file == ATOM_PROP_FILE and
                                        self.ph is None and
                                        self.db_conf_file is not None)
 
@@ -1468,8 +1424,8 @@ class NAPOLI_PLI:
                     db_ligand_entity = None
                     if self.db_conf_file and self.job_code:
                         step = "Check ligand entry existance"
-                        if isinstance(ligand_entry, DBLigandEntry) is False:
-                            message = ("Entry '%s' is not a DBLigandEntry "
+                        if isinstance(ligand_entry, DBEntry) is False:
+                            message = ("Entry '%s' is not a DBEntry "
                                        "object. So, nAPOLI cannot obtain an "
                                        "id information for this ligand entry "
                                        "and no database update will be "
