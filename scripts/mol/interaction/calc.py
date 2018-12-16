@@ -1,12 +1,12 @@
-import interaction.util as iu
+import mol.interaction.math as iu
 
-from interaction.conf import DefaultInteractionConf
-from interaction.filter import InteractionFilter
-from interaction.type import InteractionType
+from mol.interaction.conf import DefaultInteractionConf
+from mol.interaction.filter import InteractionFilter
+from mol.interaction.type import InteractionType
+from mol.features import ChemicalFeature
 
-from mol.chemical_feature import ChemicalFeature
 from operator import (le, ge)
-from itertools import (combinations, product)
+from itertools import (chain, combinations, product)
 from collections import defaultdict
 from util.exceptions import IllegalArgumentError
 
@@ -16,43 +16,52 @@ logger = logging.getLogger(__name__)
 
 class InteractionCalculator:
 
-    def __init__(self, inter_conf=DefaultInteractionConf(), inter_filter=InteractionFilter(),
-                 inter_funcs=None, add_proximal=False, add_cov_inter=False, add_clash=False):
+    def __init__(self, inter_conf=DefaultInteractionConf(), inter_filter=None,
+                 inter_funcs=None, add_proximal=False, add_cov_inter=False,
+                 add_clash=False, add_orphan_h2o_pair=False):
 
         self.inter_conf = inter_conf
-        self.inter_filter = inter_filter
 
         self.add_proximal = add_proximal
         self.add_cov_inter = add_cov_inter
         self.add_clash = add_clash
+        self.add_orphan_h2o_pair = add_orphan_h2o_pair
 
-        if (inter_funcs is None):
+        if inter_filter is None:
+            inter_filter = InteractionFilter(inter_conf=inter_conf)
+        self.inter_filter = inter_filter
+
+        if inter_funcs is None:
             inter_funcs = self._default_functions()
 
         self._inter_funcs = inter_funcs
 
     @property
     def funcs(self):
-        return self._funcs
+        return self._inter_funcs
 
-    def calc_interactions(self, trgt_comp_grps, nb_comp_grps):
+    def calc_interactions(self, trgt_comp_grps, nb_comp_grps=None):
         all_interactions = []
 
+        # If nb_comp_grps was not informed, it uses the trgt_comp_grps as the neighbors.
+        # In this case, the interactions will be target x target.
+        nb_comp_grps = nb_comp_grps or trgt_comp_grps
+
         for (trgt_comp_group, nb_comp_grp) in product(trgt_comp_grps, nb_comp_grps):
-            for (trgt_atms_grp, nb_atms_grp) in product(trgt_comp_group.atomGroups, nb_comp_grp.atomGroups):
+            for (trgt_atms_grp, nb_atms_grp) in product(trgt_comp_group.atm_grps, nb_comp_grp.atm_grps):
+
                 if isinstance(self.inter_filter, InteractionFilter):
                     if not self.inter_filter.is_valid_pair(trgt_atms_grp, nb_atms_grp):
                         continue
 
                 if self.add_proximal:
-                    all_interactions.extend(self.calc_proximal())
+                    all_interactions.extend(self.calc_proximal((trgt_atms_grp, nb_atms_grp)))
                 if self.add_cov_inter:
                     pass
                 if self.add_clash:
                     pass
 
-                featurePairs = list(product(trgt_atms_grp.chemicalFeatures,
-                                            nb_atms_grp.chemicalFeatures))
+                featurePairs = list(product(trgt_atms_grp.features, nb_atms_grp.features))
 
                 featurePairs = filter(lambda x: self.is_feature_pair_valid(*x), featurePairs)
 
@@ -62,16 +71,22 @@ class InteractionCalculator:
                     all_interactions.extend(interactions)
 
         dependent_interactions = self.find_dependent_interactions(all_interactions)
-        interactions.extend(dependent_interactions)
+        all_interactions.extend(dependent_interactions)
+
+        # Get only unique interactions.
+        all_interactions = set(all_interactions)
+
+        if not self.add_orphan_h2o_pair:
+            all_interactions = self.remove_orphan_h2o_pairs(all_interactions)
 
         logger.info("Number of potential interactions: %d" % len(all_interactions))
 
-        return all_interactions
+        return list(all_interactions)
 
     def resolve_interactions(self, group1, group2, feat1, feat2):
         func = self.get_function(feat1.name, feat2.name)
         if (func is None):
-            raise IllegalArgumentError("Does not exist a corresponding function to the features: '%s' and '%s'."
+            raise IllegalArgumentError("It does not exist a corresponding function to the features: '%s' and '%s'."
                                        % (feat1, feat2))
 
         interactions = func((group1, group2, feat1, feat2))
@@ -155,6 +170,10 @@ class InteractionCalculator:
                 if key1 in sb_groups or key2 in sb_groups:
                     continue
 
+                if isinstance(self.inter_filter, InteractionFilter):
+                    if not self.inter_filter.is_valid_pair(attractive.atm_grp1, attractive.atm_grp2):
+                        continue
+
                 sb_groups.add(key1)
                 params = {"depend_of": [hbond, attractive]}
 
@@ -162,6 +181,16 @@ class InteractionCalculator:
                 dependent_interactions.add(inter)
 
         return dependent_interactions
+
+    def remove_orphan_h2o_pairs(self, interactions):
+        interactions = set(interactions)
+        valid_hbs = set(chain.from_iterable(i.required_interactions for i in interactions))
+
+        orphan_hbs = set([i for i in interactions
+                          if ((i.atm_grp1.compound.is_water() or i.atm_grp2.compound.is_water()) and
+                              i.type == "Hydrogen bond" and i not in valid_hbs)])
+
+        return interactions - orphan_hbs
 
     def _default_functions(self):
         return {("Hydrophobic", "Hydrophobic"): self.calc_hydrop,
@@ -196,13 +225,10 @@ class InteractionCalculator:
         interactions = []
 
         group1, group2, feat1, feat2 = params
-        ccDist = iu.calc_euclidean_distance(group1.centroid,
-                                            group2.centroid)
+        ccDist = iu.euclidean_distance(group1.centroid, group2.centroid)
 
         if self.is_within_boundary(ccDist, "boundary_cutoff", le):
-            if (self.is_within_boundary(ccDist,
-                                        "max_dist_cation_pi_inter", le)):
-
+            if (self.is_within_boundary(ccDist, "max_dist_cation_pi_inter", le)):
                 params = {"dist_cation_pi_inter": ccDist}
                 inter = InteractionType(group1, group2, "Cation-pi", params)
 
@@ -213,16 +239,14 @@ class InteractionCalculator:
         interactions = []
 
         ring1, ring2, feat1, feat2 = params
-        ccDist = iu.calc_euclidean_distance(ring1.centroid, ring2.centroid)
+        ccDist = iu.euclidean_distance(ring1.centroid, ring2.centroid)
 
         if self.is_within_boundary(ccDist, "boundary_cutoff", le):
-            if (self.is_within_boundary(ccDist,
-                                        "max_cc_dist_pi_pi_inter", le)):
+            if (self.is_within_boundary(ccDist, "max_cc_dist_pi_pi_inter", le)):
 
-                dihedralAngle = iu.to_quad1(iu.calc_angle(ring1.normal,
-                                                          ring2.normal))
+                dihedralAngle = iu.to_quad1(iu.angle(ring1.normal, ring2.normal))
                 vectorCC = ring2.centroid - ring1.centroid
-                dispAngle1 = iu.to_quad1(iu.calc_angle(ring1.normal, vectorCC))
+                dispAngle1 = iu.to_quad1(iu.angle(ring1.normal, vectorCC))
 
                 # If the angle criteria were not defined, a specific
                 # Pi-stacking definition is not possible as it depends
@@ -232,11 +256,9 @@ class InteractionCalculator:
                         "max_disp_ang_pi_pi_inter" not in self.inter_conf.conf):
                     interType = "Pi-stacking"
                 else:
-                    if (self.is_within_boundary(dihedralAngle,
-                                                "min_dihed_ang_pi_pi_inter", ge)):
+                    if (self.is_within_boundary(dihedralAngle, "min_dihed_ang_pi_pi_inter", ge)):
                         interType = "Edge-to-face pi-stacking"
-                    elif (self.is_within_boundary(dispAngle1,
-                                                  "max_disp_ang_pi_pi_inter", le)):
+                    elif (self.is_within_boundary(dispAngle1, "max_disp_ang_pi_pi_inter", le)):
                         interType = "Face-to-face pi-stacking"
                     else:
                         interType = "Parallel-displaced pi-stacking"
@@ -254,12 +276,10 @@ class InteractionCalculator:
         interactions = []
 
         group1, group2, feat1, feat2 = params
-        ccDist = iu.calc_euclidean_distance(group1.centroid,
-                                            group2.centroid)
+        ccDist = iu.euclidean_distance(group1.centroid, group2.centroid)
 
         if self.is_within_boundary(ccDist, "boundary_cutoff", le):
-            if (self.is_within_boundary(ccDist,
-                                        "max_dist_hydrop_inter", le)):
+            if (self.is_within_boundary(ccDist, "max_dist_hydrop_inter", le)):
 
                 params = {"dist_hydrop_inter": ccDist}
                 inter = InteractionType(group1, group2, "Hydrophobic", params)
@@ -281,34 +301,28 @@ class InteractionCalculator:
         # There are always just one donor/acceptor atom.
         donorAtom = donorGroup.atoms[0]
         # Recover only carbon coordinates
-        xCarbonCoords = [x for x in donorAtom.nbCoords.coords
-                         if x.atomicNumber == 6]
+        xCarbonCoords = [x for x in donorAtom.nb_coords.coords if x.atomic_num == 6]
 
         # Interaction model: C-X ---- A-R
         # Defining the XA distance, in which A is the ring center
-        xaDist = iu.calc_euclidean_distance(donorGroup.centroid,
-                                            ringGroup.centroid)
+        xaDist = iu.euclidean_distance(donorGroup.centroid, ringGroup.centroid)
 
         if self.is_within_boundary(xaDist, "boundary_cutoff", le):
-            if (self.is_within_boundary(xaDist,
-                                        "max_xc_dist_xbond_inter", le)):
+            if (self.is_within_boundary(xaDist, "max_xc_dist_xbond_inter", le)):
 
                 axVect = donorGroup.centroid - ringGroup.centroid
-                dispAngle = iu.to_quad1(iu.calc_angle(ringGroup.normal,
-                                                      axVect))
+                dispAngle = iu.to_quad1(iu.angle(ringGroup.normal, axVect))
 
-                if (self.is_within_boundary(dispAngle,
-                                            "max_disp_ang_xbond_inter", le)):
+                if (self.is_within_boundary(dispAngle, "max_disp_ang_xbond_inter", le)):
                     # Interaction model: C-X ---- A-R
                     # XA vector is always the same
                     xaVect = ringGroup.centroid - donorGroup.centroid
                     # Defining angle CXA, in which A is the ring center
                     for carbonCoord in xCarbonCoords:
                         xcVect = carbonCoord.coord - donorGroup.centroid
-                        cxaAngle = iu.calc_angle(xcVect, xaVect)
+                        cxaAngle = iu.angle(xcVect, xaVect)
 
-                        if (self.is_within_boundary(cxaAngle,
-                                                    "min_cxa_ang_xbond_inter", ge)):
+                        if (self.is_within_boundary(cxaAngle, "min_cxa_ang_xbond_inter", ge)):
 
                             params = {"xc_dist_xbond_inter": xaDist,
                                       "disp_ang_xbond_inter": dispAngle,
@@ -337,17 +351,14 @@ class InteractionCalculator:
 
         # Recover only carbon coordinates
         # TODO: adicionar S, P aqui
-        xCarbonCoords = [x for x in donorAtom.nbCoords.coords
-                         if x.atomicNumber == 6]
+        xCarbonCoords = [x for x in donorAtom.nb_coords.coords if x.atomic_num == 6]
 
         # Interaction model: C-X ---- A-R
         # Distance XY.
-        xaDist = iu.calc_euclidean_distance(donorGroup.centroid,
-                                            acceptorGroup.centroid)
+        xaDist = iu.euclidean_distance(donorGroup.centroid, acceptorGroup.centroid)
 
         if self.is_within_boundary(xaDist, "boundary_cutoff", le):
-            if (self.is_within_boundary(xaDist,
-                                        "max_xa_dist_xbond_inter", le)):
+            if (self.is_within_boundary(xaDist, "max_xa_dist_xbond_inter", le)):
 
                 # Interaction model: C-X ---- A-R
                 validCXAAngles = []
@@ -361,9 +372,8 @@ class InteractionCalculator:
                 # Defining the angle CXA
                 for carbonCoord in xCarbonCoords:
                     xcVect = carbonCoord.coord - donorGroup.centroid
-                    cxaAngle = iu.calc_angle(xcVect, xaVect)
-                    if (self.is_within_boundary(cxaAngle,
-                                                "min_cxa_ang_xbond_inter", ge)):
+                    cxaAngle = iu.angle(xcVect, xaVect)
+                    if (self.is_within_boundary(cxaAngle, "min_cxa_ang_xbond_inter", ge)):
                         validCXAAngles.append(cxaAngle)
 
                 # Interaction model: C-X ---- A-R
@@ -371,12 +381,11 @@ class InteractionCalculator:
                 validXARAngles = []
                 # AX vector is always the same
                 axVect = donorGroup.centroid - acceptorGroup.centroid
-                for nbAtomCoord in acceptorAtom.nbCoords.coords:
+                for nbAtomCoord in acceptorAtom.nb_coords.coords:
                     arVect = nbAtomCoord.coord - acceptorGroup.centroid
-                    xarAngle = iu.calc_angle(axVect, arVect)
+                    xarAngle = iu.angle(axVect, arVect)
 
-                    if (self.is_within_boundary(xarAngle,
-                                                "min_xar_ang_xbond_inter", ge)):
+                    if (self.is_within_boundary(xarAngle, "min_xar_ang_xbond_inter", ge)):
                         validXARAngles.append(xarAngle)
 
                 for anglePair in product(validCXAAngles, validXARAngles):
@@ -403,16 +412,14 @@ class InteractionCalculator:
 
         donorAtom = donorGroup.atoms[0]
 
-        daDist = iu.calc_euclidean_distance(donorGroup.centroid,
-                                            acceptorGroup.centroid)
+        daDist = iu.euclidean_distance(donorGroup.centroid, acceptorGroup.centroid)
 
         if self.is_within_boundary(daDist, "boundary_cutoff", le):
             if self.is_within_boundary(daDist, "max_da_dist_hb_inter", le):
 
                 if donorAtom.get_parent().get_id()[0] == "W":
                     haDist = daDist - 1
-                    if (self.is_within_boundary(haDist,
-                                                "max_ha_dist_hb_inter", le)):
+                    if (self.is_within_boundary(haDist, "max_ha_dist_hb_inter", le)):
                         params = {"da_dist_hb_inter": daDist,
                                   "ha_dist_hb_inter": -1,
                                   "dha_ang_hb_inter": -1}
@@ -422,21 +429,17 @@ class InteractionCalculator:
                         interactions.append(inter)
                 else:
                     # Recover only hydrogen coordinates
-                    hydrogCoords = [x for x in donorAtom.nbCoords.coords
-                                    if x.atomicNumber == 1]
+                    hydrogCoords = [x for x in donorAtom.nb_coords.coords if x.atomic_num == 1]
 
                     for hydrogCoord in hydrogCoords:
-                        haDist = iu.calc_euclidean_distance(hydrogCoord.coord,
-                                                            acceptorGroup.centroid)
+                        haDist = iu.euclidean_distance(hydrogCoord.coord, acceptorGroup.centroid)
 
                         dhVect = donorGroup.centroid - hydrogCoord.coord
                         haVect = acceptorGroup.centroid - hydrogCoord.coord
-                        dhaAngle = iu.calc_angle(haVect, dhVect)
+                        dhaAngle = iu.angle(haVect, dhVect)
 
-                        if (self.is_within_boundary(haDist,
-                                                    "max_ha_dist_hb_inter", le) and
-                            self.is_within_boundary(dhaAngle,
-                                                    "min_dha_ang_hb_inter", ge)):
+                        if (self.is_within_boundary(haDist, "max_ha_dist_hb_inter", le) and
+                                self.is_within_boundary(dhaAngle, "min_dha_ang_hb_inter", ge)):
 
                             params = {"da_dist_hb_inter": daDist,
                                       "ha_dist_hb_inter": haDist,
@@ -451,12 +454,10 @@ class InteractionCalculator:
         interactions = []
 
         group1, group2, feat1, feat2 = params
-        ccDist = iu.calc_euclidean_distance(group1.centroid,
-                                            group2.centroid)
+        ccDist = iu.euclidean_distance(group1.centroid, group2.centroid)
 
         if self.is_within_boundary(ccDist, "boundary_cutoff", le):
-            if (self.is_within_boundary(ccDist,
-                                        "max_dist_attract_inter", le)):
+            if (self.is_within_boundary(ccDist, "max_dist_attract_inter", le)):
 
                 params = {"dist_attract_inter": ccDist}
 
@@ -469,12 +470,10 @@ class InteractionCalculator:
         interactions = []
 
         group1, group2, feat1, feat2 = params
-        ccDist = iu.calc_euclidean_distance(group1.centroid,
-                                            group2.centroid)
+        ccDist = iu.euclidean_distance(group1.centroid, group2.centroid)
 
         if self.is_within_boundary(ccDist, "boundary_cutoff", le):
-            if (self.is_within_boundary(ccDist,
-                                        "max_dist_repuls_inter", le)):
+            if (self.is_within_boundary(ccDist, "max_dist_repuls_inter", le)):
 
                 params = {"dist_repuls_inter": ccDist}
                 inter = InteractionType(group1, group2, "Repulsive", params)
@@ -487,7 +486,7 @@ class InteractionCalculator:
 
         group1, group2 = params
 
-        ccDist = iu.calc_euclidean_distance(group1.centroid, group2.centroid)
+        ccDist = iu.euclidean_distance(group1.centroid, group2.centroid)
         if self.is_within_boundary(ccDist, "boundary_cutoff", le):
             params = {"dist_proximal": ccDist}
             inter = InteractionType(group1, group2, "Proximal", params)
@@ -509,7 +508,7 @@ class InteractionCalculator:
         if isinstance(feat2, ChemicalFeature):
             feat2 = feat2.name
 
-        funcs = self._funcs
+        funcs = self.funcs
         return (True if ((feat1, feat2) in funcs or
                          (feat2, feat1) in funcs) else False)
 
@@ -519,7 +518,7 @@ class InteractionCalculator:
         if isinstance(feat2, ChemicalFeature):
             feat2 = feat2.name
 
-        funcs = self._funcs
+        funcs = self.funcs
         if (feat1, feat2) in funcs:
             return funcs[(feat1, feat2)]
         elif (feat2, feat1) in funcs:
@@ -528,7 +527,7 @@ class InteractionCalculator:
             return None
 
     def set_function(self, pair, func):
-        self._funcs[pair] = func
+        self.funcs[pair] = func
 
 
 def apply_interaction_criteria(interactions, conf=DefaultInteractionConf(),

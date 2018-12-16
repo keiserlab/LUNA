@@ -15,6 +15,15 @@ class InteractionType():
     def params(self):
         return self._params
 
+    @property
+    def required_interactions(self):
+        interactions = []
+
+        if "depend_of" in self._params:
+            interactions = self._params["depend_of"]
+
+        return interactions
+
     def _expand_dict(self):
         for key in self._params:
             self.__dict__[key] = self._params[key]
@@ -39,6 +48,8 @@ class InteractionType():
             has_equal_params = self.params == other.params
 
             is_equal = is_equal_compounds and is_equal_interactions and has_equal_params
+        else:
+            print("Entrou aqui")
 
         return is_equal
 
