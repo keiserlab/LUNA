@@ -1,5 +1,7 @@
-from util.exceptions import (BitsValueError, ShellCenterNotFound)
+from util.exceptions import (BitsValueError, ShellCenterNotFound, PymolSessionNotInitialized)
 from util.default_values import (CHEMICAL_FEATURES_IDS, INTERACTIONS_IDS)
+
+from mol.interaction.fp.shell_viewer import PymolShellViewer
 
 from Bio.KDTree import KDTree
 
@@ -7,8 +9,6 @@ from rdkit.DataStructs.cDataStructs import (ExplicitBitVect, SparseBitVect)
 
 from itertools import (chain, product)
 from collections import defaultdict
-
-from mol.wrappers.pymol import (PymolWrapper, mybio_to_pymol_selection)
 
 from scipy.sparse import (issparse, csr_matrix)
 
@@ -25,90 +25,6 @@ logger = logging.getLogger(__name__)
 DEFAULT_NBITS = 2**32
 DEFAULT_FP_LENGTH = 1024
 DEFAULT_FP_DTYPE = np.bool_
-
-
-class PymolShellViwer:
-
-    def __init__(self, input_file, show_cartoon=False, bg_color="white", pse_export_version="1.8"):
-        self.wrapper = PymolWrapper()
-        self.input_file = input_file
-        self.show_cartoon = show_cartoon
-        self.bg_color = bg_color
-        self.pse_export_version = pse_export_version
-
-        # TODO:
-        # Accept color parameters
-
-    def create_session(self, shells, output_file):
-        self.new_view()
-        self.set_view(shells)
-        self.save_session(output_file)
-
-    def new_view(self):
-        self.wrapper.reset_view()
-
-        self.wrapper.set("pse_export_version", self.pse_export_version)
-        self.wrapper.set("transparency_mode", 3)
-        self.wrapper.run_cmds([("bg_color", {"color": self.bg_color})])
-
-        self.wrapper.load(self.input_file)
-        self.wrapper.color_by_element(["all"])
-        self.wrapper.hide_all()
-
-        if self.show_cartoon:
-            self.wrapper.show([("cartoon", "all")])
-
-    def set_view(self, shells):
-        for (s, shell) in enumerate(shells):
-            centroid_name = "sphere_%d" % s
-
-            self.wrapper.add_pseudoatom(centroid_name, {"color": "white", "pos": list(shell.central_atm_grp.centroid)})
-
-            self.wrapper.hide([("nonbonded", centroid_name)])
-            self.wrapper.show([("sphere", centroid_name)])
-            self.wrapper.show([("nb_spheres", centroid_name)])
-
-            self.wrapper.show([("dots", centroid_name)])
-            self.wrapper.set("dot_color", "red")
-
-            # Compound view (residue, ligand, etc)
-            self.wrapper.show([("sticks", mybio_to_pymol_selection(shell.central_atm_grp.compound))])
-            self.wrapper.color([("gray", mybio_to_pymol_selection(shell.central_atm_grp.compound) + " AND elem C")])
-
-            self.wrapper.set("sphere_scale", shell.radius, {"selection": centroid_name})
-            self.wrapper.set("sphere_transparency", 0.7, {"selection": centroid_name})
-            self.wrapper.run_cmds([("center", {"selection": centroid_name})])
-
-            for (i, inter) in enumerate(shell.interactions):
-                obj1_name = "Group_%s" % hash(inter.comp1)
-                obj2_name = "Group_%s" % hash(inter.comp2)
-
-                self.wrapper.show([("sticks", mybio_to_pymol_selection(inter.comp1.compound)),
-                                   ("sticks", mybio_to_pymol_selection(inter.comp2.compound))])
-
-                self.wrapper.add_pseudoatom(obj1_name, {"vdw": 1, "pos": list(inter.comp1.centroid)})
-                self.wrapper.add_pseudoatom(obj2_name, {"vdw": 1, "pos": list(inter.comp2.centroid)})
-
-                self.wrapper.hide([("nonbonded", obj1_name), ("nonbonded", obj2_name)])
-                self.wrapper.show([("sphere", obj1_name), ("sphere", obj2_name)])
-                self.wrapper.set("sphere_scale", 0.4, {"selection": obj1_name})
-                self.wrapper.set("sphere_scale", 0.4, {"selection": obj2_name})
-
-                self.wrapper.distance("inter_%s_%d" % (s, i), obj1_name, obj2_name)
-
-                # TODO: Remove
-                if inter.type != "Proximal":
-                    if shell.level == 1:
-                        self.wrapper.color([("orange", "inter_%s_%d" % (s, i))])
-                    if shell.level == 2:
-                        self.wrapper.color([("red", "inter_%s_%d" % (s, i))])
-                    if shell.level == 3:
-                        self.wrapper.color([("blue", "inter_%s_%d" % (s, i))])
-                else:
-                    self.wrapper.color([("gray", "inter_%s_%d" % (s, i))])
-
-    def save_session(self, output_file):
-        self.wrapper.save_session(output_file)
 
 
 class ShellSearch:
@@ -141,8 +57,7 @@ class ShellSearch:
 
 class ShellManager:
 
-    def __init__(self, num_levels, radius_step, num_bits, shells=None, verbose=False):
-
+    def __init__(self, num_levels, radius_step, num_bits, shells=None, full_control=True, verbose=False):
         self.num_levels = num_levels
         self.radius_steps = radius_step
         self.num_bits = num_bits
@@ -176,77 +91,26 @@ class ShellManager:
                 # But, if none of them have interactions, check if the spheres have equal identifiers.
                 if not added_shell.interactions and not shell.interactions:
                     if added_shell.identifier == shell.identifier:
-                        # print("Equal shells containing no interactions")
                         found_shell = added_shell
                         break
                 # If both shells have interactions, check if the interactions are equal.
                 elif added_shell.interactions and shell.interactions:
                     if added_shell.interactions == shell.interactions:
-                        # print("Equal shells containing equal interactions")
                         found_shell = added_shell
                         break
 
         return found_shell
 
     def add_shell(self, shell):
-        # print()
-        # print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
         found_shell = self.find_similar_shell(shell)
 
         if found_shell:
-            # print()
-            # print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
-            # print(found_shell.central_atm_grp, found_shell.central_atm_grp.compound)
-            # print(found_shell.central_atm_grp.chemicalFeatures)
-            # print(found_shell.interactions)
-            # print()
-            # print(shell.central_atm_grp, shell.central_atm_grp.compound)
-            # print(shell.central_atm_grp.chemicalFeatures)
-            # print(shell.interactions)
-            # print()
-            # print(found_shell.identifier)
-            # print(shell.identifier)
-            # print()
-            # print(found_shell._data)
-            # print(shell._data)
-            # print()
-
             if found_shell.level < shell.level:
-                # print("Old level is lower")
                 shell.is_valid = False
-            elif ((found_shell.level == shell.level) and
-                    (found_shell.identifier <= shell.identifier)):
-                # print("Old level is equal to the new one, but the older shell has higher precedence.")
+            elif found_shell.level == shell.level and found_shell.identifier <= shell.identifier:
                 shell.is_valid = False
             else:
-                # print("This shell become invalid. %s" % found_shell.identifier)
                 found_shell.is_valid = False
-
-            # print()
-            # print(shell.level, found_shell.level)
-            # print()
-            # if shell.level > 0 and found_shell.level > 0:
-            #     filename = get_unique_filename("tmp", size=10)
-
-            #     psv = PymolShellViwer("3QQK.pdb")
-            #     shells_to_plot = [found_shell]
-            #     output_file1 = "%s_Level-%d_Sphere-%s-FOUND" % (filename, found_shell.level, found_shell.identifier)
-            #     psv.create_session(shells_to_plot, output_file1)
-
-            #     psv = PymolShellViwer("3QQK.pdb")
-            #     shells_to_plot = [shell]
-            #     output_file2 = "%s_Level-%d_Sphere-%s-FOUND" % (filename, shell.level, shell.identifier)
-            #     psv.create_session(shells_to_plot, output_file2)
-
-            #     print()
-            #     print("Check the files %s and %s" % (output_file1, output_file2))
-
-        # print()
-        # print("Should I add the new shell sir? %s" % str(shell.is_valid))
-
-        # print("-----------------------------")
-        # print()
-        # print()
 
         self.shells.append(shell)
         self.levels[shell.level].append(shell)
@@ -292,16 +156,31 @@ class ShellManager:
             curr_level = level
 
         if shell is None and self.verbose:
-            logger.warning("No previous shell centered in '%s' departing from the level %d was found."
+            logger.warning("No previous shell centered on '%s' departing from the level '%d' was found."
                            % (center, level))
 
         return shell
 
-    def get_identifiers(self, level=None):
-        if level:
-            identifiers = [s.identifier for s in get_shells_by_level(level)]
+    def get_last_shell(self, center):
+        shell = None
+
+        shells = self.get_shells_by_center(center)
+        if shells:
+            shell = sorted(shells, key=int)[-1]
+        elif self.verbose:
+            logger.warning("No shell centered on '%s' was found." % center)
+
+    def get_identifiers(self, unique_shells=True, level=None):
+        if level is not None:
+            if unique_shells:
+                identifiers = [s.identifier for s in get_shells_by_level(level) if s.is_valid]
+            else:
+                identifiers = [s.identifier for s in get_shells_by_level(level)]
         else:
-            identifiers = [s.identifier for s in self.shells]
+            if unique_shells:
+                identifiers = [s.identifier for s in self.shells if s.is_valid]
+            else:
+                identifiers = [s.identifier for s in self.shells]
 
         return sorted(identifiers)
 
@@ -313,30 +192,34 @@ class ShellManager:
             levels[shell.level].append(shell)
             centers[shell.central_atm_grp][shell.level] = shell
 
-        # TODO: transform everything into a hidden variable _
         self.levels = levels
         self.centers = centers
 
 
 class Shell:
 
-    def __init__(self, central_atm_grp, level, radius, inter_tuples=None,
-                 np_dtype=np.int64, seed=0, manager=None, is_valid=True,
-                 feature_mapper=None):
+    def __init__(self, central_atm_grp, level, radius, neighborhood=None, inter_tuples=None,
+                 np_dtype=np.int64, seed=0, manager=None, is_valid=True, feature_mapper=None):
 
         self.central_atm_grp = central_atm_grp
         self.level = level
         self.radius = radius
         self.is_valid = is_valid
 
+        if not neighborhood:
+            # If inter_tuples was not defined initialize the neighborhood as an empty list.
+            # Otherwise, define the neighborhood as the atom groups interacting with the central atom group.
+            neighborhood = [] if not inter_tuples else [x[1] for x in self._inter_tuples]
+        self._neighborhood = set(neighborhood)
+
+        # Always guarantee that the central atom defines the neighborhood.
+        self._neighborhood.add(central_atm_grp)
+
         if not inter_tuples:
             inter_tuples = []
         self._inter_tuples = set(inter_tuples)
 
         self._interactions = set([x[0] for x in self._inter_tuples])
-
-        self._atom_groups = set([x[1] for x in self._inter_tuples])
-        self._atom_groups.add(central_atm_grp)
 
         if not feature_mapper:
             default_dict = {**CHEMICAL_FEATURES_IDS, **INTERACTIONS_IDS}
@@ -354,11 +237,15 @@ class Shell:
 
     @property
     def neighborhood(self):
-        return self._atom_groups
+        return self._neighborhood
 
     @property
     def interactions(self):
         return self._interactions
+
+    @property
+    def inter_tuples(self):
+        return self._inter_tuples
 
     @property
     def manager(self):
@@ -378,17 +265,17 @@ class Shell:
 
     def hash_shell(self):
         if self.level == 0:
-            data = [self.feature_mapper[cf.format_name()] for cf in self.central_atm_grp.chemicalFeatures]
+            data = [self.feature_mapper[cf.format_name()] for cf in self.central_atm_grp.features]
 
             if len(self.central_atm_grp.atoms) == 1:
-                chemicalFeatures = set()
+                features = set()
                 for a in self.central_atm_grp.atoms:
-                    for ga in a.atomGroups:
+                    for ga in a.atm_grps:
 
                         if ga != self.central_atm_grp:
-                            chemicalFeatures.update(ga.chemicalFeatures)
+                            features.update(ga.features)
 
-                data += [self.feature_mapper[cf.format_name()] for cf in chemicalFeatures]
+                data += [self.feature_mapper[cf.format_name()] for cf in features]
             data.sort()
         else:
             cent_prev_id = self.previous_shell.identifier
@@ -396,21 +283,8 @@ class Shell:
             # Initialization of a new feature vector
             data = [(self.level, cent_prev_id)]
 
-            # print()
-            # print("++++++++++++++++++++++++++++++++++=")
-            # print(self.central_atm_grp, self.central_atm_grp.compound)
-            # print(self.central_atm_grp.chemicalFeatures)
-
-            # print()
-
             inter_tuples = set()
             for (inter, nb_atm_grp) in self._inter_tuples:
-                # print(nb_atm_grp, nb_atm_grp.compound)
-                # print(nb_atm_grp.chemicalFeatures)
-                # print(inter.get_partner(nb_atm_grp), inter.get_partner(nb_atm_grp).compound)
-                # print(inter.type)
-                # print()
-
                 prev_nb_shell = self._manager.get_previous_shell(nb_atm_grp, self.level)
                 if prev_nb_shell is None:
                     raise ShellCenterNotFound("No previous shell centered in %s was found." % nb_atm_grp)
@@ -419,30 +293,12 @@ class Shell:
                 # 2nd elem: previous identifier of the neighbor atom group;
                 inter_tuples.add((self.feature_mapper[inter.type], prev_nb_shell.identifier))
 
-            # print(inter_tuples)
-
-
-            # for i in self.interactions:
-            #     nb_atm_grp = i.comp2 if i.comp1 == self.central_atm_grp else i.comp1
-            #     prev_nb_shell = self._manager.get_previous_shell(nb_atm_grp, self.level)
-            #     if prev_nb_shell is None:
-            #         raise ShellCenterNotFound("No previous shell centered in %s was found." % nb_atm_grp)
-
-            #     prev_nb_id = prev_nb_shell.identifier
-
-            #     # 1st elem: previous identifier of the neighbor atom group;
-            #     # 2nd elem: interaction type.
-            #     inter_tuples.add((prev_nb_id, self.feature_mapper[i.type]))
-
             # Sort the tuples to avoid dependence on the order in which tuples are added.
             sorted_list = sorted(inter_tuples)
 
             # Join the interaction information to the feature vector.
             data += sorted_list
 
-            # print(data)
-            # print()
-        self._data = data
         np_array = np.array(data, self.np_dtype)
 
         # TODO: Let user to define hash function
@@ -457,12 +313,12 @@ class Shell:
 
 class ShellGenerator:
 
-    def __init__(self, num_levels, radius_step, include_proximal=True, bucket_size=10, seed=0,
+    def __init__(self, num_levels, radius_step, implicit_proximal_inter=False, bucket_size=10, seed=0,
                  np_dtype=np.int64, num_bits=DEFAULT_NBITS):
 
         self.num_levels = num_levels
         self.radius_step = radius_step
-        self.include_proximal = include_proximal
+        self.implicit_proximal_inter = implicit_proximal_inter
 
         self.bucket_size = bucket_size
         self.seed = seed
@@ -473,149 +329,107 @@ class ShellGenerator:
         sm = ShellManager(self.num_levels, self.radius_step, self.num_bits)
         ss = ShellSearch(neighborhood, self.bucket_size)
 
+        neighborhood = set(neighborhood)
+        skip_atm_grps = set()
         for level in range(self.num_levels):
             radius = self.radius_step * level
 
-            print("> Starting Level=%d, Radius=%d" % (level, radius))
-            print()
-
             for atm_grp in neighborhood:
+                # Ignore centroids that already reached the limit of possible substructures.
+                if atm_grp in skip_atm_grps:
+                    continue
+
+                shell = None
                 if radius > 0:
+                    prev_shell = sm.get_previous_shell(atm_grp, level)
+                    if not prev_shell:
+                        raise ShellCenterNotFound("There are no shells initialized to the atom group '%s'." % atm_grp)
+
+                    prev_atm_grps = prev_shell.neighborhood
+                    prev_interactions = prev_shell.interactions
+
                     nb_atm_grps = set(ss.search(atm_grp.centroid, radius))
 
-                    prev_atm_grps = sm.get_previous_shell(atm_grp, level).neighborhood
-
                     inter_tuples = set()
+                    # For each atom group from the previous shell
                     for prev_atm_grp in prev_atm_grps:
-                        # print(prev_atm_grp, prev_atm_grp.compound)
-                        # print("Interactions: %d" % len(prev_atm_grp.interactions))
-                        # print()
                         for inter in prev_atm_grp.interactions:
                             if inter.get_partner(prev_atm_grp) in nb_atm_grps:
-                                # print()
-                                # print("-----------")
-                                # print(inter.comp1, inter.comp1.compound)
-                                # print(inter.comp2, inter.comp2.compound)
-                                # print(inter.type)
-                                # print("Tuple has: ", inter.get_partner(prev_atm_grp))
-                                # print()
-                                inter_tuples.add((inter, inter.get_partner(prev_atm_grp)))
 
-                    if inter_tuples:
-                        # print("=========================")
-                        # print("Neighborhood before: ", prev_atm_grps)
-                        # print()
+                                new_tuple = (inter, inter.get_partner(prev_atm_grp))
 
-                        shell = Shell(atm_grp, level, radius, inter_tuples=inter_tuples, manager=sm,
-                                      seed=self.seed, np_dtype=self.np_dtype)
+                                # Ignore interactions that already exists in the previous shell only if the previous
+                                # source atom group does not correspond to the current one. It avoids duplications
+                                # on the list of interactions. For example, without this control, an interaction I
+                                # between atom A1 and A2 would appear twice in the list: (I, A1) and (I, A2).
+                                # Thus, it keeps only the first interaction that appears while increasing the shell.
+                                if inter in prev_interactions and new_tuple not in prev_shell.inter_tuples:
+                                    continue
 
-                        # print("Neighborhood after: ", shell.neighborhood)
-                        # print("-----------------------------------------------------")
-                        # print()
-                        # print()
-                        sm.add_shell(shell)
+                                inter_tuples.add(new_tuple)
 
-                        # Plot Spheres
-                        psv = PymolShellViwer("3QQK.pdb")
-                        filename = get_unique_filename("tmp")
-                        shells_to_plot = list(sm.get_shells_by_center(atm_grp).values())
-                        output_file = "%s_level-%d_Sphere-%d" % (filename, level, shell.identifier)
-                        psv.create_session(shells_to_plot, output_file)
-                        del(psv)
-                    # exit()
+                    # It adds a new shell when there are interactions inside the shell or if implicit proximal
+                    # interactions were set on. The latter parameter causes shells containing atoms with no interaction
+                    # or that only interact between themselves to produce a shell. It allows the algorithm to find
+                    # patterns involving disconnected graphs.
+                    if inter_tuples or self.implicit_proximal_inter:
+                        # If implicit proximal interactions are set on, the shell neighborhood will always be the atoms
+                        # inside a sphere of radius R centered on atom A.
+                        if self.implicit_proximal_inter:
+                            shell_nb = nb_atm_grps
+                        else:
+                            shell_nb = set([x[1] for x in inter_tuples])
+                        shell_nb.add(atm_grp)
+
+                        shell = Shell(atm_grp, level, radius, neighborhood=shell_nb, inter_tuples=inter_tuples,
+                                      manager=sm, seed=self.seed, np_dtype=self.np_dtype)
                 else:
                     shell = Shell(atm_grp, level, radius, manager=sm, seed=self.seed, np_dtype=self.np_dtype)
+
+                if shell:
                     sm.add_shell(shell)
+                    last_shell = shell
+                else:
+                    last_shell = sm.get_last_shell(atm_grp)
 
-            # print()
+                # Evaluate if the limit of possible substructures for the current centroid (atom group) was reached.
+                if last_shell:
+                    # If implicit proximal interactions were set on, the limit will be reached when the last shell
+                    # comprises all the atom groups provided as parameter (variable neighborhood)
+                    if self.implicit_proximal_inter:
+                        if len(last_shell.neighborhood) == len(neighborhood):
+                            # print("Last shell contains all atom groups and cannot expand anymore.")
+                            # If the limit was reached for this centroid, in the next level it can be ignored.
+                            skip_atm_grps.add(atm_grp)
+                    # Otherwise, the limit will be reached when the last shell already contains all interactions
+                    # established by the atom groups inside the last shell. In this case, expanding the radius
+                    # will not result in any new shell because a shell is only created when the atoms inside
+                    # the last shell establish interactions with the atom groups found after increasing the radius.
+                    else:
+                        all_interactions = tuple(chain.from_iterable([g.interactions for g in last_shell.neighborhood]))
+                        # It considers only interactions whose atom groups exist in the neigborhood.
+                        valid_interactions = set([i for i in all_interactions
+                                                 if i.atm_grp1 in neighborhood and i.atm_grp2 in neighborhood])
 
-        print()
-        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        print()
-        print("Number of shells: %d" % sm.num_shells)
-        print("Number of unique shells: %d" % sm.num_unique_shells)
-        print("Number of invalid shells: %d" % len([s for s in sm.shells if s.is_valid == False]))
+                        current_interactions = last_shell.interactions
 
-        # psv = PymolShellViwer("3QQK.pdb")
-        # for s in sm.unique_shells:
-        #     filename = get_unique_filename("tmp")
-        #     try:
-        #         shells_to_plot = list(sm.get_shells_by_center(atm_grp).values())
-        #         output_file = "%s_level-%d_Sphere-%d" % (filename, level, shell.identifier)
-        #         psv.create_session(shells_to_plot, output_file)
-        #     except Exception:
-        #         print(filename, level, shell.identifier)
-        #         raise
-        exit()
+                        if valid_interactions == current_interactions:
+                            # If the limit was reached for this centroid, in the next level it can be ignored.
+                            skip_atm_grps.add(atm_grp)
 
-    # def create_shells(self, atm_grps, trgt_grps=None):
-    #     sm = ShellManager(shell_nbits=self.num_bits)
-    #     ss = ShellSearch(atm_grps, self.bucket_size)
+            # If all atom groups reached the limit of possible substructures, just leave the loop.
+            if len(skip_atm_grps) == len(neighborhood):
+                logger.warning("The list of shells cannot be expanded anymore. The maximum number "
+                               "of substructures were reached.")
+                break
 
-    #     for level in range(self.num_levels):
-    #         radius = self.radius_step * level
+        logger.info("Shells creation finished.")
+        logger.info("The last level executed was: %d." % level)
+        logger.info("The number of levels defined was: %d." % self.num_levels)
+        logger.info("Total number of shells created: %d" % sm.num_shells)
+        logger.info("Total number of unique shells created: %d" % sm.num_unique_shells)
 
-    #         print("> Starting Level=%d, Radius=%d" % (level, radius))
-    #         print()
-
-    #         for atm_grp in atm_grps:
-    #             if radius > 0:
-    #                 print(">>>>>>> New group")
-    #                 print(atm_grp, atm_grp.compound)
-    #                 print("-------------------------------------")
-
-    #                 nb_atm_grps = ss.search(atm_grp.centroid, radius)
-    #                 interactions = self._get_interactions(atm_grp, nb_atm_grps, trgt_grps)
-
-    #                 print("Interactions: %d" % len(interactions))
-
-    #                 if interactions:
-    #                     shell = Shell(atm_grp, level, radius, interactions=interactions, manager=sm,
-    #                                   seed=self.seed, np_dtype=self.np_dtype)
-
-    #                     print("Len: %d" % len(interactions))
-    #                     print()
-    #                     teste = sm.find_equal_shell(shell)
-    #                     print(teste)
-
-    #                     sm.add_shell(shell)
-
-    #                 print("######################\n")
-    #             else:
-    #                 shell = Shell(atm_grp, level, radius, manager=sm, seed=self.seed, np_dtype=self.np_dtype)
-    #                 sm.add_shell(shell)
-
-    #     return sm
-
-    # def _get_interactions(self, central_atm_grp, nb_atm_grps, trgt_grps=None):
-    #     all_interactions = set()
-
-    #     if trgt_grps is not None:
-    #         trgt_grps = set(trgt_grps)
-
-    #     for nb_atm_grp in nb_atm_grps:
-    #         if nb_atm_grp == central_atm_grp:
-    #             continue
-
-    #         if trgt_grps is not None:
-    #             if central_atm_grp not in trgt_grps and nb_atm_grp not in trgt_grps:
-    #                 continue
-
-    #         print("NB", nb_atm_grp, nb_atm_grp.compound)
-
-    #         interactions = central_atm_grp.get_interactions_with(nb_atm_grp)
-    #         print("NCI: %d" % len(interactions))
-
-    #         if self.include_proximal:
-    #             iType = InteractionType(central_atm_grp, nb_atm_grp, DEFAULT_PROXIMAL_INTERACTION_LABEL)
-    #             interactions.append(iType)
-
-    #         print("NCI + Prox: %d" % len(interactions))
-    #         print()
-
-    #         all_interactions.update(interactions)
-
-    #     return all_interactions
+        return sm
 
 
 class Fingerprint:
