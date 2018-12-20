@@ -1,6 +1,10 @@
 from pymol import cmd
 from pymol import util
+
 from util.file import (get_filename, get_file_format)
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 class PymolWrapper:
@@ -49,13 +53,30 @@ class PymolWrapper:
         opts = opts or {}
         cmd.set(name, value, **opts)
 
-    def reset_view(self):
-        cmd.delete('all')
+    def reinitialize(self):
+        cmd.reinitialize('everything')
         self.input_file = None
+
+    def quit(self):
+        cmd.quit()
 
     def run_cmds(self, commands):
         for func_name, opts in commands:
             getattr(cmd, func_name)(**opts)
+
+
+class PymolColorMap:
+
+    def __init__(self, color_map=None, default_color=None):
+        self.color_map = color_map or {}
+        self.default_color = default_color
+
+    def get_color(self, key):
+        if key in self.color_map:
+            return self.color_map[key]
+        else:
+            logger.warning("Key '%s' does not exist. Default color will be used: %s." % (key, self.default_color))
+            return self.default_color
 
 
 def mybio_to_pymol_selection(entity):
@@ -78,4 +99,5 @@ def mybio_to_pymol_selection(entity):
                     params['resn'] = residue.resname
                     params['res'] = str(residue.id[1]) + residue.id[2].strip()
                     params['chain'] = residue.get_parent().id
+
             return (' AND ').join(['%s %s' % (k, str(v)) for k, v in params.items()])
