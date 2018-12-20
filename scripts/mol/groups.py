@@ -23,9 +23,7 @@ class AtomGroup():
         self._centroid = imath.centroid(self.coords)
         self._normal = None
 
-        if interactions is None:
-            interactions = []
-        self.interactions = interactions
+        self.interactions = interactions or []
 
         if recursive:
             for a in self.atoms:
@@ -63,6 +61,12 @@ class AtomGroup():
                 target_interactions.append(i)
 
         return target_interactions
+
+    def add_interaction(self, interaction):
+        self.interactions = list(set(self.interactions + [interaction]))
+
+    def remove_interaction(self, interaction):
+        self.interactions.remove(interaction)
 
     def _calc_normal(self):
         if self._normal is None:
@@ -125,8 +129,7 @@ def find_compound_groups(mybio_residue, feature_extractor, ph=None, has_explicit
     atm_map = {}
     nb_coords_by_atm = {}
 
-    filtered_obAtom = [a for a in OBMolAtomIter(obMol.OBMol)
-                       if a.GetAtomicNum() != 1]
+    filtered_obAtom = [a for a in OBMolAtomIter(obMol.OBMol) if a.GetAtomicNum() != 1]
 
     for idx, obAtom in enumerate(filtered_obAtom):
         # Ignore hydrogen atoms
@@ -136,7 +139,7 @@ def find_compound_groups(mybio_residue, feature_extractor, ph=None, has_explicit
             atm_map[idx] = serialNumber
 
             nb_coords = []
-            if (not mybio_residue.is_water()):
+            if not mybio_residue.is_water():
                 for nb_obAtom in OBAtomAtomIter(obAtom):
                     coords = Coordinate(nb_obAtom.GetX(), nb_obAtom.GetY(), nb_obAtom.GetZ(),
                                         atomic_num=nb_obAtom.GetAtomicNum())

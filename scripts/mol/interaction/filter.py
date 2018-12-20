@@ -70,6 +70,10 @@ class InteractionFilter:
         is_same_compound = atm_grp1.compound == atm_grp2.compound
         if self.ignore_self_inter and is_same_compound:
             return False
+        # It accepts all pairs composed by atom groups from a same compound when
+        # ignore_self_inter is set off.
+        elif not self.ignore_self_inter and is_same_compound:
+            return True
 
         # It ignores protein-protein interactions if it is required.
         is_prot_prot = (atm_grp1.compound.is_aminoacid() and atm_grp2.compound.is_aminoacid())

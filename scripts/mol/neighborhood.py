@@ -28,8 +28,7 @@ class NbAtom():
         return self._atm_grps
 
     def add_atom_group(self, group):
-        atm_grps = set(self.atm_grps + [group])
-        self._atm_grps = list(atm_grps)
+        self._atm_grps = list(set(self.atm_grps + [group]))
 
     def __getattr__(self, attr):
         return getattr(self._atom, attr)

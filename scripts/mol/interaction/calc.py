@@ -93,9 +93,6 @@ class InteractionCalculator:
 
         if isinstance(interactions, list) is False:
             interactions = []
-        else:
-            group1.interactions.extend(interactions)
-            group2.interactions.extend(interactions)
 
         return interactions
 
@@ -143,7 +140,6 @@ class InteractionCalculator:
                 params = {"depends_on": [h2o_pairs[h2o_key][atm_grp1], h2o_pairs[h2o_key][atm_grp2]]}
 
                 inter = InteractionType(atm_grp1, atm_grp2, "Water-bridged hydrogen bond", params)
-
                 dependent_interactions.add(inter)
 
         # It will try to match Hydrogen bonds and Attractive interactions
@@ -190,7 +186,13 @@ class InteractionCalculator:
                           if ((i.atm_grp1.compound.is_water() or i.atm_grp2.compound.is_water()) and
                               i.type == "Hydrogen bond" and i not in valid_hbs)])
 
-        return interactions - orphan_hbs
+        interactions -= orphan_hbs
+
+        # Clear the references of each interaction from the AtomGroups objects.
+        for i in orphan_hbs:
+            i.clear_refs()
+
+        return interactions
 
     def _default_functions(self):
         return {("Hydrophobic", "Hydrophobic"): self.calc_hydrop,
@@ -482,17 +484,14 @@ class InteractionCalculator:
         return interactions
 
     def calc_proximal(self, params):
-        interactions = []
-
         group1, group2 = params
 
+        interactions = []
         ccDist = iu.euclidean_distance(group1.centroid, group2.centroid)
-        if self.is_within_boundary(ccDist, "boundary_cutoff", le):
+        if self.is_within_boundary(ccDist, "max_dist_proximal", le):
             params = {"dist_proximal": ccDist}
             inter = InteractionType(group1, group2, "Proximal", params)
             interactions.append(inter)
-            group1.interactions.append(inter)
-            group2.interactions.append(inter)
 
         return interactions
 

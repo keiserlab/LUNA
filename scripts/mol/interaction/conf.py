@@ -86,6 +86,9 @@ class DefaultInteractionConf(InteractionConf):
         conf["min_xar_ang_xbond_inter"] = 80
         conf["max_disp_ang_xbond_inter"] = 60
 
+        # Proximal interactions
+        conf["max_dist_proximal"] = 6
+
         # Covalent interactions
         conf["cov_dist_tolerance"] = 0.45
 

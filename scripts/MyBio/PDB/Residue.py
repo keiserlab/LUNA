@@ -12,11 +12,16 @@
 # 1) The module __lt__ was overwritten to allow sorting in Python 3
 # 2) Inherit inhouse modifications. Package: MyBio.
 
-# Data: 21/02/2018.
+# Date: 21/02/2018.
 # 1) Added function to check if a residue is a water molecule.
 # 2) Added function to check if a residue is an hetero group.
 # 3) Added function to check if a residue is an amino acid.
 # 4) Added function to check if a residue is a nucleic acid.
+
+# Date: 12/17/2018
+# 1) Added property "_is_target" to control residues that will be targets for some processing.
+# 2) Added function "is_target() to verify the status of the is_target variable.
+# 3) Added function "set_as_target" to allow the definition if a residue is a target or not.
 
 # Each line or block with modifications contain a MODBY tag.
 
@@ -51,6 +56,11 @@ class Residue(Entity):
         self.disordered = 0
         self.resname = resname
         self.segid = segid
+
+        # MODBY: Alexandre Fassio
+        # By default: no residue is a target for any calculations.
+        self._is_target = False
+
         Entity.__init__(self, id)
 
     # Special methods
@@ -146,6 +156,11 @@ class Residue(Entity):
     def is_nucleotide(self):
         return self.get_id()[0] == " " and not self.is_aminoacid()
 
+    # MODBY: Alexandre Fassio
+    # Check if a residue is a target, i.e., if it will be used for any calculations.
+    def is_target(self):
+        return self._is_target
+
     def get_resname(self):
         return self.resname
 
@@ -183,6 +198,11 @@ class Residue(Entity):
         hetflag, resseq, icode = self.get_id()
 
         return (pdb_id, chain, resname, resseq, icode)
+
+    # MODBY: Alexandre Fassio
+    # Define if the residue is a target or not.
+    def set_as_target(self, is_target=True):
+        self._is_target = is_target
 
 
 class DisorderedResidue(DisorderedEntityWrapper):
