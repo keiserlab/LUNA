@@ -56,3 +56,7 @@ class BitsValueError(ValueError):
 
 class ShellCenterNotFound(KeyError):
     pass
+
+
+class PymolSessionNotInitialized(NameError):
+    pass
