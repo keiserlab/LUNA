@@ -1,30 +1,19 @@
-from util.exceptions import (BitsValueError, ShellCenterNotFound, PymolSessionNotInitialized)
+from util.exceptions import ShellCenterNotFound
+
 from util.default_values import (CHEMICAL_FEATURES_IDS, INTERACTIONS_IDS)
 
-from mol.interaction.fp.shell_viewer import PymolShellViewer
-
 from Bio.KDTree import KDTree
-
-from rdkit.DataStructs.cDataStructs import (ExplicitBitVect, SparseBitVect)
 
 from itertools import (chain, product)
 from collections import defaultdict
 
-from scipy.sparse import (issparse, csr_matrix)
+from mol.interaction.fp.fingerprint import (DEFAULT_SHELL_NBITS, Fingerprint, CountFingerprint)
 
 import numpy as np
 import mmh3
 import logging
 
-# TODO: Remove
-from util.file import get_unique_filename
-
 logger = logging.getLogger(__name__)
-
-
-DEFAULT_NBITS = 2**32
-DEFAULT_FP_LENGTH = 1024
-DEFAULT_FP_DTYPE = np.bool_
 
 
 class ShellSearch:
@@ -62,10 +51,7 @@ class ShellManager:
         self.radius_steps = radius_step
         self.num_bits = num_bits
 
-        if not shells:
-            shells = []
-        self.shells = shells
-
+        self.shells = shells or []
         self.verbose = verbose
 
         self._init_controllers()
@@ -119,40 +105,57 @@ class ShellManager:
     def get_valid_shells(self):
         return [s for s in self.shells if s.is_valid]
 
-    def get_shells_by_level(self, level):
+    def get_shells_by_identifier(self, identifier, unique_shells=False):
+        if unique_shells:
+            return [s for s in self.shells if s.identifier == identifier and s.is_valid]
+        else:
+            return [s for s in self.shells if s.identifier == identifier]
+
+    def get_shells_by_level(self, level, unique_shells=False):
         shells = []
 
         if level in self.levels:
-            shells = self.levels[level]
+            if unique_shells:
+                shells = [s for s in self.levels[level] if s.is_valid]
+            else:
+                shells = self.levels[level]
         elif self.verbose:
             logger.warning("The informed level '%d' does not exist." % level)
 
         return shells
 
-    def get_shells_by_center(self, center):
+    def get_shells_by_center(self, center, unique_shells=False):
         shells = []
 
         if center in self.centers:
-            shells = self.centers[center]
+            if unique_shells:
+                shells = [s for s in self.centers[center] if s.is_valid]
+            else:
+                shells = self.centers[center]
         elif self.verbose:
             logger.warning("The informed center '%s' does not exist." % center)
 
         return shells
 
-    def get_shell_by_center_and_level(self, center, level):
+    def get_shell_by_center_and_level(self, center, level, unique_shells=False):
         shell = self.centers.get(center, {}).get(level)
 
-        if not shell and self.verbose:
+        if shell is None and self.verbose:
             logger.warning("The informed center '%s' does not exist in the level '%d'." % (center, level))
+
+        if unique_shells:
+            shell = shell if shell.is_valid else None
+            if shell is None and self.verbose:
+                logger.warning("The shell found with center '%s' and level '%d' is not unique." % (center, level))
 
         return shell
 
-    def get_previous_shell(self, center, curr_level):
+    def get_previous_shell(self, center, curr_level, unique_shells=False):
         shell = None
 
         while curr_level != 0 and shell is None:
             level = curr_level - 1
-            shell = self.get_shell_by_center_and_level(center, level)
+            shell = self.get_shell_by_center_and_level(center, level, unique_shells)
             curr_level = level
 
         if shell is None and self.verbose:
@@ -161,16 +164,18 @@ class ShellManager:
 
         return shell
 
-    def get_last_shell(self, center):
+    def get_last_shell(self, center, unique_shells=False):
         shell = None
 
-        shells = self.get_shells_by_center(center)
+        shells = self.get_shells_by_center(center, unique_shells)
         if shells:
             shell = sorted(shells, key=int)[-1]
         elif self.verbose:
             logger.warning("No shell centered on '%s' was found." % center)
 
-    def get_identifiers(self, unique_shells=True, level=None):
+        return shell
+
+    def get_identifiers(self, level=None, unique_shells=False):
         if level is not None:
             if unique_shells:
                 identifiers = [s.identifier for s in get_shells_by_level(level) if s.is_valid]
@@ -183,6 +188,22 @@ class ShellManager:
                 identifiers = [s.identifier for s in self.shells]
 
         return sorted(identifiers)
+
+    def to_fingerprint(self, unique_shells=False, fold_to_size=None, count_fp=False):
+        indices = self.get_identifiers(unique_shells=unique_shells)
+        props = {"num_levels": self.num_levels,
+                 "num_bits": self.num_bits,
+                 "radius_steps": self.radius_steps}
+
+        if count_fp:
+            fp = CountFingerprint(indices, fp_length=self.num_bits, props=props)
+        else:
+            fp = Fingerprint(indices, fp_length=self.num_bits, props=props)
+
+        if fold_to_size:
+            return fp.fold(fold_to_size)
+        else:
+            return fp
 
     def _init_controllers(self):
         levels = defaultdict(list)
@@ -221,6 +242,7 @@ class Shell:
 
         self._interactions = set([x[0] for x in self._inter_tuples])
 
+        # TODO: FIX IT.
         if not feature_mapper:
             default_dict = {**CHEMICAL_FEATURES_IDS, **INTERACTIONS_IDS}
             # TODO: Built a class for managing the feature maps.
@@ -259,6 +281,7 @@ class Shell:
     def previous_shell(self):
         shell = self._manager.get_previous_shell(self.central_atm_grp, self.level)
         if shell is None:
+            logger.exception("No previous shell centered in '%s' was found." % self.central_atm_grp)
             raise ShellCenterNotFound("No previous shell centered in '%s' was found." % self.central_atm_grp)
 
         return shell
@@ -283,15 +306,16 @@ class Shell:
             # Initialization of a new feature vector
             data = [(self.level, cent_prev_id)]
 
-            inter_tuples = set()
+            inter_tuples = []
             for (inter, nb_atm_grp) in self._inter_tuples:
                 prev_nb_shell = self._manager.get_previous_shell(nb_atm_grp, self.level)
                 if prev_nb_shell is None:
+                    logger.exception("No previous shell centered in %s was found." % nb_atm_grp)
                     raise ShellCenterNotFound("No previous shell centered in %s was found." % nb_atm_grp)
 
                 # 1st elem: interaction type.
                 # 2nd elem: previous identifier of the neighbor atom group;
-                inter_tuples.add((self.feature_mapper[inter.type], prev_nb_shell.identifier))
+                inter_tuples.append((self.feature_mapper[inter.type], prev_nb_shell.identifier))
 
             # Sort the tuples to avoid dependence on the order in which tuples are added.
             sorted_list = sorted(inter_tuples)
@@ -314,7 +338,7 @@ class Shell:
 class ShellGenerator:
 
     def __init__(self, num_levels, radius_step, implicit_proximal_inter=False, bucket_size=10, seed=0,
-                 np_dtype=np.int64, num_bits=DEFAULT_NBITS):
+                 np_dtype=np.int64, num_bits=DEFAULT_SHELL_NBITS):
 
         self.num_levels = num_levels
         self.radius_step = radius_step
@@ -343,6 +367,7 @@ class ShellGenerator:
                 if radius > 0:
                     prev_shell = sm.get_previous_shell(atm_grp, level)
                     if not prev_shell:
+                        logger.exception("No previous shell centered in %s was found." % nb_atm_grp)
                         raise ShellCenterNotFound("There are no shells initialized to the atom group '%s'." % atm_grp)
 
                     prev_atm_grps = prev_shell.neighborhood
@@ -398,7 +423,6 @@ class ShellGenerator:
                     # comprises all the atom groups provided as parameter (variable neighborhood)
                     if self.implicit_proximal_inter:
                         if len(last_shell.neighborhood) == len(neighborhood):
-                            # print("Last shell contains all atom groups and cannot expand anymore.")
                             # If the limit was reached for this centroid, in the next level it can be ignored.
                             skip_atm_grps.add(atm_grp)
                     # Otherwise, the limit will be reached when the last shell already contains all interactions
@@ -430,144 +454,3 @@ class ShellGenerator:
         logger.info("Total number of unique shells created: %d" % sm.num_unique_shells)
 
         return sm
-
-
-class Fingerprint:
-
-    def __init__(self, indices, fp_length, counts=None, unfolding_map=None, name=None):
-
-        indices = np.asarray(indices, dtype=np.long)
-
-        if np.any(indices >= fp_length):
-            raise BitsValueError("Provided indices are in a different bit scale.")
-
-        self._indices = np.unique(indices)
-        self._counts = counts
-
-        self.fp_length = fp_length
-        self.unfolding_map = unfolding_map
-
-        self._name = name
-
-    @classmethod
-    def from_bitstring(cls, bitstring, level=-1, **kwargs):
-        pass
-
-    @classmethod
-    def from_fingerprint(cls, fp, **kwargs):
-        pass
-
-    @classmethod
-    def from_rdkit(cls, rdkit_fprint, **kwargs):
-        pass
-
-    @property
-    def indices(self):
-        return self._indices
-
-    @property
-    def bit_count(self):
-        return self.indices.shape[0]
-
-    @property
-    def density(self):
-        return self.bit_count / self.fp_length
-
-    @property
-    def counts(self):
-        if self._counts is None:
-            self._counts = dict([(k, 1) for k in self.indices])
-
-        return self._counts
-
-    @property
-    def name(self):
-        if self._name is None:
-            return ""
-        else:
-            return self._name
-
-    def to_vector(self, compressed=True, dtype=DEFAULT_FP_DTYPE):
-
-        data = [self.counts[i] for i in self.indices]
-        if compressed:
-            try:
-                row = np.zeros(self.bit_count)
-                col = self.indices
-                vector = csr_matrix((data, (row, col)), shape=(1, self.fp_length), dtype=dtype)
-            except ValueError:
-                raise BitsValueError("Sparse matrix construction failed. Invalid indices or input data.")
-        else:
-            vector = np.zeros(self.fp_length, dtype=dtype)
-            try:
-                vector[self.indices] = data
-            except IndexError:
-                raise BitsValueError("Some of the provided indices are greater than the fingerprint length.")
-
-        return vector
-
-    def to_bit_vector(self, compressed=True):
-        return self.to_vector(compressed=compressed, dtype=DEFAULT_FP_DTYPE)
-
-    def to_bit_string(self):
-        bit_vector = self.to_bit_vector(compressed=False).astype(np.int)
-        return "".join(map(str, bit_vector))
-
-    def to_rdkit(self, rdkit_fp_cls=None):
-
-        if rdkit_fp_cls is None:
-            # Classes to store explicit bit vectors: ExplicitBitVect or SparseBitVect.
-            # ExplicitBitVect is most useful for situations where the size of the vector is
-            # relatively small (tens of thousands or smaller).
-            # For larger vectors, use the _SparseBitVect_ class instead.
-            if self.fp_length < 1e5:
-                rdkit_fp_cls = ExplicitBitVect
-            else:
-                rdkit_fp_cls = SparseBitVect
-
-        # RDKit data structure defines fingerprints as a std:set composed of ints (signed int).
-        # Since we always have values higher than 0 and since the data structure contains only signed ints,
-        # then the max length for a RDKit fingerprint is 2^31 - 1.
-        # C signed int (32 bit) ranges: [-2^31, 2^31-1].
-        max_rdkit_fp_length = 2**31 - 1
-        fp_length = min(self.fp_length, max_rdkit_fp_length)
-        indices = self.indices % max_rdkit_fp_length
-
-        rdkit_fp = rdkit_fp_cls(fp_length)
-        rdkit_fp.SetBitsFromList(indices.tolist())
-        return rdkit_fp
-
-    def fold(self, new_fp_length=DEFAULT_FP_LENGTH):
-
-        if new_fp_length > self.fp_length:
-            raise BitsValueError("Fold operation requires the new fingerprint length (%d) "
-                                 "to be greater than the current one (%d)." % (new_fp_length, self.fp_length))
-
-        if not np.log2(self.fp_length / new_fp_length).is_integer():
-            raise BitsValueError("It is not possible to fold the current fingerprint into the informed new length."
-                                 "The current length divided by the new one is not a power of 2 number.")
-
-        folded_indices = self.indices % new_fp_length
-
-        unfolding_map = defaultdict(set)
-        for k, v in sorted(zip(folded_indices, self.indices)):
-            unfolding_map[k].add(v)
-
-        new_fp = self.__class__(folded_indices, new_fp_length, unfolding_map=unfolding_map)
-
-        return new_fp
-
-    def unfold(self):
-        indices = []
-
-        if self.unfolding_map is None:
-            logger.warning("This fingerprint was not previously folded.")
-        else:
-            indices = list(chain.from_iterable(self.unfolding_map.values()))
-
-        return np.array(indices)
-
-    def __repr__(self):
-        return ("<%s: indices=%s bits=%d name='%s'>" %
-                (self.__class__.__name__, repr(self.indices).replace('\n', '').replace(' ', ''),
-                 self.fp_length, self.name))
