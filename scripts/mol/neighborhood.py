@@ -17,7 +17,7 @@ class NbAtom():
 
     @property
     def nb_coords(self):
-        return self._nb_coords
+        return self._nb_coords.coords
 
     @property
     def num_neighbours(self):

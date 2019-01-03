@@ -50,13 +50,21 @@ class ProcessingFailed(RuntimeError):
     pass
 
 
-class BitsValueError(ValueError):
-    pass
-
-
 class ShellCenterNotFound(KeyError):
     pass
 
 
 class PymolSessionNotInitialized(NameError):
+    pass
+
+
+class InvalidFingerprintType(TypeError):
+    pass
+
+
+class BitsValueError(ValueError):
+    pass
+
+
+class FingerprintCountsError(ValueError):
     pass

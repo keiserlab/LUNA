@@ -4,7 +4,7 @@ import numpy as np
 class Coordinate():
 
     def __init__(self, x, y, z, atomic_num=None, atom_id=None):
-        self._coord = (x, y, z)
+        self._coord = np.array([x, y, z])
         self.atomic_num = atomic_num
         self.atom_id = atom_id
 
@@ -22,6 +22,10 @@ class Coordinate():
     @property
     def z(self):
         return self._coord[2]
+
+    @property
+    def vector(self):
+        return self.coord
 
     @property
     def coord(self):

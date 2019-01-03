@@ -59,7 +59,6 @@ class InteractionType():
 
     def __eq__(self, other):
         """Overrides the default implementation"""
-        is_equal = False
         if isinstance(self, other.__class__):
             is_equal_compounds = ((self.atm_grp1 == other.atm_grp1 and self.atm_grp2 == other.atm_grp2) or
                                   (self.atm_grp1 == other.atm_grp2 and self.atm_grp2 == other.atm_grp1))
@@ -67,9 +66,8 @@ class InteractionType():
             is_equal_interactions = self.type == other.type
             has_equal_params = self.params == other.params
 
-            is_equal = is_equal_compounds and is_equal_interactions and has_equal_params
-
-        return is_equal
+            return is_equal_compounds and is_equal_interactions and has_equal_params
+        return False
 
     def __ne__(self, other):
         """Overrides the default implementation (unnecessary in Python 3)"""
