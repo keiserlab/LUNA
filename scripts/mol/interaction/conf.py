@@ -58,6 +58,15 @@ class DefaultInteractionConf(InteractionConf):
         conf["max_ha_dist_hb_inter"] = 2.8
         conf["min_dha_ang_hb_inter"] = 90
 
+        # Weak hydrogen bond
+        # Ref: Panigrahi, S. K. & Desiraju, G. R. (2007).
+        # Ref: Desiraju, G. R. & Steiner, T. (2001).
+        conf["max_da_dist_whb_inter"] = 4
+        conf["max_ha_dist_whb_inter"] = 3
+        conf["min_dha_ang_whb_inter"] = 110
+        conf["min_har_ang_whb_inter"] = 90
+        conf["min_dar_ang_whb_inter"] = 90
+
         # Ionic interactions
         conf["max_dist_repuls_inter"] = 6
         conf["max_dist_attract_inter"] = 6
