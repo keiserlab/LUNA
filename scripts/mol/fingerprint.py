@@ -123,8 +123,7 @@ def prepare_pharm2d_fp(fp_opt):
     else:
         fdefName = 'data/MinimalFeatures.fdef'
         featFactory = ChemicalFeatures.BuildFeatureFactory(fdefName)
-        sigFactory = SigFactory(featFactory, minPointCount=2, maxPointCount=3,
-                                trianglePruneBins=False)
+        sigFactory = SigFactory(featFactory, minPointCount=2, maxPointCount=3, trianglePruneBins=False)
         sigFactory.SetBins([(0, 2), (2, 5), (5, 8)])
         sigFactory.Init()
 
@@ -151,13 +150,10 @@ def generate_fp_for_mols(mols, fp_function=None, fp_opt=None, critical=False):
 
     if (fp_function is None):
         fp_function = "pharm2d_fp"
-
         logger.info("No fingerprint function was defined.")
-        logger.info("The default fingerprint type will be used: 2D "
-                    "Pharmacophore fingerprint.")
+        logger.info("The default fingerprint type will be used: 2D Pharmacophore fingerprint.")
 
-    logger.info("Trying to generate fingerprints for %d molecules."
-                % len(mols))
+    logger.info("Trying to generate fingerprints for %d molecules." % len(mols))
 
     params = prepare_fp_params(fp_function, fp_opt)
     fpg = FingerprintGenerator()
@@ -169,8 +165,7 @@ def generate_fp_for_mols(mols, fp_function=None, fp_opt=None, critical=False):
             fp = getattr(fpg, fp_function)(**params)
             fpMols.append({"fp": fp, "mol": mol.GetProp("_Name")})
         except Exception as e:
-            logger.info("Molecule at position %d failed. Name: %s" %
-                        (idx, mol.GetProp("_Name")))
+            logger.info("Molecule at position %d failed. Name: %s" % (idx, mol.GetProp("_Name")))
             logger.exception(e)
 
             if (critical):
