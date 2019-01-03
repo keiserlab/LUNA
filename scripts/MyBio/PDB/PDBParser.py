@@ -18,6 +18,10 @@ Modifications included by Alexandre Fassio (alexandrefassio@dcc.ufmg.br).
     When OpenBabel adds Hydrogen atoms, it does not set HETATM for hydrogen atoms from heteroatoms.
 5) Added an option to correct all OpenBabel errors.
 
+Modifications included by Alexandre Fassio (alexandrefassio@dcc.ufmg.br).
+    Date: 01/02/19
+
+1) Now it recognizes different labels for waters: 'HOH', 'DOD', 'WAT', 'H2O', 'OH2'
 
 Each line or block with modifications contain a MODBY tag.
 
@@ -223,18 +227,24 @@ class PDBParser(object):
                 icode = line[26]  # insertion code
 
                 # MODBY: Alexandre Fassio
+                # Possible labels for water molecules.
+                # Ref: http://prody.csb.pitt.edu/manual/reference/atomic/flags.html.
+                # DOD: deutered water.
+                waters = ['HOH', 'DOD', 'WAT', 'H2O', 'OH2']
+
+                # MODBY: Alexandre Fassio
                 # Correct flags that were incorrectly set by OpenBabel.
+                # Recognize other water labels.
                 if (self.FIX_OBABEL_FLAGS):
                     # Incorrect flags are set only for added hydrogen atoms
                     if (name == "H"):
                         child_dict = structure_builder.model[chainid].child_dict
                         # If this hydrogen belongs to water molecule or to a ligand
-                        if ((resname == "HOH" or resname == "WAT") or
-                           (("H_%s" % resname, resseq, icode) in child_dict)):
+                        if ((resname in waters) or (("H_%s" % resname, resseq, icode) in child_dict)):
                             record_type = "HETATM"
 
                 if record_type == "HETATM":  # hetero atom flag
-                    if resname == "HOH" or resname == "WAT":
+                    if resname in waters:
                         hetero_flag = "W"
                     else:
                         hetero_flag = "H"
