@@ -36,9 +36,9 @@ def euclidean_distance(p1, p2):
 
 
 def angle(p1, p2):
-    cosAngle = np.dot(p1, p2) / (np.linalg.norm(p1) * np.linalg.norm(p2))
-    arcosAngle = np.arccos(np.clip(cosAngle, -1, 1))
-    return np.degrees(arcosAngle)
+    cos_angle = np.dot(p1, p2) / (np.linalg.norm(p1) * np.linalg.norm(p2))
+    arcos_angle = np.arccos(np.clip(cos_angle, -1, 1))
+    return np.degrees(arcos_angle)
 
 
 def norm_vector(p1, p2):
