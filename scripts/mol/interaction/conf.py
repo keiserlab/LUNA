@@ -57,6 +57,8 @@ class DefaultInteractionConf(InteractionConf):
         conf["max_da_dist_hb_inter"] = 3.9
         conf["max_ha_dist_hb_inter"] = 2.8
         conf["min_dha_ang_hb_inter"] = 90
+        conf["min_har_ang_hb_inter"] = 90
+        conf["min_dar_ang_hb_inter"] = 90
 
         # Weak hydrogen bond
         # Ref: Panigrahi, S. K. & Desiraju, G. R. (2007).
@@ -66,6 +68,14 @@ class DefaultInteractionConf(InteractionConf):
         conf["min_dha_ang_whb_inter"] = 110
         conf["min_har_ang_whb_inter"] = 90
         conf["min_dar_ang_whb_inter"] = 90
+
+        # Weak hydrogen bonds: hydrogen bonds involving aromatic rings
+        # Ref: Hydrogen bonds with π-acceptors in proteins: frequencies and role in stabilizing local 3D structures [Steiner, 2001]
+        # Ref: Strong and Weak Hydrogen BondsProtein–Ligand Interface [Panigrahi, 2007]
+        conf["max_dc_dist_whb_inter"] = 4.5
+        conf["max_hc_dist_whb_inter"] = 3.5
+        conf["min_dhc_ang_whb_inter"] = 120
+        conf["max_disp_ang_whb_inter"] = 40
 
         # Ionic interactions
         conf["max_dist_repuls_inter"] = 6
@@ -87,10 +97,11 @@ class DefaultInteractionConf(InteractionConf):
         # Where C is a carbon, X a halogen, A an acceptor and
         # R is an atom bonded to A.
         # Distance X-A when A is an single atom.
-        conf["max_xa_dist_xbond_inter"] = 4
-        # Distance X-A when A is an aromatic ring, so C comes from Centroid.
-        conf["max_xc_dist_xbond_inter"] = 4.5
         # Ref: Halogen bonds in biological molecules [Auffinger, 2004]
+        # Ref: The Important Role of Halogen Bond in Substrate Selectivity of Enzymatic Catalysis [Jiang, 2016]
+        conf["max_xa_dist_xbond_inter"] = 4
+        # Distance X-A when A is an aromatic ring, so C stands for Centroid.
+        conf["max_xc_dist_xbond_inter"] = 4.5
         conf["min_cxa_ang_xbond_inter"] = 120
         conf["min_xar_ang_xbond_inter"] = 80
         conf["max_disp_ang_xbond_inter"] = 60
