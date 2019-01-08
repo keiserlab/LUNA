@@ -139,12 +139,11 @@ def find_compound_groups(mybio_residue, feature_extractor, ph=None, has_explicit
             atm_map[idx] = serialNumber
 
             nb_coords = []
-            if not mybio_residue.is_water():
-                for nb_obAtom in OBAtomAtomIter(obAtom):
-                    coords = Coordinate(nb_obAtom.GetX(), nb_obAtom.GetY(), nb_obAtom.GetZ(),
-                                        atomic_num=nb_obAtom.GetAtomicNum())
+            for nb_obAtom in OBAtomAtomIter(obAtom):
+                coords = Coordinate(nb_obAtom.GetX(), nb_obAtom.GetY(), nb_obAtom.GetZ(),
+                                    atomic_num=nb_obAtom.GetAtomicNum())
 
-                    nb_coords.append(coords)
+                nb_coords.append(coords)
 
             nb_coords_by_atm[serialNumber] = NbCoordinates(nb_coords)
 
