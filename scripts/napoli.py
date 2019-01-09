@@ -28,7 +28,7 @@ from mol.features import FeatureExtractor
 from mol.wrappers.obabel import convert_molecule
 from mol.clustering import cluster_fps_butina
 from mol.depiction import ligand_pharm_figure
-from mol.interaction.fp.shell import (ShellGenerator, Fingerprint)
+from mol.interaction.fp.shell import (ShellGenerator, Fingerprint, CountFingerprint)
 
 from analysis.residues import (InteractingResidues, get_interacting_residues)
 from analysis.summary import *
@@ -388,9 +388,7 @@ class InteractionsProject:
         return target_entity
 
     def perceive_chemical_groups(self, entity, ligand):
-        nb_compounds = get_contacts_for_entity(entity,
-                                               ligand,
-                                               level='R')
+        nb_compounds = get_contacts_for_entity(entity, ligand, level='R')
 
         compounds = set([x[1] for x in nb_compounds])
         grps_by_compounds = {}
@@ -636,8 +634,7 @@ class RCSB_PLI_Population(InteractionsProject):
             trgt_grps = [grps_by_compounds[x] for x in grps_by_compounds
                          if x != ligand]
 
-            all_inter = calc_all_interactions(src_grps, trgt_grps,
-                                              conf=BOUNDARY_CONF)
+            all_inter = calc_all_interactions(src_grps, trgt_grps, conf=BOUNDARY_CONF)
 
             rcsb_inter_manager.insert_interactions(all_inter, db_ligand_entity)
 
@@ -966,6 +963,8 @@ class Local_PLI_Project(InteractionsProject):
 
         fingerprints = []
 
+        pli_fingerprints = []
+
         comp_type_count_by_entry = {}
         inter_type_count_by_entry = {}
         inter_res_by_entry = {}
@@ -991,6 +990,7 @@ class Local_PLI_Project(InteractionsProject):
 
             structure = PDB_PARSER.get_structure(ligand_entry.pdb_id, pdb_file)
             ligand = self.get_target_entity(structure, ligand_entry)
+            ligand.set_as_target(is_target=True)
 
             grps_by_compounds = self.perceive_chemical_groups(structure[0], ligand)
             src_grps = [grps_by_compounds[x] for x in grps_by_compounds if x.get_id()[0] != " "]
@@ -1018,26 +1018,7 @@ class Local_PLI_Project(InteractionsProject):
             #                                            conf=self.interaction_conf)
             #     inter_to_be_stored = filtered_inter
 
-            # TODO: remove lines
-            # x = {}
-            # res = structure[0]["A"][(" ", 81, " ")]
-            # x[res] = grps_by_compounds[res]
-
-            # res = structure[0]["A"][(" ", 83, " ")]
-            # x[res] = grps_by_compounds[res]
-
-            # res = structure[0]["A"][(" ", 82, " ")]
-            # x[res] = grps_by_compounds[res]
-
-            # x[ligand] = grps_by_compounds[ligand]
-
-            # grps_by_compounds = x
-
-            # neighborhood = [ag for c in grps_by_compounds.values() for ag in c.atm_grps]
-
             # res_to_inter = [x for x in grps_by_compounds.values()]
-
-            print("Before interactions")
 
             # filtered_inter = calc_all_interactions(src_grps, trgt_grps, conf=self.interaction_conf)
 
@@ -1046,25 +1027,46 @@ class Local_PLI_Project(InteractionsProject):
             # inter_filter = InteractionFilter.new_pli_filter(inter_conf=self.interaction_conf,
             #                                                 ignore_h2o_h2o=False)
 
-            ic = InteractionCalculator(inter_conf=self.interaction_conf, inter_filter=inter_filter)
+            # TODO: remove lines
+            # res_list = [structure[0]["A"][(" ", 81, " ")], structure[0]["A"][(" ", 83, " ")],
+            #             structure[0]["A"][(" ", 82, " ")], structure[0]["A"][(" ", 145, " ")]]
+            # x = {res: grps_by_compounds[res] for res in res_list}
+            # x[ligand] = grps_by_compounds[ligand]
+            #
+            # grps_by_compounds = x
+            # src_grps = [grps_by_compounds[x] for x in grps_by_compounds if x.get_id()[0] != " "]
+            # trgt_grps = [grps_by_compounds[x] for x in grps_by_compounds if x != ligand]
+            ##########
+
+            ic = InteractionCalculator(inter_conf=self.interaction_conf, inter_filter=inter_filter, add_proximal=False)
             new_inters = ic.calc_interactions(src_grps, trgt_grps)
 
-            neighborhood = [ag for ag in grps_by_compounds[ligand].atm_grps]
-            shells = ShellGenerator(7, 1, include_proximal=True)
+            print("Number of found interactions: %d" % len(new_inters))
+            print()
+            print()
+
+            exit()
+
+            for i in new_inters:
+                if i.atm_grp1.compound != ligand and i.atm_grp2.compound != ligand:
+                    continue
+
+                print(i.atm_grp1, i.atm_grp1.compound)
+                print(i.atm_grp2, i.atm_grp2.compound)
+                print(i.type)
+                print(i.params)
+                print()
+            exit()
+            neighborhood = [ag for c in grps_by_compounds.values() for ag in c.atm_grps]
+
+            shells = ShellGenerator(10, 1, implicit_proximal_inter=True)
             sm = shells.create_shells(neighborhood)
 
             fp_length = 1024
-            fp_length = 128
-            fp = Fingerprint(sm.get_identifiers(), sm.shell_nbits)
+            fp = sm.to_fingerprint(fold_to_size=fp_length)
 
-            folded_fp = fp.fold(fp_length)
-
-            # count = defaultdict(int)
-            # for i in fp.indices:
-            #     count[i] += 1
-
-            # for k in count:
-            #     print(k, count[k])
+            pli_fingerprints.append((fp, sm))
+            continue
             exit()
 
             #
@@ -1082,33 +1084,84 @@ class Local_PLI_Project(InteractionsProject):
 
             # TODO: Atualizar outros scripts que verificam se um residuo é proteina ou nao.
             #       Agora temos uma função propria dentro de Residue.py
-            # interacting_residues = get_interacting_residues(filtered_inter,
-                                                            # {ligand})
+            # interacting_residues = get_interacting_residues(filtered_inter, {ligand})
             # inter_res_by_entry[ligand_entry] = interacting_residues
 
             # PAREI AQUI:
             # PROXIMO PASSO: contabilizar pra cada cluster o numero de ligantes que interagem com o residuo
-
 
             # TODO: Definir uma regĩao em volta do ligante pra ser o sitio ativo
             # TODO: Contar pra cada sitio o numero de cada tipo de grupo
             # TODO: Contar pra cada sitio o numero de interacoes
 
             # Select ligand and read it in a RDKit molecule object
-            rdmol_lig = self.get_rdkit_mol(structure[0], ligand,
-                                           ligand_entry.to_string(ENTRIES_SEPARATOR))
+            rdmol_lig = self.get_rdkit_mol(structure[0], ligand, ligand_entry.to_string(ENTRIES_SEPARATOR))
 
             # Generate fingerprint for the ligand
             fp = self.get_fingerprint(rdmol_lig)
             fingerprints.append(fp)
 
-            # print()
-            print(fp["fp"])
-            # print()
-            # print(fp["fp"].ToBitString())
-            exit()
-
             # self.generate_ligand_figure(rdmol_lig, grps_by_compounds[ligand])
+
+        from rdkit import DataStructs
+        from mol.interaction.fp.shell_viewer import PymolShellViewer
+
+        fp1 = pli_fingerprints[0][0]
+        fp2 = pli_fingerprints[1][0]
+
+        i1 = fp1 & fp2
+        d1 = fp1.unfolding_map
+        d2 = fp2.unfolding_map
+
+        print({key: d1.get(key) for key in i1})
+        print()
+
+        x = [58, 984, 950]
+
+        x1 = set()
+        for key in i1:
+            for identifier in d1[key]:
+                shells = pli_fingerprints[0][1].get_shells_by_identifier(identifier, unique_shells=True)
+                for i, s in enumerate(shells):
+                    x1.add(s.identifier)
+
+        x2 = set()
+        for key in i1:
+            for identifier in d2[key]:
+                shells = pli_fingerprints[0][1].get_shells_by_identifier(identifier, unique_shells=True)
+                for i, s in enumerate(shells):
+                    x2.add(s.identifier)
+        #
+        #
+
+        pw = PymolShellViewer('%s/pdbs/3QQK.pdb' % self.working_path)
+        for key in i1:
+            for identifier in d1[key]:
+                shells = pli_fingerprints[0][1].get_shells_by_identifier(identifier, unique_shells=True)
+                for i, s in enumerate(shells):
+                    if len(s.interactions) == 0:
+                        continue
+
+                    if s.identifier in x1 and s.identifier in x2:
+                        output = "tmp/FOLD-%s___3QQK_____REAL-%s___shell-%d.pse" % (str(key), str(identifier), i)
+                        pw.new_session([s], output)
+
+        pw = PymolShellViewer('%s/pdbs/3QTQ.pdb' % self.working_path)
+        for key in i1:
+            for identifier in d2[key]:
+                shells = pli_fingerprints[1][1].get_shells_by_identifier(identifier, unique_shells=True)
+                for i, s in enumerate(shells):
+                    if len(s.interactions) == 0:
+                        continue
+
+                    if s.identifier in x1 and s.identifier in x2:
+                        output = "tmp/FOLD-%s___3QTQ_____REAL-%s___shell-%d.pse" % (str(key), str(identifier), i)
+                        pw.new_session([s], output)
+
+
+        dist = DataStructs.TanimotoSimilarity(fp1.to_rdkit(), fp2.to_rdkit())
+        print(dist)
+        exit()
 
         # TODO: Remover entradas repetidas
         # TODO: remover Entradas que derem erro
@@ -1529,9 +1582,9 @@ class NAPOLI_PLI:
 
                     ##########################################################
                     step = "Parse PDB file"
-                    structure = pdb_parser.get_structure(ligand_entry.pdb_id,
-                                                         pdbFile)
+                    structure = pdb_parser.get_structure(ligand_entry.pdb_id, pdbFile)
                     ligand = structure[0][ligand_entry.chain_id][myBioLigand]
+                    ligand.set_as_target()
 
                     ##########################################################
                     step = "Generate structural fingerprint"
@@ -1558,12 +1611,8 @@ class NAPOLI_PLI:
                         groups = find_compound_groups(comp, feat_extractor)
                         grps_by_compounds[comp] = groups
 
-                    trgt_grps = [grps_by_compounds[x]
-                                 for x in grps_by_compounds
-                                 if x.get_id()[0] != " "]
-                    nb_grps = [grps_by_compounds[x]
-                               for x in grps_by_compounds
-                               if x != ligand]
+                    trgt_grps = [grps_by_compounds[x] for x in grps_by_compounds if x.is_water() or x.is_hetatm()]
+                    nb_grps = [grps_by_compounds[x] for x in grps_by_compounds if x != ligand]
 
                     # TODO: Preparar estrutura somente se não for selecionar
                     # da base de dados

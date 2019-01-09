@@ -203,11 +203,14 @@ class InteractionCalculator:
 
                 # ("Donor", "Acceptor"): self.calc_hbond,
                 # ("WeakDonor", "Acceptor"): self.calc_weak_hbond,
-                ("Donor", "Aromatic"): self.calc_hbond_pi,
-                ("WeakDonor", "Aromatic"): self.calc_hbond_pi,
+                # ("Donor", "Aromatic"): self.calc_hbond_pi,
+                # ("WeakDonor", "Aromatic"): self.calc_hbond_pi,
 
                 # ("HalogenDonor", "Acceptor"): self.calc_xbond,
                 # ("HalogenDonor", "Aromatic"): self.calc_xbond_pi,
+
+                ("Amide", "Aromatic"): self.calc_amide_pi,
+
 
                 # ("Negative", "Positive"): self.calc_attractive,
                 # ("Negative", "Negative"): self.calc_repulsive,
@@ -238,6 +241,9 @@ class InteractionCalculator:
 
         # Metalic complex
 
+        # REF: https://onlinelibrary.wiley.com/doi/epdf/10.1002/anie.200390319
+        # aromatic between hbond arrays
+
     def calc_cation_pi(self, params):
         interactions = []
 
@@ -263,7 +269,7 @@ class InteractionCalculator:
 
                 dihedral_angle = iu.to_quad1(iu.angle(ring1.normal, ring2.normal))
                 vector_cc = ring2.centroid - ring1.centroid
-                disp_angle1 = iu.to_quad1(iu.angle(ring1.normal, vector_cc))
+                disp_angle = iu.to_quad1(iu.angle(ring1.normal, vector_cc))
 
                 # If the angle criteria were not defined, a specific Pi-stacking definition is not
                 # possible as it depends on angle criteria. Therefore, a more general classification
@@ -274,18 +280,77 @@ class InteractionCalculator:
                 else:
                     if (self.is_within_boundary(dihedral_angle, "min_dihed_ang_pi_pi_inter", ge)):
                         inter_type = "Edge-to-face pi-stacking"
-                    elif (self.is_within_boundary(disp_angle1, "max_disp_ang_pi_pi_inter", le)):
+                    elif (self.is_within_boundary(disp_angle, "max_disp_ang_pi_pi_inter", le)):
                         inter_type = "Face-to-face pi-stacking"
                     else:
                         inter_type = "Parallel-displaced pi-stacking"
 
                 params = {"cc_dist_pi_pi_inter": cc_dist,
                           "dihed_ang_pi_pi_inter": dihedral_angle,
-                          "disp_ang_pi_pi_inter": disp_angle1}
+                          "disp_ang_pi_pi_inter": disp_angle}
 
                 inter = InteractionType(ring1, ring2, inter_type, params)
 
                 interactions.append(inter)
+        return interactions
+
+    def calc_amide_pi(self, params):
+        interactions = []
+
+        group1, group2, feat1, feat2 = params
+
+        if (feat1.name == "Aromatic" and feat2.name == "Amide"):
+            ring_grp = group1
+            amide_grp = group2
+        elif (feat2.name == "Aromatic" and feat1.name == "Amide"):
+            ring_grp = group2
+            amide_grp = group1
+        else:
+            logger.warning("Amide-aromatic interactions requires an aromatic and and amide group.")
+            logger.warning("However, the informed groups have the features '%s' and '%s'" %
+                           (group1.features, group2.features))
+            return []
+
+        # Distance between the amide and ring centroids.
+        cc_dist = iu.euclidean_distance(ring_grp.centroid, amide_grp.centroid)
+
+        print("#############################")
+        print(ring_grp)
+        print(ring_grp.compound)
+        print("Amide:")
+        print(amide_grp)
+        print(amide_grp.compound)
+        print()
+        print("CC dist: ", cc_dist)
+        print()
+
+        if (self.is_within_boundary(cc_dist, "boundary_cutoff", le) and
+                self.is_within_boundary(cc_dist, "max_cc_dist_amide_pi_inter", le)):
+
+            dihedral_angle = iu.to_quad1(iu.angle(ring_grp.normal, amide_grp.normal))
+            vector_cc = amide_grp.centroid - ring_grp.centroid
+            disp_angle = iu.to_quad1(iu.angle(ring_grp.normal, vector_cc))
+
+            print("Dihedral: ", dihedral_angle)
+            print("Displacement: ", disp_angle)
+            print()
+
+            if (self.is_within_boundary(dihedral_angle, "max_dihed_ang_amide_pi_inter", le) and
+                    self.is_within_boundary(disp_angle, "max_disp_ang_pi_pi_inter", le)):
+
+                print("Valid interaction")
+                print()
+
+                params = {"cc_dist_amide_pi_inter": cc_dist,
+                          "dihed_ang_amide_pi_inter": dihedral_angle,
+                          "disp_ang_amide_pi_inter": disp_angle}
+
+                inter = InteractionType(group1, group2, "Amide-aromatic stacking", params)
+
+                interactions.append(inter)
+
+        print()
+
         return interactions
 
     def calc_hydrop(self, params):
@@ -717,15 +782,16 @@ class InteractionCalculator:
         group1, group2, feat1, feat2 = params
 
         if (feat1.name == "Aromatic" and (feat2.name == "Donor" or feat2.name == "WeakDonor")):
-            donor_grp = group2
             ring_grp = group1
+            donor_grp = group2
         elif (feat2.name == "Aromatic" and (feat1.name == "Donor" or feat1.name == "WeakDonor")):
-            donor_grp = group1
             ring_grp = group2
+            donor_grp = group1
         else:
             logger.warning("Hydrogen bond involving pi-systems requires an aromatic and donor (weak donor) groups.")
             logger.warning("However, the informed groups have the features '%s' and '%s'" %
                            (group1.features, group2.features))
+            return []
 
         if len(donor_grp.atoms) != 1:
             logger.warning("Invalid donor (weak donor) group was informed: '%s'" % donor_grp)

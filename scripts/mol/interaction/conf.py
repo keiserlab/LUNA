@@ -71,7 +71,7 @@ class DefaultInteractionConf(InteractionConf):
 
         # Weak hydrogen bonds: hydrogen bonds involving aromatic rings
         # Ref: Hydrogen bonds with π-acceptors in proteins: frequencies and role in stabilizing local 3D structures [Steiner, 2001]
-        # Ref: Strong and Weak Hydrogen BondsProtein–Ligand Interface [Panigrahi, 2007]
+        # Ref: Strong and Weak Hydrogen Bonds [Panigrahi, 2007]
         conf["max_dc_dist_whb_inter"] = 4.5
         conf["max_hc_dist_whb_inter"] = 3.5
         conf["min_dhc_ang_whb_inter"] = 120
@@ -85,6 +85,19 @@ class DefaultInteractionConf(InteractionConf):
         conf["max_cc_dist_pi_pi_inter"] = 6
         conf["min_dihed_ang_pi_pi_inter"] = 30
         conf["max_disp_ang_pi_pi_inter"] = 20
+
+        # Amide-aromatic stacking
+        # [1] A systematic analysis of atomic protein–ligand interactions in the PDB [Freitas, 2007].
+        # [2] Efficient Stacking on Protein Amide Fragments [Harder, 2013].
+        # [3] The environment of amide groups in protein–ligand complexes: H-bonds and beyond [Cotesta, 2006].
+        # [4] Hydrogen bonds with π-acceptors in proteins: frequencies and role in stabilizing local 3D structures [Steiner, 2001]
+        #
+        # Ref: [1], [2], and [4].
+        conf["max_cc_dist_amide_pi_inter"] = 4
+        # Ref: [3].
+        conf["max_dihed_ang_amide_pi_inter"] = 30
+        # Ref: [1] and [3]
+        conf["max_disp_ang_pi_pi_inter"] = 25
 
         # Hydrophobic interaction
         conf["max_dist_hydrop_inter"] = 4.5
