@@ -8,20 +8,23 @@
 
 # Modifications included by Alexandre Fassio (alexandrefassio@dcc.ufmg.br).
 
-# Date: 19/02/2018.
+# Date: 02/19/2018.
 # 1) The module __lt__ was overwritten to allow sorting in Python 3
 # 2) Inherit inhouse modifications. Package: MyBio.
 
-# Date: 21/02/2018.
+# Date: 02/21/2018.
 # 1) Added function to check if a residue is a water molecule.
 # 2) Added function to check if a residue is an hetero group.
 # 3) Added function to check if a residue is an amino acid.
 # 4) Added function to check if a residue is a nucleic acid.
 
-# Date: 12/17/2018
+# Date: 17/12/2018
 # 1) Added property "_is_target" to control residues that will be targets for some processing.
 # 2) Added function "is_target() to verify the status of the is_target variable.
-# 3) Added function "set_as_target" to allow the definition if a residue is a target or not.
+# 3) Added function "set_as_target()" to allow the definition if a residue is a target or not.
+
+# Data: 01/10/2019
+# 1) Added function "get_class()" to get the compound class: amino acid, hetatm, water, nucleotide, or unknown.
 
 # Each line or block with modifications contain a MODBY tag.
 
@@ -160,6 +163,20 @@ class Residue(Entity):
     # Check if a residue is a target, i.e., if it will be used for any calculations.
     def is_target(self):
         return self._is_target
+
+    # MODBY: Alexandre Fassio
+    # Get the compound class.
+    def get_class(self):
+        if self.is_water():
+            return "Water"
+        if self.is_hetatm():
+            return "Hetatm"
+        if self.is_aminoacid():
+            return "Amino acid"
+        if self.is_nucleotide():
+            return "Nucleotide"
+
+        return "Unknown"
 
     def get_resname(self):
         return self.resname

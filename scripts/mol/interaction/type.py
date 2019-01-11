@@ -6,7 +6,7 @@ class InteractionType():
         self._type = inter_type
         self._params = params or {}
 
-        self._hash_chache = None
+        self._hash_cache = None
 
         if recursive:
             self.atm_grp1.add_interaction(self)
@@ -70,13 +70,13 @@ class InteractionType():
         return False
 
     def __ne__(self, other):
-        """Overrides the default implementation (unnecessary in Python 3)"""
+        """Overrides the default implementation"""
         return not self.__eq__(other)
 
     def __hash__(self):
         """Overrides the default implementation"""
 
-        if self._hash_chache is None:
+        if self._hash_cache is None:
             # First, it flats the dictionary by transforming it to a list.
             # Then, it transforms the list into an immutable data structure (tuple).
             params_values = []
@@ -92,10 +92,10 @@ class InteractionType():
             # For example, Class(X,Y) would be considered different from Class(Y,X).
             # However, in both cases the interactions should be considered the same.
             # Then, the next line turns the order dependent arguments into an independent order data.
-            comp_values_as_tuple = tuple(sorted([self.atm_grp1, self.atm_grp2], key=id))
-            self._hash_chache = hash(tuple([comp_values_as_tuple, self.type, params_as_tuple]))
+            comp_values_as_tuple = tuple(sorted([self.atm_grp1, self.atm_grp2], key=hash))
+            self._hash_cache = hash(tuple([comp_values_as_tuple, self.type, params_as_tuple]))
 
-        return self._hash_chache
+        return self._hash_cache
 
     def __repr__(self):
         return ('<InteractionType: compounds=(%s, %s) type=%s>' % (self.atm_grp1, self.atm_grp2, self.type))

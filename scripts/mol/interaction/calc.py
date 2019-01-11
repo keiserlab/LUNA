@@ -106,8 +106,8 @@ class InteractionCalculator:
         # Save all hydrogen bonds involving waters and attractive interactions.
         for inter in interactions:
             if inter.type == "Hydrogen bond":
-                comp1 = inter.atm_grp1.compound
-                comp2 = inter.atm_grp2.compound
+                comp1 = inter.atm_grp1.compounds[0]
+                comp2 = inter.atm_grp2.compounds[0]
 
                 if comp1.is_water():
                     h2o_key = inter.atm_grp1
@@ -131,8 +131,8 @@ class InteractionCalculator:
             pairs = combinations(h2o_pairs[h2o_key].keys(), 2)
 
             for (atm_grp1, atm_grp2) in pairs:
-                comp1 = atm_grp1.compound
-                comp2 = atm_grp2.compound
+                comp1 = atm_grp1.compounds[0]
+                comp2 = atm_grp2.compounds[0]
 
                 if isinstance(self.inter_filter, InteractionFilter):
                     if not self.inter_filter.is_valid_pair(atm_grp1, atm_grp2):
@@ -184,7 +184,7 @@ class InteractionCalculator:
         valid_hbs = set(chain.from_iterable(i.required_interactions for i in interactions))
 
         orphan_hbs = set([i for i in interactions
-                          if ((i.atm_grp1.compound.is_water() or i.atm_grp2.compound.is_water()) and
+                          if ((i.atm_grp1.is_water() or i.atm_grp2.is_water()) and
                               i.type == "Hydrogen bond" and i not in valid_hbs)])
 
         interactions -= orphan_hbs
@@ -316,10 +316,10 @@ class InteractionCalculator:
 
         print("#############################")
         print(ring_grp)
-        print(ring_grp.compound)
+        print(ring_grp.compounds)
         print("Amide:")
         print(amide_grp)
-        print(amide_grp.compound)
+        print(amide_grp.compounds)
         print()
         print("CC dist: ", cc_dist)
         print()
@@ -349,7 +349,7 @@ class InteractionCalculator:
 
                 interactions.append(inter)
 
-        print()
+        # print()
 
         return interactions
 

@@ -69,14 +69,12 @@ class PymolShellViewer:
             self.wrapper.set("dot_color", "red")
 
             # Compound view (residue, ligand, etc)
-            comp_repr = "sphere" if shell.central_atm_grp.compound.is_water() else "sticks"
-            carb_color = "green" if shell.central_atm_grp.compound.is_target() else "gray"
+            for compound in shell.central_atm_grp.compounds:
+                comp_repr = "sphere" if compound.is_water() else "sticks"
+                carb_color = "green" if compound.is_target() else "gray"
 
-            self.wrapper.show([(comp_repr, mybio_to_pymol_selection(shell.central_atm_grp.compound))])
-            self.wrapper.color([(carb_color, mybio_to_pymol_selection(shell.central_atm_grp.compound) + " AND elem C")])
-
-            # if shell.central_atm_grp.compound.is_water():
-                # self.wrapper.set("sphere_scale", "0.3", {"selection": centroid_name})
+                self.wrapper.show([(comp_repr, mybio_to_pymol_selection(compound))])
+                self.wrapper.color([(carb_color, mybio_to_pymol_selection(compound) + " AND elem C")])
 
             self.wrapper.set("sphere_scale", shell.radius, {"selection": centroid_name})
             self.wrapper.set("sphere_transparency", 0.7, {"selection": centroid_name})
@@ -89,22 +87,14 @@ class PymolShellViewer:
                 obj1_name = "Group_%s" % hash(inter.atm_grp1)
                 obj2_name = "Group_%s" % hash(inter.atm_grp2)
 
-                comp1_sel = mybio_to_pymol_selection(inter.atm_grp1.compound)
-                comp2_sel = mybio_to_pymol_selection(inter.atm_grp2.compound)
+                # Set the representation for each compound in the groups involved in the interaction.
+                for compound in inter.atm_grp1.compounds.union(inter.atm_grp2.compounds):
+                    comp_repr = "sphere" if compound.is_water() else "sticks"
+                    comp_sel = mybio_to_pymol_selection(compound)
+                    self.wrapper.show([(comp_repr, comp_sel)])
 
-                comp1_repr = "sphere" if inter.atm_grp1.compound.is_water() else "sticks"
-                comp2_repr = "sphere" if inter.atm_grp2.compound.is_water() else "sticks"
-                self.wrapper.show([(comp1_repr, comp1_sel), (comp2_repr, comp2_sel)])
-
-                # if inter.atm_grp1.compound.is_water():
-                #     self.wrapper.set("sphere_scale", "0.3", {"selection": comp1_sel})
-                # if inter.atm_grp2.compound.is_water():
-                #     self.wrapper.set("sphere_scale", "0.3", {"selection": comp2_sel})
-
-                carb1_color = "green" if inter.atm_grp1.compound.is_target() else "gray"
-                carb2_color = "green" if inter.atm_grp2.compound.is_target() else "gray"
-                self.wrapper.color([(carb1_color, comp1_sel + " AND elem C")])
-                self.wrapper.color([(carb2_color, comp2_sel + " AND elem C")])
+                    carb_color = "green" if compound.is_target() else "gray"
+                    self.wrapper.color([(carb_color, comp_sel + " AND elem C")])
 
                 self.wrapper.add_pseudoatom(obj1_name, {"vdw": 1, "pos": list(inter.atm_grp1.centroid)})
                 self.wrapper.add_pseudoatom(obj2_name, {"vdw": 1, "pos": list(inter.atm_grp2.centroid)})

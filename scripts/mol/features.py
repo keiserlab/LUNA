@@ -9,12 +9,13 @@ class ChemicalFeature():
     def __init__(self, name):
         self.name = name
 
+    def format_name(self, case_func="sentencecase"):
+        func = getattr(case, case_func)
+        return func(self.name)
+
     # Special methods
     def __repr__(self):
         return "<Feature=%s>" % self.name
-
-    def __hash__(self):
-        return hash(self.name)
 
     def __eq__(self, other):
         """Overrides the default implementation"""
@@ -23,76 +24,73 @@ class ChemicalFeature():
         return False
 
     def __ne__(self, other):
-        """Overrides the default implementation (unnecessary in Python 3)"""
+        """Overrides the default implementation"""
         return not self.__eq__(other)
 
-    def format_name(self, case_func="sentencecase"):
-        func = getattr(case, case_func)
-        return func(self.name)
+    def __hash__(self):
+        return hash(self.name)
 
 
 class FeatureExtractor():
 
-    def __init__(self, featureFactory=None):
-        self.featureFactory = featureFactory
+    def __init__(self, feature_factory=None):
+        self.feature_factory = feature_factory
 
-    def set_feature_factory(self, featureFactory):
-        self.featureFactory = featureFactory
+    def set_feature_factory(self, feature_factory):
+        self.feature_factory = feature_factory
 
-    def get_features_by_atoms(self, rdMol, atomMap=None):
-        perceivedFeatures = self.featureFactory.GetFeaturesForMol(rdMol)
+    def get_features_by_atoms(self, rdMol, atm_map=None):
+        perceived_features = self.feature_factory.GetFeaturesForMol(rdMol)
 
-        atomFeatures = {}
-        for f in perceivedFeatures:
-            for atomIdx in f.GetAtomIds():
-                tmpAtomIdx = atomIdx
-                if (atomMap is not None):
-                    if (atomIdx in atomMap):
-                        tmpAtomIdx = atomMap[atomIdx]
+        atm_features = {}
+        for f in perceived_features:
+            for atm_idx in f.GetAtomIds():
+                tmp_atm_idx = atm_idx
+                if (atm_map is not None):
+                    if (atm_idx in atm_map):
+                        tmp_atm_idx = atm_map[atm_idx]
                     else:
                         logger.warning("Does not exist a corresponding mapping"
-                                       " to the index '%d'" % atomIdx)
+                                       " to the index '%d'" % atm_idx)
 
-                if (tmpAtomIdx in atomFeatures):
-                    features = set(atomFeatures[tmpAtomIdx])
+                if (tmp_atm_idx in atm_features):
+                    features = set(atm_features[tmp_atm_idx])
                 else:
                     features = set()
 
                 feature = ChemicalFeature(f.GetFamily())
                 features.add(feature)
-                atomFeatures[tmpAtomIdx] = features
+                atm_features[tmp_atm_idx] = features
 
-        return atomFeatures
+        return atm_features
 
-    def get_features_by_groups(self, rdMol, atomMap=None):
-        perceivedFeatures = self.featureFactory.GetFeaturesForMol(rdMol)
+    def get_features_by_groups(self, rdMol, atm_map=None):
+        perceived_features = self.feature_factory.GetFeaturesForMol(rdMol)
 
-        groupFeatures = {}
-        for f in perceivedFeatures:
-            atomIds = sorted(list(f.GetAtomIds()))
+        grp_features = {}
+        for f in perceived_features:
+            atm_ids = sorted(list(f.GetAtomIds()))
 
-            if atomMap is not None:
-                tmpAtomIds = []
-                for i in range(0, len(atomIds)):
-                    if (atomIds[i] in atomMap):
-                        tmpAtomIds.append(atomMap[atomIds[i]])
+            if atm_map is not None:
+                tmp_atm_ids = []
+                for i in range(0, len(atm_ids)):
+                    if (atm_ids[i] in atm_map):
+                        tmp_atm_ids.append(atm_map[atm_ids[i]])
                     else:
-                        logger.warning("Does not exist a corresponding mapping"
-                                       " to the index '%d'. "
-                                       "It will be ignored."
-                                       % atomIds[i])
-                atomIds = tmpAtomIds
+                        logger.warning("Does not exist a corresponding mapping to the index '%d'. It will be ignored."
+                                       % atm_ids[i])
+                atm_ids = tmp_atm_ids
 
-            key = ','.join([str(x) for x in atomIds])
-            if key in groupFeatures:
-                groupObj = groupFeatures[key]
+            key = ','.join([str(x) for x in atm_ids])
+            if key in grp_features:
+                grp_obj = grp_features[key]
             else:
-                groupObj = {"atomIds": atomIds, "features": []}
+                grp_obj = {"atm_ids": atm_ids, "features": []}
 
-            features = set(groupObj["features"])
+            features = set(grp_obj["features"])
             feature = ChemicalFeature(f.GetFamily())
             features.add(feature)
-            groupObj["features"] = list(features)
-            groupFeatures[key] = groupObj
+            grp_obj["features"] = list(features)
+            grp_features[key] = grp_obj
 
-        return groupFeatures
+        return grp_features

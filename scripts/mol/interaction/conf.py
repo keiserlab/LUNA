@@ -91,13 +91,14 @@ class DefaultInteractionConf(InteractionConf):
         # [2] Efficient Stacking on Protein Amide Fragments [Harder, 2013].
         # [3] The environment of amide groups in protein–ligand complexes: H-bonds and beyond [Cotesta, 2006].
         # [4] Hydrogen bonds with π-acceptors in proteins: frequencies and role in stabilizing local 3D structures [Steiner, 2001]
+        # [5] Systematic Investigation of Halogen Bonding in Protein–Ligand Interactions [Hardegger, 2011]
         #
-        # Ref: [1], [2], and [4].
-        conf["max_cc_dist_amide_pi_inter"] = 4
-        # Ref: [3].
+        # Ref: [1], [2], [4], and [5].
+        conf["max_cc_dist_amide_pi_inter"] = 4.5
+        # Ref: [1] and [3].
         conf["max_dihed_ang_amide_pi_inter"] = 30
-        # Ref: [1] and [3]
-        conf["max_disp_ang_pi_pi_inter"] = 25
+        # Ref: [3]: I use the centroid of an amide, while they use the nitrogen.
+        conf["max_disp_ang_pi_pi_inter"] = 30
 
         # Hydrophobic interaction
         conf["max_dist_hydrop_inter"] = 4.5

@@ -17,21 +17,41 @@ from io import StringIO
 class AtomGroup():
 
     def __init__(self, atoms, features, interactions=None, recursive=True):
-        self.atoms = atoms
         self.features = features
-        self.coords = imath.atom_coordinates(atoms)
+
+        # Update the atoms and coordinate properties.
+        self._atoms = atoms
+        self._coords = imath.atom_coordinates(atoms)
         self._centroid = imath.centroid(self.coords)
         self._normal = None
 
         self.interactions = interactions or []
 
+        self._hash_cache = None
+
         if recursive:
             for a in self.atoms:
-                a.add_atom_group(self)
+                a.add_atm_grp(self)
 
     @property
-    def compound(self):
-        return self.atoms[0].get_parent()
+    def atoms(self):
+        return self._atoms
+
+    @atoms.setter
+    def atoms(self, new_atoms):
+        self._atoms = new_atoms
+        self._coords = imath.atom_coordinates(new_atoms)
+        self._centroid = imath.centroid(self.coords)
+        self._normal = None
+        self._hash_cache = None
+
+    @property
+    def compounds(self):
+        return set([a.parent for a in self._atoms])
+
+    @property
+    def coords(self):
+        return self._coords
 
     @property
     def centroid(self):
@@ -40,8 +60,7 @@ class AtomGroup():
     @property
     def normal(self):
         if self._normal is None:
-            self._calc_normal()
-
+            self._normal = imath.calc_normal(self.coords)
         return self._normal
 
     def has_atom(self, atom):
@@ -68,23 +87,72 @@ class AtomGroup():
     def remove_interaction(self, interaction):
         self.interactions.remove(interaction)
 
-    def _calc_normal(self):
-        if self._normal is None:
-            self._normal = imath.calc_normal(self.coords)
+    def is_water(self):
+        """Return 1 if all compounds are water molecules."""
+        return all([a.parent.is_water() for a in self.atoms])
+
+    def is_hetatm(self):
+        """Return 1 if all compounds are hetero groups."""
+        return all([a.parent.is_hetatm() for a in self.atoms])
+
+    def is_aminoacid(self):
+        """Return 1 if all compounds are amino acids."""
+        return all([a.parent.is_aminoacid() for a in self.atoms])
+
+    def is_nucleotide(self):
+        """Return 1 if all compounds are nucleotides."""
+        return all([a.parent.is_nucleotide() for a in self.atoms])
+
+    def is_mixed(self):
+        """Return 1 if the compounds are from different classes."""
+        return len(set([a.parent.get_class() for a in self.atoms])) > 1
+
+    def has_water(self):
+        """Return 1 if all compounds are water molecules."""
+        return any([a.parent.is_water() for a in self.atoms])
+
+    def has_hetatm(self):
+        """Return 1 if all compounds are hetero groups."""
+        return any([a.parent.is_hetatm() for a in self.atoms])
+
+    def has_aminoacid(self):
+        """Return 1 if all compounds are amino acids."""
+        return any([a.parent.is_aminoacid() for a in self.atoms])
+
+    def has_nucleotide(self):
+        """Return 1 if all compounds are nucleotides."""
+        return any([a.parent.is_nucleotide() for a in self.atoms])
 
     def __repr__(self):
         return '<AtomGroup: [%s]' % ', '.join([str(x) for x in self.atoms])
+
+    def __eq__(self, other):
+        """Overrides the default implementation"""
+        if isinstance(self, other.__class__):
+            return self.atoms == other.atoms and self.features == other.features
+        return False
+
+    def __ne__(self, other):
+        """Overrides the default implementation"""
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        """Overrides the default implementation"""
+        if self._hash_cache is None:
+            # Transform atoms and features list into an imutable data structure.
+            # The lists are sorted in order to avoid dependence on appending order.
+            atoms_tuple = tuple(sorted(self.atoms, key=hash))
+            feat_tuple = tuple(sorted(self.features, key=hash))
+
+            self._hash_cache = hash((atoms_tuple, feat_tuple))
+        return self._hash_cache
 
 
 class CompoundGroups():
 
     def __init__(self, mybio_residue, atm_grps=None):
         self.residue = mybio_residue
-
-        if atm_grps is None:
-            atm_grps = []
-
-        self.atm_grps = atm_grps
+        self.atm_grps = atm_grps or []
 
     @property
     def summary(self):
@@ -113,7 +181,8 @@ def find_compound_groups(mybio_residue, feature_extractor, ph=None, has_explicit
         if (pair[1] != mybio_residue):
             cov_residues.add(pair[1])
 
-    res_sel = ResidueSelector(list(cov_residues) + [mybio_residue])
+    res_list = list(cov_residues) + [mybio_residue]
+    res_sel = ResidueSelector(res_list)
 
     fh = StringIO()
     io = PDBIO()
@@ -153,31 +222,22 @@ def find_compound_groups(mybio_residue, feature_extractor, ph=None, has_explicit
     group_features = feature_extractor.get_features_by_groups(rdMol, atm_map)
 
     trgt_atms = {}
-    for atm in mybio_residue.get_atoms():
-        # Ignore hydrogen atoms
-        if (atm.element != "H"):
-            nb_coords = nb_coords_by_atm[atm.get_serial_number()]
-            nb_atom = NbAtom(atm, nb_coords)
-            trgt_atms[atm.get_serial_number()] = nb_atom
+    for mybio_res in res_list:
+        for atm in mybio_res.get_atoms():
+            # Ignore hydrogen atoms
+            if (atm.element != "H"):
+                nb_coords = nb_coords_by_atm[atm.get_serial_number()]
+                nb_atom = NbAtom(atm, nb_coords)
+                trgt_atms[atm.get_serial_number()] = nb_atom
 
     comp_grps = CompoundGroups(mybio_residue)
     for key in group_features:
         grp_obj = group_features[key]
 
-        is_grp_valid = True
-        atoms = []
-        for atm_idx in grp_obj["atomIds"]:
-            if (atm_idx not in trgt_atms):
-                is_grp_valid = False
-                break
-            else:
-                atoms.append(trgt_atms[atm_idx])
-
-        # This group has atoms that do not belong to the target residue.
-        if (is_grp_valid is False):
-            continue
-
-        atm_grp = AtomGroup(atoms, grp_obj["features"], recursive=True)
-        comp_grps.add_group(atm_grp)
+        # Only get groups containing atoms from the informed residue (mybio_residue parameter)
+        if any([trgt_atms[i].parent == mybio_residue for i in grp_obj["atm_ids"]]):
+            atoms = [trgt_atms[i] for i in grp_obj["atm_ids"]]
+            atm_grp = AtomGroup(atoms, grp_obj["features"], recursive=True)
+            comp_grps.add_group(atm_grp)
 
     return comp_grps

@@ -7,7 +7,8 @@ class InteractionFilter:
     def __init__(self, funcs=None, inter_conf=DefaultInteractionConf(),
                  ignore_self_inter=True, ignore_prot_prot=True, ignore_prot_nucl=True,
                  ignore_prot_lig=True, ignore_nucl_nucl=True, ignore_nucl_lig=True,
-                 ignore_lig_lig=True, ignore_h2o_h2o=True, ignore_any_h2o=True):
+                 ignore_lig_lig=True, ignore_h2o_h2o=True, ignore_any_h2o=False,
+                 ignore_multi_comps=False, ignore_mixed_class=False):
 
         if funcs is None:
             funcs = self._default_functions()
@@ -24,18 +25,28 @@ class InteractionFilter:
         self.ignore_lig_lig = ignore_lig_lig
         self.ignore_h2o_h2o = ignore_h2o_h2o
         self.ignore_any_h2o = ignore_any_h2o
+        self.ignore_multi_comps = ignore_multi_comps
+        self.ignore_mixed_class = ignore_mixed_class
 
     @classmethod
-    def new_pli_filter(cls, **kwargs):
-        return cls(ignore_prot_lig=False, ignore_any_h2o=False, **kwargs)
+    def new_pli_filter(cls, ignore_prot_lig=False, ignore_any_h2o=False, **kwargs):
+        return cls(ignore_prot_lig=ignore_prot_lig, ignore_any_h2o=ignore_any_h2o, **kwargs)
 
     @classmethod
-    def new_ppi_filter(cls, **kwargs):
-        return cls(ignore_prot_prot=False, ignore_any_h2o=False, **kwargs)
+    def new_ppi_filter(cls, ignore_prot_prot=False, ignore_any_h2o=False, **kwargs):
+        return cls(ignore_prot_prot=ignore_prot_prot, ignore_any_h2o=ignore_any_h2o, **kwargs)
 
     @classmethod
-    def new_pni_filter(cls, **kwargs):
-        return cls(ignore_prot_nucl=False, ignore_any_h2o=False, **kwargs)
+    def new_pni_filter(cls, ignore_prot_nucl=False, ignore_any_h2o=False, **kwargs):
+        return cls(ignore_prot_nucl=ignore_prot_nucl, ignore_any_h2o=ignore_any_h2o, **kwargs)
+
+    @classmethod
+    def new_nni_filter(cls, ignore_nucl_nucl=False, ignore_any_h2o=False, **kwargs):
+        return cls(ignore_nucl_nucl=ignore_nucl_nucl, ignore_any_h2o=ignore_any_h2o, **kwargs)
+
+    @classmethod
+    def new_nli_filter(cls, ignore_nucl_lig=False, ignore_any_h2o=False, **kwargs):
+        return cls(ignore_nucl_lig=ignore_nucl_lig, ignore_any_h2o=ignore_any_h2o, **kwargs)
 
     @property
     def funcs(self):
@@ -66,61 +77,76 @@ class InteractionFilter:
         if atm_grp1.contain_group(atm_grp2) or atm_grp2.contain_group(atm_grp1):
             return False
 
+        # If one of the groups contain atoms from different compounds.
+        has_multi_comps = (len(atm_grp1.compounds) > 1 or len(atm_grp2.compounds) > 1)
+        if self.ignore_multi_comps and has_multi_comps:
+            return False
+
+        # If one of the groups contain compounds from different classes as, for instance, residue and ligand.
+        # It means that compounds from different classes are covalently bonded to each other.
+        has_any_mixed = (atm_grp1.is_mixed() or atm_grp2.is_mixed())
+        if self.ignore_mixed_class and has_any_mixed:
+            return False
+
         # It ignores interactions involving the same compounds if it is required.
-        is_same_compound = atm_grp1.compound == atm_grp2.compound
-        if self.ignore_self_inter and is_same_compound:
+        # As each group may have atoms from different compounds, we can check if there is at least
+        # one common compound between the two groups. Remember that if two or more compounds exist in a group,
+        # it means that these molecules are covalently bonded and should be considered the same molecule.
+        # For example: a carbohydrate can be expressed in a PDB as its subparts:
+        # GLC + GLC = CBI
+        is_same_compounds = len(atm_grp1.compounds.intersection(atm_grp2.compounds)) >= 1
+        if self.ignore_self_inter and is_same_compounds:
             return False
         # It accepts all pairs composed by atom groups from a same compound when
         # ignore_self_inter is set off.
-        elif not self.ignore_self_inter and is_same_compound:
+        elif not self.ignore_self_inter and is_same_compounds:
             return True
 
         # It ignores protein-protein interactions if it is required.
-        is_prot_prot = (atm_grp1.compound.is_aminoacid() and atm_grp2.compound.is_aminoacid())
+        is_prot_prot = (atm_grp1.is_aminoacid() and atm_grp2.is_aminoacid())
         if self.ignore_prot_prot and is_prot_prot:
             return False
 
         # It ignores protein-nucleic acid interactions if it is required.
-        is_prot_nucl = ((atm_grp1.compound.is_aminoacid() and atm_grp2.compound.is_nucleotide()) or
-                        (atm_grp1.compound.is_nucleotide() and atm_grp2.compound.is_aminoacid()))
+        is_prot_nucl = ((atm_grp1.is_aminoacid() and atm_grp2.is_nucleotide()) or
+                        (atm_grp1.is_nucleotide() and atm_grp2.is_aminoacid()))
         if self.ignore_prot_nucl and is_prot_nucl:
             return False
 
         # It ignores protein-ligand interactions if it is required.
-        is_prot_lig = ((atm_grp1.compound.is_aminoacid() and atm_grp2.compound.is_hetatm()) or
-                       (atm_grp1.compound.is_hetatm() and atm_grp2.compound.is_aminoacid()))
+        is_prot_lig = ((atm_grp1.is_aminoacid() and atm_grp2.is_hetatm()) or
+                       (atm_grp1.is_hetatm() and atm_grp2.is_aminoacid()))
         if self.ignore_prot_lig and is_prot_lig:
             return False
 
         # It ignores nucleic acid-nucleic acid interactions if it is required.
-        is_nucl_nucl = (atm_grp1.compound.is_nucleotide() and atm_grp2.compound.is_nucleotide())
+        is_nucl_nucl = (atm_grp1.is_nucleotide() and atm_grp2.is_nucleotide())
         if self.ignore_nucl_nucl and is_nucl_nucl:
             return False
 
         # It ignores nucleic acid-ligand interactions if it is required.
-        is_nucl_lig = ((atm_grp1.compound.is_nucleotide() and atm_grp2.compound.is_hetatm()) or
-                       (atm_grp1.compound.is_hetatm() and atm_grp2.compound.is_nucleotide()))
+        is_nucl_lig = ((atm_grp1.is_nucleotide() and atm_grp2.is_hetatm()) or
+                       (atm_grp1.is_hetatm() and atm_grp2.is_nucleotide()))
         if self.ignore_nucl_lig and is_nucl_lig:
             return False
 
         # It ignores ligand-ligand interactions if it is required.
-        is_lig_lig = (atm_grp1.compound.is_hetatm() and atm_grp2.compound.is_hetatm())
+        is_lig_lig = (atm_grp1.is_hetatm() and atm_grp2.is_hetatm())
         if self.ignore_lig_lig and is_lig_lig:
-            return False
-
-        # It ignores interactions involving two waters if it is required.
-        # If it is on, it will produce water-bridged interactions of multiple levels
-        # Eg: residue -- h2o -- h2o -- ligand, residue -- residue -- h2o -- h2o -- ligand.
-        is_h2o_h2o = (atm_grp1.compound.is_water() and atm_grp2.compound.is_water())
-        if self.ignore_h2o_h2o and is_h2o_h2o:
             return False
 
         # It ignores interactions of other molecule types with water.
         # It enables the possibility of identifying water-bridged interaction.
         # Eg: residue-water, ligand-water = residue -- water -- ligand.
-        is_any_h2o = ((atm_grp1.compound.is_water() and not atm_grp2.compound.is_water()) or
-                      (not atm_grp1.compound.is_water() and atm_grp2.compound.is_water()))
+        is_any_h2o = (atm_grp1.is_water() or atm_grp2.is_water())
         if self.ignore_any_h2o and is_any_h2o:
+            return False
+
+        # It ignores interactions involving two waters if it is required.
+        # If it is on, it will produce water-bridged interactions of multiple levels
+        # Eg: residue -- h2o -- h2o -- ligand, residue -- residue -- h2o -- h2o -- ligand.
+        is_h2o_h2o = (atm_grp1.is_water() and atm_grp2.is_water())
+        if self.ignore_h2o_h2o and is_h2o_h2o:
             return False
 
         return True

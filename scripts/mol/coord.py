@@ -8,9 +8,6 @@ class Coordinate():
         self.atomic_num = atomic_num
         self.atom_id = atom_id
 
-    def __repr__(self):
-        return ("<Coordinate x=%.3f, y=%.3f, z=%.3f>" % (self.x, self.y, self.z))
-
     @property
     def x(self):
         return self._coord[0]
@@ -34,3 +31,20 @@ class Coordinate():
     @coord.setter
     def coord(self, xyz):
         self._coord = np.array(xyz)
+
+    def __repr__(self):
+        return ("<Coordinate x=%.3f, y=%.3f, z=%.3f>" % (self.x, self.y, self.z))
+
+    def __eq__(self, other):
+        """Overrides the default implementation"""
+        if isinstance(self, other.__class__):
+            return np.all(self._coord == other._coord)
+        return False
+
+    def __ne__(self, other):
+        """Overrides the default implementation"""
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        """Overrides the default implementation"""
+        return hash(tuple(self._coord))
