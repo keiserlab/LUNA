@@ -62,10 +62,12 @@ def create_directory(path, clear=False):
         if not exists(path):
             makedirs(path)
         elif clear:
+            logger.warning("The directory '%s' already exists, and it will be cleaned before "
+                           "the program continues." % path)
             clear_directory(path)
         else:
-            raise DirectoryAlreadyExists("The directory '%s' already exists."
-                                         % path)
+            logger.warning("The directory '%s' already exists, but it will not be cleaned before "
+                           "the program continues." % path)
     except OSError as e:
         logger.exception(e)
         raise

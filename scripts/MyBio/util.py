@@ -22,16 +22,15 @@ def download_pdb(pdb_id, output_path=".", output_file=None, overwrite=False):
         @param output_path: put the PDB file in this directory.
         @type  output_path: string
     """
-    logger.info("Trying to download the PDB '%s' and store it at the "
-                "directory '%s'." % (pdb_id, output_path))
+    logger.info("Trying to download the PDB '%s' and store it at the directory '%s'."
+                % (pdb_id, output_path))
 
     try:
         pdb_id = pdb_id.lower()
         if (pdb_id is not None and pdb_id.strip() != ""):
             if (is_directory_valid(output_path)):
                 pdbl = PDBList()
-                pdbl.retrieve_pdb_file(pdb_id, pdir=output_path,
-                                       file_format="pdb", overwrite=overwrite)
+                pdbl.retrieve_pdb_file(pdb_id, pdir=output_path, file_format="pdb", overwrite=overwrite)
 
                 if output_file:
                     pdb_file = '%s/pdb%s.ent' % (output_path, pdb_id)
