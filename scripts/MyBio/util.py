@@ -44,7 +44,7 @@ def download_pdb(pdb_id, output_path=".", output_file=None, overwrite=False):
     logger.info("Download complete!!")
 
 
-def try_parse_from_pdb(id, file):
+def parse_from_file(id, file):
     """Read a PDB file and return a Structure object.
 
         @param id: the id that will be used for the structure
@@ -65,38 +65,44 @@ def try_parse_from_pdb(id, file):
         raise PDBNotReadError("File '%s' not parsed as a PDB file.")
 
 
-def try_save_2pdb(pdbObject, outputFile, selector=Select()):
-    """Save a PDB file applying some filtering in it.
+def save_to_file(entity, output_file, select=Select(), write_conects=True, write_end=True,
+                 preserve_atom_numbering=True):
+    """ Write a Structure object (or a subset of a Structure object) into a file.
 
-        @param pdbObject: the PDB object to be saved
-        @type pdbObject: object
+        @param entity: the PDB object to be saved
+        @type entity: object
 
-        @param outputFile: the name of the new PDB file
-        @type outputFile: string
+        @param output_file: the name of the new PDB file
+        @type output_file: string
 
-        @param selector: a filtering definition. DEFAULT: extracts everything
-        @type selector: Select
+        @param select: a filtering function. Default: it extracts everything
+        @type select: Select
+
+        @param write_conects: decide if it is necessary to write CONECT fields.
+        @type write_conects: boolean
+
+        @param write_end: decide if it is necessary to write END fields.
+        @type write_end: boolean
+
+        @param preserve_atom_numbering: decide if it is necessary to re-enumerate the atom serial numbers.
+        @type preserve_atom_numbering: boolean
     """
     try:
         io = PDBIO()
-        io.set_structure(pdbObject)
-        io.save(outputFile, selector,
-                preserve_atom_numbering=True)
+        io.set_structure(entity)
+        io.save(output_file, select=select, write_conects=write_conects, write_end=write_end,
+                preserve_atom_numbering=preserve_atom_numbering)
     except Exception as e:
         logger.exception(e)
-        raise FileNotCreated("PDB file '%s' could not be created."
-                             % outputFile)
+        raise FileNotCreated("PDB file '%s' could not be created." % output_file)
 
 
-def pdb_object_2block(entity, select=Select(),
-                      preserve_atom_numbering=True,
-                      write_conects=True):
-
+def entity_to_string(entity, select=Select(), write_conects=True, write_end=True, preserve_atom_numbering=True):
     fh = StringIO()
     io = PDBIO()
     io.set_structure(entity)
-    io.save(fh, select=select, preserve_atom_numbering=preserve_atom_numbering,
-            write_conects=write_conects)
+    io.save(fh, select=select, write_conects=write_conects, write_end=write_end,
+            preserve_atom_numbering=preserve_atom_numbering)
     fh.seek(0)
     return ''.join(fh.readlines())
 
