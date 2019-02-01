@@ -1,5 +1,12 @@
 import util.stringcase as case
 
+from util.exceptions import MoleculeObjectTypeError
+from rdkit.Chem import Mol as RDMol
+from openbabel import (OBMol, OBSmartsPattern)
+from pybel import Molecule as PybelMol
+
+from collections import defaultdict
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -31,41 +38,63 @@ class ChemicalFeature():
         return hash(self.name)
 
 
-class FeatureExtractor():
+class MolChemicalFeature:
 
-    def __init__(self, feature_factory=None):
+    def __init__(self, family, atom_ids):
+        self.family = family
+        self.atom_ids = atom_ids
+
+    def GetAtomIds(self):
+        return self.atom_ids
+
+    def GetFamily(self):
+        return self.family
+
+
+class FeatureExtractor:
+
+    def __init__(self, feature_factory):
         self.feature_factory = feature_factory
 
     def set_feature_factory(self, feature_factory):
         self.feature_factory = feature_factory
 
-    def get_features_by_atoms(self, rdMol, atm_map=None):
-        perceived_features = self.feature_factory.GetFeaturesForMol(rdMol)
+    def get_features_by_atoms(self, mol_obj, atm_map=None):
+        if isinstance(mol_obj, RDMol):
+            perceived_features = self.feature_factory.GetFeaturesForMol(mol_obj)
+        elif isinstance(mol_obj, OBMol):
+            perceived_features = self._get_features_from_obmol(mol_obj)
+        elif isinstance(mol_obj, PybelMol):
+            perceived_features = self._get_features_from_obmol(mol_obj.OBMol)
+        else:
+            logger.exception("Objects of type '%s' are not currently accepted." % mol_obj.__class__)
+            raise MoleculeObjectTypeError("Objects of type '%s' are not currently accepted." % mol_obj.__class__)
 
-        atm_features = {}
+        atm_features = defaultdict(set)
         for f in perceived_features:
             for atm_idx in f.GetAtomIds():
                 tmp_atm_idx = atm_idx
-                if (atm_map is not None):
-                    if (atm_idx in atm_map):
+                if atm_map is not None:
+                    if atm_idx in atm_map:
                         tmp_atm_idx = atm_map[atm_idx]
                     else:
-                        logger.warning("Does not exist a corresponding mapping"
-                                       " to the index '%d'" % atm_idx)
-
-                if (tmp_atm_idx in atm_features):
-                    features = set(atm_features[tmp_atm_idx])
-                else:
-                    features = set()
+                        logger.warning("There is no corresponding mapping to the index '%d'. It will be ignored." % atm_idx)
 
                 feature = ChemicalFeature(f.GetFamily())
-                features.add(feature)
-                atm_features[tmp_atm_idx] = features
+                atm_features[tmp_atm_idx].add(feature)
 
         return atm_features
 
-    def get_features_by_groups(self, rdMol, atm_map=None):
-        perceived_features = self.feature_factory.GetFeaturesForMol(rdMol)
+    def get_features_by_groups(self, mol_obj, atm_map=None):
+        if isinstance(mol_obj, RDMol):
+            perceived_features = self.feature_factory.GetFeaturesForMol(mol_obj)
+        elif isinstance(mol_obj, OBMol):
+            perceived_features = self._get_features_from_obmol(mol_obj)
+        elif isinstance(mol_obj, PybelMol):
+            perceived_features = self._get_features_from_obmol(mol_obj.OBMol)
+        else:
+            logger.exception("Objects of type '%s' are not currently accepted." % mol_obj.__class__)
+            raise MoleculeObjectTypeError("Objects of type '%s' are not currently accepted." % mol_obj.__class__)
 
         grp_features = {}
         for f in perceived_features:
@@ -73,12 +102,11 @@ class FeatureExtractor():
 
             if atm_map is not None:
                 tmp_atm_ids = []
-                for i in range(0, len(atm_ids)):
-                    if (atm_ids[i] in atm_map):
-                        tmp_atm_ids.append(atm_map[atm_ids[i]])
+                for atm_id in atm_ids:
+                    if atm_id in atm_map:
+                        tmp_atm_ids.append(atm_map[atm_id])
                     else:
-                        logger.warning("Does not exist a corresponding mapping to the index '%d'. It will be ignored."
-                                       % atm_ids[i])
+                        logger.warning("There is no corresponding mapping to the index '%d'. It will be ignored." % atm_id)
                 atm_ids = tmp_atm_ids
 
             key = ','.join([str(x) for x in atm_ids])
@@ -94,3 +122,41 @@ class FeatureExtractor():
             grp_features[key] = grp_obj
 
         return grp_features
+
+    def _get_features_from_obmol(self, ob_mol):
+        grp_features = defaultdict(set)
+        for (key, smarts) in self.feature_factory.GetFeatureDefs().items():
+            grp_type = key.split(".")[0]
+
+            ob_smart = OBSmartsPattern()
+            ob_smart.Init(str(smarts))
+            ob_smart.Match(ob_mol)
+
+            matches = [x for x in ob_smart.GetMapList()]
+            if matches:
+                for match in matches:
+                    cur_ids = set(match)
+                    exists = False
+                    remove_ids = []
+
+                    for ids in grp_features[grp_type]:
+                        ids = set(ids)
+                        # If there is any other group of the same type that already contains the current atoms.
+                        if cur_ids.issubset(ids):
+                            exists = True
+                            # It just need to find one bigger group.
+                            break
+                        # If the current group contains atoms from already added group atoms.
+                        elif ids.issubset(cur_ids):
+                            exists = True
+                            # Find all smaller groups to remove them.
+                            remove_ids.append(tuple(ids))
+
+                    if exists is False:
+                        grp_features[grp_type].add(tuple(cur_ids))
+                    elif remove_ids:
+                        for ids in remove_ids:
+                            grp_features[grp_type].remove(ids)
+                        grp_features[grp_type].add(tuple(cur_ids))
+
+        return [MolChemicalFeature(family, atom_ids) for family in grp_features for atom_ids in grp_features[family]]
