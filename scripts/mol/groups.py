@@ -1,17 +1,26 @@
-from MyBio.PDB.PDBIO import PDBIO
 from MyBio.selector import ResidueSelector
+from MyBio.util import save_to_file
 
 import mol.interaction.math as imath
 from mol.interaction.contact import get_contacts_for_entity
 from mol.neighborhood import (NbAtom, NbCoordinates)
 from mol.coord import Coordinate
+from mol.charge_model import OpenEyeModel
+from mol.validator import (MolValidator, RDKitValidator)
+from mol.wrappers.obabel import convert_molecule
+from util.file import get_unique_filename
+from util.exceptions import (MoleculeSizeError, MoleculeInformationError, IllegalArgumentError)
 
-from rdkit.Chem import MolFromMolBlock
-from openbabel import (OBMolAtomIter, OBAtomAtomIter)
+from rdkit.Chem import (MolFromMolFile, MolFromMolBlock)
+from openbabel import (OBMolAtomIter, OBAtomAtomIter, OBMolBondIter)
+from pybel import readfile
 
 from collections import defaultdict
-from pybel import readstring
-from io import StringIO
+
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 class AtomGroup():
@@ -31,7 +40,7 @@ class AtomGroup():
 
         if recursive:
             for a in self.atoms:
-                a.add_atm_grp(self)
+                a.add_atom_group(self)
 
     @property
     def atoms(self):
@@ -168,67 +177,117 @@ class CompoundGroups():
         self.atm_grps = list(atm_grps)
 
 
-def find_compound_groups(mybio_residue, feature_extractor, ph=None, has_explicit_hydrogen=False):
+# TODO:
+# Create a class for finding groups
+# Option: use openbabel or rdkit
 
-    COV_CUTOFF = 1.99999999999
+# Create a function for extracting openbabel smarts search
+
+# Adapt code for accepting ligand files and use it
+def find_compound_groups(mybio_residue, feature_extractor, output_path, add_h=False, ph=None,
+                         error_level=2, charge_model=OpenEyeModel()):
+
+    '''
+        error_level:
+            0 = permissive mode. No validation will be performed.
+            1 = amending mode. A validation will be performed and it will try to fix some errors.
+            2 = strict mode. A validation will be performed, and no errors will be accepted.
+            3 = RDKit sanitization mode. A validation will be performed using RDKit sanitization functions, and no errors will be accepted.
+            4 = Amending + RDKit sanitization mode. A validation will be performed using RDKit sanitization functions, but first it will try to fix errors.
+    '''
+    COV_CUTOFF = 2
 
     model = mybio_residue.get_parent_by_level('M')
-    proximal = get_contacts_for_entity(entity=model, source=mybio_residue,
-                                       radius=COV_CUTOFF, level='R')
+    proximal = get_contacts_for_entity(entity=model, source=mybio_residue, radius=COV_CUTOFF, level='R')
+    res_set = set([p[1] for p in proximal])
+    res_list = sorted(list(res_set), key=lambda r: r.id)
+    res_sel = ResidueSelector(res_list, keep_altloc=False, keep_hydrog=False)
 
-    cov_residues = set()
-    for pair in proximal:
-        if (pair[1] != mybio_residue):
-            cov_residues.add(pair[1])
+    # First it saves the selection into a PDB file and then it converts the file to .mol.
+    # I had to do it because the OpenBabel 2.4.1 had a problem with some molecules containing aromatic rings.
+    # In such cases, the aromatic ring was being wrongly perceived and some atoms received more double bonds than
+    # it was exepcted. The version 2.3.2 works fine. Therefore, I defined this version manually (openbabel property).
+    # But why to convert to MOL file? Because RDKit does not perceive bond order from PDB files.
+    filename = get_unique_filename(output_path)
+    pdb_file = '%s.pdb' % filename
+    save_to_file(model, pdb_file, res_sel)
 
-    res_list = list(cov_residues) + [mybio_residue]
-    res_sel = ResidueSelector(res_list)
+    mol_file = '%s.mol' % filename
+    ob_opt = {"error-level": 5}
+    if add_h:
+        if ph is not None:
+            ob_opt["p"] = ph
+        else:
+            ob_opt["h"] = None
+    convert_molecule(pdb_file, mol_file, opt=ob_opt, openbabel='/usr/bin/obabel')
 
-    fh = StringIO()
-    io = PDBIO()
-    io.set_structure(model)
-    io.save(fh, select=res_sel, preserve_atom_numbering=True, write_conects=True)
-    fh.seek(0)
-    pdb_block = ''.join(fh.readlines())
+    # Recover all atoms from the previous selected residues.
+    atoms = [a for r in res_list for a in r.get_unpacked_list() if res_sel.accept_atom(a)]
+    atoms = tuple(sorted(atoms, key=lambda a: a.serial_number))
+    ob_mol = next(readfile("mol", mol_file))
 
-    obMol = readstring("pdb", pdb_block)
-    if (ph is not None):
-        obMol.OBMol.AddHydrogens(True, True, ph)
+    if error_level == 0:
+        logger.warning("Error level set to 0. No validation will be performed. Molecules containing errors may generate incorrect results.")
+    elif error_level == 1:
+        logger.warning("Error level set to 1. A validation will be performed and it will try to fix some errors.")
+        mv = MolValidator(fix_charges=True, fix_implicit_valence=True)
+        if not mv.is_mol_valid(ob_mol):
+            logger.warning("Molecule loaded from '%s' is invalid. Check the logs for more information." % mol_file)
+            raise MoleculeInformationError("Molecule loaded from '%s' is invalid. Check the logs for more information." % mol_file)
+    elif error_level == 2:
+        logger.warning("Error level set to 2. A validation will be performed and no errors will be accepted.")
+        mv = MolValidator()
+        if not mv.is_mol_valid(ob_mol):
+            logger.warning("Molecule loaded from '%s' is invalid. Check the logs for more information." % mol_file)
+            raise MoleculeInformationError("Molecule loaded from '%s' is invalid. Check the logs for more information." % mol_file)
+    elif error_level == 3:
+        logger.warning("Error level set to 3. A validation will be performed using RDKit sanitization functions. No errors will be accepted.")
+        mv = RDKitValidator()
+        rdk_mol = MolFromMolFile(mol_file, removeHs=False, sanitize=False)
+        if not mv.is_mol_valid(rdk_mol):
+            logger.warning("Molecule loaded from '%s' is invalid. Check the logs for more information." % mol_file)
+            raise MoleculeInformationError("Molecule loaded from '%s' is invalid. Check the logs for more information." % mol_file)
+    elif error_level == 4:
+        logger.warning("A validation will be performed using RDKit sanitization functions. No errors will be accepted.")
+        mv = MolValidator(fix_charges=True, fix_implicit_valence=True)
+        if not mv.is_mol_valid(ob_mol):
+            logger.warning("Molecule loaded from '%s' is invalid. Check the logs for more information." % mol_file)
+            raise MoleculeInformationError("Molecule loaded from '%s' is invalid. Check the logs for more information." % mol_file)
+        else:
+            mv = RDKitValidator()
+            mol_block = ob_mol.write('mol')
+            rdk_mol = MolFromMolBlock(mol_block, removeHs=False, sanitize=False)
+            if not mv.is_mol_valid(rdk_mol):
+                logger.warning("Molecule loaded from '%s' is invalid. Check the logs for more information." % mol_file)
+                raise MoleculeInformationError("Molecule loaded from '%s' is invalid. Check the logs for more information." % mol_file)
+    else:
+        raise IllegalArgumentError("Error level must be either 0, 1, 2, 3, or 4.")
+    logger.warning('Molecule validated!!!')
+
+    if ob_mol.OBMol.NumHvyAtoms() != len(atoms):
+        raise MoleculeSizeError("The number of heavy atoms in the PDB selection and in the MOL file are different.")
 
     atm_map = {}
-    nb_coords_by_atm = {}
-
-    filtered_obAtom = [a for a in OBMolAtomIter(obMol.OBMol) if a.GetAtomicNum() != 1]
-
-    for idx, obAtom in enumerate(filtered_obAtom):
-        # Ignore hydrogen atoms
-        if (obAtom.GetAtomicNum() != 1):
-            obResidue = obAtom.GetResidue()
-            serialNumber = obResidue.GetSerialNum(obAtom)
-            atm_map[idx] = serialNumber
-
-            nb_coords = []
-            for nb_obAtom in OBAtomAtomIter(obAtom):
-                coords = Coordinate(nb_obAtom.GetX(), nb_obAtom.GetY(), nb_obAtom.GetZ(),
-                                    atomic_num=nb_obAtom.GetAtomicNum())
-
-                nb_coords.append(coords)
-
-            nb_coords_by_atm[serialNumber] = NbCoordinates(nb_coords)
-
-    mol_block = obMol.write('mol')
-    rdMol = MolFromMolBlock(mol_block)
-
-    group_features = feature_extractor.get_features_by_groups(rdMol, atm_map)
-
     trgt_atms = {}
-    for mybio_res in res_list:
-        for atm in mybio_res.get_atoms():
-            # Ignore hydrogen atoms
-            if (atm.element != "H"):
-                nb_coords = nb_coords_by_atm[atm.get_serial_number()]
-                nb_atom = NbAtom(atm, nb_coords)
-                trgt_atms[atm.get_serial_number()] = nb_atom
+    for i, ob_atm in enumerate(OBMolAtomIter(ob_mol.OBMol)):
+        # Ignore hydrogen atoms
+        if (ob_atm.GetAtomicNum() != 1):
+            atm_map[ob_atm.GetIdx()] = atoms[i].serial_number
+            trgt_atms[atoms[i].serial_number] = NbAtom(atoms[i])
+
+    # Set all neighbors, i.e., covalently bonded atoms.
+    for ob_bond in OBMolBondIter(ob_mol.OBMol):
+        bgn_ob_atm = ob_bond.GetBeginAtom()
+        end_ob_atm = ob_bond.GetEndAtom()
+
+        if bgn_ob_atm.GetAtomicNum() != 1 and end_ob_atm.GetAtomicNum() != 1:
+            bgn_nb_atm = trgt_atms[atm_map[bgn_ob_atm.GetIdx()]]
+            end_nb_atm = trgt_atms[atm_map[end_ob_atm.GetIdx()]]
+
+            bgn_nb_atm.add_nb_atom(end_nb_atm)
+            end_nb_atm.add_nb_atom(bgn_nb_atm)
+
+    group_features = feature_extractor.get_features_by_groups(ob_mol, atm_map)
 
     comp_grps = CompoundGroups(mybio_residue)
     for key in group_features:
