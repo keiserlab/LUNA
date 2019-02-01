@@ -1,12 +1,12 @@
 from util.file import (is_file_valid, try_validate_file, get_file_format)
-from subprocess import Popen, PIPE
+from subprocess import (Popen, PIPE)
 from util.exceptions import (FileNotCreated, InvalidFileFormat)
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-def mol_2svg_obabel(infile, output, opt=None):
+def mol_to_svg(infile, output, opt=None):
     """Depict a molecule as SVG using OpenBabel.
 
         @param infile: a file to be converted.
@@ -24,14 +24,14 @@ def mol_2svg_obabel(infile, output, opt=None):
     try:
         try_validate_file(infile)
 
-        optList = _get_options(opt, "x")
-        args = ["obabel", infile, "-O", output] + optList
+        opt_list = _get_options(opt, "x")
+        args = ["obabel", infile, "-O", output] + opt_list
 
         p = Popen(args, stdout=PIPE, stderr=PIPE)
         stdout, stderr = p.communicate()
 
-        isSVGCreated = stderr.decode().strip() == "1 molecule converted"
-        if (not is_file_valid(output) or not isSVGCreated):
+        svg_created = stderr.decode().strip() == "1 molecule converted"
+        if (not is_file_valid(output) or not svg_created):
             raise FileNotCreated("SVG diagram for '%s' not created." % infile)
         else:
             logger.info("SVG diagram for '%s' created." % infile)
@@ -41,24 +41,23 @@ def mol_2svg_obabel(infile, output, opt=None):
 
 
 def _get_options(opt, prefix=""):
-    optList = []
+    opt_list = []
 
     if (opt is not None):
         for key in opt:
             if (len(key) > 1):
-                optList.append("--%s%s" % (prefix, key))
+                opt_list.append("--%s%s" % (prefix, key))
             else:
-                optList.append("-%s%s" % (prefix, key))
+                opt_list.append("-%s%s" % (prefix, key))
 
             if (opt[key] is not None):
-                optList.append(str(opt[key]))
+                opt_list.append(str(opt[key]))
 
-    return optList
+    return opt_list
 
 
-def convert_molecule(infile, output, infileFormat=None,
-                     outputFormat=None, opt=None,
-                     openbabel='obabel'):
+def convert_molecule(infile, output, infile_format=None,
+                     output_format=None, opt=None, openbabel='obabel'):
     """Convert a molecule file to other format using OpenBabel.
 
         @param infile: a file to be converted.
@@ -67,11 +66,11 @@ def convert_molecule(infile, output, infileFormat=None,
         @param output: a path to the converted file.
         @type output: string
 
-        @param infileFormat: the format of the infile file.
-        @type infileFormat: string
+        @param infile_format: the format of the infile file.
+        @type infile_format: string
 
-        @param outputFormat: the format of the infile file.
-        @type outputFormat: string
+        @param output_format: the format of the infile file.
+        @type output_format: string
 
         @param opt: a set of convertion options. Check OpenBabel options.
         @type opt: dictionary
@@ -83,31 +82,28 @@ def convert_molecule(infile, output, infileFormat=None,
         # It raises an error if it is not valid.
         try_validate_file(infile)
 
-        if (infileFormat is None):
+        if (infile_format is None):
             logger.info("Input file format not defined.")
             logger.info("It will try to figure out the format.")
-            infileFormat = get_file_format(infile)
+            infile_format = get_file_format(infile)
 
-        if (infileFormat not in read_formats()):
-            raise InvalidFileFormat("Infile format '%s' does not exist."
-                                    % infileFormat)
+        if (infile_format not in read_formats()):
+            raise InvalidFileFormat("Infile format '%s' does not exist." % infile_format)
 
-        logger.info("Input format: %s" % infileFormat)
+        logger.info("Input format: %s" % infile_format)
 
-        if (outputFormat is None):
+        if (output_format is None):
             logger.info("Output file format not defined.")
             logger.info("It will try to figure out the format.")
-            outputFormat = get_file_format(output, 1)
+            output_format = get_file_format(output, 1)
 
-        if (outputFormat not in write_formats()):
-            raise InvalidFileFormat("Infile format '%s' does not exist."
-                                    % outputFormat)
+        if (output_format not in write_formats()):
+            raise InvalidFileFormat("Infile format '%s' does not exist." % output_format)
 
-        logger.info("Output format: %s" % outputFormat)
+        logger.info("Output format: %s" % output_format)
 
-        optList = _get_options(opt)
-        args = [openbabel, "-i", infileFormat, infile,
-                "-o", outputFormat, "-O", output] + optList
+        opt_list = _get_options(opt)
+        args = [openbabel, "-i", infile_format, infile, "-o", output_format, "-O", output] + opt_list
 
         p = Popen(args, stdout=PIPE, stderr=PIPE)
         stdout, stderr = p.communicate()
@@ -115,8 +111,7 @@ def convert_molecule(infile, output, infileFormat=None,
         output_lines = stderr.decode().strip().split("\n")
         is_mol_converted = output_lines[-1] != "0 molecule converted"
         if (not is_file_valid(output) or not is_mol_converted):
-            raise FileNotCreated("File '%s' not converted to '%s'."
-                                 % (infile, output))
+            raise FileNotCreated("File '%s' not converted to '%s'." % (infile, output))
         else:
             logger.info("File '%s' converted to '%s'." % (infile, output))
     except Exception as e:

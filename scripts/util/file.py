@@ -87,13 +87,11 @@ def new_filename(size=32, chars=string.ascii_uppercase + string.digits):
 
 
 def get_unique_filename(path, size=32, chars=string.ascii_uppercase + string.digits, retries=5):
-    filename = None
     for r in range(retries):
         filename = '%s/%s' % (path, new_filename(size, chars))
         if not exists(filename):
-            break
-
-    return filename
+            return filename
+    return None
 
 
 def validate_filesystem(path, type):

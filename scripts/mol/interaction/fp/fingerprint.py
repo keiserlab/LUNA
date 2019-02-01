@@ -73,8 +73,8 @@ class Fingerprint:
     @classmethod
     def from_fingerprint(cls, fp, **kwargs):
         if not isinstance(fp, Fingerprint):
-            logger.exception("Informed fingerprint is not an instance of %s." % (cls.__class__.__name__))
-            raise InvalidFingerprintType("Informed fingerprint is not an instance of %s." % (cls.__class__.__name__))
+            logger.exception("Informed fingerprint is not an instance of %s." % (cls.__class__))
+            raise InvalidFingerprintType("Informed fingerprint is not an instance of %s." % (cls.__class__))
 
         unfolded_fp = fp.__class__.from_fingerprint(fp.unfolded_fp) if fp.unfolded_fp is not None else None
 
@@ -285,8 +285,8 @@ class Fingerprint:
 
     def union(self, other):
         if not isinstance(other, Fingerprint):
-            logger.exception("Informed fingerprint is not an instance of %s." % (other.__class__.__name__))
-            raise InvalidFingerprintType("Informed fingerprint is not an instance of %s." % (other.__class__.__name__))
+            logger.exception("Informed fingerprint is not an instance of %s." % (other.__class__))
+            raise InvalidFingerprintType("Informed fingerprint is not an instance of %s." % (other.__class__))
 
         if self.fp_length != other.fp_length:
             raise BitsValueError("Fingerprints are in a different bit scale")
@@ -295,8 +295,8 @@ class Fingerprint:
 
     def intersection(self, other):
         if not isinstance(other, Fingerprint):
-            logger.exception("Informed fingerprint is not an instance of %s." % (other.__class__.__name__))
-            raise InvalidFingerprintType("Informed fingerprint is not an instance of %s." % (other.__class__.__name__))
+            logger.exception("Informed fingerprint is not an instance of %s." % (other.__class__))
+            raise InvalidFingerprintType("Informed fingerprint is not an instance of %s." % (other.__class__))
 
         if self.fp_length != other.fp_length:
             raise BitsValueError("Fingerprints are in a different bit scale")
@@ -305,8 +305,8 @@ class Fingerprint:
 
     def difference(self, other):
         if not isinstance(other, Fingerprint):
-            logger.exception("Informed fingerprint is not an instance of %s." % (other.__class__.__name__))
-            raise InvalidFingerprintType("Informed fingerprint is not an instance of %s." % (other.__class__.__name__))
+            logger.exception("Informed fingerprint is not an instance of %s." % (other.__class__))
+            raise InvalidFingerprintType("Informed fingerprint is not an instance of %s." % (other.__class__))
 
         if self.fp_length != other.fp_length:
             raise BitsValueError("Fingerprints are in a different bit scale")
@@ -315,8 +315,8 @@ class Fingerprint:
 
     def symmetric_difference(self, other):
         if not isinstance(other, Fingerprint):
-            logger.exception("Informed fingerprint is not an instance of %s." % (other.__class__.__name__))
-            raise InvalidFingerprintType("Informed fingerprint is not an instance of %s." % (other.__class__.__name__))
+            logger.exception("Informed fingerprint is not an instance of %s." % (other.__class__))
+            raise InvalidFingerprintType("Informed fingerprint is not an instance of %s." % (other.__class__))
 
         if self.fp_length != other.fp_length:
             raise BitsValueError("Fingerprints are in a different bit scale")
@@ -325,7 +325,7 @@ class Fingerprint:
 
     def __repr__(self):
         return ("<%s: indices=%s length=%d>" %
-                (self.__class__.__name__, repr(self.indices).replace('\n', '').replace(' ', ''), self.fp_length))
+                (self.__class__, repr(self.indices).replace('\n', '').replace(' ', ''), self.fp_length))
 
     def __eq__(self, other):
         if isinstance(other, Fingerprint):
@@ -424,8 +424,8 @@ class CountFingerprint(Fingerprint):
     @classmethod
     def from_fingerprint(cls, fp, **kwargs):
         if not isinstance(fp, Fingerprint):
-            logger.exception("Informed fingerprint is not an instance of %s." % (cls.__class__.__name__))
-            raise InvalidFingerprintType("Informed fingerprint is not an instance of %s." % (cls.__class__.__name__))
+            logger.exception("Informed fingerprint is not an instance of %s." % (cls.__class__))
+            raise InvalidFingerprintType("Informed fingerprint is not an instance of %s." % (cls.__class__))
 
         counts = dict([(i, c) for i, c in fp.counts.items() if c > 0])
         unfolded_fp = fp.__class__.from_fingerprint(fp.unfolded_fp) if fp.unfolded_fp is not None else None
@@ -455,7 +455,7 @@ class CountFingerprint(Fingerprint):
 
     def __repr__(self):
         return ("<%s: counts={%s} length=%d>" %
-                (self.__class__.__name__, tuple([(k, v) for k, v in self.counts.items()]), self.fp_length))
+                (self.__class__, tuple([(k, v) for k, v in self.counts.items()]), self.fp_length))
 
     def __eq__(self, other):
         if isinstance(other, Fingerprint):
