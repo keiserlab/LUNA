@@ -1,10 +1,11 @@
-import mol.interaction.math as iu
+import mol.interaction.math as im
 
 from mol.interaction.conf import DefaultInteractionConf
 from mol.interaction.filter import InteractionFilter
 from mol.interaction.type import InteractionType
 from mol.features import ChemicalFeature
 
+from openbabel import etab
 from operator import (le, ge)
 from itertools import (chain, combinations, product)
 from collections import defaultdict
@@ -17,14 +18,13 @@ logger = logging.getLogger(__name__)
 class InteractionCalculator:
 
     def __init__(self, inter_conf=DefaultInteractionConf(), inter_filter=None,
-                 inter_funcs=None, add_proximal=False, add_cov_inter=False,
-                 add_clash=False, add_orphan_h2o_pair=False, strict_donor_rules=False):
+                 inter_funcs=None, add_proximal=False, add_atom_atom=False,
+                 add_orphan_h2o_pair=False, strict_donor_rules=False):
 
         self.inter_conf = inter_conf
 
         self.add_proximal = add_proximal
-        self.add_cov_inter = add_cov_inter
-        self.add_clash = add_clash
+        self.add_atom_atom = add_atom_atom
         self.add_orphan_h2o_pair = add_orphan_h2o_pair
         self.strict_donor_rules = strict_donor_rules
 
@@ -55,18 +55,10 @@ class InteractionCalculator:
                     if not self.inter_filter.is_valid_pair(trgt_atms_grp, nb_atms_grp):
                         continue
 
-                if self.add_proximal:
-                    all_interactions.extend(self.calc_proximal((trgt_atms_grp, nb_atms_grp)))
-                if self.add_cov_inter:
-                    pass
-                if self.add_clash:
-                    pass
+                feat_pairs = list(product(trgt_atms_grp.features, nb_atms_grp.features))
+                feat_pairs = filter(lambda x: self.is_feature_pair_valid(*x), feat_pairs)
 
-                featurePairs = list(product(trgt_atms_grp.features, nb_atms_grp.features))
-
-                featurePairs = filter(lambda x: self.is_feature_pair_valid(*x), featurePairs)
-
-                for featPair in featurePairs:
+                for featPair in feat_pairs:
                     calc_inter_params = (trgt_atms_grp, nb_atms_grp) + featPair
                     interactions = self.resolve_interactions(*calc_inter_params)
                     all_interactions.extend(interactions)
@@ -85,15 +77,14 @@ class InteractionCalculator:
         return list(all_interactions)
 
     def resolve_interactions(self, group1, group2, feat1, feat2):
-        func = self.get_function(feat1.name, feat2.name)
-        if (func is None):
+        funcs = self.get_function(feat1.name, feat2.name)
+        if len(funcs) == 0:
             raise IllegalArgumentError("It does not exist a corresponding function to the features: '%s' and '%s'."
                                        % (feat1, feat2))
 
-        interactions = func((group1, group2, feat1, feat2))
-
-        if isinstance(interactions, list) is False:
-            interactions = []
+        interactions = []
+        for func in funcs:
+            interactions.extend(func((group1, group2, feat1, feat2)))
 
         return interactions
 
@@ -106,8 +97,8 @@ class InteractionCalculator:
         # Save all hydrogen bonds involving waters and attractive interactions.
         for inter in interactions:
             if inter.type == "Hydrogen bond":
-                comp1 = inter.atm_grp1.compounds[0]
-                comp2 = inter.atm_grp2.compounds[0]
+                comp1 = next(iter(inter.atm_grp1.compounds))
+                comp2 = next(iter(inter.atm_grp2.compounds))
 
                 if comp1.is_water():
                     h2o_key = inter.atm_grp1
@@ -131,8 +122,8 @@ class InteractionCalculator:
             pairs = combinations(h2o_pairs[h2o_key].keys(), 2)
 
             for (atm_grp1, atm_grp2) in pairs:
-                comp1 = atm_grp1.compounds[0]
-                comp2 = atm_grp2.compounds[0]
+                comp1 = next(iter(atm_grp1.compounds))
+                comp2 = next(iter(atm_grp2.compounds))
 
                 if isinstance(self.inter_filter, InteractionFilter):
                     if not self.inter_filter.is_valid_pair(atm_grp1, atm_grp2):
@@ -197,32 +188,33 @@ class InteractionCalculator:
 
     def _default_functions(self):
         return {
-                # ("Hydrophobic", "Hydrophobic"): self.calc_hydrop,
-                # ("Hydrophobe", "Hydrophobe"): self.calc_hydrop,
-                # ("Aromatic", "Aromatic"): self.calc_pi_pi,
+                ("Hydrophobic", "Hydrophobic"): [self.calc_hydrop],
+                ("Hydrophobe", "Hydrophobe"): [self.calc_hydrop],
+                ("Aromatic", "Aromatic"): [self.calc_pi_pi],
 
-                # ("Donor", "Acceptor"): self.calc_hbond,
-                # ("WeakDonor", "Acceptor"): self.calc_weak_hbond,
-                # ("Donor", "Aromatic"): self.calc_hbond_pi,
-                # ("WeakDonor", "Aromatic"): self.calc_hbond_pi,
+                ("Donor", "Acceptor"): [self.calc_hbond],
+                ("WeakDonor", "Acceptor"): [self.calc_weak_hbond],
+                ("Donor", "Aromatic"): [self.calc_hbond_pi],
+                ("WeakDonor", "Aromatic"): [self.calc_hbond_pi],
 
-                # ("HalogenDonor", "Acceptor"): self.calc_xbond,
-                # ("HalogenDonor", "Aromatic"): self.calc_xbond_pi,
+                ("HalogenDonor", "Acceptor"): [self.calc_xbond],
+                ("HalogenDonor", "Aromatic"): [self.calc_xbond_pi],
 
-                ("Amide", "Aromatic"): self.calc_amide_pi,
+                ("Amide", "Aromatic"): [self.calc_amide_pi],
 
+                ("Negative", "Positive"): [self.calc_attractive],
+                ("Negative", "Negative"): [self.calc_repulsive],
+                ("Positive", "Positive"): [self.calc_repulsive],
+                ("NegIonizable", "PosIonizable"): [self.calc_attractive],
+                ("NegIonizable", "NegIonizable"): [self.calc_repulsive],
+                ("PosIonizable", "PosIonizable"): [self.calc_repulsive],
+                ("PosIonizable", "Aromatic"): [self.calc_cation_pi],
+                ("NegativelyIonizable", "PositivelyIonizable"): [self.calc_attractive],
+                ("NegativelyIonizable", "NegativelyIonizable"): [self.calc_repulsive],
+                ("PositivelyIonizable", "PositivelyIonizable"): [self.calc_repulsive],
+                ("PositivelyIonizable", "Aromatic"): [self.calc_cation_pi],
 
-                # ("Negative", "Positive"): self.calc_attractive,
-                # ("Negative", "Negative"): self.calc_repulsive,
-                # ("Positive", "Positive"): self.calc_repulsive,
-                # ("NegIonizable", "PosIonizable"): self.calc_attractive,
-                # ("NegIonizable", "NegIonizable"): self.calc_repulsive,
-                # ("PosIonizable", "PosIonizable"): self.calc_repulsive,
-                # ("PosIonizable", "Aromatic"): self.calc_cation_pi,
-                # ("NegativelyIonizable", "PositivelyIonizable"): self.calc_attractive,
-                # ("NegativelyIonizable", "NegativelyIonizable"): self.calc_repulsive,
-                # ("PositivelyIonizable", "PositivelyIonizable"): self.calc_repulsive,
-                # ("PositivelyIonizable", "Aromatic"): self.calc_cation_pi
+                ("Atom", "Atom"): [self.calc_atom_atom, self.calc_proximal]
                 }
 
         # TODO: Incluir:
@@ -232,8 +224,6 @@ class InteractionCalculator:
         # Weak donor - weak acceptor
 
         # Dipole-dipole interaction
-        # Covalent interaction
-        # Clash
         # Amide-pi bond
         # Agostic and Hydrogen-Bonding X–H· · · M
 
@@ -245,10 +235,10 @@ class InteractionCalculator:
         # aromatic between hbond arrays
 
     def calc_cation_pi(self, params):
+        group1, group2, feat1, feat2 = params
         interactions = []
 
-        group1, group2, feat1, feat2 = params
-        cc_dist = iu.euclidean_distance(group1.centroid, group2.centroid)
+        cc_dist = im.euclidean_distance(group1.centroid, group2.centroid)
 
         if (self.is_within_boundary(cc_dist, "boundary_cutoff", le) and
                 self.is_within_boundary(cc_dist, "max_dist_cation_pi_inter", le)):
@@ -259,17 +249,17 @@ class InteractionCalculator:
         return interactions
 
     def calc_pi_pi(self, params):
+        ring1, ring2, feat1, feat2 = params
         interactions = []
 
-        ring1, ring2, feat1, feat2 = params
-        cc_dist = iu.euclidean_distance(ring1.centroid, ring2.centroid)
+        cc_dist = im.euclidean_distance(ring1.centroid, ring2.centroid)
 
         if (self.is_within_boundary(cc_dist, "boundary_cutoff", le) and
                 self.is_within_boundary(cc_dist, "max_cc_dist_pi_pi_inter", le)):
 
-                dihedral_angle = iu.to_quad1(iu.angle(ring1.normal, ring2.normal))
+                dihedral_angle = im.to_quad1(im.angle(ring1.normal, ring2.normal))
                 vector_cc = ring2.centroid - ring1.centroid
-                disp_angle = iu.to_quad1(iu.angle(ring1.normal, vector_cc))
+                disp_angle = im.to_quad1(im.angle(ring1.normal, vector_cc))
 
                 # If the angle criteria were not defined, a specific Pi-stacking definition is not
                 # possible as it depends on angle criteria. Therefore, a more general classification
@@ -295,9 +285,8 @@ class InteractionCalculator:
         return interactions
 
     def calc_amide_pi(self, params):
-        interactions = []
-
         group1, group2, feat1, feat2 = params
+        interactions = []
 
         if (feat1.name == "Aromatic" and feat2.name == "Amide"):
             ring_grp = group1
@@ -312,34 +301,17 @@ class InteractionCalculator:
             return []
 
         # Distance between the amide and ring centroids.
-        cc_dist = iu.euclidean_distance(ring_grp.centroid, amide_grp.centroid)
-
-        print("#############################")
-        print(ring_grp)
-        print(ring_grp.compounds)
-        print("Amide:")
-        print(amide_grp)
-        print(amide_grp.compounds)
-        print()
-        print("CC dist: ", cc_dist)
-        print()
+        cc_dist = im.euclidean_distance(ring_grp.centroid, amide_grp.centroid)
 
         if (self.is_within_boundary(cc_dist, "boundary_cutoff", le) and
                 self.is_within_boundary(cc_dist, "max_cc_dist_amide_pi_inter", le)):
 
-            dihedral_angle = iu.to_quad1(iu.angle(ring_grp.normal, amide_grp.normal))
+            dihedral_angle = im.to_quad1(im.angle(ring_grp.normal, amide_grp.normal))
             vector_cc = amide_grp.centroid - ring_grp.centroid
-            disp_angle = iu.to_quad1(iu.angle(ring_grp.normal, vector_cc))
-
-            print("Dihedral: ", dihedral_angle)
-            print("Displacement: ", disp_angle)
-            print()
+            disp_angle = im.to_quad1(im.angle(ring_grp.normal, vector_cc))
 
             if (self.is_within_boundary(dihedral_angle, "max_dihed_ang_amide_pi_inter", le) and
                     self.is_within_boundary(disp_angle, "max_disp_ang_pi_pi_inter", le)):
-
-                print("Valid interaction")
-                print()
 
                 params = {"cc_dist_amide_pi_inter": cc_dist,
                           "dihed_ang_amide_pi_inter": dihedral_angle,
@@ -349,15 +321,13 @@ class InteractionCalculator:
 
                 interactions.append(inter)
 
-        # print()
-
         return interactions
 
     def calc_hydrop(self, params):
+        group1, group2, feat1, feat2 = params
         interactions = []
 
-        group1, group2, feat1, feat2 = params
-        cc_dist = iu.euclidean_distance(group1.centroid, group2.centroid)
+        cc_dist = im.euclidean_distance(group1.centroid, group2.centroid)
 
         if (self.is_within_boundary(cc_dist, "boundary_cutoff", le) and
                 self.is_within_boundary(cc_dist, "max_dist_hydrop_inter", le)):
@@ -369,8 +339,8 @@ class InteractionCalculator:
         return interactions
 
     def calc_xbond_pi(self, params):
-        interactions = []
         group1, group2, feat1, feat2 = params
+        interactions = []
 
         if (feat1.name == "Aromatic" and feat2.name == "HalogenDonor"):
             donor_grp = group2
@@ -384,13 +354,13 @@ class InteractionCalculator:
 
         # Interaction model: C-X ---- A
         # Defining the XA distance, in which A is the ring center
-        xa_dist = iu.euclidean_distance(donor_grp.centroid, ring_grp.centroid)
+        xa_dist = im.euclidean_distance(donor_grp.centroid, ring_grp.centroid)
 
         if (self.is_within_boundary(xa_dist, "boundary_cutoff", le) and
                 self.is_within_boundary(xa_dist, "max_xc_dist_xbond_inter", le)):
 
             ax_vect = donor_grp.centroid - ring_grp.centroid
-            disp_angle = iu.to_quad1(iu.angle(ring_grp.normal, ax_vect))
+            disp_angle = im.to_quad1(im.angle(ring_grp.normal, ax_vect))
 
             if (self.is_within_boundary(disp_angle, "max_disp_ang_xbond_inter", le)):
                 # Interaction model: C-X ---- A
@@ -401,10 +371,10 @@ class InteractionCalculator:
                 # It may happen that X is covalently bound to more than one group.
                 # In such cases the halogen may also form more than one halogen bond.
                 # Ref: Cavallo, G. et al. The Halogen Bond. (2016).
-                carbon_coords = [x for x in donor_atm.nb_coords if x.atomic_num == 6]
-                for coord in carbon_coords:
-                    xc_vect = coord.vector - donor_grp.centroid
-                    cxa_angle = iu.angle(xc_vect, xa_vect)
+                carbon_coords = [nbi.coord for nbi in donor_atm.neighbors_info if nbi.atomic_num == 6]
+                for c_coord in carbon_coords:
+                    xc_vect = c_coord - donor_grp.centroid
+                    cxa_angle = im.angle(xc_vect, xa_vect)
 
                     if (self.is_within_boundary(cxa_angle, "min_cxa_ang_xbond_inter", ge)):
                         params = {"xc_dist_xbond_inter": xa_dist,
@@ -418,8 +388,8 @@ class InteractionCalculator:
         return interactions
 
     def calc_xbond(self, params):
-        interactions = []
         group1, group2, feat1, feat2 = params
+        interactions = []
 
         if len(group1.atoms) != 1 or len(group2.atoms) != 1:
             logger.warning("One or more invalid atom groups were informed: '%s' and '%s" % (group1, group2))
@@ -439,7 +409,7 @@ class InteractionCalculator:
 
         # Interaction model: C-X ---- A-R
         # Distance XA.
-        xa_dist = iu.euclidean_distance(donor_grp.centroid, acceptor_grp.centroid)
+        xa_dist = im.euclidean_distance(donor_grp.centroid, acceptor_grp.centroid)
 
         if (self.is_within_boundary(xa_dist, "boundary_cutoff", le) and
                 self.is_within_boundary(xa_dist, "max_xa_dist_xbond_inter", le)):
@@ -452,15 +422,15 @@ class InteractionCalculator:
             # It may happen that X is covalently bound to more than one group.
             # In such cases the halogen may also form more than one halogen bond.
             # Ref: Cavallo, G. et al. The Halogen Bond. (2016).
-            carbon_coords = [x for x in donor_atm.nb_coords if x.atomic_num == 6]
+            carbon_coords = [nbi for nbi in donor_atm.neighbors_info if nbi.atomic_num == 6]
 
             # Interaction model: C-X ---- A-R.
             # R coordinates, in which R is a heavy atom.
-            r_coords = [x for x in acceptor_atm.nb_coords if x.atomic_num != 1]
+            r_coords = [nbi for nbi in acceptor_atm.neighbors_info if nbi.atomic_num != 1]
 
-            for coord in carbon_coords:
-                xc_vect = coord.vector - donor_grp.centroid
-                cxa_angle = iu.angle(xc_vect, xa_vect)
+            for c_coord in carbon_coords:
+                xc_vect = c_coord - donor_grp.centroid
+                cxa_angle = im.angle(xc_vect, xa_vect)
 
                 if (self.is_within_boundary(cxa_angle, "min_cxa_ang_xbond_inter", ge)):
                     # If no heavy atom is bonded to the acceptor, it means that only hydrogens
@@ -482,8 +452,8 @@ class InteractionCalculator:
 
                         lowest_xar_angle = None
                         for r_coord in r_coords:
-                            ar_vect = r_coord.vector - acceptor_grp.centroid
-                            xar_angle = iu.angle(ax_vect, ar_vect)
+                            ar_vect = r_coord - acceptor_grp.centroid
+                            xar_angle = im.angle(ax_vect, ar_vect)
 
                             # Update the XAR angle with the lowest value.
                             if lowest_xar_angle is None or xar_angle < lowest_xar_angle:
@@ -505,8 +475,8 @@ class InteractionCalculator:
         return interactions
 
     def calc_hbond(self, params):
-        interactions = []
         group1, group2, feat1, feat2 = params
+        interactions = []
 
         if len(group1.atoms) != 1 or len(group2.atoms) != 1:
             logger.warning("One or more invalid atom groups were informed: '%s' and '%s" % (group1, group2))
@@ -525,28 +495,27 @@ class InteractionCalculator:
 
         # Interaction model: D-H ---- A-R.
         # DA distance
-        da_dist = iu.euclidean_distance(donor_grp.centroid, acceptor_grp.centroid)
+        da_dist = im.euclidean_distance(donor_grp.centroid, acceptor_grp.centroid)
 
         if (self.is_within_boundary(da_dist, "boundary_cutoff", le) and
                 self.is_within_boundary(da_dist, "max_da_dist_hb_inter", le)):
 
             # Interaction model: D-H ---- A-R.
             # Recover only hydrogen coordinates bonded to the donor.
-            hydrog_coords = [x for x in donor_atm.nb_coords if x.atomic_num == 1]
+            hydrog_coords = [nbi.coord for nbi in donor_atm.neighbors_info if nbi.atomic_num == 1]
 
             # Interaction model: D-H ---- A-R.
             # R coordinates, in which R is a heavy atom.
-            r_coords = [x for x in acceptor_atm.nb_coords if x.atomic_num != 1]
+            r_coords = [nbi.coord for nbi in acceptor_atm.neighbors_info if nbi.atomic_num != 1]
 
             # Firstly, it checks if it is not necessary to apply a strict hbond rule, i.e.,
             # hydrogens must exist and all geometrical criteria should be evaluated.
             # Then it checks if no hydrogen is bonded to the donor, or if the donor has hydrogens
             # and only hydrogens as neighbours (water, solvents, ammonia, SH2). In the latter case, the
-            # hydrogens can be positioned in many different set of ways, and each run of a tool like
-            # OpenBabel would vary the hydrogen bond list when one applies this algorithm.
+            # hydrogens can be positioned in many different ways, and each run of a tool like OpenBabel
+            # would vary the hydrogen bond list when one applies this algorithm.
             if (self.strict_donor_rules is False and
-                    (len(hydrog_coords) == 0 or
-                        len(hydrog_coords) == len(donor_atm.nb_coords))):
+                    (len(hydrog_coords) == 0 or len(hydrog_coords) == len(donor_atm.neighbors_info))):
 
                 # When the position of the hydrogen cannot be defined, it assumes the hydrogen to be located 1A
                 # away from the donor in a line formed by the donor and the acceptor.
@@ -573,8 +542,8 @@ class InteractionCalculator:
 
                         lowest_dar_angle = None
                         for r_coord in r_coords:
-                            ar_vect = r_coord.vector - acceptor_grp.centroid
-                            dar_angle = iu.angle(ad_vect, ar_vect)
+                            ar_vect = r_coord - acceptor_grp.centroid
+                            dar_angle = im.angle(ad_vect, ar_vect)
 
                             # Update the DAR angle with the lowest value.
                             if lowest_dar_angle is None or dar_angle < lowest_dar_angle:
@@ -599,11 +568,11 @@ class InteractionCalculator:
                 # In this case, it is necessary to check the distances and angles for each atom.
                 # It will produce a hydrogen bond for each valid hydrogen.
                 for h_coord in hydrog_coords:
-                    ha_dist = iu.euclidean_distance(h_coord.vector, acceptor_grp.centroid)
+                    ha_dist = im.euclidean_distance(h_coord, acceptor_grp.centroid)
 
-                    hd_vect = donor_grp.centroid - h_coord.vector
-                    ha_vect = acceptor_grp.centroid - h_coord.vector
-                    dha_angle = iu.angle(hd_vect, ha_vect)
+                    hd_vect = donor_grp.centroid - h_coord
+                    ha_vect = acceptor_grp.centroid - h_coord
+                    dha_angle = im.angle(hd_vect, ha_vect)
 
                     if (self.is_within_boundary(ha_dist, "max_ha_dist_hb_inter", le) and
                             self.is_within_boundary(dha_angle, "min_dha_ang_hb_inter", ge)):
@@ -625,7 +594,7 @@ class InteractionCalculator:
                         else:
                             # Interaction model: D-H ---- A-R
                             # AH vector is always the same.
-                            ah_vect = h_coord.vector - acceptor_grp.centroid
+                            ah_vect = h_coord - acceptor_grp.centroid
                             # AD vector is always the same.
                             ad_vect = donor_grp.centroid - acceptor_grp.centroid
 
@@ -639,9 +608,9 @@ class InteractionCalculator:
                             lowest_har_angle = None
                             lowest_dar_angle = None
                             for r_coord in r_coords:
-                                ar_vect = r_coord.vector - acceptor_grp.centroid
-                                har_angle = iu.angle(ah_vect, ar_vect)
-                                dar_angle = iu.angle(ad_vect, ar_vect)
+                                ar_vect = r_coord - acceptor_grp.centroid
+                                har_angle = im.angle(ah_vect, ar_vect)
+                                dar_angle = im.angle(ad_vect, ar_vect)
 
                                 # Update the HAR angle with the lowest value.
                                 if lowest_har_angle is None or har_angle < lowest_har_angle:
@@ -672,9 +641,8 @@ class InteractionCalculator:
         return interactions
 
     def calc_weak_hbond(self, params):
-        interactions = []
-
         group1, group2, feat1, feat2 = params
+        interactions = []
 
         if len(group1.atoms) != 1 or len(group2.atoms) != 1:
             logger.warning("One or more invalid atom groups were informed: '%s' and '%s" % (group1, group2))
@@ -691,26 +659,26 @@ class InteractionCalculator:
         donor_atm = donor_grp.atoms[0]
         acceptor_atm = acceptor_grp.atoms[0]
 
-        da_dist = iu.euclidean_distance(donor_grp.centroid, acceptor_grp.centroid)
+        da_dist = im.euclidean_distance(donor_grp.centroid, acceptor_grp.centroid)
         if (self.is_within_boundary(da_dist, "boundary_cutoff", le) and
                 self.is_within_boundary(da_dist, "max_da_dist_whb_inter", le)):
 
             # Interaction model: D-H ---- A-R.
             # Recover only hydrogen coordinates bonded to the donor.
-            hydrog_coords = [x for x in donor_atm.nb_coords if x.atomic_num == 1]
+            hydrog_coords = [nbi.coord for nbi in donor_atm.neighbors_info if nbi.atomic_num == 1]
 
             # Interaction model: D-H ---- A-R.
             # R coordinates, in which R is a heavy atom.
-            r_coords = [x for x in acceptor_atm.nb_coords if x.atomic_num != 1]
+            r_coords = [nbi.coord for nbi in acceptor_atm.neighbors_info if nbi.atomic_num != 1]
 
             # It may happen that D is covalently bound to more than one hydrogen atom.
             # In such cases, it's necessary to check the distances and angles for each atom.
             for h_coord in hydrog_coords:
-                ha_dist = iu.euclidean_distance(h_coord.vector, acceptor_grp.centroid)
+                ha_dist = im.euclidean_distance(h_coord, acceptor_grp.centroid)
 
-                hd_vect = donor_grp.centroid - h_coord.vector
-                ha_vect = acceptor_grp.centroid - h_coord.vector
-                dha_angle = iu.angle(hd_vect, ha_vect)
+                hd_vect = donor_grp.centroid - h_coord
+                ha_vect = acceptor_grp.centroid - h_coord
+                dha_angle = im.angle(hd_vect, ha_vect)
 
                 if (self.is_within_boundary(ha_dist, "max_ha_dist_whb_inter", le) and
                         self.is_within_boundary(dha_angle, "min_dha_ang_whb_inter", ge)):
@@ -732,7 +700,7 @@ class InteractionCalculator:
                     else:
                         # Interaction model: D-H ---- A-R
                         # AH vector is always the same.
-                        ah_vect = h_coord.vector - acceptor_grp.centroid
+                        ah_vect = h_coord - acceptor_grp.centroid
                         # AD vector is always the same.
                         ad_vect = donor_grp.centroid - acceptor_grp.centroid
 
@@ -746,9 +714,9 @@ class InteractionCalculator:
                         lowest_har_angle = None
                         lowest_dar_angle = None
                         for r_coord in r_coords:
-                            ar_vect = r_coord.vector - acceptor_grp.centroid
-                            har_angle = iu.angle(ah_vect, ar_vect)
-                            dar_angle = iu.angle(ad_vect, ar_vect)
+                            ar_vect = r_coord - acceptor_grp.centroid
+                            har_angle = im.angle(ah_vect, ar_vect)
+                            dar_angle = im.angle(ad_vect, ar_vect)
 
                             # Update the HAR angle with the lowest value.
                             if lowest_har_angle is None or har_angle < lowest_har_angle:
@@ -778,8 +746,8 @@ class InteractionCalculator:
         return interactions
 
     def calc_hbond_pi(self, params):
-        interactions = []
         group1, group2, feat1, feat2 = params
+        interactions = []
 
         if (feat1.name == "Aromatic" and (feat2.name == "Donor" or feat2.name == "WeakDonor")):
             ring_grp = group1
@@ -802,13 +770,13 @@ class InteractionCalculator:
         donor_atm = donor_grp.atoms[0]
 
         # Interaction model: D-H ---- A, in which A is the ring center.
-        da_dist = iu.euclidean_distance(donor_grp.centroid, ring_grp.centroid)
+        da_dist = im.euclidean_distance(donor_grp.centroid, ring_grp.centroid)
         if (self.is_within_boundary(da_dist, "boundary_cutoff", le) and
                 self.is_within_boundary(da_dist, "max_dc_dist_whb_inter", le)):
 
             # Interaction model: D-H ---- A, in which A is the ring center.
             # Recover only hydrogen coordinates bonded to the donor.
-            hydrog_coords = [x for x in donor_atm.nb_coords if x.atomic_num == 1]
+            hydrog_coords = [nbi.coord for nbi in donor_atm.neighbors_info if nbi.atomic_num == 1]
 
             # Firstly, it checks if it is not necessary to apply a strict hbond rule, i.e.,
             # hydrogens must exist and all geometrical criteria should be evaluated.
@@ -817,8 +785,7 @@ class InteractionCalculator:
             # hydrogens can be positioned in many different set of ways, and each run of a tool like
             # OpenBabel would vary the hydrogen bond list when one applies this algorithm.
             if (self.strict_donor_rules is False and
-                    (len(hydrog_coords) == 0 or
-                        len(hydrog_coords) == len(donor_atm.nb_coords))):
+                    (len(hydrog_coords) == 0 or len(hydrog_coords) == len(donor_atm.neighbors_info))):
 
                 # When the position of the hydrogen cannot be defined, it assumes the hydrogen to be located 1A
                 # away from the donor in a line formed by the donor and the acceptor.
@@ -828,7 +795,7 @@ class InteractionCalculator:
                     # Interaction model: D-H ---- A, in which A is the ring center.
                     # Calculate the displacement angle formed between the ring normal and the vector Donor-Centroid.
                     ad_vect = donor_grp.centroid - ring_grp.centroid
-                    disp_angle = iu.to_quad1(iu.angle(ring_grp.normal, ad_vect))
+                    disp_angle = im.to_quad1(im.angle(ring_grp.normal, ad_vect))
 
                     if (self.is_within_boundary(disp_angle, "max_disp_ang_whb_inter", le)):
                         params = {"dc_dist_whb_inter": da_dist,
@@ -843,11 +810,11 @@ class InteractionCalculator:
                 # In this case, it is necessary to check the distances and angles for each atom.
                 # It will produce a hydrogen bond for each valid hydrogen.
                 for h_coord in hydrog_coords:
-                    ha_dist = iu.euclidean_distance(h_coord.vector, ring_grp.centroid)
+                    ha_dist = im.euclidean_distance(h_coord, ring_grp.centroid)
 
-                    hd_vect = donor_grp.centroid - h_coord.vector
-                    ha_vect = ring_grp.centroid - h_coord.vector
-                    dha_angle = iu.angle(hd_vect, ha_vect)
+                    hd_vect = donor_grp.centroid - h_coord
+                    ha_vect = ring_grp.centroid - h_coord
+                    dha_angle = im.angle(hd_vect, ha_vect)
 
                     if (self.is_within_boundary(ha_dist, "max_hc_dist_whb_inter", le) and
                             self.is_within_boundary(dha_angle, "min_dhc_ang_whb_inter", ge)):
@@ -855,7 +822,7 @@ class InteractionCalculator:
                         # Interaction model: D-H ---- A, in which A is the ring center.
                         # Calculate the displacement angle formed between the ring normal and the vector Donor-Centroid.
                         ad_vect = donor_grp.centroid - ring_grp.centroid
-                        disp_angle = iu.to_quad1(iu.angle(ring_grp.normal, ad_vect))
+                        disp_angle = im.to_quad1(im.angle(ring_grp.normal, ad_vect))
 
                         if (self.is_within_boundary(disp_angle, "max_disp_ang_whb_inter", le)):
                             params = {"dc_dist_whb_inter": da_dist,
@@ -870,9 +837,9 @@ class InteractionCalculator:
 
     def calc_attractive(self, params):
         group1, group2, feat1, feat2 = params
-
         interactions = []
-        cc_dist = iu.euclidean_distance(group1.centroid, group2.centroid)
+
+        cc_dist = im.euclidean_distance(group1.centroid, group2.centroid)
         if (self.is_within_boundary(cc_dist, "boundary_cutoff", le) and
                 self.is_within_boundary(cc_dist, "max_dist_attract_inter", le)):
 
@@ -884,9 +851,9 @@ class InteractionCalculator:
 
     def calc_repulsive(self, params):
         group1, group2, feat1, feat2 = params
-
         interactions = []
-        cc_dist = iu.euclidean_distance(group1.centroid, group2.centroid)
+
+        cc_dist = im.euclidean_distance(group1.centroid, group2.centroid)
         if (self.is_within_boundary(cc_dist, "boundary_cutoff", le) and
                 self.is_within_boundary(cc_dist, "max_dist_repuls_inter", le)):
 
@@ -897,14 +864,59 @@ class InteractionCalculator:
         return interactions
 
     def calc_proximal(self, params):
-        group1, group2 = params
+        if not self.add_proximal:
+            return []
 
+        group1, group2, feat1, feat2 = params
         interactions = []
-        cc_dist = iu.euclidean_distance(group1.centroid, group2.centroid)
-        if self.is_within_boundary(cc_dist, "max_dist_proximal", le):
+
+        cc_dist = im.euclidean_distance(group1.centroid, group2.centroid)
+        if (self.is_within_boundary(cc_dist, "min_dist_proximal", ge) and
+                self.is_within_boundary(cc_dist, "max_dist_proximal", le)):
+
             params = {"dist_proximal": cc_dist}
             inter = InteractionType(group1, group2, "Proximal", params)
             interactions.append(inter)
+
+        return interactions
+
+    def calc_atom_atom(self, params):
+        if not self.add_atom_atom:
+            return []
+
+        group1, group2, feat1, feat2 = params
+        interactions = []
+
+        atm1 = group1.atoms[0]
+        atm2 = group2.atoms[0]
+
+        cc_dist = im.euclidean_distance(group1.centroid, group2.centroid)
+        params = {"dist_covalent": cc_dist}
+
+        # It checks if the two atoms are neighbors, i.e., if they are covalently bonded.
+        # The covalent bonds are detected by OpenBabel, which besides other evaluations,
+        # states that two atoms are covalently bonded if:
+        #       0.4 <= d(a1, a2) <= cov_rad(a1) + cov_rad(a2) + 0.45
+        if atm1.is_neighbor(atm2):
+            inter = InteractionType(group1, group2, "Covalent bond", params)
+            interactions.append(inter)
+        else:
+            cov1 = etab.GetCovalentRad(etab.GetAtomicNum(atm1.element))
+            cov2 = etab.GetCovalentRad(etab.GetAtomicNum(atm2.element))
+
+            if cc_dist <= cov1 + cov2:
+                inter = InteractionType(group1, group2, "Atom overlap", params)
+                interactions.append(inter)
+            else:
+                rdw1 = etab.GetVdwRad(etab.GetAtomicNum(atm1.element))
+                rdw2 = etab.GetVdwRad(etab.GetAtomicNum(atm2.element))
+
+                if cc_dist <= rdw1 + rdw2:
+                    inter = InteractionType(group1, group2, "Van der Waals clash", params)
+                    interactions.append(inter)
+                elif cc_dist <= rdw1 + rdw2 + self.inter_conf.conf.get("vdw_tolerance", 0):
+                    inter = InteractionType(group1, group2, "Van der Waals", params)
+                    interactions.append(inter)
 
         return interactions
 

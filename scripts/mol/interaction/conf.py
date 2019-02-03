@@ -122,9 +122,10 @@ class DefaultInteractionConf(InteractionConf):
 
         # Proximal interactions
         conf["max_dist_proximal"] = 6
+        conf["min_dist_proximal"] = 2
 
         # Covalent interactions
-        conf["cov_dist_tolerance"] = 0.45
+        conf["vdw_tolerance"] = 0.1
 
         conf["boundary_cutoff"] = 7
 
