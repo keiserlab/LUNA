@@ -1,25 +1,16 @@
 # $Id$
 #
 # FDef file contributed by Markus Kossner
-#
-# FDef file update by Alexandre Fassio
-#
 
 AtomType AcidicN	[$([NH,N-1](S(=O))(C(=O))),$([NH,N-1](C(=O))(C(=O))),$([NH,N-1](S(=O)(=O))c),$([NH2]S(=O)(=O)c)]
 AtomType AmideN [$([#7]-C(=O))]
 AtomType AmidineTripleN [$([#7]-C(=[#7]))]
-
 AtomType SulfonamideN [$([N;H0]S(=O)(=O))]
 AtomType NDonor [N&!H0&v3,N&!H0&+1&v4,n&H1&+0;!{AcidicN};!{AmidineTripleN}]
-
-# If it is a tertiary amine. Amines tend to be protonated at pH 7, but not amide that does not have a very high basicity.
 AtomType NDonor [$([Nv3](-C)(-C)-C);!{AmideN};!{AmidineTripleN}] #Primary Amine but not Amide!
-
-# Tautomers of aromatic rings
 AtomType NDonor [$(n[n;H1]),$(nc[n;H1]);!{AcidicN}]
 
 AtomType AcidicHydroxyl [$([O]C(=[O,S,P]))]
-
 AtomType ChalcDonor [O,S;H1;+0]
 DefineFeature SingleAtomDonor [{NDonor},{ChalcDonor};!{AcidicHydroxyl}]
   Family Donor
@@ -51,9 +42,9 @@ DefineFeature SingleAtomAcceptor [{Hydroxyl},{ChalcAcceptor},{NAcceptor},{Haloge
   Weights 1
 EndFeature
 
-# this one is NOT delightfully easy :-)
-#We wil define some additional NegIonizable Features
-#I later found some similar substructures in
+# this one is NOT delightfully easy :-) 
+#We wil define some additional NegIonizable Features 
+#I later found some similar substructures in 
 # Good,Oprea J.Comput.Aided.Mol.Des (2008) 22:169-178:
 
 DefineFeature AcidicGroup [C,S,P](=[O,S])-[O;H1,H0&-1]
@@ -113,8 +104,8 @@ EndFeature
 #
 # Note that with the aromatics, it's important to include the ring-size queries along with
 # the aromaticity query for two reasons:
-#   1) Much of the current feature-location code assumes that the feature point is
-#      equidistant from the atoms defining it. Larger definitions like: a1aaaaaaaa1 will actually
+#   1) Much of the current feature-location code assumes that the feature point is 
+#      equidistant from the atoms defining it. Larger definitions like: a1aaaaaaaa1 will actually 
 #      match things like 'o1c2cccc2ccc1', which have an aromatic unit spread across multiple simple
 #      rings and so don't fit that requirement.
 #   2) It's *way* faster.
@@ -149,7 +140,7 @@ EndFeature
 
 # hydrophobic features
 # any carbon that is not bonded to a polar atom is considered a hydrophobe
-#
+# 
 # 23.11.2007 (GL): match any bond (not just single bonds); add #6 at
 #  beginning to make it more efficient
 AtomType Carbon_Polar [#6;$([#6]~[#7,#8,#9])]
@@ -166,7 +157,7 @@ DefineFeature Hphobe [{Hphobe}{Hphobe}]
   Weights 1.0
 EndFeature
 
-# 8.2009 (MK):
+# 8.2009 (MK): 
 DefineFeature Methyl [CH3]
   Family Hydrophobe
   Weights 1.0
@@ -188,7 +179,7 @@ DefineFeature ChainEnd [R0;D1][R0;D2]
   Weights 1.0,1.0
 EndFeature
 
-# 5.2009 (MK): update ring membership tests to reflect 'Lumped Hydrophobes'
+# 5.2009 (MK): update ring membership tests to reflect 'Lumped Hydrophobes' 
 AtomType Ring6 [r6,!R1&r5,!R1&r4,!R1&r3]
 DefineFeature R6_6 [{Ring6}]1[{Ring6}][{Ring6}][{Ring6}][{Ring6}][{Ring6}]1
   Family LumpedHydrophobe
