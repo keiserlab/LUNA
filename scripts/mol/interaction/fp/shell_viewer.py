@@ -8,6 +8,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_INTERACTIONS_COLOR = {
     "Proximal": "gray60",
     "Hydrogen bond": "tv_blue",
+    "Water-bridged hydrogen bond": "lightblue",
+    "Weak hydrogen bond": "lightteal",
     "Attractive": "forest",
     "Salt bridge": "palegreen",
     "Cation-pi": "salmon",
@@ -17,23 +19,25 @@ DEFAULT_INTERACTIONS_COLOR = {
     "Hydrophobic": "orange",
     "Halogen bond": "aquamarine",
     "Repulsive": "violetpurple",
-    "Water-bridged hydrogen bond": "lightblue",
-    "Pi-stacking": "tv_red"
+    "Pi-stacking": "tv_red",
+    "Covalent bond": "black"
 }
+
+DEFAULT_INTER_COLOR_MAP = PymolColorMap(DEFAULT_INTERACTIONS_COLOR, "white")
 
 
 class PymolShellViewer:
 
     def __init__(self, input_file, show_cartoon=False, bg_color="white", pharm_color=None,
-                 inter_color=None, pse_export_version="1.8"):
+                 inter_color=DEFAULT_INTER_COLOR_MAP, pse_export_version="1.8"):
 
         self.input_file = input_file
         self.show_cartoon = show_cartoon
         self.bg_color = bg_color
         self.pse_export_version = pse_export_version
-        self.wrapper = None
+        self.inter_color = inter_color
 
-        self.inter_color = inter_color or PymolColorMap(DEFAULT_INTERACTIONS_COLOR, "white")
+        self.wrapper = None
 
     def new_session(self, shells, output_file):
         self.start_session()

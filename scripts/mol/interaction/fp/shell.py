@@ -294,7 +294,6 @@ class Shell:
                 features = set()
                 for a in self.central_atm_grp.atoms:
                     for ga in a.atm_grps:
-
                         if ga != self.central_atm_grp:
                             features.update(ga.features)
 
@@ -337,12 +336,11 @@ class Shell:
 
 class ShellGenerator:
 
-    def __init__(self, num_levels, radius_step, implicit_proximal_inter=False, bucket_size=10, seed=0,
-                 np_dtype=np.int64, num_bits=DEFAULT_SHELL_NBITS):
+    def __init__(self, num_levels, radius_step, bucket_size=10, seed=0, np_dtype=np.int64,
+                 num_bits=DEFAULT_SHELL_NBITS):
 
         self.num_levels = num_levels
         self.radius_step = radius_step
-        self.implicit_proximal_inter = implicit_proximal_inter
 
         self.bucket_size = bucket_size
         self.seed = seed
@@ -393,17 +391,9 @@ class ShellGenerator:
 
                                 inter_tuples.add(new_tuple)
 
-                    # It adds a new shell when there are interactions inside the shell or if implicit proximal
-                    # interactions were set on. The latter parameter causes shells containing atoms with no interaction
-                    # or that only interact between themselves to produce a shell. It allows the algorithm to find
-                    # patterns involving disconnected graphs.
-                    if inter_tuples or self.implicit_proximal_inter:
-                        # If implicit proximal interactions are set on, the shell neighborhood will always be the atoms
-                        # inside a sphere of radius R centered on atom A.
-                        if self.implicit_proximal_inter:
-                            shell_nb = nb_atm_grps
-                        else:
-                            shell_nb = set([x[1] for x in inter_tuples])
+                    # It adds a new shell when there are interactions inside the shell.
+                    if inter_tuples:
+                        shell_nb = set([x[1] for x in inter_tuples])
                         shell_nb.add(atm_grp)
 
                         shell = Shell(atm_grp, level, radius, neighborhood=shell_nb, inter_tuples=inter_tuples,
@@ -419,27 +409,20 @@ class ShellGenerator:
 
                 # Evaluate if the limit of possible substructures for the current centroid (atom group) was reached.
                 if last_shell:
-                    # If implicit proximal interactions were set on, the limit will be reached when the last shell
-                    # comprises all the atom groups provided as parameter (variable neighborhood)
-                    if self.implicit_proximal_inter:
-                        if len(last_shell.neighborhood) == len(neighborhood):
-                            # If the limit was reached for this centroid, in the next level it can be ignored.
-                            skip_atm_grps.add(atm_grp)
-                    # Otherwise, the limit will be reached when the last shell already contains all interactions
-                    # established by the atom groups inside the last shell. In this case, expanding the radius
+                    # The limit will be reached when the last shell already contains all interactions
+                    # established by the atom groups inside the shell. In this case, expanding the radius
                     # will not result in any new shell because a shell is only created when the atoms inside
                     # the last shell establish interactions with the atom groups found after increasing the radius.
-                    else:
-                        all_interactions = tuple(chain.from_iterable([g.interactions for g in last_shell.neighborhood]))
-                        # It considers only interactions whose atom groups exist in the neigborhood.
-                        valid_interactions = set([i for i in all_interactions
-                                                 if i.atm_grp1 in neighborhood and i.atm_grp2 in neighborhood])
+                    all_interactions = tuple(chain.from_iterable([g.interactions for g in last_shell.neighborhood]))
+                    # It considers only interactions whose atom groups exist in the neigborhood.
+                    valid_interactions = set([i for i in all_interactions
+                                             if i.atm_grp1 in neighborhood and i.atm_grp2 in neighborhood])
 
-                        current_interactions = last_shell.interactions
+                    current_interactions = last_shell.interactions
 
-                        if valid_interactions == current_interactions:
-                            # If the limit was reached for this centroid, in the next level it can be ignored.
-                            skip_atm_grps.add(atm_grp)
+                    if valid_interactions == current_interactions:
+                        # If the limit was reached for this centroid, in the next level it can be ignored.
+                        skip_atm_grps.add(atm_grp)
 
             # If all atom groups reached the limit of possible substructures, just leave the loop.
             if len(skip_atm_grps) == len(neighborhood):
