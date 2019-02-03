@@ -68,3 +68,23 @@ class BitsValueError(ValueError):
 
 class FingerprintCountsError(ValueError):
     pass
+
+
+class MoleculeSizeError(ValueError):
+    pass
+
+
+class SanitizationError(ValueError):
+    pass
+
+
+class MoleculeInformationError(ValueError):
+    pass
+
+
+class AtomObjectTypeError(TypeError):
+    pass
+
+
+class MoleculeObjectTypeError(TypeError):
+    pass
