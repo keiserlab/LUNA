@@ -14,8 +14,6 @@ INTERACTION_CONF = DefaultInteractionConf()
 
 BOUNDARY_CONF = InteractionConf({"boundary_cutoff": 7})
 
-PDB_PARSER = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=True)
-
 NMR_METHODS = ["SOLID-STATE NMR", "SOLUTION NMR"]
 
 ATOM_TYPES_COLOR = ColorPallete({
@@ -49,7 +47,9 @@ CHEMICAL_FEATURES_IDS = {
     "Weak acceptor": 15,
     "Electrophile": 16,
     "Nucleophile": 17,
-    "Chalcogen donor": 19
+    "Chalcogen donor": 19,
+    "Amide": 21,
+    "Atom": 22
 }
 
 INTERACTIONS_IDS = {
@@ -65,5 +65,11 @@ INTERACTIONS_IDS = {
     "Halogen bond": 9,
     "Repulsive": 10,
     "Water-bridged hydrogen bond": 11,
-    "Pi-stacking": 12
+    "Pi-stacking": 12,
+    "Amide-aromatic stacking": 13,
+    "Weak hydrogen bond": 14,
+    "Covalent bond": 15,
+    "Atom overlap": 16,
+    "Van der Waals clash": 17,
+    "Van der Waals": 18
 }
