@@ -1,25 +1,40 @@
 from MyBio.PDB.PDBIO import Select
 
 
-class ResidueSelectorByResSeq(Select):
-    def __init__(self, entries):
+DEFAULT_ALTLOC = ("A", "1")
+
+
+class Selector(Select):
+
+    def __init__(self, entries, keep_hydrog=True, keep_altloc=True, altloc=DEFAULT_ALTLOC):
         self.entries = entries
+        self.keep_hydrog = keep_hydrog
+        self.keep_altloc = keep_altloc
+        self.altloc = altloc
+
+    def accept_atom(self, atom):
+        if not self.keep_hydrog and atom.element == "H":
+            return False
+
+        if self.keep_altloc:
+            return True
+        else:
+            return not atom.is_disordered() or atom.get_altloc() in self.altloc
+
+
+class ResidueSelectorByResSeq(Selector):
 
     def accept_residue(self, res):
         return True if (res.get_id()[1] in self.entries) else False
 
 
-class ResidueSelector(Select):
-    def __init__(self, entries):
-        self.entries = entries
+class ResidueSelector(Selector):
 
     def accept_residue(self, res):
-        return True if (res in self.entries) else False
+        return res in self.entries
 
 
-class ChainSelector(Select):
-    def __init__(self, entries):
-        self.entries = entries
+class ChainSelector(Selector):
 
     def accept_chain(self, chain):
         return True if (chain in self.entries) else False
