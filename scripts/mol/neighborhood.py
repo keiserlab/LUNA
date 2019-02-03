@@ -1,3 +1,6 @@
+import numpy as np
+
+
 class NbCoordinates():
 
     def __init__(self, coords):
@@ -24,42 +27,47 @@ class NbCoordinates():
         return hash(coords_tuple)
 
 
-class NbAtom():
+class NbAtomData:
 
-    def __init__(self, mybio_atom, nb_coods, atm_grps=None):
-        self._atom = mybio_atom
-        self._nb_coords = nb_coods
-        self._atm_grps = atm_grps or []
-
-    @property
-    def atom(self):
-        return self._atom
+    def __init__(self, atomic_num, coord, serial_num=None):
+        self.atomic_num = atomic_num
+        self._coord = np.array(coord)
+        self.serial_num = serial_num
 
     @property
-    def nb_coords(self):
-        return self._nb_coords.coords
+    def x(self):
+        return self._coord[0]
 
     @property
-    def num_neighbours(self):
-        return self._nb_coords.size
+    def y(self):
+        return self._coord[1]
 
     @property
-    def atm_grps(self):
-        return self._atm_grps
+    def z(self):
+        return self._coord[2]
 
-    def add_atm_grp(self, group):
-        self._atm_grps = list(set(self.atm_grps + [group]))
+    @property
+    def vector(self):
+        return self._coord
 
-    def __getattr__(self, attr):
-        return getattr(self._atom, attr)
+    @property
+    def coord(self):
+        return self._coord
+
+    @coord.setter
+    def coord(self, xyz):
+        self._coord = np.array(xyz)
 
     def __repr__(self):
-        return "<NBAtom %s>" % self._atom.__repr__()
+        return ("<NbAtomData: atomic number=%d, coord=(%.3f, %.3f, %.3f), serial number=%s>"
+                % (self.atomic_num, self.x, self.y, self.z, str(self.serial_num)))
 
     def __eq__(self, other):
         """Overrides the default implementation"""
         if isinstance(self, other.__class__):
-            return self._atom == other._atom and self._nb_coords == other._nb_coords
+            return (self.atomic_num == other.atomic_num and
+                    np.all(self._coord == other._coord) and
+                    self.serial_num == other.serial_num)
         return False
 
     def __ne__(self, other):
@@ -68,4 +76,54 @@ class NbAtom():
 
     def __hash__(self):
         """Overrides the default implementation"""
-        return hash((self._atom, self._nb_coords))
+        return hash((self.atomic_num, tuple(self._coord), self.serial_num))
+
+
+class NbAtom:
+
+    def __init__(self, mybio_atom, nb_info=None, atm_grps=None):
+        self._atom = mybio_atom
+        self._nb_info = nb_info or []
+        self._atm_grps = atm_grps or []
+
+    @property
+    def atom(self):
+        return self._atom
+
+    @property
+    def neighbors_info(self):
+        return self._nb_info
+
+    @property
+    def atm_grps(self):
+        return self._atm_grps
+
+    def add_nb_atom(self, nb_atom):
+        self._nb_info = list(set(self._nb_info + [nb_atom]))
+
+    def add_atm_grp(self, atm_grp):
+        self._atm_grps = list(set(self._atm_grps + [atm_grp]))
+
+    def is_neighbor(self, atom):
+        return atom.serial_number in [i.serial_num for i in self._nb_info]
+
+    def __getattr__(self, attr):
+        return getattr(self._atom, attr)
+
+    def __repr__(self):
+        return "<NBAtom: %s-%d%s/%s>" % (self._atom.parent.resname, self._atom.parent.id[1],
+                                         self._atom.parent.id[2].strip(), self._atom.name)
+
+    def __eq__(self, other):
+        """Overrides the default implementation"""
+        if isinstance(self, other.__class__):
+            return self._atom == other._atom
+        return False
+
+    def __ne__(self, other):
+        """Overrides the default implementation"""
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        """Overrides the default implementation"""
+        return hash(self._atom)

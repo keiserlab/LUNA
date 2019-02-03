@@ -1,10 +1,9 @@
 from MyBio.selector import ResidueSelector
 from MyBio.util import save_to_file
 
-import mol.interaction.math as imath
+import mol.interaction.math as im
 from mol.interaction.contact import get_contacts_for_entity
-from mol.neighborhood import (NbAtom, NbCoordinates)
-from mol.coord import Coordinate
+from mol.neighborhood import (NbAtom, NbAtomData)
 from mol.charge_model import OpenEyeModel
 from mol.validator import (MolValidator, RDKitValidator)
 from mol.wrappers.obabel import convert_molecule
@@ -12,7 +11,7 @@ from util.file import get_unique_filename
 from util.exceptions import (MoleculeSizeError, MoleculeInformationError, IllegalArgumentError)
 
 from rdkit.Chem import (MolFromMolFile, MolFromMolBlock)
-from openbabel import (OBMolAtomIter, OBAtomAtomIter, OBMolBondIter)
+from openbabel import (OBMolAtomIter, OBMolBondIter)
 from pybel import readfile
 
 from collections import defaultdict
@@ -30,8 +29,8 @@ class AtomGroup():
 
         # Update the atoms and coordinate properties.
         self._atoms = atoms
-        self._coords = imath.atom_coordinates(atoms)
-        self._centroid = imath.centroid(self.coords)
+        self._coords = im.atom_coordinates(atoms)
+        self._centroid = im.centroid(self.coords)
         self._normal = None
 
         self.interactions = interactions or []
@@ -40,7 +39,7 @@ class AtomGroup():
 
         if recursive:
             for a in self.atoms:
-                a.add_atom_group(self)
+                a.add_atm_grp(self)
 
     @property
     def atoms(self):
@@ -49,8 +48,8 @@ class AtomGroup():
     @atoms.setter
     def atoms(self, new_atoms):
         self._atoms = new_atoms
-        self._coords = imath.atom_coordinates(new_atoms)
-        self._centroid = imath.centroid(self.coords)
+        self._coords = im.atom_coordinates(new_atoms)
+        self._centroid = im.centroid(self.coords)
         self._normal = None
         self._hash_cache = None
 
@@ -69,7 +68,7 @@ class AtomGroup():
     @property
     def normal(self):
         if self._normal is None:
-            self._normal = imath.calc_normal(self.coords)
+            self._normal = im.calc_normal(self.coords)
         return self._normal
 
     def has_atom(self, atom):
@@ -280,12 +279,20 @@ def find_compound_groups(mybio_residue, feature_extractor, output_path, add_h=Fa
         bgn_ob_atm = ob_bond.GetBeginAtom()
         end_ob_atm = ob_bond.GetEndAtom()
 
-        if bgn_ob_atm.GetAtomicNum() != 1 and end_ob_atm.GetAtomicNum() != 1:
-            bgn_nb_atm = trgt_atms[atm_map[bgn_ob_atm.GetIdx()]]
-            end_nb_atm = trgt_atms[atm_map[end_ob_atm.GetIdx()]]
-
-            bgn_nb_atm.add_nb_atom(end_nb_atm)
-            end_nb_atm.add_nb_atom(bgn_nb_atm)
+        # At least one of the atoms must be a non-hydrogen atom.
+        if bgn_ob_atm.GetAtomicNum() != 1 or end_ob_atm.GetAtomicNum() != 1:
+            # If the atom 1 is not a hydrogen, add atom 2 to its neighbor list.
+            if bgn_ob_atm.GetAtomicNum() != 1:
+                serial_number = atm_map.get(end_ob_atm.GetIdx())
+                coord = [end_ob_atm.GetX(), end_ob_atm.GetY(), end_ob_atm.GetZ()]
+                atom_info = NbAtomData(end_ob_atm.GetAtomicNum(), coord, serial_number)
+                trgt_atms[atm_map[bgn_ob_atm.GetIdx()]].add_nb_atom(atom_info)
+            # If the atom 2 is not a hydrogen, add atom 1 to its neighbor list.
+            if end_ob_atm.GetAtomicNum() != 1:
+                serial_number = atm_map.get(bgn_ob_atm.GetIdx())
+                coord = [bgn_ob_atm.GetX(), bgn_ob_atm.GetY(), bgn_ob_atm.GetZ()]
+                atom_info = NbAtomData(bgn_ob_atm.GetAtomicNum(), coord, serial_number)
+                trgt_atms[atm_map[end_ob_atm.GetIdx()]].add_nb_atom(atom_info)
 
     group_features = feature_extractor.get_features_by_groups(ob_mol, atm_map)
 
