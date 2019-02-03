@@ -8,6 +8,10 @@ def atom_coordinates(atoms):
     return np.array([x.get_coord() for x in atoms])
 
 
+def ob_atom_coordinates(ob_atoms):
+    return np.array([(a.GetX(), a.GetY(), a.GetZ()) for a in ob_atoms])
+
+
 def axis_sum(arr):
     values = [0] * arr.shape[1]
 
