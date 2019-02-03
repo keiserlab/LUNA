@@ -83,6 +83,16 @@ DefineFeature TautomerRingDonorN [$(n[n;H1]),$(nc[n;H1]);!{TetrazoleN}]
 EndFeature
 
 #
+# Capture: tautomeric Guanidine
+# N[CH0X3](=N)N
+# -N=C(N)N <=> -NH-C(=N)N
+#
+#DefineFeature TautomerGuanidineN [$([NX2H0]=[CH0X3](N)N)]
+#  Family Donor
+#  Weights 1.0
+#EndFeature
+
+#
 # Capture: Hydroxyl from acid groups containing S, O and P (sulfonic and sulfunic acids, carboxylic acids, etc).
 # This constraint also cover thioketones, i.e., compounds with a double bonded S, instead of a double bonded O.
 #
@@ -665,3 +675,16 @@ DefineFeature AmideGroup [NX3][CX3](=[OX1])
   Family Amide
   Weights 1.0,1.0,1.0
 EndFeature
+
+
+########################################################################################
+#                                                                                      #
+#                                      Atom                                            #
+#                                                                                      #
+########################################################################################
+#
+DefineFeature AtomGroup [*]
+  Family Atom
+  Weights 1.0
+EndFeature
+
