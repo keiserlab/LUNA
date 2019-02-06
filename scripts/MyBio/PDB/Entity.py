@@ -179,7 +179,18 @@ class Entity(object):
     # Included function get_parent_by_level
     def get_parent_by_level(self, level):
         """Return the parent Entity object in the specified level."""
-        if (self.level == level):
+        opts = ("A", "R", "C", "M", "S")
+
+        if level not in opts:
+            raise ValueError("Level must be one of the following options: A, R, C, M, or S.")
+
+        if opts.index(level) < opts.index(self.level):
+            raise ValueError("Parent object cannot be recovered. "
+                             "Informed level ('%s') is not above the current object level ('%s'). "
+                             "The correct hierarchy is: A < R < C < M < S."
+                             % (level, self.level))
+
+        if self.level == level:
             return self
         else:
             return self.parent.get_parent_by_level(level)
