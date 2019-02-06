@@ -138,6 +138,30 @@ class PDBParser(object):
 
         return structure
 
+    def get_structure_from_pdb_block(self, id, pdb_block):
+        with warnings.catch_warnings():
+            if self.QUIET:
+                warnings.filterwarnings("ignore", category=PDBConstructionWarning)
+
+            self.header = None
+            self.trailer = None
+            # Make a StructureBuilder instance (pass id of structure as parameter)
+            self.structure_builder.init_structure(id)
+
+            lines = pdb_block.split("\n")
+            self._parse(lines)
+
+            self.structure_builder.set_header(self.header)
+
+            # MODBY: Alexandre Fassio
+            # Now it parses CONECT records.
+            self.structure_builder.set_conects(self.conects)
+
+            # Return the Structure instance
+            structure = self.structure_builder.get_structure()
+
+        return structure
+
     def get_header(self):
         """Return the header."""
         return self.header
@@ -158,6 +182,7 @@ class PDBParser(object):
         """Parse the PDB file (PRIVATE)."""
         # Extract the header; return the rest of the file
         self.header, coords_trailer = self._get_header(header_coords_trailer)
+
         # Parse the atomic data; return the PDB file trailer
         self.trailer = self._parse_coordinates(coords_trailer)
 
