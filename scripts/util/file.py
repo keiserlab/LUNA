@@ -2,8 +2,6 @@ from os.path import (basename, exists, isdir, isfile, splitext)
 from os import makedirs
 from shutil import rmtree
 
-from util.exceptions import DirectoryAlreadyExists
-
 import string
 import random
 import logging
