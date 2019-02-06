@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class InteractionCalculator:
 
     def __init__(self, inter_conf=DefaultInteractionConf(), inter_filter=None,
-                 inter_funcs=None, add_proximal=False, add_atom_atom=False,
+                 inter_funcs=None, add_proximal=False, add_atom_atom=True,
                  add_orphan_h2o_pair=False, strict_donor_rules=False):
 
         self.inter_conf = inter_conf
@@ -72,7 +72,7 @@ class InteractionCalculator:
         if not self.add_orphan_h2o_pair:
             all_interactions = self.remove_orphan_h2o_pairs(all_interactions)
 
-        logger.info("Number of potential interactions: %d" % len(all_interactions))
+        logger.info("Number of potential interactions found: %d" % len(all_interactions))
 
         return list(all_interactions)
 
@@ -422,11 +422,11 @@ class InteractionCalculator:
             # It may happen that X is covalently bound to more than one group.
             # In such cases the halogen may also form more than one halogen bond.
             # Ref: Cavallo, G. et al. The Halogen Bond. (2016).
-            carbon_coords = [nbi for nbi in donor_atm.neighbors_info if nbi.atomic_num == 6]
+            carbon_coords = [nbi.coord for nbi in donor_atm.neighbors_info if nbi.atomic_num == 6]
 
             # Interaction model: C-X ---- A-R.
             # R coordinates, in which R is a heavy atom.
-            r_coords = [nbi for nbi in acceptor_atm.neighbors_info if nbi.atomic_num != 1]
+            r_coords = [nbi.coord for nbi in acceptor_atm.neighbors_info if nbi.atomic_num != 1]
 
             for c_coord in carbon_coords:
                 xc_vect = c_coord - donor_grp.centroid
