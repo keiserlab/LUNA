@@ -88,3 +88,7 @@ class AtomObjectTypeError(TypeError):
 
 class MoleculeObjectTypeError(TypeError):
     pass
+
+
+class MoleculeObjectError(RuntimeError):
+    pass
