@@ -683,7 +683,7 @@ EndFeature
 #                                                                                      #
 ########################################################################################
 #
-DefineFeature AtomGroup [*]
+DefineFeature AtomGroup [!#1]
   Family Atom
   Weights 1.0
 EndFeature
