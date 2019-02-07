@@ -1,8 +1,6 @@
 from mol.interaction.conf import (DefaultInteractionConf, InteractionConf)
 from mol.depiction import ColorPallete
 
-from MyBio.PDB.PDBParser import PDBParser
-
 ENTRIES_SEPARATOR = ":"
 
 NAPOLI_PATH = "/media/data/Workspace/nAPOLI_v2/tmp/nAPOLI"
@@ -73,3 +71,5 @@ INTERACTIONS_IDS = {
     "Van der Waals clash": 17,
     "Van der Waals": 18
 }
+
+IFP_FINGERPRINT_LENGTH = 1024

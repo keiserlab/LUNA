@@ -4,7 +4,8 @@ from util.file import is_directory_valid
 from MyBio.PDB.PDBList import PDBList
 from MyBio.PDB.PDBIO import Select
 from MyBio.PDB.PDBIO import PDBIO
-from util.exceptions import FileNotCreated
+from MyBio.PDB.PDBParser import PDBParser
+from util.exceptions import (FileNotCreated, PDBNotReadError)
 
 from io import StringIO
 from shutil import move as rename_pdb_file
@@ -53,9 +54,6 @@ def parse_from_file(id, file):
         @param file: name of the PDB file
         @type file: string
     """
-    from MyBio.PDB.PDBParser import PDBParser
-    from util.exceptions import PDBNotReadError
-
     try:
         parser = PDBParser(PERMISSIVE=1, QUIET=True)
         structure = parser.get_structure(id, file)

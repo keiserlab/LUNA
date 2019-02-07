@@ -49,7 +49,7 @@ class FingerprintGenerator():
             logger.exception(e)
             raise FingerprintNotCreated("Fingerprint could not be created.")
 
-    def morgan_fp(self, radius=2, nBits=2048, features=True, type=1):
+    def morgan_fp(self, radius=2, nBits=2048, features=False, type=1):
         """ Create a Morgan fingerprint.
 
             @param type: defines the type of Morgan fingerprint function
@@ -77,8 +77,7 @@ class FingerprintGenerator():
                                                     radius=radius,
                                                     useFeatures=features)
             else:
-                raise IllegalArgumentError("Informed type '%s' is invalid. "
-                                           "Available options are 1, 2, or 3."
+                raise IllegalArgumentError("Informed type '%s' is invalid. Available options are 1, 2, or 3."
                                            % str(type))
         except Exception as e:
             logger.exception(e)
@@ -98,7 +97,6 @@ class FingerprintGenerator():
 def available_fp_functions():
     regex = re.compile(".*([a-zA-Z]+)_fp", flags=0)
     funcs = list(filter(regex.match, dir(FingerprintGenerator)))
-
     return funcs
 
 
