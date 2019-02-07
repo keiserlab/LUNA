@@ -1,17 +1,19 @@
 from util.default_values import *
 from util.exceptions import *
-from util.file import (create_directory, is_file_valid, get_filename, get_unique_filename)
+from util.file import (create_directory, is_file_valid, get_file_format, get_filename, get_unique_filename)
 from util.logging import new_logging_file
 from util.config_parser import Config
 from util.function import func_call_2str
 
-from MyBio.util import (download_pdb, pdb_object_2block)
+from MyBio.util import (download_pdb, entity_to_string)
 from MyBio.selector import ResidueSelector
 
 from rdkit.Chem import ChemicalFeatures
 from rdkit.Chem.Pharm2D.SigFactory import SigFactory
-from rdkit.Chem import MolFromPDBBlock
+from rdkit.Chem import (MolFromPDBBlock, MolFromSmiles)
 from rdkit.Chem.rdDepictor import Compute2DCoords
+
+from pybel import (informats, readfile)
 
 # Get nearby molecules (contacts)
 from mol.interaction.contact import get_contacts_for_entity
@@ -21,8 +23,10 @@ from mol.interaction.calc import InteractionCalculator
 from mol.interaction.conf import InteractionConf
 from mol.interaction.filter import InteractionFilter
 
-from mol.entry import (DBEntry, PLIEntryValidator)
-from mol.groups import find_compound_groups
+from MyBio.PDB.PDBParser import PDBParser
+
+from mol.entry import (DBEntry, MolEntry, PLIEntryValidator)
+from mol.groups import CompoundGroupPerceiver
 from mol.fingerprint import generate_fp_for_mols
 from mol.features import FeatureExtractor
 from mol.wrappers.obabel import convert_molecule
@@ -45,6 +49,9 @@ from database.util import (get_ligand_tbl_join_filter, default_interaction_filte
 from os.path import exists
 from collections import defaultdict
 from functools import wraps
+
+
+PDB_PARSER = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=False, FIX_OBABEL_FLAGS=False)
 
 
 class StepControl:
@@ -97,8 +104,7 @@ class ExceptionWrapper(object):
             proj_obj = args[0]
 
             # TODO: update if it is critical based on the database if it is available
-            task = proj_obj.get_or_create_task(self.step_id,
-                                               self.has_subtasks)
+            task = proj_obj.get_or_create_task(self.step_id, self.has_subtasks)
             error_message = None
             try:
                 # Print a description of the function to be executed
@@ -161,16 +167,17 @@ class InteractionsProject:
                  entries,
                  working_path,
                  pdb_path=PDB_PATH,
-                 has_submitted_files=False,
+                 has_local_files=False,
                  overwrite_path=False,
                  db_conf_file=None,
                  pdb_template=None,
                  atom_prop_file=ATOM_PROP_FILE,
                  interaction_conf=INTERACTION_CONF,
-                 ph=7,
-                 is_to_add_hydrog=True,
+                 ph=7.4,
+                 add_hydrogen=True,
                  fingerprint_func="pharm2d_fp",
                  similarity_func="BulkTanimotoSimilarity",
+                 preload_mol_files=False,
                  butina_cutoff=0.2,
                  run_from_step=None,
                  run_until_step=None):
@@ -178,19 +185,20 @@ class InteractionsProject:
         self.entries = entries
         self.working_path = working_path
         self.pdb_path = pdb_path
-        self.has_submitted_files = has_submitted_files
+        self.has_local_files = has_local_files
         self.overwrite_path = overwrite_path
         self.db_conf_file = db_conf_file
         self.pdb_template = pdb_template
         self.atom_prop_file = atom_prop_file
         self.interaction_conf = interaction_conf
         self.ph = ph
-        self.is_to_add_hydrog = is_to_add_hydrog
+        self.add_hydrogen = add_hydrogen
         self.fingerprint_func = fingerprint_func
         self.similarity_func = similarity_func
         self.butina_cutoff = butina_cutoff
         self.run_from_step = run_from_step
         self.run_until_step = run_until_step
+        self.preload_mol_files = preload_mol_files
 
         self.step_controls = {}
 
@@ -231,14 +239,11 @@ class InteractionsProject:
             num_subtasks = len(self.entries) if has_subtasks else 0
             num_executed_subtasks = 0
             task = StepControl(step_id, num_subtasks, num_executed_subtasks)
-
         return task
 
     def get_status_id(self, status_name):
         if status_name not in self.status_control:
-            raise KeyError("The Status table does not have an "
-                           "%s entry for project control."
-                           % status_name)
+            raise KeyError("The Status table does not have an %s entry for project control." % status_name)
 
         return self.status_control[status_name].id
 
@@ -282,6 +287,7 @@ class InteractionsProject:
         create_directory(self.working_path, self.overwrite_path)
         create_directory("%s/pdbs" % self.working_path)
         create_directory("%s/figures" % self.working_path)
+        create_directory("%s/tmp" % self.working_path)
 
     def validate_entry_format(self, ligand_entry):
         entry_str = ligand_entry.to_string(ENTRIES_SEPARATOR)
@@ -291,33 +297,41 @@ class InteractionsProject:
     def get_pdb_file(self, pdb_id):
         pdb_file = "%s/%s.pdb" % (self.pdb_path, pdb_id)
 
-        if self.has_submitted_files:
+        if self.has_local_files:
             if not exists(pdb_file):
-                raise FileNotFoundError("The PDB file '%s' was "
-                                        "not found." % pdb_file)
+                raise FileNotFoundError("The PDB file '%s' was not found." % pdb_file)
         elif not exists(pdb_file):
             working_pdb_path = "%s/pdbs" % self.working_path
             pdb_file = "%s/%s.pdb" % (working_pdb_path, pdb_id)
 
             try:
-                download_pdb(pdb_id=pdb_id, output_path=working_pdb_path,
-                             output_file=pdb_file)
+                download_pdb(pdb_id=pdb_id, output_path=working_pdb_path, output_file=pdb_file)
             except Exception as e:
                 logger.exception(e)
                 raise FileNotCreated("PDB file '%s' was not created." % pdb_file) from e
 
         return pdb_file
 
+    def decide_hydrogen_addition(self, pdb_header):
+        if self.add_hydrogen:
+            if "structure_method" in pdb_header:
+                method = pdb_header["structure_method"]
+                # If the method is not a NMR type, which, in general, already have hydrogens.
+                if method.upper() in NMR_METHODS:
+                    return False
+            return True
+        return False
+
     def add_hydrogen(self, pdb_file):
         new_pdb_file = pdb_file
 
-        if self.is_to_add_hydrog:
+        if self.add_hydrogen:
             pdb_id = get_filename(pdb_file)
             new_pdb_file = "%s/pdbs/%s.H.pdb" % (self.working_path, pdb_id)
 
             if not exists(new_pdb_file):
                 run_obabel = False
-                # if self.has_submitted_files:
+                # if self.has_local_files:
                 #     run_obabel = True
                 # else:
                 #     db_structure = (self.db.session
@@ -378,39 +392,40 @@ class InteractionsProject:
             else:
                 target_entity = chain
         else:
-            raise ChainNotFoundError("The informed chain id '%s' for the "
-                                     "ligand entry '%s' does not exist "
+            raise ChainNotFoundError("The informed chain id '%s' for the ligand entry '%s' does not exist "
                                      "in the PDB '%s'."
-                                     % (entry.chain_id,
-                                        entry.to_string(ENTRIES_SEPARATOR),
-                                        structure.get_id()))
+                                     % (entry.chain_id, entry.to_string(ENTRIES_SEPARATOR), structure.get_id()))
 
         return target_entity
 
-    def perceive_chemical_groups(self, entity, ligand):
+    def perceive_chemical_groups(self, entity, ligand, add_h=False):
+        perceiver = CompoundGroupPerceiver(self.feature_extractor, add_h=add_h, ph=self.ph,
+                                           tmp_path="%s/tmp" % self.working_path)
+
         nb_compounds = get_contacts_for_entity(entity, ligand, level='R')
 
-        compounds = set([x[1] for x in nb_compounds])
         grps_by_compounds = {}
-        for comp in compounds:
+        for comp in set([x[1] for x in nb_compounds]):
             # TODO: verificar se estou usando o ICODE nos residuos
-            groups = find_compound_groups(comp, self.feature_extractor)
+            if comp.id == self.current_entry.get_biopython_key() and isinstance(self.current_entry, MolEntry):
+                groups = perceiver.perceive_compound_groups(comp, self.current_entry.mol_obj)
+            else:
+                groups = perceiver.perceive_compound_groups(comp)
             grps_by_compounds[comp] = groups
+
+        logger.info("Chemical group perception finished!!!")
 
         return grps_by_compounds
 
     def set_pharm_objects(self):
-        feat_factory = (ChemicalFeatures
-                        .BuildFeatureFactory(self.atom_prop_file))
+        feature_factory = ChemicalFeatures.BuildFeatureFactory(self.atom_prop_file)
 
-        sig_factory = SigFactory(feat_factory, minPointCount=2,
-                                 maxPointCount=3,
-                                 trianglePruneBins=False)
+        sig_factory = SigFactory(feature_factory, minPointCount=2, maxPointCount=3, trianglePruneBins=False)
         sig_factory.SetBins([(0, 2), (2, 5), (5, 8)])
         sig_factory.Init()
-
         self.sig_factory = sig_factory
-        self.feature_extractor = FeatureExtractor(feat_factory)
+
+        self.feature_extractor = FeatureExtractor(feature_factory)
 
     def get_fingerprint(self, rdmol):
         fp_opt = {"sigFactory": self.sig_factory}
@@ -502,12 +517,50 @@ class InteractionsProject:
 
     def get_rdkit_mol(self, entity, target, mol_name="Mol0"):
         target_sel = ResidueSelector({target})
-        pdb_block = pdb_object_2block(entity, target_sel,
-                                      write_conects=False)
+        pdb_block = entity_to_string(entity, target_sel, write_conects=False)
         rdmol = MolFromPDBBlock(pdb_block)
         rdmol.SetProp("_Name", mol_name)
 
         return rdmol
+
+    def add_mol_obj_to_entries(self):
+        mol_files = defaultdict(dict)
+        for entry in self.entries:
+            mol_files[entry.mol_file][entry.mol_id] = entry
+
+        for mol_file in mol_files:
+            ext = get_file_format(mol_file)
+            if ext not in informats:
+                raise IllegalArgumentError("Extension '%s' informed or assumed by the filename is not a "
+                                           "recognised Open Babel format." % ext)
+            if not exists(mol_file):
+                raise FileNotFoundError("The file '%s' was not found." % mol_file)
+
+            try:
+                for ob_mol in readfile(ext, mol_file):
+                    if ob_mol.OBMol.GetTitle() in mol_files[mol_file]:
+                        logger.info("Loading molecule object to ligand %s." % ob_mol.OBMol.GetTitle())
+                        entry = mol_files[mol_file][ob_mol.OBMol.GetTitle()]
+                        entry.mol_obj = ob_mol
+                        del(mol_files[mol_file][ob_mol.OBMol.GetTitle()])
+                    # If there is no other molecules to search, just stop the loop.
+                    if len(mol_files[mol_file]) == 0:
+                        break
+            except Exception as e:
+                logger.exception(e)
+                raise MoleculeObjectError("An error occurred while parsing the file with Open Babel and "
+                                          "the molecule object could not be created. Check the logs for "
+                                          "more information.")
+
+        invalid_entries = [e for m in mol_files for e in mol_files[m].values()]
+        if invalid_entries:
+            entries = set(self.entries)
+            for entry in invalid_entries:
+                entries.remove(entry)
+                logger.warning("Ligand in entry '%s' not found in the informed file '%s'. It will be removed."
+                               % (entry, entry.mol_file))
+            logger.warning("%d invalid entrie(s) removed." % len(invalid_entries))
+            self.entries = entries
 
     def generate_ligand_figure(self, rdmol, group_types):
         atm_types = defaultdict(set)
@@ -598,7 +651,7 @@ class RCSB_PLI_Population(InteractionsProject):
     def __init__(self, entries, working_path, db_conf_file, **kwargs):
 
         super().__init__(entries=entries, working_path=working_path, db_conf_file=db_conf_file,
-                         has_submitted_files=False, **kwargs)
+                         has_local_files=False, **kwargs)
 
     def __call__(self):
         self.init_logging_file()
@@ -627,8 +680,7 @@ class RCSB_PLI_Population(InteractionsProject):
             structure = PDB_PARSER.get_structure(ligand_entry.pdb_id, pdb_file)
             ligand = structure[0][ligand_entry.chain_id][mybio_ligand]
 
-            grps_by_compounds = self.perceive_chemical_groups(structure[0],
-                                                              ligand)
+            grps_by_compounds = self.perceive_chemical_groups(structure[0], ligand)
             src_grps = [grps_by_compounds[x] for x in grps_by_compounds
                         if x.get_id()[0] != " "]
             trgt_grps = [grps_by_compounds[x] for x in grps_by_compounds
@@ -664,7 +716,7 @@ class RCSB_PLI_Population(InteractionsProject):
 class DB_PLI_Project(InteractionsProject):
 
     def __init__(self, db_conf_file, job_code, working_path=None, entries=None, keep_all_potential_inter=True,
-                 has_submitted_files=False, **kwargs):
+                 has_local_files=False, **kwargs):
 
         self.job_code = job_code
 
@@ -677,7 +729,7 @@ class DB_PLI_Project(InteractionsProject):
         self.keep_all_potential_inter = keep_all_potential_inter
 
         self.project_type = "PLI analysis"
-        self.has_submitted_files = has_submitted_files
+        self.has_local_files = has_local_files
 
         super().__init__(db_conf_file=db_conf_file, working_path=working_path, entries=entries, **kwargs)
 
@@ -687,6 +739,9 @@ class DB_PLI_Project(InteractionsProject):
 
         # TODO: Definir as mensagens de descrição para o usuário
         # TODO: colocar wrapers em cada função
+
+        # TODO: add a new parameter: hydrogen addition mode to define how hydrogens will be added OR:
+        #       add a new parameter: force hydrogen addition.
 
         self.init_logging_file()
         self.init_db_connection()
@@ -706,7 +761,7 @@ class DB_PLI_Project(InteractionsProject):
 
         self.set_pharm_objects()
 
-        free_filename_format = self.has_submitted_files
+        free_filename_format = self.has_local_files
         self.entry_validator = PLIEntryValidator(free_filename_format)
 
         rcsb_inter_manager = RCSBInteractionManager(self.db)
@@ -756,18 +811,18 @@ class DB_PLI_Project(InteractionsProject):
             #       Usuario vai poder definir pH?
             #       Obabel gera erro com posicoes alternativas
 
-            # TODO: está dando erro na entrada 3QL8
-            # pdb_file = self.add_hydrogen(pdb_file)
-
             structure = PDB_PARSER.get_structure(ligand_entry.pdb_id, pdb_file)
             ligand = self.get_target_entity(structure, ligand_entry)
 
-            grps_by_compounds = self.perceive_chemical_groups(structure[0],
-                                                              ligand)
-            src_grps = [grps_by_compounds[x] for x in grps_by_compounds
-                        if x.get_id()[0] != " "]
-            trgt_grps = [grps_by_compounds[x] for x in grps_by_compounds
-                         if x != ligand]
+            # to_add_hydrogen = self.decide_hydrogen_addition(PDB_PARSER.get_header())
+            # print(to_add_hydrogen)
+            # exit()
+
+            # exit()
+
+            grps_by_compounds = self.perceive_chemical_groups(structure[0], ligand)
+            src_grps = [grps_by_compounds[x] for x in grps_by_compounds if x.get_id()[0] != " "]
+            trgt_grps = [grps_by_compounds[x] for x in grps_by_compounds if x != ligand]
 
             calc_interactions = True
             if is_inter_params_default:
@@ -791,14 +846,11 @@ class DB_PLI_Project(InteractionsProject):
                                                       conf=BOUNDARY_CONF)
 
                     # Then it applies a filtering function.
-                    filtered_inter = apply_interaction_criteria(all_inter,
-                                                                conf=self.interaction_conf)
+                    filtered_inter = apply_interaction_criteria(all_inter, conf=self.interaction_conf)
                     inter_to_be_stored = all_inter
                 else:
                     # It filters the interactions by using a cutoff at once.
-                    filtered_inter = calc_all_interactions(src_grps,
-                                                           trgt_grps,
-                                                           conf=self.interaction_conf)
+                    filtered_inter = calc_all_interactions(src_grps, trgt_grps, conf=self.interaction_conf)
                     inter_to_be_stored = filtered_inter
 
                 # TODO: Remover comentario
@@ -809,8 +861,7 @@ class DB_PLI_Project(InteractionsProject):
             #
             # Count the number of compound types for each ligand
             #
-            comp_type_count = count_group_types(grps_by_compounds[ligand],
-                                                comp_type_id_map)
+            comp_type_count = count_group_types(grps_by_compounds[ligand], comp_type_id_map)
             # self.store_compound_statistics(ligand_entry.id,
             #                                comp_type_count)
             comp_type_count_by_entry[ligand_entry] = comp_type_count
@@ -818,22 +869,18 @@ class DB_PLI_Project(InteractionsProject):
             #
             # Count the number of interactions for each type
             #
-            inter_type_count = count_interaction_types(filtered_inter,
-                                                       {ligand},
-                                                       inter_type_id_map)
+            inter_type_count = count_interaction_types(filtered_inter, {ligand}, inter_type_id_map)
             # Store the count into the DB
             # self.store_interaction_statistics(ligand_entry.id, inter_type_count)
             inter_type_count_by_entry[ligand_entry] = inter_type_count
 
             # TODO: Atualizar outros scripts que verificam se um residuo é proteina ou nao.
             #       Agora temos uma função propria dentro de Residue.py
-            interacting_residues = get_interacting_residues(filtered_inter,
-                                                            {ligand})
+            interacting_residues = get_interacting_residues(filtered_inter, {ligand})
             inter_res_by_entry[ligand_entry] = interacting_residues
 
             # PAREI AQUI:
             # PROXIMO PASSO: contabilizar pra cada cluster o numero de ligantes que interagem com o residuo
-
 
             # TODO: Definir uma regĩao em volta do ligante pra ser o sitio ativo
             # TODO: Contar pra cada sitio o numero de cada tipo de grupo
@@ -905,8 +952,7 @@ class DB_PLI_Project(InteractionsProject):
         # TODO: Calcular a frequencia dos residuos
         # TODO: Adicionar informações de frequencia no banco
 
-    def update_res_freq_by_cluster(self, interacting_residues,
-                                   inter_res_freq):
+    def update_res_freq_by_cluster(self, interacting_residues, inter_res_freq):
         inter_res_freq.update(interacting_residues)
 
     def recover_ligand_entry(self, ligand_entry):
@@ -935,16 +981,25 @@ class DB_PLI_Project(InteractionsProject):
         return db_ligand_entity
 
 
-class Local_PLI_Project(InteractionsProject):
+class Fingerprint_PLI_Project(InteractionsProject):
 
-    def __init__(self, entries, working_path, keep_all_potential_inter=True, has_submitted_files=False, **kwargs):
-
-        self.keep_all_potential_inter = keep_all_potential_inter
+    def __init__(self, entries, working_path, has_local_files=False, **kwargs):
 
         self.project_type = "PLI analysis"
-        self.has_submitted_files = has_submitted_files
 
-        super().__init__(working_path=working_path, entries=entries, **kwargs)
+        super().__init__(entries=entries, working_path=working_path, has_local_files=has_local_files, **kwargs)
+
+    def __call__(self):
+        pass
+
+
+class Local_PLI_Project(InteractionsProject):
+
+    def __init__(self, entries, working_path, has_local_files=False, **kwargs):
+
+        self.project_type = "PLI analysis"
+
+        super().__init__(entries=entries, working_path=working_path, has_local_files=has_local_files, **kwargs)
 
     def __call__(self):
 
@@ -953,121 +1008,79 @@ class Local_PLI_Project(InteractionsProject):
         # TODO: Definir as mensagens de descrição para o usuário
         # TODO: colocar wrapers em cada função
 
+        # TODO: Remove duplicated entries.
+
+        # TODO: add a new parameter: hydrogen addition mode to define how hydrogens will be added OR:
+        #       add a new parameter: force hydrogen addition.
+
+        # TODO: logging is not working. The logs are not being directed to the logging.log file.
+
         self.prepare_project_path()
         self.init_logging_file("%s/%s" % (self.working_path, "logging.log"))
 
         self.set_pharm_objects()
 
-        free_filename_format = self.has_submitted_files
+        free_filename_format = self.has_local_files
         self.entry_validator = PLIEntryValidator(free_filename_format)
 
         fingerprints = []
-
         pli_fingerprints = []
 
         comp_type_count_by_entry = {}
         inter_type_count_by_entry = {}
         inter_res_by_entry = {}
 
+        if self.preload_mol_files:
+            self.add_mol_obj_to_entries()
+
+        import time
+
         # Loop over each entry.
         for ligand_entry in self.entries:
+            start = time.time()
+
+            logger.info("Processing entry: %s." % ligand_entry)
+            print("Processing entry: %s." % ligand_entry.mol_id)
             self.current_entry = ligand_entry
 
             # Check if the entry is in the correct format.
-            # It also accepts entries whose pdb_id is defined by
-            # the filename.
+            # It also accepts entries whose pdb_id is defined by the filename.
             self.validate_entry_format(ligand_entry)
 
             pdb_file = self.get_pdb_file(ligand_entry.pdb_id)
 
-            # TODO: resolver o problema dos hidrogenios.
-            #       Vou adicionar hidrogenio a pH 7?
-            #       Usuario vai poder definir pH?
-            #       Obabel gera erro com posicoes alternativas
-
-            # TODO: está dando erro na entrada 3QL8
-            pdb_file = self.add_hydrogen(pdb_file)
-
+            # # TODO: resolver o problema dos hidrogenios.
+            # #       Vou adicionar hidrogenio a pH 7?
+            # #       Usuario vai poder definir pH?
             structure = PDB_PARSER.get_structure(ligand_entry.pdb_id, pdb_file)
+            add_hydrogen = self.decide_hydrogen_addition(PDB_PARSER.get_header())
+
+            if isinstance(ligand_entry, MolEntry):
+                structure = ligand_entry.get_biopython_structure(structure, PDB_PARSER)
+
             ligand = self.get_target_entity(structure, ligand_entry)
             ligand.set_as_target(is_target=True)
 
-            grps_by_compounds = self.perceive_chemical_groups(structure[0], ligand)
+            grps_by_compounds = self.perceive_chemical_groups(structure[0], ligand, add_hydrogen)
             src_grps = [grps_by_compounds[x] for x in grps_by_compounds if x.get_id()[0] != " "]
-            trgt_grps = [grps_by_compounds[x] for x in grps_by_compounds if x != ligand]
+            trgt_grps = [grps_by_compounds[x] for x in grps_by_compounds]
 
-            # if self.keep_all_potential_inter:
-            #     # TODO: calcular ponte de hidrogenio fraca
-            #     # TODO: detectar interações covalentes
-            #     # TODO: detectar complexos metalicos
-            #     # TODO: detectar CLASH
+            # # Calculate interactions
+            inter_filter = InteractionFilter.new_pli_filter(inter_conf=self.interaction_conf, ignore_self_inter=False)
+            ic = InteractionCalculator(inter_conf=self.interaction_conf, inter_filter=inter_filter, add_atom_atom=True)
+            interactions = ic.calc_interactions(src_grps, trgt_grps)
 
-            #     # TODO: add an option to accept hydrogen bonds when H was not added, in this case use only distances.
-            #     all_inter = calc_all_interactions(src_grps,
-            #                                       trgt_grps,
-            #                                       conf=BOUNDARY_CONF)
-
-            #     # Then it applies a filtering function.
-            #     filtered_inter = apply_interaction_criteria(all_inter,
-            #                                                 conf=self.interaction_conf)
-            #     inter_to_be_stored = all_inter
-            # else:
-            #     # It filters the interactions by using a cutoff at once.
-            #     filtered_inter = calc_all_interactions(src_grps,
-            #                                            trgt_grps,
-            #                                            conf=self.interaction_conf)
-            #     inter_to_be_stored = filtered_inter
-
-            # res_to_inter = [x for x in grps_by_compounds.values()]
-
-            # filtered_inter = calc_all_interactions(src_grps, trgt_grps, conf=self.interaction_conf)
-
-            inter_filter = InteractionFilter.new_pli_filter(inter_conf=self.interaction_conf)
-            # TODO: test it to see how it works the shell
-            # inter_filter = InteractionFilter.new_pli_filter(inter_conf=self.interaction_conf,
-            #                                                 ignore_h2o_h2o=False)
-
-            # TODO: remove lines
-            # res_list = [structure[0]["A"][(" ", 81, " ")], structure[0]["A"][(" ", 83, " ")],
-            #             structure[0]["A"][(" ", 82, " ")], structure[0]["A"][(" ", 145, " ")]]
-            # x = {res: grps_by_compounds[res] for res in res_list}
-            # x[ligand] = grps_by_compounds[ligand]
-            #
-            # grps_by_compounds = x
-            # src_grps = [grps_by_compounds[x] for x in grps_by_compounds if x.get_id()[0] != " "]
-            # trgt_grps = [grps_by_compounds[x] for x in grps_by_compounds if x != ligand]
-            ##########
-
-            ic = InteractionCalculator(inter_conf=self.interaction_conf, inter_filter=inter_filter, add_proximal=False)
-            new_inters = ic.calc_interactions(src_grps, trgt_grps)
-
-            print("Number of found interactions: %d" % len(new_inters))
-            print()
-            print()
-
-            exit()
-
-            for i in new_inters:
-                if i.atm_grp1.compound != ligand and i.atm_grp2.compound != ligand:
-                    continue
-
-                print(i.atm_grp1, i.atm_grp1.compound)
-                print(i.atm_grp2, i.atm_grp2.compound)
-                print(i.type)
-                print(i.params)
-                print()
-            exit()
             neighborhood = [ag for c in grps_by_compounds.values() for ag in c.atm_grps]
-
-            shells = ShellGenerator(10, 1, implicit_proximal_inter=True)
+            shells = ShellGenerator(10, 1)
             sm = shells.create_shells(neighborhood)
+            fp = sm.to_fingerprint(fold_to_size=IFP_FINGERPRINT_LENGTH)
 
-            fp_length = 1024
-            fp = sm.to_fingerprint(fold_to_size=fp_length)
+            pli_fingerprints.append((ligand_entry, fp))
 
-            pli_fingerprints.append((fp, sm))
+            end = time.time()
+            print("> Processing time:", (end - start))
+            print()
             continue
-            exit()
 
             #
             # Count the number of compound types for each ligand
@@ -1094,73 +1107,42 @@ class Local_PLI_Project(InteractionsProject):
             # TODO: Contar pra cada sitio o numero de cada tipo de grupo
             # TODO: Contar pra cada sitio o numero de interacoes
 
-            # Select ligand and read it in a RDKit molecule object
-            rdmol_lig = self.get_rdkit_mol(structure[0], ligand, ligand_entry.to_string(ENTRIES_SEPARATOR))
+            # Select ligand and read it in a RDKit molecule object.
+
+            # TODO: I cannot use RDKit directly in the PDB file or it will crash the molecule.
+            #       First I need to convert it to MOL.
+            # rdmol_lig = self.get_rdkit_mol(structure[0], ligand, ligand_entry.to_string(ENTRIES_SEPARATOR))
 
             # Generate fingerprint for the ligand
-            fp = self.get_fingerprint(rdmol_lig)
-            fingerprints.append(fp)
+            # fp = self.get_fingerprint(rdmol_lig)
+            # fingerprints.append(fp)
+
+            # Generate fingerprint for the ligand.
+
+            if isinstance(ligand_entry, MolEntry):
+                rdmol_lig = MolFromSmiles(str(ligand_entry.mol_obj).split("\t")[0])
+                rdmol_lig.SetProp("_Name", ligand_entry. mol_id)
+                fps = generate_fp_for_mols([rdmol_lig], "morgan_fp")
+                fingerprints.append((ligand_entry, fps[0]["fp"]))
+
+
 
             # self.generate_ligand_figure(rdmol_lig, grps_by_compounds[ligand])
 
-        from rdkit import DataStructs
-        from mol.interaction.fp.shell_viewer import PymolShellViewer
+        with open("ecfp4_fingerprints.csv", "w") as OUT:
+            OUT.write("id,smarts,fp\n")
+            for (entry, fp) in fingerprints:
+                fp_str = "\t".join([str(x) for x in fp.GetOnBits()])
+                OUT.write("%s,%s,%s\n" % (entry.mol_id, str(entry.mol_obj).split("\t")[0], fp_str))
+        exit()
 
-        fp1 = pli_fingerprints[0][0]
-        fp2 = pli_fingerprints[1][0]
+        with open("ifp_fingerprints.csv", "w") as OUT:
+            OUT.write("id,smarts,fp\n")
+            for (entry, fp) in pli_fingerprints:
+                fp_str = "\t".join([str(x) for x in fp.get_on_bits()])
+                OUT.write("%s,%s,%s\n" % (entry.mol_id, str(entry.mol_obj).split("\t")[0], fp_str))
 
-        i1 = fp1 & fp2
-        d1 = fp1.unfolding_map
-        d2 = fp2.unfolding_map
-
-        print({key: d1.get(key) for key in i1})
-        print()
-
-        x = [58, 984, 950]
-
-        x1 = set()
-        for key in i1:
-            for identifier in d1[key]:
-                shells = pli_fingerprints[0][1].get_shells_by_identifier(identifier, unique_shells=True)
-                for i, s in enumerate(shells):
-                    x1.add(s.identifier)
-
-        x2 = set()
-        for key in i1:
-            for identifier in d2[key]:
-                shells = pli_fingerprints[0][1].get_shells_by_identifier(identifier, unique_shells=True)
-                for i, s in enumerate(shells):
-                    x2.add(s.identifier)
-        #
-        #
-
-        pw = PymolShellViewer('%s/pdbs/3QQK.pdb' % self.working_path)
-        for key in i1:
-            for identifier in d1[key]:
-                shells = pli_fingerprints[0][1].get_shells_by_identifier(identifier, unique_shells=True)
-                for i, s in enumerate(shells):
-                    if len(s.interactions) == 0:
-                        continue
-
-                    if s.identifier in x1 and s.identifier in x2:
-                        output = "tmp/FOLD-%s___3QQK_____REAL-%s___shell-%d.pse" % (str(key), str(identifier), i)
-                        pw.new_session([s], output)
-
-        pw = PymolShellViewer('%s/pdbs/3QTQ.pdb' % self.working_path)
-        for key in i1:
-            for identifier in d2[key]:
-                shells = pli_fingerprints[1][1].get_shells_by_identifier(identifier, unique_shells=True)
-                for i, s in enumerate(shells):
-                    if len(s.interactions) == 0:
-                        continue
-
-                    if s.identifier in x1 and s.identifier in x2:
-                        output = "tmp/FOLD-%s___3QTQ_____REAL-%s___shell-%d.pse" % (str(key), str(identifier), i)
-                        pw.new_session([s], output)
-
-
-        dist = DataStructs.TanimotoSimilarity(fp1.to_rdkit(), fp2.to_rdkit())
-        print(dist)
+        print("DONE!!!!")
         exit()
 
         # TODO: Remover entradas repetidas
@@ -1216,8 +1198,7 @@ class Local_PLI_Project(InteractionsProject):
         # TODO: Calcular a frequencia dos residuos
         # TODO: Adicionar informações de frequencia no banco
 
-    def update_res_freq_by_cluster(self, interacting_residues,
-                                   inter_res_freq):
+    def update_res_freq_by_cluster(self, interacting_residues, inter_res_freq):
         inter_res_freq.update(interacting_residues)
 
 
@@ -1311,8 +1292,7 @@ class NAPOLI_PLI:
             create_directory(working_path, self.overwrite_path)
             create_directory(working_pdb_path)
 
-            logger.info("Results and temporary files will be saved at '%s'."
-                        % working_path)
+            logger.info("Results and temporary files will be saved at '%s'." % working_path)
 
             # Set the LOG file at the working path
             # logfile = "%s/napoli.log" % working_path
@@ -1335,8 +1315,7 @@ class NAPOLI_PLI:
             # TODO: avisar se eh csv ou salvar no BD.
             # OUTPUT MODE:
             if self.job_code:
-                logger.info("A job code ('%s') was informed. "
-                            "nAPOLI will try to save all results "
+                logger.info("A job code ('%s') was informed. nAPOLI will try to save all results "
                             "in the database using such id." % self.job_code)
 
             # Define which PDB path to use.
@@ -1429,11 +1408,10 @@ class NAPOLI_PLI:
             validator = PLIEntryValidator()
             pdb_parser = PDBParser(PERMISSIVE=True,
                                    QUIET=True,
-                                   FIX_ATOM_NAME_CONFLICT=True,
-                                   FIX_OBABEL_FLAGS=True)
+                                   FIX_ATOM_NAME_CONFLICT=False,
+                                   FIX_OBABEL_FLAGS=False)
 
-            feat_factory = (ChemicalFeatures
-                            .BuildFeatureFactory(self.atom_prop_file))
+            feat_factory = (ChemicalFeatures.BuildFeatureFactory(self.atom_prop_file))
 
             sigFactory = SigFactory(feat_factory, minPointCount=2,
                                     maxPointCount=3,
@@ -1519,17 +1497,13 @@ class NAPOLI_PLI:
                         # If there are already interactions to this entry,
                         # raise an error.
                         elif status_by_id[db_ligand_entity.status_id] == "AVAILABLE":
-                            raise DuplicateEntry("Interactions to the entry "
-                                                 "'%s' already exists in "
-                                                 "the database."
-                                                 % entry_str)
+                            raise DuplicateEntry("Interactions to the entry '%s' already exists in "
+                                                 "the database." % entry_str)
 
                     ##########################################################
                     step = "Validate nAPOLI entry"
                     if not validator.is_valid(entry_str):
-                        raise InvalidNapoliEntry("Entry '%s' does not match "
-                                                 "the nAPOLI entry format."
-                                                 % entry_str)
+                        raise InvalidNapoliEntry("Entry '%s' does not match the nAPOLI entry format." % entry_str)
 
                     ##########################################################
                     # TODO: option to change name of default PDB name.
@@ -1537,26 +1511,22 @@ class NAPOLI_PLI:
                     step = "Check PDB file existance"
                     # User has defined a specific directory.
                     if self.pdb_path:
-                        pdbFile = "%s/%s.pdb" % (pdb_path, ligand_entry.pdb_id)
+                        pdb_file = "%s/%s.pdb" % (pdb_path, ligand_entry.pdb_id)
                         # If the file does not exist or is invalid.
-                        if is_file_valid(pdbFile) is False:
-                            raise FileNotFoundError("The PDB file '%s' was "
-                                                    "not found." % pdbFile)
+                        if is_file_valid(pdb_file) is False:
+                            raise FileNotFoundError("The PDB file '%s' was not found." % pdb_file)
                     # If none DB conf. was defined try to download the PDB.
                     # Here, pdb_path is equal to the working_pdb_path
                     elif self.db_conf_file is None:
-                        pdbFile = "%s/pdb%s.ent" % (working_pdb_path,
-                                                    ligand_entry.pdb_id.lower())
+                        pdb_file = "%s/pdb%s.ent" % (working_pdb_path, ligand_entry.pdb_id.lower())
                         download_pdb(ligand_entry.pdb_id, working_pdb_path)
                     else:
-                        pdbFile = "%s/pdb%s.ent" % (pdb_path,
-                                                    ligand_entry.pdb_id.lower())
+                        pdb_file = "%s/pdb%s.ent" % (pdb_path, ligand_entry.pdb_id.lower())
 
                         # If the file does not exist or is invalid, it is
                         # better to download a new PDB file at the working path.
-                        if not is_file_valid(pdbFile):
-                            pdbFile = "%s/pdb%s.ent" % (working_pdb_path,
-                                                        ligand_entry.pdb_id.lower())
+                        if not is_file_valid(pdb_file):
+                            pdb_file = "%s/pdb%s.ent" % (working_pdb_path, ligand_entry.pdb_id.lower())
                             download_pdb(ligand_entry.pdb_id, working_pdb_path)
                         else:
                             # TODO: check if PDB is updated on the DB
@@ -1567,30 +1537,29 @@ class NAPOLI_PLI:
                     # TODO: Distinguish between files that need to remove hydrogens (NMR, for example).
                     # TODO: Add parameter to force remove hydrogens (user marks it)
                     if self.add_hydrog:
-                        prepPdbFile = "%s/%s.H.pdb" % (working_pdb_path,
+                        preppdb_file = "%s/%s.H.pdb" % (working_pdb_path,
                                                        ligand_entry.pdb_id)
 
-                        if not exists(prepPdbFile):
+                        if not exists(preppdb_file):
                             if self.ph:
                                 obOpt = {"p": 7, "error-level": 5}
                             else:
                                 obOpt = {"h": None, "error-level": 5}
 
-                            convert_molecule(pdbFile, prepPdbFile, opt=obOpt)
+                            convert_molecule(pdb_file, preppdb_file, opt=obOpt)
 
-                        pdbFile = prepPdbFile
+                        pdb_file = preppdb_file
 
                     ##########################################################
                     step = "Parse PDB file"
-                    structure = pdb_parser.get_structure(ligand_entry.pdb_id, pdbFile)
+                    structure = pdb_parser.get_structure(ligand_entry.pdb_id, pdb_file)
                     ligand = structure[0][ligand_entry.chain_id][myBioLigand]
                     ligand.set_as_target()
 
                     ##########################################################
                     step = "Generate structural fingerprint"
                     lig_sel = ResidueSelector({ligand})
-                    lig_block = pdb_object_2block(structure, lig_sel,
-                                                  write_conects=False)
+                    lig_block = entity_to_string(structure, lig_sel, write_conects=False)
                     rdLig = MolFromPDBBlock(lig_block)
                     rdLig.SetProp("_Name", entry_str)
                     fpOpt = {"sigFactory": sigFactory}
@@ -1733,10 +1702,10 @@ class NAPOLI_PLI:
 
             # step = "Generate 2D ligand structure"
             # # pdbExtractor = Extractor(structure[0][ligand_entry.chain])
-            # # ligandPdbFile = "%s/%s.pdb" % (working_pdb_path, entry)
-            # # pdbExtractor.extract_residues([ligandBio], ligandPdbFile)
+            # # ligandpdb_file = "%s/%s.pdb" % (working_pdb_path, entry)
+            # # pdbExtractor.extract_residues([ligandBio], ligandpdb_file)
             # lig_sel = ResidueSelector({ligand})
-            # lig_block = pdb_object_2block(structure, lig_sel,
+            # lig_block = entity_to_string(structure, lig_sel,
             #                              write_conects=False)
             # rdLig = MolFromPDBBlock(lig_block)
             # Compute2DCoords(rdLig)
