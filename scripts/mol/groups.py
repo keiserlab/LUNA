@@ -10,7 +10,7 @@ from mol.wrappers.obabel import convert_molecule
 from util.file import get_unique_filename
 from util.exceptions import (MoleculeSizeError, MoleculeInformationError, IllegalArgumentError)
 
-from rdkit.Chem import (MolFromMolFile, MolFromMolBlock)
+from rdkit.Chem import MolFromMolBlock
 from openbabel import (OBMolAtomIter, OBMolBondIter)
 from pybel import readfile
 
@@ -118,20 +118,24 @@ class AtomGroup():
         return len(set([a.parent.get_class() for a in self.atoms])) > 1
 
     def has_water(self):
-        """Return 1 if all compounds are water molecules."""
+        """Return 1 if at least one compound is a water molecule."""
         return any([a.parent.is_water() for a in self.atoms])
 
     def has_hetatm(self):
-        """Return 1 if all compounds are hetero groups."""
+        """Return 1 if at least one compound is an hetero groups."""
         return any([a.parent.is_hetatm() for a in self.atoms])
 
     def has_aminoacid(self):
-        """Return 1 if all compounds are amino acids."""
+        """Return 1 if at least one compound is an amino acids."""
         return any([a.parent.is_aminoacid() for a in self.atoms])
 
     def has_nucleotide(self):
-        """Return 1 if all compounds are nucleotides."""
+        """Return 1 if at least one compound is a nucleotides."""
         return any([a.parent.is_nucleotide() for a in self.atoms])
+
+    def has_target(self):
+        """Return 1 if at least one compound is the target."""
+        return any([a.parent.is_target() for a in self.atoms])
 
     def __repr__(self):
         return '<AtomGroup: [%s]' % ', '.join([str(x) for x in self.atoms])
