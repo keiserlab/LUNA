@@ -34,6 +34,10 @@ class Entry:
         else:
             return ' '
 
+    @property
+    def full_id(self):
+        return (self.pdb_id, self.chain_id, self.lig_name, self.lig_num, self.lig_icode)
+
     def to_string(self, sep=':'):
         entry = [self.pdb_id, self.chain_id]
         if self.lig_name:
@@ -78,6 +82,10 @@ class MolEntry(Entry):
         self._mol_obj = None
 
         super().__init__(pdb_id, "z", "LIG", 9999)
+
+    @property
+    def full_id(self):
+        return (self.pdb_id, self.mol_id)
 
     @property
     def mol_obj(self):
