@@ -113,3 +113,25 @@ def get_entity_level_name():
         "M": "model",
         "S": "structure"
     }
+
+
+def get_target_entity(entity, entry, model=0):
+        structure = entity.get_parent_by_level("S")
+        model = structure[model]
+
+        if entry.chain_id in model.child_dict:
+            chain = model[entry.chain_id]
+            if entry.is_hetatm():
+                ligand_key = entry.get_biopython_key()
+                if ligand_key in chain.child_dict:
+                    target_entity = chain[ligand_key]
+                else:
+                    raise MoleculeNotFoundError("Ligand '%s' does not exist in the PDB '%s'."
+                                                % (entry.to_string(ENTRIES_SEPARATOR), structure.get_id()))
+            else:
+                target_entity = chain
+        else:
+            raise ChainNotFoundError("The informed chain id '%s' for the ligand entry '%s' does not exist in the PDB '%s'."
+                                     % (entry.chain_id, entry.to_string(ENTRIES_SEPARATOR), structure.get_id()))
+
+        return target_entity
