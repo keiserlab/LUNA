@@ -3,7 +3,7 @@ from util.exceptions import *
 from util.file import (create_directory, is_file_valid, get_file_format, get_filename, get_unique_filename)
 from util.logging import new_logging_file
 from util.config_parser import Config
-from util.function import func_call_2str
+from util.function import func_call_to_str
 
 from MyBio.util import (download_pdb, entity_to_string)
 from MyBio.selector import ResidueSelector
@@ -46,12 +46,19 @@ from database.util import (get_ligand_tbl_join_filter, default_interaction_filte
                            format_db_ligand_entries, format_db_interactions,
                            object_as_dict, get_default_mappers_list)
 
+from math import ceil
 from os.path import exists
 from collections import defaultdict
 from functools import wraps
+import time
+import multiprocessing as mp
 
 
 PDB_PARSER = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=False, FIX_OBABEL_FLAGS=False)
+
+
+def iter_to_chunks(l, n):
+    return [l[i:i + n] for i in range(0, len(l), n)]
 
 
 class StepControl:
@@ -155,8 +162,7 @@ class ExceptionWrapper(object):
                     proj_obj.update_step_details(task, error_message)
 
                 if task.is_complete:
-                    proj_obj.logger.warning("The step %d has been "
-                                            "completed." % task.step_id)
+                    proj_obj.logger.warning("The step %d has been completed." % task.step_id)
 
         return callable
 
@@ -175,7 +181,15 @@ class InteractionsProject:
                  interaction_conf=INTERACTION_CONF,
                  ph=7.4,
                  add_hydrogen=True,
-                 fingerprint_func="pharm2d_fp",
+                 add_non_cov=True,
+                 add_atom_atom=True,
+                 add_proximal=False,
+                 calc_mfp=True,
+                 mfp_func="pharm2d_fp",
+                 calc_ifp=True,
+                 ifp_num_levels=10,
+                 ifp_radius_step=1,
+                 ifp_length=IFP_LENGTH,
                  similarity_func="BulkTanimotoSimilarity",
                  preload_mol_files=False,
                  butina_cutoff=0.2,
@@ -193,7 +207,17 @@ class InteractionsProject:
         self.interaction_conf = interaction_conf
         self.ph = ph
         self.add_hydrogen = add_hydrogen
-        self.fingerprint_func = fingerprint_func
+        self.add_non_cov = add_non_cov
+        self.add_atom_atom = add_atom_atom
+        self.add_proximal = add_proximal
+
+        self.calc_mfp = calc_mfp
+        self.mfp_func = mfp_func
+        self.calc_ifp = calc_ifp
+        self.ifp_num_levels = ifp_num_levels
+        self.ifp_radius_step = ifp_radius_step
+        self.ifp_length = ifp_length
+
         self.similarity_func = similarity_func
         self.butina_cutoff = butina_cutoff
         self.run_from_step = run_from_step
@@ -203,9 +227,7 @@ class InteractionsProject:
         self.step_controls = {}
 
     def __call__(self):
-        raise NotImplementedError("This class is not callable. "
-                                  "The function __call__() is an abstract "
-                                  "method.")
+        raise NotImplementedError("This class is not callable. The function __call__() is an abstract method.")
 
     def init_logging_file(self, logging_filename=None):
         if not logging_filename:
@@ -287,6 +309,7 @@ class InteractionsProject:
         create_directory(self.working_path, self.overwrite_path)
         create_directory("%s/pdbs" % self.working_path)
         create_directory("%s/figures" % self.working_path)
+        create_directory("%s/results" % self.working_path)
         create_directory("%s/tmp" % self.working_path)
 
     def validate_entry_format(self, ligand_entry):
@@ -429,7 +452,7 @@ class InteractionsProject:
 
     def get_fingerprint(self, rdmol):
         fp_opt = {"sigFactory": self.sig_factory}
-        fp = generate_fp_for_mols([rdmol], self.fingerprint_func,
+        fp = generate_fp_for_mols([rdmol], self.mfp_func,
                                   fp_opt=fp_opt, critical=True)[0]
 
         return fp
@@ -983,14 +1006,131 @@ class DB_PLI_Project(InteractionsProject):
 
 class Fingerprint_PLI_Project(InteractionsProject):
 
-    def __init__(self, entries, working_path, has_local_files=False, **kwargs):
+    def __init__(self, entries, working_path, mfp_output=None, ifp_output=None, **kwargs):
 
         self.project_type = "PLI analysis"
+        self.mfp_output = mfp_output
+        self.ifp_output = ifp_output
 
-        super().__init__(entries=entries, working_path=working_path, has_local_files=has_local_files, **kwargs)
+        super().__init__(entries=entries, working_path=working_path, **kwargs)
+
+    def _process_entries(self, entries):
+        for ligand_entry in entries:
+            self.current_entry = ligand_entry
+
+            # # Check if the entry is in the correct format.
+            # # It also accepts entries whose pdb_id is defined by the filename.
+            self.validate_entry_format(ligand_entry)
+
+            # # TODO: allow the person to pass a pdb_file into entries.
+            pdb_file = self.get_pdb_file(ligand_entry.pdb_id)
+
+            # # # TODO: resolver o problema dos hidrogenios.
+            # # #       Vou adicionar hidrogenio a pH 7?
+            # # #       Usuario vai poder definir pH?
+            structure = PDB_PARSER.get_structure(ligand_entry.pdb_id, pdb_file)
+            add_hydrogen = self.decide_hydrogen_addition(PDB_PARSER.get_header())
+
+            if isinstance(ligand_entry, MolEntry):
+                structure = ligand_entry.get_biopython_structure(structure, PDB_PARSER)
+
+            ligand = self.get_target_entity(structure, ligand_entry)
+            ligand.set_as_target(is_target=True)
+
+            grps_by_compounds = self.perceive_chemical_groups(structure[0], ligand, add_hydrogen)
+            src_grps = [grps_by_compounds[x] for x in grps_by_compounds if x.get_id()[0] != " "]
+            trgt_grps = [grps_by_compounds[x] for x in grps_by_compounds]
+
+            # # # Calculate interactions
+            inter_filter = InteractionFilter.new_pli_filter(inter_conf=self.interaction_conf, ignore_self_inter=False)
+            ic = InteractionCalculator(inter_conf=self.interaction_conf, inter_filter=inter_filter,
+                                       add_non_cov=self.add_non_cov, add_atom_atom=self.add_atom_atom,
+                                       add_proximal=self.add_proximal)
+            interactions = ic.calc_interactions(src_grps, trgt_grps)
+
+            result = {"id": (ligand_entry.full_id)}
+            if self.calc_mfp:
+                if isinstance(ligand_entry, MolEntry):
+                    rdmol_lig = MolFromSmiles(str(ligand_entry.mol_obj).split("\t")[0])
+                    rdmol_lig.SetProp("_Name", ligand_entry. mol_id)
+                    result["mfp"] = generate_fp_for_mols([rdmol_lig], "morgan_fp")[0]["fp"]
+                else:
+                    # Read from PDB.
+                    pass
+
+            if self.calc_ifp:
+                neighborhood = [ag for c in grps_by_compounds.values() for ag in c.atm_grps]
+                shells = ShellGenerator(self.ifp_num_levels, self.ifp_radius_step)
+                sm = shells.create_shells(neighborhood)
+                result["ifp"] = sm.to_fingerprint(fold_to_size=self.ifp_length)
+
+            if isinstance(ligand_entry, MolEntry):
+                result["smiles"] = str(ligand_entry.mol_obj).split("\t")[0]
+            else:
+                # Get Smiles from PDB
+                pass
+
+            self.result.append(result)
 
     def __call__(self):
-        pass
+
+        if not self.calc_mfp and not self.calc_ifp:
+            logger.warning("Both molecular and interaction fingerprints were turned off. So, there is nothing to be done...")
+            return
+
+        self.prepare_project_path()
+        self.init_logging_file("%s/%s" % (self.working_path, "logging.log"))
+
+        self.set_pharm_objects()
+
+        free_filename_format = self.has_local_files
+        self.entry_validator = PLIEntryValidator(free_filename_format)
+
+        fingerprints = []
+        pli_fingerprints = []
+
+        comp_type_count_by_entry = {}
+        inter_type_count_by_entry = {}
+        inter_res_by_entry = {}
+
+        if self.preload_mol_files:
+            self.add_mol_obj_to_entries()
+
+        manager = mp.Manager()
+        self.result = manager.list()
+
+        start = time.time()
+        chunk_size = ceil(len(self.entries) / (mp.cpu_count() - 1))
+        chunks = iter_to_chunks(self.entries, chunk_size)
+        processes = []
+        for (i, l) in enumerate(chunks):
+            p = mp.Process(name="Chunk %d" % i, target=self._process_entries, args=(l,))
+            processes.append(p)
+            p.start()
+
+        for p in processes:
+            p.join()
+
+        if self.calc_mfp:
+            self.mfp_output = self.mfp_output or "%s/results/mfp.csv" % self.working_path
+            with open(self.mfp_output, "w") as OUT:
+                OUT.write("ligand_id, smiles, on_bits\n")
+                for r in self.result:
+                    if "mfp" in r:
+                        fp_str = "\t".join([str(x) for x in r["mfp"].GetOnBits()])
+                        OUT.write("%s:%s,%s,%s\n" % (r["id"][0], r["id"][1], r["smiles"], fp_str))
+
+        if self.calc_ifp:
+            self.ifp_output = self.ifp_output or "%s/results/ifp.csv" % self.working_path
+            with open(self.ifp_output, "w") as OUT:
+                OUT.write("ligand_id, smiles, on_bits\n")
+                for r in self.result:
+                    if "ifp" in r:
+                        fp_str = "\t".join([str(x) for x in r["ifp"].get_on_bits()])
+                        OUT.write("%s:%s,%s,%s\n" % (r["id"][0], r["id"][1], r["smiles"], fp_str))
+
+        end = time.time()
+        print(end - start)
 
 
 class Local_PLI_Project(InteractionsProject):
@@ -1047,6 +1187,7 @@ class Local_PLI_Project(InteractionsProject):
             # It also accepts entries whose pdb_id is defined by the filename.
             self.validate_entry_format(ligand_entry)
 
+            # TODO: allow the person to pass a pdb_file into entries.
             pdb_file = self.get_pdb_file(ligand_entry.pdb_id)
 
             # # TODO: resolver o problema dos hidrogenios.
@@ -1067,13 +1208,15 @@ class Local_PLI_Project(InteractionsProject):
 
             # # Calculate interactions
             inter_filter = InteractionFilter.new_pli_filter(inter_conf=self.interaction_conf, ignore_self_inter=False)
-            ic = InteractionCalculator(inter_conf=self.interaction_conf, inter_filter=inter_filter, add_atom_atom=True)
+            ic = InteractionCalculator(inter_conf=self.interaction_conf, inter_filter=inter_filter,
+                                       add_non_cov=self.add_non_cov, add_atom_atom=self.add_atom_atom,
+                                       add_proximal=self.add_proximal)
             interactions = ic.calc_interactions(src_grps, trgt_grps)
 
             neighborhood = [ag for c in grps_by_compounds.values() for ag in c.atm_grps]
             shells = ShellGenerator(10, 1)
             sm = shells.create_shells(neighborhood)
-            fp = sm.to_fingerprint(fold_to_size=IFP_FINGERPRINT_LENGTH)
+            fp = sm.to_fingerprint(fold_to_size=IFP_LENGTH)
 
             pli_fingerprints.append((ligand_entry, fp))
 
@@ -1218,7 +1361,7 @@ class NAPOLI_PLI:
                  # force_calc_interactions=False,
                  save_all_interactions=True,
                  ph=None,
-                 fingerprint_func="pharm2d_fp",
+                 mfp_func="pharm2d_fp",
                  similarity_func="BulkTanimotoSimilarity",
                  run_from_step=None,
                  run_until_step=None):
@@ -1239,7 +1382,7 @@ class NAPOLI_PLI:
         self.save_all_interactions = save_all_interactions
         self.ph = ph
         self.add_hydrog = True
-        self.fingerprint_func = fingerprint_func
+        self.mfp_func = mfp_func
         self.similarity_func = similarity_func
         self.run_from_step = run_from_step
         self.run_until_step = run_until_step
@@ -1537,8 +1680,7 @@ class NAPOLI_PLI:
                     # TODO: Distinguish between files that need to remove hydrogens (NMR, for example).
                     # TODO: Add parameter to force remove hydrogens (user marks it)
                     if self.add_hydrog:
-                        preppdb_file = "%s/%s.H.pdb" % (working_pdb_path,
-                                                       ligand_entry.pdb_id)
+                        preppdb_file = "%s/%s.H.pdb" % (working_pdb_path, ligand_entry.pdb_id)
 
                         if not exists(preppdb_file):
                             if self.ph:
@@ -1563,7 +1705,7 @@ class NAPOLI_PLI:
                     rdLig = MolFromPDBBlock(lig_block)
                     rdLig.SetProp("_Name", entry_str)
                     fpOpt = {"sigFactory": sigFactory}
-                    fp = generate_fp_for_mols([rdLig], self.fingerprint_func,
+                    fp = generate_fp_for_mols([rdLig], self.mfp_func,
                                               fpOpt=fpOpt, critical=True)[0]
                     fingerprints.append(fp)
 
