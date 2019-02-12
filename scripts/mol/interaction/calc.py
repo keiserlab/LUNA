@@ -18,11 +18,12 @@ logger = logging.getLogger(__name__)
 class InteractionCalculator:
 
     def __init__(self, inter_conf=DefaultInteractionConf(), inter_filter=None,
-                 inter_funcs=None, add_proximal=False, add_atom_atom=True,
+                 inter_funcs=None, add_non_cov=True, add_proximal=False, add_atom_atom=True,
                  add_orphan_h2o_pair=False, strict_donor_rules=False):
 
         self.inter_conf = inter_conf
 
+        self.add_non_cov = add_non_cov
         self.add_proximal = add_proximal
         self.add_atom_atom = add_atom_atom
         self.add_orphan_h2o_pair = add_orphan_h2o_pair
@@ -44,6 +45,11 @@ class InteractionCalculator:
     def calc_interactions(self, trgt_comp_grps, nb_comp_grps=None):
         all_interactions = []
 
+        # TODO: Water-bridged interaction with weak hydrogen bond
+        # TODO: FOr removing non-covalent interaction I could test if the atom has a property != of Atom inside de calc function
+        # TODO: threshold for including slightly out of limit interactions. For example, a hydrogen bond not included for 0.01A.
+        #           Distances: 0.2 and Angles: 5
+
         # If nb_comp_grps was not informed, it uses the trgt_comp_grps as the neighbors.
         # In this case, the interactions will be target x target.
         nb_comp_grps = nb_comp_grps or trgt_comp_grps
@@ -58,8 +64,8 @@ class InteractionCalculator:
                 feat_pairs = list(product(trgt_atms_grp.features, nb_atms_grp.features))
                 feat_pairs = filter(lambda x: self.is_feature_pair_valid(*x), feat_pairs)
 
-                for featPair in feat_pairs:
-                    calc_inter_params = (trgt_atms_grp, nb_atms_grp) + featPair
+                for pair in feat_pairs:
+                    calc_inter_params = (trgt_atms_grp, nb_atms_grp) + pair
                     interactions = self.resolve_interactions(*calc_inter_params)
                     all_interactions.extend(interactions)
 
@@ -174,9 +180,10 @@ class InteractionCalculator:
         interactions = set(interactions)
         valid_hbs = set(chain.from_iterable(i.required_interactions for i in interactions))
 
+        target_interactions = ("Hydrogen bond", "Weak hydrogen bond")
         orphan_hbs = set([i for i in interactions
                           if ((i.atm_grp1.is_water() or i.atm_grp2.is_water()) and
-                              i.type == "Hydrogen bond" and i not in valid_hbs)])
+                              i.type in target_interactions and i not in valid_hbs)])
 
         interactions -= orphan_hbs
 
@@ -235,6 +242,9 @@ class InteractionCalculator:
         # aromatic between hbond arrays
 
     def calc_cation_pi(self, params):
+        if not self.add_non_cov:
+            return []
+
         group1, group2, feat1, feat2 = params
         interactions = []
 
@@ -249,6 +259,9 @@ class InteractionCalculator:
         return interactions
 
     def calc_pi_pi(self, params):
+        if not self.add_non_cov:
+            return []
+
         ring1, ring2, feat1, feat2 = params
         interactions = []
 
@@ -285,6 +298,9 @@ class InteractionCalculator:
         return interactions
 
     def calc_amide_pi(self, params):
+        if not self.add_non_cov:
+            return []
+
         group1, group2, feat1, feat2 = params
         interactions = []
 
@@ -324,6 +340,9 @@ class InteractionCalculator:
         return interactions
 
     def calc_hydrop(self, params):
+        if not self.add_non_cov:
+            return []
+
         group1, group2, feat1, feat2 = params
         interactions = []
 
@@ -339,6 +358,9 @@ class InteractionCalculator:
         return interactions
 
     def calc_xbond_pi(self, params):
+        if not self.add_non_cov:
+            return []
+
         group1, group2, feat1, feat2 = params
         interactions = []
 
@@ -388,6 +410,9 @@ class InteractionCalculator:
         return interactions
 
     def calc_xbond(self, params):
+        if not self.add_non_cov:
+            return []
+
         group1, group2, feat1, feat2 = params
         interactions = []
 
@@ -475,6 +500,9 @@ class InteractionCalculator:
         return interactions
 
     def calc_hbond(self, params):
+        if not self.add_non_cov:
+            return []
+
         group1, group2, feat1, feat2 = params
         interactions = []
 
@@ -641,6 +669,9 @@ class InteractionCalculator:
         return interactions
 
     def calc_weak_hbond(self, params):
+        if not self.add_non_cov:
+            return []
+
         group1, group2, feat1, feat2 = params
         interactions = []
 
@@ -671,81 +702,140 @@ class InteractionCalculator:
             # R coordinates, in which R is a heavy atom.
             r_coords = [nbi.coord for nbi in acceptor_atm.neighbors_info if nbi.atomic_num != 1]
 
-            # It may happen that D is covalently bound to more than one hydrogen atom.
-            # In such cases, it's necessary to check the distances and angles for each atom.
-            for h_coord in hydrog_coords:
-                ha_dist = im.euclidean_distance(h_coord, acceptor_grp.centroid)
+            # Firstly, it checks if it is not necessary to apply a strict hbond rule, i.e.,
+            # hydrogens must exist and all geometrical criteria should be evaluated.
+            # Then it checks if no hydrogen is bonded to the donor, or if the donor has hydrogens
+            # and only hydrogens as neighbours (water, solvents, ammonia, SH2). In the latter case, the
+            # hydrogens can be positioned in many different set of ways, and each run of a tool like
+            # OpenBabel would vary the hydrogen bond list when one applies this algorithm.
+            if (self.strict_donor_rules is False and
+                    (len(hydrog_coords) == 0 or len(hydrog_coords) == len(donor_atm.neighbors_info))):
 
-                hd_vect = donor_grp.centroid - h_coord
-                ha_vect = acceptor_grp.centroid - h_coord
-                dha_angle = im.angle(hd_vect, ha_vect)
-
-                if (self.is_within_boundary(ha_dist, "max_ha_dist_whb_inter", le) and
-                        self.is_within_boundary(dha_angle, "min_dha_ang_whb_inter", ge)):
+                # When the position of the hydrogen cannot be defined, it assumes the hydrogen to be located 1A
+                # away from the donor in a line formed by the donor and the acceptor.
+                ha_dist = da_dist - 1
+                if self.is_within_boundary(ha_dist, "max_ha_dist_whb_inter", le):
 
                     # If no heavy atom is bonded to the acceptor, it means that only hydrogens
                     # may be bonded to it. Then, we do not need to calculate the angles because
-                    # hydrogens are too dynamic what means that an acceptor could be ionized or not
-                    # at a specific moment in time. That is the reason for why the strict rule is
-                    # only applied to donor atoms.
+                    # hydrogens are too dynamic, what means that an acceptor could be ionized or not
+                    # at a specific moment in time and its hydrogens may be positioned in different ways.
+                    # That is the reason for why the strict rule is only applied to donor atoms.
                     if len(r_coords) == 0:
                         params = {"da_dist_whb_inter": da_dist,
-                                  "ha_dist_whb_inter": ha_dist,
-                                  "dha_ang_whb_inter": dha_angle,
+                                  "ha_dist_whb_inter": -1,
+                                  "dha_ang_whb_inter": -1,
                                   "har_ang_whb_inter": -1,
                                   "dar_ang_whb_inter": -1}
 
                         inter = InteractionType(group1, group2, "Weak hydrogen bond", params)
                         interactions.append(inter)
                     else:
-                        # Interaction model: D-H ---- A-R
-                        # AH vector is always the same.
-                        ah_vect = h_coord - acceptor_grp.centroid
                         # AD vector is always the same.
                         ad_vect = donor_grp.centroid - acceptor_grp.centroid
 
-                        # Interaction model: D-H ---- A-R
-                        # Check the angles formed at the acceptor.
-                        # When A is covalently bonded to more than one R atom, it is necessary to
-                        # evaluate all possible angles D-A-R and H-A-R. In this case, all angles should
-                        # satisfy the angle criteria. To do so, we could analyze only the lowest D-A-R and
-                        # H-A-R angles. It guarantees that all angles will satisfy the criteria.
-                        # OBS: it may happen that each one of the angles would belong to a different R atom.
-                        lowest_har_angle = None
                         lowest_dar_angle = None
                         for r_coord in r_coords:
                             ar_vect = r_coord - acceptor_grp.centroid
-                            har_angle = im.angle(ah_vect, ar_vect)
                             dar_angle = im.angle(ad_vect, ar_vect)
 
-                            # Update the HAR angle with the lowest value.
-                            if lowest_har_angle is None or har_angle < lowest_har_angle:
-                                lowest_har_angle = har_angle
                             # Update the DAR angle with the lowest value.
                             if lowest_dar_angle is None or dar_angle < lowest_dar_angle:
                                 lowest_dar_angle = dar_angle
 
-                        # The angles will be None when any R (heavy atom) atom was found.
+                        # The angle will be None when any R (heavy atom) atom was found.
                         # In this case, the criteria must always fail.
-                        if lowest_har_angle is None or lowest_dar_angle is None:
-                            lowest_har_angle = -1
+                        if lowest_dar_angle is None:
                             lowest_dar_angle = -1
 
-                        if (self.is_within_boundary(lowest_har_angle, "min_har_ang_whb_inter", ge) and
-                                self.is_within_boundary(lowest_dar_angle, "min_dar_ang_whb_inter", ge)):
-
-                            # Only the lowest D-A-R and H-A-R angles are provided.
+                        if self.is_within_boundary(lowest_dar_angle, "min_dar_ang_whb_inter", ge):
                             params = {"da_dist_whb_inter": da_dist,
-                                      "ha_dist_whb_inter": ha_dist,
-                                      "dha_ang_whb_inter": dha_angle,
-                                      "har_ang_whb_inter": lowest_har_angle,
+                                      "ha_dist_whb_inter": -1,
+                                      "dha_ang_whb_inter": -1,
+                                      "har_ang_whb_inter": -1,
                                       "dar_ang_whb_inter": lowest_dar_angle}
 
                             inter = InteractionType(group1, group2, "Weak hydrogen bond", params)
                             interactions.append(inter)
+            else:
+                # It may happen that D is covalently bound to more than one hydrogen atom.
+                # In such cases, it's necessary to check the distances and angles for each atom.
+                for h_coord in hydrog_coords:
+                    ha_dist = im.euclidean_distance(h_coord, acceptor_grp.centroid)
+
+                    hd_vect = donor_grp.centroid - h_coord
+                    ha_vect = acceptor_grp.centroid - h_coord
+                    dha_angle = im.angle(hd_vect, ha_vect)
+
+                    if (self.is_within_boundary(ha_dist, "max_ha_dist_whb_inter", le) and
+                            self.is_within_boundary(dha_angle, "min_dha_ang_whb_inter", ge)):
+
+                        # If no heavy atom is bonded to the acceptor, it means that only hydrogens
+                        # may be bonded to it. Then, we do not need to calculate the angles because
+                        # hydrogens are too dynamic what means that an acceptor could be ionized or not
+                        # at a specific moment in time. That is the reason for why the strict rule is
+                        # only applied to donor atoms.
+                        if len(r_coords) == 0:
+                            params = {"da_dist_whb_inter": da_dist,
+                                      "ha_dist_whb_inter": ha_dist,
+                                      "dha_ang_whb_inter": dha_angle,
+                                      "har_ang_whb_inter": -1,
+                                      "dar_ang_whb_inter": -1}
+
+                            inter = InteractionType(group1, group2, "Weak hydrogen bond", params)
+                            interactions.append(inter)
+                        else:
+                            # Interaction model: D-H ---- A-R
+                            # AH vector is always the same.
+                            ah_vect = h_coord - acceptor_grp.centroid
+                            # AD vector is always the same.
+                            ad_vect = donor_grp.centroid - acceptor_grp.centroid
+
+                            # Interaction model: D-H ---- A-R
+                            # Check the angles formed at the acceptor.
+                            # When A is covalently bonded to more than one R atom, it is necessary to
+                            # evaluate all possible angles D-A-R and H-A-R. In this case, all angles should
+                            # satisfy the angle criteria. To do so, we could analyze only the lowest D-A-R and
+                            # H-A-R angles. It guarantees that all angles will satisfy the criteria.
+                            # OBS: it may happen that each one of the angles would belong to a different R atom.
+                            lowest_har_angle = None
+                            lowest_dar_angle = None
+                            for r_coord in r_coords:
+                                ar_vect = r_coord - acceptor_grp.centroid
+                                har_angle = im.angle(ah_vect, ar_vect)
+                                dar_angle = im.angle(ad_vect, ar_vect)
+
+                                # Update the HAR angle with the lowest value.
+                                if lowest_har_angle is None or har_angle < lowest_har_angle:
+                                    lowest_har_angle = har_angle
+                                # Update the DAR angle with the lowest value.
+                                if lowest_dar_angle is None or dar_angle < lowest_dar_angle:
+                                    lowest_dar_angle = dar_angle
+
+                            # The angles will be None when any R (heavy atom) atom was found.
+                            # In this case, the criteria must always fail.
+                            if lowest_har_angle is None or lowest_dar_angle is None:
+                                lowest_har_angle = -1
+                                lowest_dar_angle = -1
+
+                            if (self.is_within_boundary(lowest_har_angle, "min_har_ang_whb_inter", ge) and
+                                    self.is_within_boundary(lowest_dar_angle, "min_dar_ang_whb_inter", ge)):
+
+                                # Only the lowest D-A-R and H-A-R angles are provided.
+                                params = {"da_dist_whb_inter": da_dist,
+                                          "ha_dist_whb_inter": ha_dist,
+                                          "dha_ang_whb_inter": dha_angle,
+                                          "har_ang_whb_inter": lowest_har_angle,
+                                          "dar_ang_whb_inter": lowest_dar_angle}
+
+                                inter = InteractionType(group1, group2, "Weak hydrogen bond", params)
+                                interactions.append(inter)
         return interactions
 
     def calc_hbond_pi(self, params):
+        if not self.add_non_cov:
+            return []
+
         group1, group2, feat1, feat2 = params
         interactions = []
 
@@ -836,6 +926,9 @@ class InteractionCalculator:
         return interactions
 
     def calc_attractive(self, params):
+        if not self.add_non_cov:
+            return []
+
         group1, group2, feat1, feat2 = params
         interactions = []
 
@@ -850,6 +943,9 @@ class InteractionCalculator:
         return interactions
 
     def calc_repulsive(self, params):
+        if not self.add_non_cov:
+            return []
+
         group1, group2, feat1, feat2 = params
         interactions = []
 
@@ -931,6 +1027,9 @@ class InteractionCalculator:
             feat1 = feat1.name
         if isinstance(feat2, ChemicalFeature):
             feat2 = feat2.name
+
+        if not self.add_non_cov and (feat1 != "Atom" or feat2 != "Atom"):
+            return False
 
         funcs = self.funcs
         return (True if ((feat1, feat2) in funcs or
