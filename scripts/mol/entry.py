@@ -23,7 +23,7 @@ class Entry:
         self.pdb_id = pdb_id
         self.chain_id = chain_id
         self.lig_name = lig_name
-        self.lig_num = lig_num
+        self.lig_num = int(lig_num)
         self._lig_icode = lig_icode
         self.separator = separator
 
