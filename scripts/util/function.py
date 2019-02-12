@@ -1,4 +1,4 @@
-def func_call_2str(func, *args, **kwargs):
+def func_call_to_str(func, *args, **kwargs):
     arg_names = func.__code__.co_varnames[:func.__code__.co_argcount]
     args = args[:len(arg_names)]
     defaults = func.__defaults__ or ()
