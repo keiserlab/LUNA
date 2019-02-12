@@ -14,7 +14,7 @@ def new_logging_file(filename):
 
     # Remove the existing file handlers
     for hdlr in logger.handlers[:]:
-        if isinstance(hdlr, logger.FileHander):
+        if isinstance(hdlr, logging.FileHandler):
             logger.removeHandler(hdlr)
     # Set the new handler
     logger.addHandler(fh)
