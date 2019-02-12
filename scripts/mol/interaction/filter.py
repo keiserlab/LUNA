@@ -97,9 +97,9 @@ class InteractionFilter:
         is_same_compounds = len(atm_grp1.compounds.intersection(atm_grp2.compounds)) >= 1
         if self.ignore_self_inter and is_same_compounds:
             return False
-        # It accepts all pairs composed by atom groups from a same compound when
+        # It promptly accepts all pairs composed by atom groups from the same target compound when
         # ignore_self_inter is set off.
-        elif not self.ignore_self_inter and is_same_compounds:
+        elif not self.ignore_self_inter and is_same_compounds and atm_grp1.has_target():
             return True
 
         # It ignores protein-protein interactions if it is required.
