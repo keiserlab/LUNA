@@ -5,7 +5,7 @@ from util.logging import new_logging_file
 from util.config_parser import Config
 from util.function import func_call_to_str
 
-from MyBio.util import (download_pdb, entity_to_string)
+from MyBio.util import (download_pdb, entity_to_string, get_entity_from_entry)
 from MyBio.selector import ResidueSelector
 
 from rdkit.Chem import ChemicalFeatures
@@ -415,28 +415,6 @@ class InteractionsProject:
 
         return new_pdb_file
 
-    def get_target_entity(self, entity, entry, model=0):
-        structure = entity.get_parent_by_level("S")
-        model = structure[model]
-
-        if entry.chain_id in model.child_dict:
-            chain = model[entry.chain_id]
-            if entry.is_hetatm():
-                ligand_key = entry.get_biopython_key()
-                if ligand_key in chain.child_dict:
-                    target_entity = chain[ligand_key]
-                else:
-                    raise MoleculeNotFoundError("Ligand '%s' does not exist in the PDB '%s'."
-                                                % (entry.to_string(ENTRY_SEPARATOR), structure.get_id()))
-            else:
-                target_entity = chain
-        else:
-            raise ChainNotFoundError("The informed chain id '%s' for the ligand entry '%s' does not exist "
-                                     "in the PDB '%s'."
-                                     % (entry.chain_id, entry.to_string(ENTRY_SEPARATOR), structure.get_id()))
-
-        return target_entity
-
     def perceive_chemical_groups(self, entity, ligand, add_h=False):
         perceiver = CompoundGroupPerceiver(self.feature_extractor, add_h=add_h, ph=self.ph,
                                            tmp_path="%s/tmp" % self.working_path)
@@ -843,7 +821,7 @@ class DB_PLI_Project(InteractionsProject):
             #       Obabel gera erro com posicoes alternativas
 
             structure = PDB_PARSER.get_structure(ligand_entry.pdb_id, pdb_file)
-            ligand = self.get_target_entity(structure, ligand_entry)
+            ligand = get_entity_from_entry(structure, ligand_entry)
 
             # to_add_hydrogen = self.decide_hydrogen_addition(PDB_PARSER.get_header())
             # print(to_add_hydrogen)
@@ -1042,7 +1020,7 @@ class Fingerprint_PLI_Project(InteractionsProject):
             if isinstance(ligand_entry, MolEntry):
                 structure = ligand_entry.get_biopython_structure(structure, PDB_PARSER)
 
-            ligand = self.get_target_entity(structure, ligand_entry)
+            ligand = get_entity_from_entry(structure, ligand_entry)
             ligand.set_as_target(is_target=True)
 
             grps_by_compounds = self.perceive_chemical_groups(structure[0], ligand, add_hydrogen)
@@ -1083,7 +1061,7 @@ class Fingerprint_PLI_Project(InteractionsProject):
     def __call__(self):
         start = time.time()
 
-        if not self.calc_mfp and not self.calc_ifp:
+        if not (self.calc_mfp and self.calc_ifp):
             logger.warning("Both molecular and interaction fingerprints were turned off. So, there is nothing to be done...")
             return
 
@@ -1206,7 +1184,7 @@ class Local_PLI_Project(InteractionsProject):
             if isinstance(ligand_entry, MolEntry):
                 structure = ligand_entry.get_biopython_structure(structure, PDB_PARSER)
 
-            ligand = self.get_target_entity(structure, ligand_entry)
+            ligand = get_entity_from_entry(structure, ligand_entry)
             ligand.set_as_target(is_target=True)
 
             grps_by_compounds = self.perceive_chemical_groups(structure[0], ligand, add_hydrogen)
