@@ -1,5 +1,6 @@
-from util.exceptions import IllegalArgumentError
+from util.exceptions import (IllegalArgumentError, MoleculeNotFoundError, ChainNotFoundError)
 from util.file import is_directory_valid
+from util.default_values import ENTRY_SEPARATOR
 
 from MyBio.PDB.PDBList import PDBList
 from MyBio.PDB.PDBIO import Select
@@ -11,7 +12,8 @@ from io import StringIO
 from shutil import move as rename_pdb_file
 
 import logging
-logger = logging.getLogger(__name__)
+
+logger = logging.getLogger()
 
 
 def download_pdb(pdb_id, output_path=".", output_file=None, overwrite=False):
@@ -115,7 +117,7 @@ def get_entity_level_name():
     }
 
 
-def get_target_entity(entity, entry, model=0):
+def get_entity_from_entry(entity, entry, model=0):
         structure = entity.get_parent_by_level("S")
         model = structure[model]
 
@@ -127,11 +129,11 @@ def get_target_entity(entity, entry, model=0):
                     target_entity = chain[ligand_key]
                 else:
                     raise MoleculeNotFoundError("Ligand '%s' does not exist in the PDB '%s'."
-                                                % (entry.to_string(ENTRIES_SEPARATOR), structure.get_id()))
+                                                % (entry.to_string(ENTRY_SEPARATOR), structure.get_id()))
             else:
                 target_entity = chain
         else:
-            raise ChainNotFoundError("The informed chain id '%s' for the ligand entry '%s' does not exist in the PDB '%s'."
-                                     % (entry.chain_id, entry.to_string(ENTRIES_SEPARATOR), structure.get_id()))
+            raise ChainNotFoundError("The informed chain id '%s' for the ligand entry '%s' does not exist in the PDB '%s'." %
+                                     (entry.chain_id, entry.to_string(ENTRY_SEPARATOR), structure.get_id()))
 
         return target_entity
