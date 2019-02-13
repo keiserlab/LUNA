@@ -1,7 +1,7 @@
 from mol.interaction.conf import (DefaultInteractionConf, InteractionConf)
 from mol.depiction import ColorPallete
 
-ENTRIES_SEPARATOR = ":"
+ENTRY_SEPARATOR = ":"
 
 NAPOLI_PATH = "/media/data/Workspace/nAPOLI_v2/tmp/nAPOLI"
 PDB_PATH = "%s/public/pdb" % NAPOLI_PATH
