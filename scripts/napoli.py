@@ -53,8 +53,16 @@ from functools import wraps
 import time
 import multiprocessing as mp
 
+import logging
+from util import logging_ini
+
+from util.multiprocessing_logging import start_mp_handler
+
 
 PDB_PARSER = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=False, FIX_OBABEL_FLAGS=False)
+
+
+logger = logging.getLogger(__name__)
 
 
 def iter_to_chunks(l, n):
@@ -136,22 +144,18 @@ class ExceptionWrapper(object):
 
                 result = func(*args, **kwargs)
 
-                proj_obj.logger.warning("The function '%s' finished "
-                                        "successfully." % func.__name__)
+                proj_obj.logger.warning("The function '%s' finished successfully." % func.__name__)
 
                 return result
             except Exception as e:
-                proj_obj.logger.warning("The function '%s' failed."
-                                        % func.__name__)
+                proj_obj.logger.warning("The function '%s' failed." % func.__name__)
                 proj_obj.logger.exception(e)
 
                 # TODO: se chegar uma mensagem de erro não user friendly,
                 # coloque uma mensagem generica
                 error_message = e.args[0]
                 if self.is_critical:
-                    proj_obj.logger.warning("As the called function was "
-                                            "critical, the program "
-                                            "will be aborted.")
+                    proj_obj.logger.warning("As the called function was critical, the program will be aborted.")
                     raise
             finally:
                 task.update_progress()
@@ -226,23 +230,48 @@ class InteractionsProject:
 
         self.step_controls = {}
 
+        self.log_preferences()
+
     def __call__(self):
         raise NotImplementedError("This class is not callable. The function __call__() is an abstract method.")
 
-    def init_logging_file(self, logging_filename=None):
+    def log_preferences(self):
+        logger.info("New project initialized...")
+        params = ["\t\t-- %s = %s" % (key, str(self.__dict__[key])) for key in sorted(self.__dict__)]
+        logger.info("Preferences:\n%s" % "\n".join(params))
+
+    # @ExceptionWrapper(step_id=1, has_subtasks=False, is_critical=True)
+    def prepare_project_path(self):
+        logger.warning("Initializing path '%s'..." % self.working_path)
+
+        create_directory(self.working_path, self.overwrite_path)
+        create_directory("%s/pdbs" % self.working_path)
+        create_directory("%s/figures" % self.working_path)
+        create_directory("%s/results" % self.working_path)
+        create_directory("%s/tmp" % self.working_path)
+
+        logger.warning("Path '%s' created successfully!!!" % self.working_path)
+
+    def init_logging_file(self, logging_filename=None, use_mp_handler=True):
         if not logging_filename:
             logging_filename = get_unique_filename(TMP_FILES)
 
-        logger = new_logging_file(logging_filename)
-        if logger:
-            self.logger = logger
-            self.logger.warning("Logging file initialized successfully.")
-        else:
+        try:
+            new_logging_file(logging_filename)
+
+            if use_mp_handler:
+                start_mp_handler()
+
+            logger.warning("Logging file initialized successfully.")
+
+            # Print preferences at the new logging file.
+            self.log_preferences()
+        except Exception as e:
+            logger.exception(e)
             raise FileNotCreated("Logging file could not be created.")
 
     def init_db_connection(self):
-        logger.info("A database configuration file was defined. "
-                    "Starting a new database connection...")
+        logger.info("A database configuration file was defined. Starting a new database connection...")
 
         config = Config(self.db_conf_file)
         dbConf = config.get_section_map("database")
@@ -278,10 +307,7 @@ class InteractionsProject:
 
             if error_message:
                 warning = "One or more entries failed."
-                db_message = ProjectStepMessage(self.project_id,
-                                                task.step_id,
-                                                self.get_status_id("WARNING"),
-                                                error_message)
+                db_message = ProjectStepMessage(self.project_id, task.step_id, self.get_status_id("WARNING"), error_message)
                 self.db.session.add(db_message)
 
                 db_ligand_entry = (self.db.session
@@ -298,22 +324,13 @@ class InteractionsProject:
                     status_id = self.get_status_id("DONE")
 
         # TODO: verificar se temos um banco de dados para ser atualizado ou não
-        db_step = ProjectStepDetail(self.project_id, task.step_id,
-                                    status_id, warning, task.progress)
+        db_step = ProjectStepDetail(self.project_id, task.step_id, status_id, warning, task.progress)
 
         self.db.session.merge(db_step)
         self.db.approve_session()
 
-    # @ExceptionWrapper(step_id=1, has_subtasks=False, is_critical=True)
-    def prepare_project_path(self):
-        create_directory(self.working_path, self.overwrite_path)
-        create_directory("%s/pdbs" % self.working_path)
-        create_directory("%s/figures" % self.working_path)
-        create_directory("%s/results" % self.working_path)
-        create_directory("%s/tmp" % self.working_path)
-
     def validate_entry_format(self, ligand_entry):
-        entry_str = ligand_entry.to_string(ENTRIES_SEPARATOR)
+        entry_str = ligand_entry.to_string(ENTRY_SEPARATOR)
         if not self.entry_validator.is_valid(entry_str):
             raise InvalidNapoliEntry("Entry '%s' does not match the nAPOLI entry format." % entry_str)
 
@@ -410,14 +427,13 @@ class InteractionsProject:
                     target_entity = chain[ligand_key]
                 else:
                     raise MoleculeNotFoundError("Ligand '%s' does not exist in the PDB '%s'."
-                                                % (entry.to_string(ENTRIES_SEPARATOR),
-                                                   structure.get_id()))
+                                                % (entry.to_string(ENTRY_SEPARATOR), structure.get_id()))
             else:
                 target_entity = chain
         else:
             raise ChainNotFoundError("The informed chain id '%s' for the ligand entry '%s' does not exist "
                                      "in the PDB '%s'."
-                                     % (entry.chain_id, entry.to_string(ENTRIES_SEPARATOR), structure.get_id()))
+                                     % (entry.chain_id, entry.to_string(ENTRY_SEPARATOR), structure.get_id()))
 
         return target_entity
 
@@ -458,10 +474,9 @@ class InteractionsProject:
         return fp
 
     def recover_rcsb_interactions(self, ligand_entry, manager):
-        entry_str = ligand_entry.to_string(ENTRIES_SEPARATOR)
+        entry_str = ligand_entry.to_string(ENTRY_SEPARATOR)
 
-        logger.info("Trying to select pre-computed interactions for "
-                    "the entry '%s'." % entry_str)
+        logger.info("Trying to select pre-computed interactions for the entry '%s'." % entry_str)
 
         db_ligand_entity = (self.db.session
                             .query(Ligand)
@@ -521,8 +536,7 @@ class InteractionsProject:
             self.project_id = db_proj.id
 
     def recover_all_entries(self):
-        db_ligand_entries = (LigandEntryManager(self.db)
-                             .get_entries(self.project_id))
+        db_ligand_entries = LigandEntryManager(self.db).get_entries(self.project_id)
 
         if not db_ligand_entries:
             raise NoResultFound("No ligand entries for the informed job code "
@@ -619,19 +633,13 @@ class InteractionsProject:
 
     def store_compound_statistics(self, lig_entry_id, grp_types_count):
         for type_id in grp_types_count:
-            self.db.session.merge(CompTypeCount(lig_entry_id,
-                                                self.project_id,
-                                                type_id,
-                                                grp_types_count[type_id]))
+            self.db.session.merge(CompTypeCount(lig_entry_id, self.project_id, type_id, grp_types_count[type_id]))
         # TODO: Remover comentario
         # self.db.approve_session()
 
     def store_interaction_statistics(self, lig_entry_id, inter_type_count):
         for type_id in inter_type_count:
-            self.db.session.merge(InterTypeCount(lig_entry_id,
-                                                 self.project_id,
-                                                 type_id,
-                                                 inter_type_count[type_id]))
+            self.db.session.merge(InterTypeCount(lig_entry_id, self.project_id, type_id, inter_type_count[type_id]))
         # TODO: Remover comentario
         # self.db.approve_session()
 
@@ -726,14 +734,14 @@ class RCSB_PLI_Population(InteractionsProject):
         # If this entry does not exist in the database,
         # raise an error.
         if db_ligand_entity is None:
-            message = ("Entry '%s' does not exist in the table 'ligand'." % ligand_entry.to_string(ENTRIES_SEPARATOR))
+            message = ("Entry '%s' does not exist in the table 'ligand'." % ligand_entry.to_string(ENTRY_SEPARATOR))
             raise InvalidNapoliEntry(message)
 
         # If there are already interactions to this entry,
         # raise an error.
         elif status_by_id[db_ligand_entity.status_id] == "AVAILABLE":
             raise DuplicateEntry("Interactions to the entry '%s' already exists in the database."
-                                 % ligand_entry.to_string(ENTRIES_SEPARATOR))
+                                 % ligand_entry.to_string(ENTRY_SEPARATOR))
 
 
 class DB_PLI_Project(InteractionsProject):
@@ -910,7 +918,7 @@ class DB_PLI_Project(InteractionsProject):
             # TODO: Contar pra cada sitio o numero de interacoes
 
             # Select ligand and read it in a RDKit molecule object
-            rdmol_lig = self.get_rdkit_mol(structure[0], ligand, ligand_entry.to_string(ENTRIES_SEPARATOR))
+            rdmol_lig = self.get_rdkit_mol(structure[0], ligand, ligand_entry.to_string(ENTRY_SEPARATOR))
 
             # Generate fingerprint for the ligand
             fp = self.get_fingerprint(rdmol_lig)
@@ -929,7 +937,7 @@ class DB_PLI_Project(InteractionsProject):
         inter_res_freq_by_cluster = defaultdict(InteractingResidues)
 
         for ligand_entry in self.entries:
-            cluster_id = clusters[ligand_entry.to_string(ENTRIES_SEPARATOR)]
+            cluster_id = clusters[ligand_entry.to_string(ENTRY_SEPARATOR)]
 
             # TODO: REMOVER
             cluster_id = 1
@@ -998,7 +1006,7 @@ class DB_PLI_Project(InteractionsProject):
         # If this entry does not exist in the database,
         # raise an error.
         if db_ligand_entity is None:
-            message = ("Entry '%s' does not exist in the database." % ligand_entry.to_string(ENTRIES_SEPARATOR))
+            message = ("Entry '%s' does not exist in the database." % ligand_entry.to_string(ENTRY_SEPARATOR))
             raise InvalidNapoliEntry(message)
 
         return db_ligand_entity
@@ -1073,6 +1081,7 @@ class Fingerprint_PLI_Project(InteractionsProject):
             self.result.append(result)
 
     def __call__(self):
+        start = time.time()
 
         if not self.calc_mfp and not self.calc_ifp:
             logger.warning("Both molecular and interaction fingerprints were turned off. So, there is nothing to be done...")
@@ -1080,7 +1089,6 @@ class Fingerprint_PLI_Project(InteractionsProject):
 
         self.prepare_project_path()
         self.init_logging_file("%s/%s" % (self.working_path, "logging.log"))
-
         self.set_pharm_objects()
 
         free_filename_format = self.has_local_files
@@ -1102,6 +1110,7 @@ class Fingerprint_PLI_Project(InteractionsProject):
         start = time.time()
         chunk_size = ceil(len(self.entries) / (mp.cpu_count() - 1))
         chunks = iter_to_chunks(self.entries, chunk_size)
+
         processes = []
         for (i, l) in enumerate(chunks):
             p = mp.Process(name="Chunk %d" % i, target=self._process_entries, args=(l,))
@@ -1130,7 +1139,9 @@ class Fingerprint_PLI_Project(InteractionsProject):
                         OUT.write("%s:%s,%s,%s\n" % (r["id"][0], r["id"][1], r["smiles"], fp_str))
 
         end = time.time()
-        print(end - start)
+        logger.info("Processing finished!!!")
+        logger.info("Check the results at '%s'." % self.working_path)
+        logger.info("Processing time: %.2fs." % (end - start))
 
 
 class Local_PLI_Project(InteractionsProject):
@@ -1142,6 +1153,7 @@ class Local_PLI_Project(InteractionsProject):
         super().__init__(entries=entries, working_path=working_path, has_local_files=has_local_files, **kwargs)
 
     def __call__(self):
+        start = time.time()
 
         # TODO: verificar o numero de entradas
 
@@ -1157,7 +1169,6 @@ class Local_PLI_Project(InteractionsProject):
 
         self.prepare_project_path()
         self.init_logging_file("%s/%s" % (self.working_path, "logging.log"))
-
         self.set_pharm_objects()
 
         free_filename_format = self.has_local_files
@@ -1173,14 +1184,10 @@ class Local_PLI_Project(InteractionsProject):
         if self.preload_mol_files:
             self.add_mol_obj_to_entries()
 
-        import time
-
         # Loop over each entry.
         for ligand_entry in self.entries:
-            start = time.time()
-
             logger.info("Processing entry: %s." % ligand_entry)
-            print("Processing entry: %s." % ligand_entry.mol_id)
+
             self.current_entry = ligand_entry
 
             # Check if the entry is in the correct format.
@@ -1213,17 +1220,25 @@ class Local_PLI_Project(InteractionsProject):
                                        add_proximal=self.add_proximal)
             interactions = ic.calc_interactions(src_grps, trgt_grps)
 
+            print(ligand_entry)
+            print(len(interactions))
+
+            inter_file = "%s/results/%s.tsv" % (self.working_path, ligand_entry.to_string())
+            with open(inter_file, "w") as OUT:
+                OUT.write("atom_group1\tfeatures1\tatom_group2\tfeatures2\tinteraction_type\n")
+                for i in interactions:
+                    atm_grp1 = ", ".join([x.full_atom_name for x in i.atm_grp1.atoms])
+                    atm_grp2 = ", ".join([x.full_atom_name for x in i.atm_grp2.atoms])
+                    feat1 = ", ".join([x.name for x in i.atm_grp1.features if x.name != "Atom"])
+                    feat2 = ", ".join([x.name for x in i.atm_grp2.features if x.name != "Atom"])
+                    OUT.write("%s\t%s\t%s\t%s\t%s\n" % (atm_grp1, feat1, atm_grp2, feat2, i.type))
+
             neighborhood = [ag for c in grps_by_compounds.values() for ag in c.atm_grps]
             shells = ShellGenerator(10, 1)
             sm = shells.create_shells(neighborhood)
             fp = sm.to_fingerprint(fold_to_size=IFP_LENGTH)
 
             pli_fingerprints.append((ligand_entry, fp))
-
-            end = time.time()
-            print("> Processing time:", (end - start))
-            print()
-            continue
 
             #
             # Count the number of compound types for each ligand
@@ -1254,7 +1269,7 @@ class Local_PLI_Project(InteractionsProject):
 
             # TODO: I cannot use RDKit directly in the PDB file or it will crash the molecule.
             #       First I need to convert it to MOL.
-            # rdmol_lig = self.get_rdkit_mol(structure[0], ligand, ligand_entry.to_string(ENTRIES_SEPARATOR))
+            # rdmol_lig = self.get_rdkit_mol(structure[0], ligand, ligand_entry.to_string(ENTRY_SEPARATOR))
 
             # Generate fingerprint for the ligand
             # fp = self.get_fingerprint(rdmol_lig)
@@ -1262,30 +1277,30 @@ class Local_PLI_Project(InteractionsProject):
 
             # Generate fingerprint for the ligand.
 
-            if isinstance(ligand_entry, MolEntry):
-                rdmol_lig = MolFromSmiles(str(ligand_entry.mol_obj).split("\t")[0])
-                rdmol_lig.SetProp("_Name", ligand_entry. mol_id)
-                fps = generate_fp_for_mols([rdmol_lig], "morgan_fp")
-                fingerprints.append((ligand_entry, fps[0]["fp"]))
-
-
+            # if isinstance(ligand_entry, MolEntry):
+            #     rdmol_lig = MolFromSmiles(str(ligand_entry.mol_obj).split("\t")[0])
+            #     rdmol_lig.SetProp("_Name", ligand_entry. mol_id)
+            #     fps = generate_fp_for_mols([rdmol_lig], "morgan_fp")
+            #     fingerprints.append((ligand_entry, fps[0]["fp"]))
 
             # self.generate_ligand_figure(rdmol_lig, grps_by_compounds[ligand])
 
-        with open("ecfp4_fingerprints.csv", "w") as OUT:
-            OUT.write("id,smarts,fp\n")
-            for (entry, fp) in fingerprints:
-                fp_str = "\t".join([str(x) for x in fp.GetOnBits()])
-                OUT.write("%s,%s,%s\n" % (entry.mol_id, str(entry.mol_obj).split("\t")[0], fp_str))
-        exit()
+        # with open("ecfp4_fingerprints.csv", "w") as OUT:
+        #     OUT.write("id,smarts,fp\n")
+        #     for (entry, fp) in fingerprints:
+        #         fp_str = "\t".join([str(x) for x in fp.GetOnBits()])
+        #         OUT.write("%s,%s,%s\n" % (entry.mol_id, str(entry.mol_obj).split("\t")[0], fp_str))
 
-        with open("ifp_fingerprints.csv", "w") as OUT:
-            OUT.write("id,smarts,fp\n")
+        with open("%s/results/ifp_fingerprints.csv" % self.working_path, "w") as OUT:
+            OUT.write("id,fp\n")
             for (entry, fp) in pli_fingerprints:
                 fp_str = "\t".join([str(x) for x in fp.get_on_bits()])
-                OUT.write("%s,%s,%s\n" % (entry.mol_id, str(entry.mol_obj).split("\t")[0], fp_str))
+                OUT.write("%s,%s\n" % (entry.to_string(), fp_str))
 
-        print("DONE!!!!")
+        end = time.time()
+        logger.info("Processing finished!!!")
+        logger.info("Check the results at '%s'." % self.working_path)
+        logger.info("Processing time: %.2fs." % (end - start))
         exit()
 
         # TODO: Remover entradas repetidas
@@ -1299,7 +1314,7 @@ class Local_PLI_Project(InteractionsProject):
         # inter_res_freq_by_cluster = defaultdict(InteractingResidues)
 
         # for ligand_entry in self.entries:
-        #     cluster_id = clusters[ligand_entry.to_string(ENTRIES_SEPARATOR)]
+        #     cluster_id = clusters[ligand_entry.to_string(ENTRY_SEPARATOR)]
 
         #     # TODO: REMOVER
         #     cluster_id = 1
@@ -1588,7 +1603,7 @@ class NAPOLI_PLI:
             # Loop over each entry.
             for ligand_entry in self.entries:
                 try:
-                    entry_str = ligand_entry.to_string(ENTRIES_SEPARATOR)
+                    entry_str = ligand_entry.to_string(ENTRY_SEPARATOR)
                     myBioLigand = ("H_%s" % ligand_entry.lig_name,
                                    ligand_entry.lig_num,
                                    ligand_entry.lig_icode)

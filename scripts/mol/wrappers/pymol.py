@@ -4,7 +4,8 @@ from pymol import util
 from util.file import (get_filename, get_file_format)
 
 import logging
-logger = logging.getLogger(__name__)
+
+logger = logging.getLogger()
 
 
 class PymolWrapper:

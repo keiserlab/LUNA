@@ -8,7 +8,7 @@ from pybel import Molecule as PybelMol
 from collections import defaultdict
 
 import logging
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 
 class ChemicalFeature():

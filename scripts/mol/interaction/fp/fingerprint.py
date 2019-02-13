@@ -8,8 +8,7 @@ from collections import defaultdict
 import numpy as np
 import logging
 
-
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 DEFAULT_SHELL_NBITS = 2**32
 DEFAULT_FP_LENGTH = 1024

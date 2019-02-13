@@ -5,7 +5,7 @@ from mol.charge_model import OpenEyeModel
 
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 
 class MolValidator:

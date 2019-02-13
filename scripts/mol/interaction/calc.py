@@ -12,7 +12,7 @@ from collections import defaultdict
 from util.exceptions import IllegalArgumentError
 
 import logging
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 
 class InteractionCalculator:

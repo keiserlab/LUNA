@@ -8,8 +8,7 @@ from MyBio.PDB.Entity import Entity
 import re
 import logging
 
-
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 # Source: https://richjenks.com/filename-regex/
 FILENAME_REGEX = r"(?!.{256,})(?!(aux|clock\$|con|nul|prn|com[1-9]|lpt[1-9])(?:$|\.))[^ ][ \.\w\-$()+=[\];#@~,&']+[^\. ]"
@@ -178,5 +177,3 @@ class PPIEntryValidator(EntryValidator):
         else:
             pattern = '^\\w{4}:\\w$'
         super().__init__(pattern)
-
-

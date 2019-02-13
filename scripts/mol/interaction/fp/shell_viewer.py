@@ -2,8 +2,8 @@ from mol.wrappers.pymol import (PymolWrapper, PymolColorMap, mybio_to_pymol_sele
 from util.exceptions import PymolSessionNotInitialized
 
 import logging
-logger = logging.getLogger(__name__)
 
+logger = logging.getLogger()
 
 DEFAULT_INTERACTIONS_COLOR = {
     "Proximal": "gray60",

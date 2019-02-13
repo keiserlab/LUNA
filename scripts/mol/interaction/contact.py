@@ -7,7 +7,8 @@ from MyBio.PDB import Selection
 from itertools import product
 
 import logging
-logger = logging.getLogger(__name__)
+
+logger = logging.getLogger()
 
 
 def all_contacts_nh_search(entity, radius=7, level='A'):

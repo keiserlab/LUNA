@@ -7,8 +7,7 @@ from pybel import Molecule as PybelMol
 
 import logging
 
-
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 
 class AtomWrapper:

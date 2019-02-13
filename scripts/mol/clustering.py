@@ -5,8 +5,7 @@ from util.exceptions import IllegalArgumentError
 import re
 import logging
 
-
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 
 def available_similarity_functions():

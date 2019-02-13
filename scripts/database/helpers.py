@@ -1,7 +1,7 @@
 from database.napoli_model import *
 
 import logging
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 
 class MapperConfiguration():

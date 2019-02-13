@@ -17,9 +17,8 @@ from pybel import readfile
 from collections import defaultdict
 
 import logging
+logger = logging.getLogger()
 
-
-logger = logging.getLogger(__name__)
 
 COV_CUTOFF = 2
 

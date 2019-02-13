@@ -2,7 +2,8 @@ from MyBio.util import try_save_2pdb
 from MyBio.selector import (ChainSelector, ResidueSelector)
 
 import logging
-logger = logging.getLogger(__name__)
+
+logger = logging.getLogger()
 
 
 class Extractor():

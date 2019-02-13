@@ -7,7 +7,7 @@ import random
 import logging
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 
 def get_file_format(path, maxsplit=None):

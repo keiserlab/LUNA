@@ -13,7 +13,7 @@ import numpy as np
 import mmh3
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 
 class ShellSearch:

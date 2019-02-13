@@ -4,7 +4,7 @@ from util.exceptions import (FileNotCreated, InvalidFileFormat)
 from pybel import (informats, outformats)
 
 import logging
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 
 def mol_to_svg(infile, output, opt=None):

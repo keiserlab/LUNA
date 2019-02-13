@@ -16,7 +16,7 @@ import os.path
 import warnings
 
 import logging
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 
 TMALIGN = "/bin/tmalign"
