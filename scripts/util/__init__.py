@@ -15,3 +15,7 @@ def func_call_to_str(func, *args, **kwargs):
     func_as_str = "%s(%s)" % (func.__name__, args_as_str)
 
     return func_as_str
+
+
+def iter_to_chunks(l, n):
+    return [l[i:i + n] for i in range(0, len(l), n)]
