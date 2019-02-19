@@ -1,23 +1,24 @@
 from util.default_values import *
 from util.exceptions import *
-from util.file import (create_directory, is_file_valid, get_file_format, get_filename, get_unique_filename)
+from util.file import create_directory, is_file_valid, get_file_format, get_filename, get_unique_filename
 from util.logging import new_logging_file
 from util.config_parser import Config
-from util.function import func_call_to_str
+from util import func_call_to_str, iter_to_chunks
+from util.multiprocessing_logging import start_mp_handler
 
-from MyBio.util import (download_pdb, entity_to_string, get_entity_from_entry)
+from MyBio.util import download_pdb, entity_to_string, get_entity_from_entry
 from MyBio.selector import ResidueSelector
 
 from rdkit.Chem import ChemicalFeatures
 from rdkit.Chem.Pharm2D.SigFactory import SigFactory
-from rdkit.Chem import (MolFromPDBBlock, MolFromSmiles)
+from rdkit.Chem import MolFromPDBBlock, MolFromSmiles
 from rdkit.Chem.rdDepictor import Compute2DCoords
 
-from pybel import (informats, readfile)
+from pybel import informats, readfile
 
 # Get nearby molecules (contacts)
 from mol.interaction.contact import get_contacts_for_entity
-from mol.interaction.calc_interactions import (calc_all_interactions, apply_interaction_criteria)
+from mol.interaction.calc_interactions import calc_all_interactions, apply_interaction_criteria
 
 from mol.interaction.calc import InteractionCalculator
 from mol.interaction.conf import InteractionConf
@@ -25,16 +26,16 @@ from mol.interaction.filter import InteractionFilter
 
 from MyBio.PDB.PDBParser import PDBParser
 
-from mol.entry import (DBEntry, MolEntry, PLIEntryValidator)
+from mol.entry import DBEntry, MolEntry, PLIEntryValidator
 from mol.groups import CompoundGroupPerceiver
 from mol.fingerprint import generate_fp_for_mols
 from mol.features import FeatureExtractor
 from mol.wrappers.obabel import convert_molecule
 from mol.clustering import cluster_fps_butina
 from mol.depiction import ligand_pharm_figure
-from mol.interaction.fp.shell import (ShellGenerator, Fingerprint, CountFingerprint)
+from mol.interaction.fp.shell import ShellGenerator, Fingerprint, CountFingerprint
 
-from analysis.residues import (InteractingResidues, get_interacting_residues)
+from analysis.residues import InteractingResidues, get_interacting_residues
 from analysis.summary import *
 
 from sqlalchemy.orm.exc import NoResultFound
@@ -56,17 +57,11 @@ import multiprocessing as mp
 import logging
 from util import logging_ini
 
-from util.multiprocessing_logging import start_mp_handler
-
 
 PDB_PARSER = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=False, FIX_OBABEL_FLAGS=False)
 
 
 logger = logging.getLogger(__name__)
-
-
-def iter_to_chunks(l, n):
-    return [l[i:i + n] for i in range(0, len(l), n)]
 
 
 class StepControl:
@@ -1002,7 +997,10 @@ class Fingerprint_PLI_Project(InteractionsProject):
 
     def _process_entries(self, entries):
         for ligand_entry in entries:
+            logger.info("Starting processing entry %s." % ligand_entry)
             self.current_entry = ligand_entry
+
+            # print(ligand_entry.mol_obj)
 
             # # Check if the entry is in the correct format.
             # # It also accepts entries whose pdb_id is defined by the filename.
@@ -1061,8 +1059,8 @@ class Fingerprint_PLI_Project(InteractionsProject):
     def __call__(self):
         start = time.time()
 
-        if not (self.calc_mfp and self.calc_ifp):
-            logger.warning("Both molecular and interaction fingerprints were turned off. So, there is nothing to be done...")
+        if not self.calc_mfp and not self.calc_ifp:
+            logger.critical("Both molecular and interaction fingerprints were turned off. So, there is nothing to be done...")
             return
 
         self.prepare_project_path()
