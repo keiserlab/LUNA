@@ -1,13 +1,13 @@
 import logging
 
 
-def new_logging_file(filename):
+DEFAULT_FORMAT = '%(asctime)s - %(processName)s - %(name)s - %(levelname)s - %(filename)s - %(funcName)s - line %(lineno)d => %(message)s'
+
+
+def new_logging_file(filename, log_format=DEFAULT_FORMAT, mode='a'):
     # Set the LOG file at the working path
-    fh = logging.FileHandler(filename, 'a')
-    formatter = logging.Formatter('%(asctime)s - %(processName)s - %(name)s - '
-                                  '%(levelname)s - %(filename)s - '
-                                  '%(funcName)s - line %(lineno)d => '
-                                  '%(message)s')
+    fh = logging.FileHandler(filename, mode)
+    formatter = logging.Formatter(log_format)
     fh.setFormatter(formatter)
 
     logger = logging.getLogger()
