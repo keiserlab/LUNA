@@ -1,123 +1,118 @@
+from mol.wrappers.base import AtomWrapper
+import logging
 
-# class OpenEyeChargeModel():
 
-    # def __init__():
+logger = logging.getLogger()
 
-        # self.
 
-def perceive_formal_charge(rdAtom):
-    currentFormalCharge = rdAtom.GetFormalCharge()
-    formalCharge = None
+# ADAPT IT HERE:
+# https://github.com/openbabel/openbabel/blob/master/src/formats/mdlvalence.h
 
-    if (currentFormalCharge == 0):
-        atomicNum = rdAtom.GetAtomicNum()
-        valence = rdAtom.GetExplicitValence()
+
+class OpenEyeModel:
+
+    def get_charge(self, atm_obj):
+        formal_charge = None
+
+        atm_num = atm_obj.get_atomic_num()
+        valence = atm_obj.get_valence()
 
         # Hydrogen
-        if atomicNum == 1:
+        if atm_num == 1:
             if valence != 1:
-                formalCharge = 1
+                formal_charge = 1
+            elif valence == 1:
+                formal_charge = 0
         # Carbon
-        elif atomicNum == 6:
+        elif atm_num == 6:
             if valence == 3:
-                hasPolarNeighbor = False
-                for neighbor in rdAtom.GetNeighbors():
+                has_polar_nb = False
+                nbs = atm_obj.get_neighbors()
+                for nb_atm_obj in nbs:
+                    nb_atm_obj = AtomWrapper(nb_atm_obj)
                     # Polar neighbor: N, O or S
-                    if neighbor.GetAtomicNum() in (7, 8, 16):
-                        hasPolarNeighbor = True
+                    if nb_atm_obj.get_atomic_num() in (7, 8, 16):
+                        has_polar_nb = True
                         break
-                if hasPolarNeighbor is True:
-                    formalCharge = 1
+                if has_polar_nb is True:
+                    formal_charge = 1
                 else:
-                    formalCharge = -1
+                    formal_charge = -1
+            elif valence == 4:
+                formal_charge = 0
         # Nitrogen
-        elif atomicNum == 7:
+        elif atm_num == 7:
             if valence == 2:
-                formalCharge = -1
+                formal_charge = -1
             elif valence == 4:
-                formalCharge = 1
+                formal_charge = 1
+            elif valence == 3:
+                formal_charge = 0
         # Oxygen
-        elif atomicNum == 8:
+        elif atm_num == 8:
             if valence == 1:
-                formalCharge = -1
+                formal_charge = -1
             elif valence == 3:
-                formalCharge = 1
+                formal_charge = 1
+            elif valence == 2:
+                formal_charge = 0
         # Phosphorus
-        elif atomicNum == 15:
+        elif atm_num == 15:
             if valence == 4:
-                formalCharge = 1
+                formal_charge = 1
         # Sulfur
-        elif atomicNum == 16:
+        elif atm_num == 16:
             if valence == 1:
-                formalCharge = -1
+                formal_charge = -1
             elif valence == 3:
-                formalCharge = 1
+                formal_charge = 1
             elif valence == 5:
-                formalCharge = -1
+                formal_charge = -1
             elif valence == 4:
-                degree = rdAtom.GetDegree()
-                if (degree == 4):
-                    formalCharge = 2
+                if atm_obj.get_degree() == 4:
+                    formal_charge = 2
+            elif valence == 2 or valence == 6:
+                formal_charge == 0
         # Chlorine
-        elif atomicNum == 17:
+        elif atm_num == 17:
             if valence == 0:
-                formalCharge = -1
-            if valence == 4:
-                formalCharge = 3
+                formal_charge = -1
+            elif valence == 4:
+                formal_charge = 3
+            elif valence == 1:
+                formal_charge = 0
         # Fluorine, Bromine, Iodine
-        elif atomicNum == 9 or atomicNum == 35 or atomicNum == 53:
+        elif atm_num == 9 or atm_num == 35 or atm_num == 53:
             if valence == 0:
-                formalCharge = -1
+                formal_charge = -1
+            elif valence == 1:
+                formal_charge = 0
         # Magnesium, Calcium, Zinc
-        elif atomicNum == 12 or atomicNum == 20 or atomicNum == 30:
+        elif atm_num == 12 or atm_num == 20 or atm_num == 30:
             if valence == 0:
-                formalCharge = 2
+                formal_charge = 2
+            elif valence == 2:
+                formal_charge = 0
         # Lithium, Sodium, Potassium
-        elif atomicNum == 3 or atomicNum == 11 or atomicNum == 19:
+        elif atm_num == 3 or atm_num == 11 or atm_num == 19:
             if valence == 0:
-                formalCharge = 1
+                formal_charge = 1
+            elif valence == 1:
+                formal_charge = 0
         # Boron
-        # If the valence is four, the formal charge is +1.
-        elif atomicNum == 5:
+        elif atm_num == 5:
+            # If the valence is four, the formal charge is -1.
+            # OBS: there is an error in OpenEye chargel model text, they said that Boron should have a
+            # charge of +1 when the valence is 4. However, the MDL Valence Model says it should be -1.
             if valence == 4:
-                formalCharge = 1
-        else:
-            # Partial charge > 0.4 => +1
-            # Partial charge < 0.4 => -1
-            # Consider bins or rounding
+                formal_charge = -1
+            elif valence == 3:
+                formal_charge = 0
+        # Iron: 26
+        # If the valence is zero, the formal charge is +3 if the partial charge is 3.0, and +2 otherwise.
+        # Copper: 29
+        # If the valence is zero, the formal charge is +2 if the partial charge is 2.0, and +1 otherwise.
+        # else:
+        # For the remaining elements, if the valence of an atom is zero, its formal charge is set from its partial charge.
 
-
-    return formalCharge
-    # Iron
-    # If the valence is zero, the formal charge is +3 if the partial charge is 3.0, and +2 otherwise.
-    # elif atomicNum == 26:
-        # if valence == 0:
-            # formalCharge = 3
-    # Copper
-    # If the valence is zero, the formal charge is +2 if the partial charge is 2.0, and +1 otherwise.
-
-
-
-
-
-            # Sulfur
-                # If the valence is 1, the formal charge is -1,
-                # if the valence is three the formal charge is +1,
-                # if the valence is 5, the formal charge is -1,
-                # if the valence is four and the degree is four the charge is +2.
-
-
-            # Chlorine
-                # If the valence is 0 the formal charge is -1, if the valence is four the formal charge is +3.
-
-            # Fluorine, Bromine, Iodine
-            # If the valence is zero, the formal charge is -1.
-
-            # Magnesium, Calcium, Zinc
-            # If the valence is zero, the formal charge is +2.
-            # Lithium, Sodium, Potassium
-            # If the valence is zero, the formal charge is +1.
-# Iron
-# If the valence is zero, the formal charge is +3 if the partial charge is 3.0, and +2 otherwise.
-# Copper
-# If the valence is zero, the formal charge is +2 if the partial charge is 2.0, and +1 otherwise.
+        return formal_charge
