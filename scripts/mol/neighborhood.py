@@ -98,6 +98,17 @@ class NbAtom:
     def atm_grps(self):
         return self._atm_grps
 
+    @property
+    def full_atom_name(self):
+        full_atom_name = "%s/%s/%s" % self.get_full_id()[0:3]
+        res_name = "%s-%d%s" % (self._atom.parent.resname, self._atom.parent.id[1], self._atom.parent.id[2].strip())
+        atom_name = "%s" % self._atom.name
+        if self.altloc != " ":
+            atom_name += "-%s" % self.altloc
+        full_atom_name += "/%s/%s" % (res_name, atom_name)
+
+        return full_atom_name
+
     def add_nb_atom(self, nb_atom):
         self._nb_info = list(set(self._nb_info + [nb_atom]))
 
@@ -111,8 +122,7 @@ class NbAtom:
         return getattr(self._atom, attr)
 
     def __repr__(self):
-        return "<NBAtom: %s-%d%s/%s>" % (self._atom.parent.resname, self._atom.parent.id[1],
-                                         self._atom.parent.id[2].strip(), self._atom.name)
+        return "<NBAtom: %s>" % self.full_atom_name
 
     def __eq__(self, other):
         """Overrides the default implementation"""
