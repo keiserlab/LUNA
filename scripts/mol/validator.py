@@ -16,7 +16,7 @@ class MolValidator:
         self.fix_implicit_valence = fix_implicit_valence
         self.fix_charges = fix_charges
 
-    def is_mol_valid(self, mol_obj):
+    def validate_mol(self, mol_obj):
         if not isinstance(mol_obj, MolWrapper):
             mol_obj = MolWrapper(mol_obj)
 
