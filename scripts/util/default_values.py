@@ -1,13 +1,17 @@
-from mol.interaction.conf import (DefaultInteractionConf, InteractionConf)
-from mol.depiction import ColorPallete
+from mol.interaction.conf import DefaultInteractionConf, InteractionConf
+from util import ColorPallete
+
+from os import path
 
 ENTRY_SEPARATOR = ":"
 
-NAPOLI_PATH = "/media/data/Workspace/nAPOLI_v2/tmp/nAPOLI"
+NAPOLI_PATH = path.abspath(path.join(path.realpath(__file__), '../../../', 'tmp/nAPOLI'))
 PDB_PATH = "%s/public/pdb" % NAPOLI_PATH
 TMP_FILES = "%s/public/tmp" % NAPOLI_PATH
-DB_CONF_FILE = "../data/.mysql.ini"
-ATOM_PROP_FILE = "../data/Napoli.fdef"
+
+CONF_PATH = path.abspath(path.join(path.realpath(__file__), '../../../', 'data'))
+DB_CONF_FILE = "%s/.mysql.ini" % CONF_PATH
+ATOM_PROP_FILE = "%s/Napoli.fdef" % CONF_PATH
 INTERACTION_CONF = DefaultInteractionConf()
 
 BOUNDARY_CONF = InteractionConf({"boundary_cutoff": 7})
@@ -25,9 +29,27 @@ ATOM_TYPES_COLOR = ColorPallete({
     "NegIonizable": (215, 48, 3),
     "HalogenAcceptor": (215, 48, 3),
     "HalogenDonor": (215, 48, 3),
-})
+}, (255, 255, 255))
 
-CHEMICAL_FEATURES_IDS = {
+PYMOL_INTERACTION_COLOR = ColorPallete({
+    "Proximal": "gray60",
+    "Hydrogen bond": "tv_blue",
+    "Water-bridged hydrogen bond": "lightblue",
+    "Weak hydrogen bond": "lightteal",
+    "Attractive": "forest",
+    "Salt bridge": "palegreen",
+    "Cation-pi": "salmon",
+    "Edge-to-face pi-stacking": "tv_red",
+    "Face-to-face pi-stacking": "tv_red",
+    "Parallel-displaced pi-stacking": "tv_red",
+    "Hydrophobic": "orange",
+    "Halogen bond": "aquamarine",
+    "Repulsive": "violetpurple",
+    "Pi-stacking": "tv_red",
+    "Covalent bond": "black"
+}, "white")
+
+CHEMICAL_FEATURE_IDS = {
     "Aromatic": 1,
     "Acceptor": 2,
     "Donor": 3,
@@ -50,7 +72,7 @@ CHEMICAL_FEATURES_IDS = {
     "Atom": 22
 }
 
-INTERACTIONS_IDS = {
+INTERACTION_IDS = {
     "Proximal": 0,
     "Hydrogen bond": 1,
     "Attractive": 2,
@@ -72,4 +94,28 @@ INTERACTIONS_IDS = {
     "Van der Waals": 18
 }
 
+INTERACTION_SHORT_NAMES = {
+    "Proximal": "prox",
+    "Hydrogen bond": "hbond",
+    "Attractive": "attrac",
+    "Salt bridge": "salt_bridge",
+    "Cation-pi": "cation-pi",
+    "Edge-to-face pi-stacking": "t-shaped_pi-stack",
+    "Face-to-face pi-stacking": "sand_pi-stack",
+    "Parallel-displaced pi-stacking": "disp_pi-stack",
+    "Hydrophobic": "hphobe",
+    "Halogen bond": "xbond",
+    "Repulsive": "repuls",
+    "Water-bridged hydrogen bond": "water_hbond",
+    "Pi-stacking": "pi-stack",
+    "Amide-aromatic stacking": "amide_pi-stack",
+    "Weak hydrogen bond": "weak_hbond",
+    "Covalent bond": "cov",
+    "Atom overlap": "atm_overlap",
+    "Van der Waals clash": "vdw_clash",
+    "Van der Waals": "vdw"
+}
+
 IFP_LENGTH = 1024
+
+ACCEPTED_MOL_OBJ_TYPES = ("rdkit", "openbabel")
