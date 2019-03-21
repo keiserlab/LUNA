@@ -1,6 +1,7 @@
 import util.stringcase as case
 
 from util.exceptions import MoleculeObjectTypeError
+from mol.wrappers.base import MolWrapper
 from rdkit.Chem import Mol as RDMol
 from openbabel import (OBMol, OBSmartsPattern)
 from pybel import Molecule as PybelMol
@@ -86,6 +87,10 @@ class FeatureExtractor:
         return atm_features
 
     def get_features_by_groups(self, mol_obj, atm_map=None):
+
+        if isinstance(mol_obj, MolWrapper):
+            mol_obj = mol_obj.unwrap()
+
         if isinstance(mol_obj, RDMol):
             perceived_features = self.feature_factory.GetFeaturesForMol(mol_obj)
         elif isinstance(mol_obj, OBMol):
