@@ -78,10 +78,6 @@ class SanitizationError(ValueError):
     pass
 
 
-class MoleculeInformationError(ValueError):
-    pass
-
-
 class AtomObjectTypeError(TypeError):
     pass
 
