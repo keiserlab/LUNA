@@ -1,7 +1,7 @@
 from pymol import cmd
 from pymol import util
 
-from util.file import (get_filename, get_file_format)
+from util.file import get_filename, get_file_format
 
 import logging
 
@@ -50,9 +50,32 @@ class PymolWrapper:
         for selection in selections:
             util.cbag(selection)
 
+    def group(self, name, members, action=None):
+        for member in members:
+            if action:
+                cmd.group(name, member, action)
+            else:
+                cmd.group(name, member)
+
     def set(self, name, value, opts=None):
         opts = opts or {}
         cmd.set(name, value, **opts)
+
+    def align(self, mobile, target, opts=None):
+        opts = opts or {}
+        cmd.align(mobile, target, **opts)
+
+    def delete(self, selections):
+        for selection in selections:
+            cmd.delete(selection)
+
+    def remove(self, selections):
+        for selection in selections:
+            cmd.remove(selection)
+
+    def extract(self, tuples):
+        for name, selection in tuples:
+            cmd.extract(name, selection)
 
     def reinitialize(self):
         cmd.reinitialize('everything')
@@ -64,20 +87,6 @@ class PymolWrapper:
     def run_cmds(self, commands):
         for func_name, opts in commands:
             getattr(cmd, func_name)(**opts)
-
-
-class PymolColorMap:
-
-    def __init__(self, color_map=None, default_color=None):
-        self.color_map = color_map or {}
-        self.default_color = default_color
-
-    def get_color(self, key):
-        if key in self.color_map:
-            return self.color_map[key]
-        else:
-            logger.warning("Key '%s' does not exist. Default color will be used: %s." % (key, self.default_color))
-            return self.default_color
 
 
 def mybio_to_pymol_selection(entity):
