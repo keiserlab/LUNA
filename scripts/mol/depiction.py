@@ -2,20 +2,7 @@ from rdkit import Chem
 from rdkit.Chem.Draw import rdMolDraw2D
 from rdkit.Chem.AllChem import Compute2DCoords
 
-from math import (cos, sin, radians)
-
-
-class ColorPallete:
-
-    def __init__(self, color_map=None):
-        color_map = color_map or {}
-        self.color_map = color_map
-
-    def add_color(self, key, rgb_tuple):
-        self.color_map[key] = rgb_tuple
-
-    def get_normalized_color(self, key):
-        return tuple(c / 255 for c in self.color_map[key])
+from math import cos, sin, radians
 
 
 def add_atom(mol, pos=None):
