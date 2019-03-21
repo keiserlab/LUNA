@@ -18,7 +18,7 @@
 # 3) Added function to check if a residue is an amino acid.
 # 4) Added function to check if a residue is a nucleic acid.
 
-# Date: 17/12/2018
+# Date: 12/17/2018
 # 1) Added property "_is_target" to control residues that will be targets for some processing.
 # 2) Added function "is_target() to verify the status of the is_target variable.
 # 3) Added function "set_as_target()" to allow the definition if a residue is a target or not.
@@ -205,16 +205,6 @@ class Residue(Entity):
                      BiopythonDeprecationWarning)
         for a in self:
             yield a
-
-    # MODBY: Alexandre Fassio
-    # Returns a unique tuple from Structure to Residue
-    def get_deep_id(self):
-        pdb_id = self.get_parent_by_level('S').get_id()
-        chain = self.get_parent().get_id()
-        resname = self.get_resname()
-        hetflag, resseq, icode = self.get_id()
-
-        return (pdb_id, chain, resname, resseq, icode)
 
     # MODBY: Alexandre Fassio
     # Define if the residue is a target or not.
