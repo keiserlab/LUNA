@@ -123,7 +123,8 @@ def get_entity_from_entry(entity, entry, model=0):
 
         if entry.chain_id in model.child_dict:
             chain = model[entry.chain_id]
-            if entry.is_hetatm():
+
+            if entry.comp_name and entry.comp_num:
                 ligand_key = entry.get_biopython_key()
                 if ligand_key in chain.child_dict:
                     target_entity = chain[ligand_key]
