@@ -11,6 +11,11 @@
 # 1) The module __lt__ was overwritten to allow sorting in Python 3
 # 2) Inherit inhouse modifications. Package: MyBio.
 
+# Date: 02/22/2019
+# 1) Added property "_is_target" to control chains that will be targets for some processing.
+# 2) Added function "is_target() to verify the status of the is_target variable.
+# 3) Added function "set_as_target()" to allow the definition if a chain is a target or not.
+
 # Each line or block with modifications contain a MODBY tag.
 
 ###################################################################
@@ -26,6 +31,11 @@ from MyBio.PDB.Entity import Entity
 class Chain(Entity):
     def __init__(self, id):
         self.level = "C"
+
+        # MODBY: Alexandre Fassio
+        # By default: no chain is a target for any calculations.
+        self._is_target = False
+
         Entity.__init__(self, id)
 
     # Special methods
@@ -154,6 +164,11 @@ class Chain(Entity):
         id = self._translate_id(id)
         return Entity.has_id(self, id)
 
+    # MODBY: Alexandre Fassio
+    # Check if a chain is a target, i.e., if it will be used for any calculations.
+    def is_target(self):
+        return self._is_target
+
     # Public
 
     def get_residues(self):
@@ -164,3 +179,11 @@ class Chain(Entity):
         for r in self.get_residues():
             for a in r:
                 yield a
+
+    # MODBY: Alexandre Fassio
+    # Define if all the residues in the chain are a target or not.
+    def set_as_target(self, is_target=True):
+        self._is_target = is_target
+
+        for r in self.get_residues():
+            r.set_as_target(is_target)
