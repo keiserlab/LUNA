@@ -231,7 +231,6 @@ class InteractionCalculator:
         # Weak donor - weak acceptor
 
         # Dipole-dipole interaction
-        # Amide-pi bond
         # Agostic and Hydrogen-Bonding X–H· · · M
 
         # Sulfur interactions - Bissantz 2010; Taylor 2016

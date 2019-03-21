@@ -80,8 +80,7 @@ class Fingerprint:
         unfolding_map = dict(fp.unfolding_map)
         props = dict(fp.props)
 
-        new_fp = cls.from_indices(fp.indices, fp.fp_length, unfolded_fp=unfolded_fp,
-                                  unfolding_map=unfolding_map, props=props)
+        new_fp = cls.from_indices(fp.indices, fp.fp_length, unfolded_fp=unfolded_fp, unfolding_map=unfolding_map, props=props)
 
         return new_fp
 

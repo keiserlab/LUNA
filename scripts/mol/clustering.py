@@ -33,8 +33,7 @@ def calc_distance_matrix(fps, similarity_func="BulkTanimotoSimilarity"):
     return dists
 
 
-def cluster_fps_butina(fps, cutoff=0.2,
-                       similarity_func="BulkTanimotoSimilarity"):
+def cluster_fps_butina(fps, cutoff=0.2, similarity_func="BulkTanimotoSimilarity"):
     logger.info("Trying to clusterize %d molecules." % len(fps))
     logger.info("Defined cutoff: %.2f. Defined similarity function: %s."
                 % (cutoff, similarity_func))

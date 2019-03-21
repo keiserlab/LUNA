@@ -230,7 +230,7 @@ class Atom(object):
 
     # MODBY: Alexandre Fassio
     # Included function get_parent_by_level
-    # As the Atom class only (partly) implements the Entity interface, this function were included in both classes.
+    # As the Atom class only partly implements the Entity interface, this function were included in both classes.
     def get_parent_by_level(self, level):
         """Return the parent Entity object in the specified level."""
         if (self.level == level):
