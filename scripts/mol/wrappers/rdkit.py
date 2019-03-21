@@ -1,27 +1,42 @@
 from util.exceptions import IllegalArgumentError
 from util.file import get_file_format
-from rdkit.Chem import (MolFromMolBlock, MolFromMol2Block)
+from rdkit.Chem import MolFromMolBlock, MolFromMol2Block, SanitizeFlags, SanitizeMol
 
+import logging
 
-FORMATS = ("mol2", "mol", "mdl", "sdf", "sd")
+logger = logging.getLogger()
+
+RDKIT_FORMATS = ("mol2", "mol", "mdl", "sdf", "sd")
 
 
 def new_mol_from_block(block, mol_format, sanitize=True, removeHs=True):
     if mol_format == "mol2":
-        return MolFromMol2Block(block, sanitize=sanitize, removeHs=removeHs)
-    elif mol_format in FORMATS:
-        return MolFromMolBlock(block, sanitize=sanitize, removeHs=removeHs)
+        # First it creates the molecule without applying the sanitization function.
+        rdk_mol = MolFromMol2Block(block, sanitize=False, removeHs=removeHs)
+    elif mol_format in RDKIT_FORMATS:
+        # First it creates the molecule without applying the sanitization function.
+        rdk_mol = MolFromMolBlock(block, sanitize=False, removeHs=removeHs)
     else:
-        raise IllegalArgumentError("Invalid '%s' format. The accepted formats are: %s." % (mol_format, ",".join(FORMATS)))
+        raise IllegalArgumentError("Invalid '%s' format. The accepted formats are: %s." % (mol_format, ",".join(RDKIT_FORMATS)))
+
+    # Now it sanitizes the molecule if necessary.
+    # We do it here in order to catch an Exception while performing the sanitization.
+    if sanitize:
+        try:
+            SanitizeMol(rdk_mol, SanitizeFlags.SANITIZE_ALL)
+        except Exception as e:
+            logger.exception(e)
+            return None
+    return rdk_mol
 
 
 def read_multimol_file(mol_file, mol_file_format=None, targets=None, sanitize=True, removeHs=True):
 
     ext = mol_file_format or get_file_format(mol_file)
 
-    if ext not in FORMATS:
-        raise IllegalArgumentError("Format '%s' informed or assumed by the filename is invalid. The accepted formats are: %s."
-                                   % (ext, ",".join(FORMATS)))
+    if ext not in RDKIT_FORMATS:
+        raise IllegalArgumentError("Format '%s' informed or assumed from the filename is invalid. The accepted formats are: %s."
+                                   % (ext, ",".join(RDKIT_FORMATS)))
 
     with open(mol_file, "r") as IN:
 
@@ -70,11 +85,12 @@ def read_multimol_file(mol_file, mol_file_format=None, targets=None, sanitize=Tr
                     elif line.startswith("$$$$") is False:
                         mol.append(line)
             except StopIteration:
-                mol_id = mol[1].strip() if ext == "mol2" else mol[0].strip()
-                # If a target list is informed, create a new molecule only if it is in the list.
-                if targets is None or (targets is not None and mol_id in targets):
-                    # Create a new RDKit object
-                    yield(new_mol_from_block("".join(mol), ext, sanitize, removeHs))
+                if mol:
+                    mol_id = mol[1].strip() if ext == "mol2" else mol[0].strip()
+                    # If a target list is informed, create a new molecule only if it is in the list.
+                    if targets is None or (targets is not None and mol_id in targets):
+                        # Create a new RDKit object
+                        yield(new_mol_from_block("".join(mol), ext, sanitize, removeHs))
                 break
 
             # If all target compounds were already found, just break the loop.
