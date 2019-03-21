@@ -1,35 +1,17 @@
-from mol.wrappers.pymol import (PymolWrapper, PymolColorMap, mybio_to_pymol_selection)
+from mol.wrappers.pymol import PymolWrapper, mybio_to_pymol_selection
 from util.exceptions import PymolSessionNotInitialized
+from util.default_values import PYMOL_INTERACTION_COLOR
+
 
 import logging
 
 logger = logging.getLogger()
 
-DEFAULT_INTERACTIONS_COLOR = {
-    "Proximal": "gray60",
-    "Hydrogen bond": "tv_blue",
-    "Water-bridged hydrogen bond": "lightblue",
-    "Weak hydrogen bond": "lightteal",
-    "Attractive": "forest",
-    "Salt bridge": "palegreen",
-    "Cation-pi": "salmon",
-    "Edge-to-face pi-stacking": "tv_red",
-    "Face-to-face pi-stacking": "tv_red",
-    "Parallel-displaced pi-stacking": "tv_red",
-    "Hydrophobic": "orange",
-    "Halogen bond": "aquamarine",
-    "Repulsive": "violetpurple",
-    "Pi-stacking": "tv_red",
-    "Covalent bond": "black"
-}
-
-DEFAULT_INTER_COLOR_MAP = PymolColorMap(DEFAULT_INTERACTIONS_COLOR, "white")
-
 
 class PymolShellViewer:
 
     def __init__(self, input_file, show_cartoon=False, bg_color="white", pharm_color=None,
-                 inter_color=DEFAULT_INTER_COLOR_MAP, pse_export_version="1.8"):
+                 inter_color=PYMOL_INTERACTION_COLOR, pse_export_version="1.8"):
 
         self.input_file = input_file
         self.show_cartoon = show_cartoon

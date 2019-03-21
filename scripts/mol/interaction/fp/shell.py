@@ -1,13 +1,13 @@
 from util.exceptions import ShellCenterNotFound
 
-from util.default_values import (CHEMICAL_FEATURES_IDS, INTERACTIONS_IDS)
+from util.default_values import CHEMICAL_FEATURE_IDS, INTERACTION_IDS
 
 from Bio.KDTree import KDTree
 
-from itertools import (chain, product)
+from itertools import chain, product
 from collections import defaultdict
 
-from mol.interaction.fp.fingerprint import (DEFAULT_SHELL_NBITS, Fingerprint, CountFingerprint)
+from mol.interaction.fp.fingerprint import DEFAULT_SHELL_NBITS, Fingerprint, CountFingerprint
 
 import numpy as np
 import mmh3
@@ -244,7 +244,7 @@ class Shell:
 
         # TODO: FIX IT.
         if not feature_mapper:
-            default_dict = {**CHEMICAL_FEATURES_IDS, **INTERACTIONS_IDS}
+            default_dict = {**CHEMICAL_FEATURE_IDS, **INTERACTION_IDS}
             # TODO: Built a class for managing the feature maps.
             # TODO: Attribute a unique id for each new feature.
             # feature_mapper = defaultdict(lambda: -1, default_dict)
