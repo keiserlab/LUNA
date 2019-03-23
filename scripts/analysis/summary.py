@@ -2,8 +2,10 @@ from collections import defaultdict
 import logging
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
+
+# TODO: fix this code to accept the new format of AtomGroups as the atoms can be from different compounds
 
 def count_group_types(compound, key_map={}):
     grp_types = defaultdict(int)
@@ -15,10 +17,7 @@ def count_group_types(compound, key_map={}):
                 if key in key_map:
                     key = key_map[key]
                 else:
-                    logger.warning("Does not exist a corresponding "
-                                   "mapping to the key '%s'. "
-                                   "It will be ignored."
-                                   % key)
+                    logger.warning("Does not exist a corresponding mapping to the key '%s'. It will be ignored." % key)
                     continue
 
             grp_types[key] += 1

@@ -34,6 +34,10 @@ def get_interacting_residues(interactions, targets, key_map={}):
 
     for i in interactions:
         if (i.atm_grp1.compound in targets and i.atm_grp2.compound.is_aminoacid()):
+
+        # TODO: fix this code to accept the new format of AtomGroups as the atoms can be from different compounds
+        # if (any([c in targets for c in i.atm_grp1.compounds]) and i.atm_grp2.is_aminoacid())
+
             res.add(i.atm_grp2.compound)
             res_inter.add((i.atm_grp2.compound, i.type))
             res_inter_atm.add((i.atm_grp2.compound, i.type, i.atm_grp2))
