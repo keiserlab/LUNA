@@ -6,8 +6,7 @@ DEFAULT_ALTLOC = ("A", "1")
 
 class Selector(Select):
 
-    def __init__(self, entries, keep_hydrog=True, keep_altloc=True, altloc=DEFAULT_ALTLOC):
-        self.entries = entries
+    def __init__(self, keep_hydrog=True, keep_altloc=True, altloc=DEFAULT_ALTLOC):
         self.keep_hydrog = keep_hydrog
         self.keep_altloc = keep_altloc
         self.altloc = altloc
@@ -24,17 +23,33 @@ class Selector(Select):
 
 class ResidueSelectorByResSeq(Selector):
 
+    def __init__(self, entries, **kwargs):
+        self.entries = entries
+        super().__init__(**kwargs)
+
     def accept_residue(self, res):
         return True if (res.get_id()[1] in self.entries) else False
 
 
+class ChainSelector(Selector):
+
+    def __init__(self, entries, **kwargs):
+        self.entries = entries
+        super().__init__(**kwargs)
+
+    def accept_chain(self, chain):
+        return True if (chain in self.entries) else False
+
+
 class ResidueSelector(Selector):
+
+    def __init__(self, entries, **kwargs):
+        self.entries = entries
+        super().__init__(**kwargs)
 
     def accept_residue(self, res):
         return res in self.entries
 
 
-class ChainSelector(Selector):
-
-    def accept_chain(self, chain):
-        return True if (chain in self.entries) else False
+class AtomSelector(Selector):
+    pass
