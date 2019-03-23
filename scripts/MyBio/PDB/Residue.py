@@ -43,7 +43,6 @@ from MyBio.PDB.PDBExceptions import PDBConstructionException
 from MyBio.PDB.Entity import Entity, DisorderedEntityWrapper
 from Bio.PDB.Polypeptide import is_aa
 
-
 _atom_name_dict = {}
 _atom_name_dict["N"] = 1
 _atom_name_dict["CA"] = 2
@@ -145,18 +144,19 @@ class Residue(Entity):
     # MODBY: Alexandre Fassio
     # Check if a residue is an hetero group.
     def is_hetatm(self):
-        """Return 1 if the residue is an hetero group."""
+        """Return True if the residue is an hetero group."""
         return self.get_id()[0].startswith("H_")
 
     # MODBY: Alexandre Fassio
     # Check if a residue is an amino acid.
     def is_aminoacid(self):
-        """Return 1 if the residue is an amino acid."""
-        return is_aa(self.resname)
+        """Return True if the residue is an amino acid."""
+        return self.get_id()[0] == " " and is_aa(self.resname)
 
     # MODBY: Alexandre Fassio
     # Check if a residue is a nucleotide.
     def is_nucleotide(self):
+        """Return True if the residue is a nucleic acid."""
         return self.get_id()[0] == " " and not self.is_aminoacid()
 
     # MODBY: Alexandre Fassio
