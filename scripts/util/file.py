@@ -1,5 +1,5 @@
-from os.path import (basename, exists, isdir, isfile, splitext)
-from os import makedirs
+from os.path import basename, exists, isdir, isfile, splitext
+from os import makedirs, remove
 from shutil import rmtree
 
 import string
@@ -10,46 +10,60 @@ import logging
 logger = logging.getLogger()
 
 
-def get_file_format(path, maxsplit=None):
-    return generic_splitext(path, maxsplit)[1][1:]
+def get_file_format(path, max_split=None):
+    return generic_splitext(path, max_split)[1][1:]
 
 
-def get_filename(path, maxsplit=None):
+def get_filename(path, max_split=None):
     return generic_splitext(path)[0]
 
 
-def generic_splitext(path, maxsplit=None):
+def generic_splitext(path, max_split=None):
     filename = basename(path)
 
-    numExt = filename.count('.') + 1
-    if (maxsplit is None or maxsplit < 1):
-        maxsplit = numExt
+    num_ext = filename.count('.') + 1
+    if (max_split is None or max_split < 1):
+        max_split = num_ext
     else:
-        maxsplit = min(maxsplit, numExt)
+        max_split = min(max_split, num_ext)
 
-    filename, fileExt = splitext(filename)
-    maxsplit -= 1
-    while maxsplit > 0:
-        filename, tmpFileExt = splitext(filename)
-        fileExt = tmpFileExt + fileExt
-        maxsplit -= 1
+    filename, ext = splitext(filename)
+    max_split -= 1
+    while max_split > 0:
+        filename, tmp_ext = splitext(filename)
+        ext = tmp_ext + ext
+        max_split -= 1
 
-    return (filename, fileExt)
+    return (filename, ext)
 
 
-def generate_json_file(json_data, outputFile):
+def generate_json_file(json_data, output_file):
     try:
         import simplejson as json
         logger.info("Module 'simplejson' imported.")
     except ImportError as e:
-        logger.exception(e)
-        logger.warning("Module 'simplejson not available.")
-        logger.warning("Built-in module 'json' will be imported.")
+        logger.info("Module 'simplejson' not available. Built-in module 'json' will be imported.")
         import json
 
     try:
-        with open(outputFile, "w") as f:
-            json.dump(json_data, f, indent=4, sort_keys=True)
+        with open(output_file, "w") as IN:
+            json.dump(json_data, IN, indent=4, sort_keys=True)
+    except Exception as e:
+        logger.exception(e)
+        raise
+
+
+def parse_json_file(json_file):
+    try:
+        import simplejson as json
+        logger.info("Module 'simplejson' imported.")
+    except ImportError as e:
+        logger.info("Module 'simplejson' not available. Built-in module 'json' will be imported.")
+        import json
+
+    try:
+        with open(json_file, "r") as IN:
+            return json.load(IN)
     except Exception as e:
         logger.exception(e)
         raise
@@ -67,6 +81,14 @@ def create_directory(path, clear=False):
     except OSError as e:
         logger.exception(e)
         raise
+
+
+def remove_files(files):
+    for f in files:
+        if exists(f):
+            remove(f)
+        else:
+            logger.info("File %s does not exist." % f)
 
 
 def clear_directory(path):
