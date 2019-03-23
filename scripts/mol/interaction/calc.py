@@ -6,8 +6,8 @@ from mol.interaction.type import InteractionType
 from mol.features import ChemicalFeature
 
 from openbabel import etab
-from operator import (le, ge)
-from itertools import (chain, combinations, product)
+from operator import le, ge
+from itertools import chain, combinations, product
 from collections import defaultdict
 from util.exceptions import IllegalArgumentError
 

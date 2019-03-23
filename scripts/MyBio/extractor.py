@@ -1,5 +1,5 @@
-from MyBio.util import try_save_2pdb
-from MyBio.selector import (ChainSelector, ResidueSelector)
+from MyBio.util import save_to_file
+from MyBio.selector import ChainSelector, ResidueSelector
 
 import logging
 
@@ -13,37 +13,34 @@ class Extractor():
     def __init__(self, entity):
         self.entity = entity
 
-    def extract_chains(self, chains, outputFile):
-        if (self.entity.level != "M"):
+    def extract_chains(self, chains, output_file):
+        if self.entity.level != "M":
             logger.warning("Target must be a Model object.")
         else:
-            selChains = set()
+            chain_sel = set()
             for chain in chains:
-                if (chain in self.target.child_dict):
-                    selChains.add(self.entity[chain])
+                if chain in self.target.child_dict:
+                    chain_sel.add(self.entity[chain])
                 else:
                     logger.warning("Chain %s does not exist." % chain)
 
-            if (len(selChains) > 0):
-                try_save_2pdb(self.entity, outputFile,
-                              ChainSelector(selChains))
+            if len(chain_sel) > 0:
+                save_to_file(self.entity, output_file, ChainSelector(chain_sel))
             else:
                 logger.warning("No valid chain to extract.")
 
-    def extract_residues(self, residues, outputFile):
+    def extract_residues(self, residues, output_file):
         if (self.entity.level != "C"):
             logger.warning("Target must be a Chain object.")
         else:
-            selResidues = set()
-
+            res_sel = set()
             for res in residues:
                 if (res in self.entity.child_dict):
-                    selResidues.add(self.entity[res])
+                    res_sel.add(self.entity[res])
                 else:
                     logger.warning("Residue %s does not exist." % str(res))
 
-            if (len(selResidues) > 0):
-                try_save_2pdb(self.entity, outputFile,
-                              ResidueSelector(selResidues))
+            if len(res_sel) > 0:
+                save_to_file(self.entity, output_file, ResidueSelector(res_sel))
             else:
                 logger.warning("No valid residue to extract.")

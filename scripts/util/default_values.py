@@ -12,8 +12,8 @@ TMP_FILES = "%s/public/tmp" % NAPOLI_PATH
 CONF_PATH = path.abspath(path.join(path.realpath(__file__), '../../../', 'data'))
 DB_CONF_FILE = "%s/.mysql.ini" % CONF_PATH
 ATOM_PROP_FILE = "%s/Napoli.fdef" % CONF_PATH
-INTERACTION_CONF = DefaultInteractionConf()
 
+INTERACTION_CONF = DefaultInteractionConf()
 BOUNDARY_CONF = InteractionConf({"boundary_cutoff": 7})
 
 NMR_METHODS = ["SOLID-STATE NMR", "SOLUTION NMR"]
