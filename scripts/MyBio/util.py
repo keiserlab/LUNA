@@ -1,17 +1,18 @@
-from util.exceptions import (IllegalArgumentError, MoleculeNotFoundError, ChainNotFoundError)
+import logging
+from openbabel import etab
+from io import StringIO
+from shutil import move as rename_pdb_file
+from itertools import product
+
+from util.exceptions import IllegalArgumentError, MoleculeNotFoundError, ChainNotFoundError
 from util.file import is_directory_valid
 from util.default_values import ENTRY_SEPARATOR
-
 from MyBio.PDB.PDBList import PDBList
 from MyBio.PDB.PDBIO import Select
 from MyBio.PDB.PDBIO import PDBIO
 from MyBio.PDB.PDBParser import PDBParser
-from util.exceptions import (FileNotCreated, PDBNotReadError)
+from util.exceptions import FileNotCreated, PDBNotReadError
 
-from io import StringIO
-from shutil import move as rename_pdb_file
-
-import logging
 
 logger = logging.getLogger()
 
@@ -138,3 +139,155 @@ def get_entity_from_entry(entity, entry, model=0):
                                      (entry.chain_id, entry.to_string(ENTRY_SEPARATOR), structure.get_id()))
 
         return target_entity
+
+
+def get_residue_neighbors(residue, select=Select()):
+
+    # TODO: add index as a property of the residue.
+    for idx, res in enumerate(residue.parent.child_list):
+        if residue == res:
+            break
+
+    # Get valid atoms according to the provided selection function.
+    trgt_res_atms = {atm.name: atm for atm in residue.get_atoms() if select.accept_atom(atm)}
+
+    print(trgt_res_atms.keys())
+    print()
+
+    if residue.is_aminoacid():
+        if "N" not in trgt_res_atms:
+            logger.warning("There is a missing N in the residue %s. It may have been filtered out by the provided "
+                           "selection function. So, the predecessor residue cannot be identified." % residue)
+        if "C" not in trgt_res_atms:
+            logger.warning("There is a missing C in the residue %s. It may have been filtered out by the provided "
+                           "selection function. So, the successor residue cannot be identified." % residue)
+
+        # If neither N and C are available in the valid atom list.
+        if "N" not in trgt_res_atms and "C" not in trgt_res_atms:
+            return {}
+
+        neighbors = {}
+        # If the chain has a residue coming before the target residue.
+        if idx - 1 >= 0:
+            # First residue before the target in the chain list.
+            prev_res = residue.parent.child_list[idx - 1]
+            # Get valid atoms according to the provided selection function.
+            prev_res_atms = {atm.name: atm for atm in prev_res.get_atoms() if select.accept_atom(atm)}
+
+            # A peptide bond exists between the C of one amino acid and the N of another.
+            if "C" in prev_res_atms and "N" in trgt_res_atms:
+                # Distance atom-atom
+                dist = trgt_res_atms["N"] - prev_res_atms["C"]
+                # Covalent radius
+                cov1 = etab.GetCovalentRad(etab.GetAtomicNum(trgt_res_atms["N"].element))
+                cov2 = etab.GetCovalentRad(etab.GetAtomicNum(prev_res_atms["C"].element))
+                # OpenBabel thresholds.
+                if 0.4 <= dist <= cov1 + cov2 + 0.45:
+                    neighbors["previous"] = prev_res
+                else:
+                    logger.warning("The first residue before %s is too distant to fulfill the covalent thresholds. "
+                                   "It may be an indication of bad atom positioning or that there are missing residues." % residue)
+            elif "C" not in prev_res_atms:
+                logger.warning("There is a missing C in %s, the first residue before %s in the chain list. "
+                               "It may have been filtered out by the provided selection function. "
+                               "So, the predecessor residue cannot be identified." % (prev_res, residue))
+        # Otherwise, it could mean that the residue is the first one in the sequence or there are missing residues.
+        else:
+            logger.warning("The residue %s seems not to have any predecessor residue. "
+                           "It may be the first in the chain sequence or there are missing residues." % residue)
+
+        # If the chain has a residue coming after the target residue.
+        if idx + 1 < len(residue.parent.child_list):
+            # First residue after the target in the chain list.
+            next_res = residue.parent.child_list[idx + 1]
+            # Get valid atoms according to the provided selection function.
+            next_res_atms = {atm.name: atm for atm in next_res.get_atoms() if select.accept_atom(atm)}
+
+            # A peptide bond exists between the C of one amino acid and the N of another.
+            if "C" in trgt_res_atms and "N" in next_res_atms:
+                # Distance atom-atom
+                dist = next_res_atms["N"] - trgt_res_atms["C"]
+                # Covalent radius
+                cov1 = etab.GetCovalentRad(etab.GetAtomicNum(next_res_atms["N"].element))
+                cov2 = etab.GetCovalentRad(etab.GetAtomicNum(trgt_res_atms["C"].element))
+
+                # OpenBabel thresholds.
+                if 0.4 <= dist <= cov1 + cov2 + 0.45:
+                    neighbors["next"] = next_res
+                else:
+                    logger.warning("The first residue after %s is too distant to fulfill the covalent thresholds. "
+                                   "It may be an indication of bad atom positioning or that there are missing residues." % residue)
+            elif "N" in next_res_atms:
+                logger.warning("There is a missing N in %s, the first residue after %s in the chain list. "
+                               "It may have been filtered out by the provided selection function. "
+                               "So, the predecessor residue cannot be identified." % (prev_res, residue))
+        # Otherwise, it could mean that the residue is the last one in the sequence or there are missing residues.
+        else:
+
+            logger.warning("The residue %s seems not to have any successor residue. "
+                           "It may be the last in the chain sequence or there are missing residues." % residue)
+
+        return neighbors
+    else:
+        # First residue before the target in the chain list.
+        prev_res = residue.parent.child_list[idx - 1]
+        # Get valid atoms according to the provided selection function.
+        prev_res_atms = {atm.name: atm for atm in prev_res.get_atoms() if select.accept_atom(atm)}
+
+        neighbors = {}
+        # If the chain has a residue coming before the target residue.
+        if idx - 1 >= 0:
+            # First residue before the target in the chain list.
+            prev_res = residue.parent.child_list[idx - 1]
+            # Get valid atoms according to the provided selection function.
+            prev_res_atms = {atm.name: atm for atm in prev_res.get_atoms() if select.accept_atom(atm)}
+
+            for prev_atm, trgt_atm in product(prev_res_atms.values(), trgt_res_atms.values()):
+                # Distance atom-atom
+                dist = trgt_atm - prev_atm
+                # Covalent radius
+                cov1 = etab.GetCovalentRad(etab.GetAtomicNum(trgt_atm.element))
+                cov2 = etab.GetCovalentRad(etab.GetAtomicNum(prev_atm.element))
+
+                # OpenBabel thresholds.
+                if 0.4 <= dist <= cov1 + cov2 + 0.45:
+                    neighbors["previous"] = prev_res
+                    break
+
+            if "previous" not in neighbors:
+                logger.warning("The first residue after %s is too distant to fulfill the covalent thresholds. "
+                               "It may be an indication of bad atom positioning or that there are missing residues." % residue)
+        # Otherwise, it could mean that the residue is the first one in the sequence or there are missing residues.
+        else:
+            logger.warning("The residue %s seems not to have any predecessor residue. "
+                           "It may be the first in the chain sequence or there are missing residues." % residue)
+
+        # If the chain has a residue coming after the target residue.
+        if idx + 1 < len(residue.parent.child_list):
+            # First residue after the target in the chain list.
+            next_res = residue.parent.child_list[idx + 1]
+            # Get valid atoms according to the provided selection function.
+            next_res_atms = {atm.name: atm for atm in next_res.get_atoms() if select.accept_atom(atm)}
+
+            # Check each pair of atoms for covalently bonded atoms.
+            for next_atm, trgt_atm in product(next_res_atms.values(), trgt_res_atms.values()):
+                # Distance atom-atom
+                dist = trgt_atm - next_atm
+                # Covalent radius
+                cov1 = etab.GetCovalentRad(etab.GetAtomicNum(trgt_atm.element))
+                cov2 = etab.GetCovalentRad(etab.GetAtomicNum(next_atm.element))
+
+                # OpenBabel thresholds.
+                if 0.4 <= dist <= cov1 + cov2 + 0.45:
+                    neighbors["next"] = next_res
+                    break
+
+            if "next" not in neighbors:
+                logger.warning("The first residue after %s is too distant to fulfill the covalent thresholds. "
+                               "It may be an indication of bad atom positioning or that there are missing residues." % residue)
+        # Otherwise, it could mean that the residue is the last one in the sequence or there are missing residues.
+        else:
+            logger.warning("The residue %s seems not to have any successor residue. "
+                           "It may be the last in the chain sequence or there are missing residues." % residue)
+
+        return neighbors
