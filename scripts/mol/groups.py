@@ -1,22 +1,24 @@
-from MyBio.selector import ResidueSelector
-from MyBio.util import save_to_file
+from collections import defaultdict
+from rdkit.Chem import MolFromMolBlock, MolFromMolFile, SanitizeFlags, SanitizeMol
+from pybel import readfile
 
-import mol.interaction.math as im
+
+from MyBio.selector import ResidueSelector, AtomSelector
+from MyBio.util import save_to_file, get_residue_neighbors
 
 from mol.interaction.contact import get_contacts_for_entity
-from mol.neighborhood import (NbAtom, NbAtomData)
+from mol.neighborhood import NbAtom, NbAtomData
 from mol.charge_model import OpenEyeModel
 from mol.validator import MolValidator
 from mol.wrappers.obabel import convert_molecule
 from mol.wrappers.base import MolWrapper
-from util.file import get_unique_filename
+from mol.amino_features import DEFAULT_AMINO_ATM_FEATURES
+from mol.features import ChemicalFeature
+from util.file import get_unique_filename, remove_files
 from util.exceptions import MoleculeSizeError, IllegalArgumentError, MoleculeObjectError
 from util.default_values import ACCEPTED_MOL_OBJ_TYPES
 
-from rdkit.Chem import MolFromMolBlock, MolFromMolFile, SanitizeFlags, SanitizeMol
-from pybel import readfile
-
-from collections import defaultdict
+import mol.interaction.math as im
 
 import logging
 logger = logging.getLogger()
@@ -204,6 +206,78 @@ class CompoundGroupPerceiver():
         self.radius = radius
 
     def perceive_compound_groups(self, target_residue, mol_obj=None, only_grps_with_target=True):
+
+        print(target_residue)
+        print()
+
+        if target_residue.resname in DEFAULT_AMINO_ATM_FEATURES:
+
+            # Recover all atoms from the previous selected residues.
+            res_list = [target_residue]
+            res_sel = ResidueSelector(res_list, keep_altloc=False, keep_hydrog=False)
+            atoms = [a for r in res_list for a in r.get_unpacked_list() if res_sel.accept_atom(a)]
+
+            atm_map = {atm.name: NbAtom(atm) for atm in atoms}
+
+            comp_grps = CompoundGroups(target_residue, only_grps_with_target=only_grps_with_target)
+            # atm_grp = AtomGroup(atoms, grp_obj["features"], recursive=True)
+            # comp_grps.add_group(atm_grp)
+
+            neighbors = get_residue_neighbors(target_residue, AtomSelector(keep_altloc=False, keep_hydrog=False))
+
+            print()
+            print(neighbors)
+            print()
+
+            # TODO: How to detect if the residue is the first one? In this case the N is +.
+            # TODO: What to do when there is a covalent ligand?
+            # TODO: What to do with hydrogens if the person asked to add it?
+
+            for atms_str in DEFAULT_AMINO_ATM_FEATURES[target_residue.resname]:
+                nb_atoms = []
+                missing_atoms = []
+                for atm_name in atms_str.split(","):
+                    if atm_name in atm_map:
+                        nb_atoms.append(atm_map[atm_name])
+                    else:
+                        missing_atoms.append(atm_name)
+
+                if missing_atoms:
+                    # If the only missing atom is the OXT.
+                    if len(missing_atoms) == 1 and missing_atoms[0] == "OXT":
+                        # If there is no successor residue, it may be an indication that there is a missing atom, the OXT in this case.
+                        # But, sometimes not having the successor residue may be caused by missing residues instead of missing atoms.
+                        # As it is not so important, we will always print the alert.
+                        if "next" not in neighbors:
+                            logger.warning("The group composed by the atoms '%s' will be ignored because the OXT atom is missing in the "
+                                           "residue %s. If the atom is not the C-terminal just ignore this message. "
+                                           % (atms_str.replace(",", ", "), target_residue))
+                    else:
+                        logger.warning("The group composed by the atoms '%s' will be ignored because some of them were not found in "
+                                       "the residue %s. The missing atoms are: %s." % (atms_str.replace(",", ", "), target_residue,
+                                                                                       ", ".join(missing_atoms)))
+                else:
+                    features = [ChemicalFeature(f) for f in DEFAULT_AMINO_ATM_FEATURES[target_residue.resname][atms_str].split(",")]
+                    atm_grp = AtomGroup(nb_atoms, features, recursive=True)
+                    comp_grps.add_group(atm_grp)
+
+            # if "previous" in neighbors:
+                # TODO: How to add amide groups?
+                    # N + prev(O, C)
+                    # O, C + next(N)
+
+
+        # Select atoms from the target to remove occupancy
+        # Create a NBAtom for each atom.
+        # Get Neighbors:
+            # Check distance: 0.4 <= d(a1, a2) <= cov_rad(a1) + cov_rad(a2) + 0.45 (OpenBabel)
+            # Coord
+            # NBAtomData
+            # Add nb atom
+        # Add features
+
+        exit()
+
         # If no OBMol object was defined and expand_selection was set ON, it will get all residues around the
         # target and create a new OBMol object with them.
         if mol_obj is None and self.expand_selection:
@@ -227,7 +301,7 @@ class CompoundGroupPerceiver():
             raise MoleculeSizeError("The number of heavy atoms in the PDB selection and in the MOL file are different.")
 
         # Ignore hydrogen atoms
-        atm_obj_list = [atm for atm in mol_obj.get_atoms(wrappered=True) if atm.get_atomic_num() != 1]
+        atm_obj_list = [atm for atm in mol_obj.get_atoms(wrapped=True) if atm.get_atomic_num() != 1]
 
         atm_map = {}
         trgt_atms = {}
@@ -236,9 +310,9 @@ class CompoundGroupPerceiver():
             trgt_atms[atoms[i].serial_number] = NbAtom(atoms[i])
 
         # Set all neighbors, i.e., covalently bonded atoms.
-        for bond_obj in mol_obj.get_bonds(wrappered=True):
-            bgn_atm_obj = bond_obj.get_begin_atom(wrappered=True)
-            end_atm_obj = bond_obj.get_end_atom(wrappered=True)
+        for bond_obj in mol_obj.get_bonds(wrapped=True):
+            bgn_atm_obj = bond_obj.get_begin_atom(wrapped=True)
+            end_atm_obj = bond_obj.get_end_atom(wrapped=True)
 
             # At least one of the atoms must be a non-hydrogen atom.
             if bgn_atm_obj.get_atomic_num() != 1 or end_atm_obj.get_atomic_num() != 1:
@@ -300,6 +374,7 @@ class CompoundGroupPerceiver():
                 ob_opt["h"] = ""
         convert_molecule(pdb_file, mol_file, opt=ob_opt, openbabel='/usr/bin/obabel')
 
+        mol_obj = None
         if self.amend_mol:
             logger.info("A validation will be performed and it will try to fix some errors.")
 
@@ -316,16 +391,13 @@ class CompoundGroupPerceiver():
             if not is_valid:
                 logger.warning("The molecular file '%s' contain invalid atoms. Check the logs for more information." % mol_file)
 
-            if self.mol_obj_type == "openbabel":
-                return mol_obj
-            else:
+            if self.mol_obj_type == "rdkit":
                 try:
-                    # The sanitization is set off. We will apply it in the next statement.
-                    rdk_mol = MolFromMolBlock(mol_obj.write('mol'), sanitize=False, removeHs=False)
+                    # The sanitization is set off. We will apply it in the next step.
+                    mol_obj = MolFromMolBlock(mol_obj.write('mol'), sanitize=False, removeHs=False)
                     # Sanitize molecule is applied now, so we will be able to catch the exceptions raised by RDKit,
                     # otherwise it would not be possible.
-                    SanitizeMol(rdk_mol, SanitizeFlags.SANITIZE_ALL)
-                    return rdk_mol
+                    SanitizeMol(mol_obj, SanitizeFlags.SANITIZE_ALL)
                 except Exception as e:
                     logger.exception(e)
                     raise MoleculeObjectError("An error occurred while parsing the molecular block generated by Open Babel with "
@@ -334,16 +406,20 @@ class CompoundGroupPerceiver():
             try:
                 # Create a new Mol object.
                 if self.mol_obj_type == "openbabel":
-                    return next(readfile("mol", mol_file))
+                    mol_obj = next(readfile("mol", mol_file))
                 else:
                     # The sanitization is set off. We will apply it in the next statement.
-                    rdk_mol = MolFromMolFile(mol_file, sanitize=False, removeHs=False)
+                    mol_obj = MolFromMolFile(mol_file, sanitize=False, removeHs=False)
                     # Sanitize molecule is applied now, so we will be able to catch the exceptions raised by RDKit,
                     # otherwise it would not be possible.
-                    SanitizeMol(rdk_mol, SanitizeFlags.SANITIZE_ALL)
-                    return rdk_mol
+                    SanitizeMol(mol_obj, SanitizeFlags.SANITIZE_ALL)
             except Exception as e:
                 logger.exception(e)
                 tool = "Open Babel" if self.mol_obj_type == "openbabel" else "RDKit"
                 raise MoleculeObjectError("An error occurred while parsing the file '%s' with %s and the molecule "
                                           "object could not be created. Check the logs for more information." % (mol_file, tool))
+
+        # Remove temporary files.
+        remove_files([pdb_file, mol_file])
+
+        return mol_obj
