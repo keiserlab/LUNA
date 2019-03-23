@@ -5,6 +5,8 @@
 *.bak
 *.log
 
+test*.py
+
 .project
 .pydevproject
 
@@ -16,3 +18,28 @@ www/system
 www/application/config
 www/data
 __pycache__
+scripts/output
+
+scripts/0V8JNH63KZ8WOXAIJMJSSCA4BKW2J0FH_level-6_Sphere-768508393\.pse
+
+scripts/3qqk\.pdb
+
+*.pdb
+
+*.output
+
+scripts/out2
+
+scripts/output1
+
+scripts/output2
+
+*.csv
+
+scripts/compare_molecules\.py
+
+scripts/molecules_with_error\.py
+
+scripts/calc\.ods
+
+scripts/obsolete/
