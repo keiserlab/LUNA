@@ -1,7 +1,7 @@
 from rdkit import Chem
 from rdkit.Chem import ChemicalFeatures
 
-from mol.chemical_feature import FeatureExtractor
+from mol.features import FeatureExtractor
 from os.path import (basename, splitext)
 
 import glob
@@ -574,7 +574,7 @@ smiles = 'CN(O)C'
 # smiles = 'C[C@@H](O)CNC(=O)CC[C@]1(C)[C@@H](CC(N)=O)C2[N-]3C1=C(C)C1=[N]4C(=CC5=[N]6C(=C(C)C7=[N]([C@]2(C)[C@@](C)(CC(N)=O)[C@@H]7CCC(N)=O)[Co++]346)[C@@](C)(CC(N)=O)[C@@H]5CCC(N)=O)C(C)(C)[C@@H]1CCC(N)=O'
 # smiles = '[H][N]([H])([H])[Co+3]([N]([H])([H])[H])([N]([H])([H])[H])[N]([H])([H])[H]'
 
-# Boro
+# Be
 # smiles = 'F[Be-](F)F'
 
 # Mg
@@ -592,14 +592,30 @@ smiles = 'CN(O)C'
 
 
 # ALA
-smilse = 'C[C@H](N)C(O)=O'
+smiles = 'C[C@H](N)C(O)=O'
 
 # ASP
 # smiles = 'N[C@@H](CC(N)=O)C(O)=O'
 
-
-
 smiles = 'C#N'
+
+
+# Guanidine-like
+smiles = 'NC(N)=N'
+smiles = 'CCNC(N)=N'
+# Guanidine-like tautomer
+smiles = 'CCN=C(N)N'
+smiles = 'CC[NH+]=C(N)N'
+
+
+# Aromatic diformamide substructures.
+# Methyluracil
+smiles = 'Cn1ccc(=O)[nH]c1=O'
+# Uracil
+smiles = 'O=C1NC=CC(=O)N1'
+
+
+
 
 
 print()
@@ -607,6 +623,7 @@ print(smiles)
 print()
 
 mols = [Chem.MolFromSmiles(smiles)]
+
 
 
 # sdf = '../tmp/pharma_rules/ligand/4PO_ideal.sdf'
@@ -656,10 +673,10 @@ mols = [Chem.MolFromSmiles(smiles)]
 for rdmol in mols:
     group_features = feature_extractor.get_features_by_groups(rdmol)
     for grp in group_features:
-        atom_ids = group_features[grp]["atomIds"]
-        atom_symbols = [rdmol.GetAtomWithIdx(i).GetSymbol() for i in atom_ids]
+        atm_ids = group_features[grp]["atm_ids"]
+        atom_symbols = [rdmol.GetAtomWithIdx(i).GetSymbol() for i in atm_ids]
 
-        print("%s: %s, %s" % (group_features[grp]["features"], atom_ids, atom_symbols))
+        print("%s: %s, %s" % (group_features[grp]["features"], atm_ids, atom_symbols))
 
 exit()
 
@@ -670,8 +687,8 @@ for rdmol in mols:
 
     group_features = feature_extractor.get_features_by_groups(rdmol)
     for grp in group_features:
-        atom_ids = group_features[grp]["atomIds"]
-        atom_ids = [atom_names_by_id[str(x)] for x in atom_ids]
-        print("%s: %s" % (group_features[grp]["features"], atom_ids))
+        atm_ids = group_features[grp]["atm_ids"]
+        atm_ids = [atom_names_by_id[str(x)] for x in atm_ids]
+        print("%s: %s" % (group_features[grp]["features"], atm_ids))
 
     exit()
