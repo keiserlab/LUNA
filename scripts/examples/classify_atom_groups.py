@@ -113,7 +113,7 @@ feature_extractor = napoli_extractor
 
 
 # Nitro group
-#smiles = '[O-][N+](=O)c1cc(ccc1NCc1ccco1)C(F)(F)F'
+smiles = '[O-][N+](=O)c1cc(ccc1NCc1ccco1)C(F)(F)F'
 
 # smiles = 'NCC'
 
@@ -392,17 +392,23 @@ feature_extractor = napoli_extractor
 # smiles = 'ON1C(=O)Cc2ccccc2C1=O'
 # R2NO: N=O
 # Lig: R1A
-smiles = 'CC1(C)C=C(CSSC[C@H](N)C(O)=O)C(C)(C)[N+]1=O'
+# smiles = 'CC1(C)C=C(CSSC[C@H](N)C(O)=O)C(C)(C)[N+]1=O'
 # R2NO: N-O + N=O
 # Pubchem CID: 28467
 # smiles = 'C1=CC=C2C(=C1)N(C(=C([N+]2=O)CO)CO)[O-]'
 # R2NO: N-O
 # Pubchem CID: 15602694
 # smiles = 'CC1=C(C(=[N+](C(=C1Cl)C)[O-])Cl)C2=NC(=C3C=C(C(=O)C(=C3)O)[N+](=O)[O-])ON2'
+# ligand: 129
+# smiles = 'ON(CCP(O)(O)=O)C=O'
+# ligand: 0N7
+# smiles = 'ON1C(=O)Cc2ccccc2C1=O'
+# ligand: AL0
+# smiles = 'N[C@@H](CN(O)N=O)C(O)=O'
 
 # Lig: R3N
-smiles = 'COc1cc(cc(OC)c1OC)C(F)(F)C(=O)N1CCCC[C@H]1C(=O)O[C@@H](CCCc1ccccc1)CCCc1cccnc1'
-smiles = 'CN(O)C'
+# smiles = 'COc1cc(cc(OC)c1OC)C(F)(F)C(=O)N1CCCC[C@H]1C(=O)O[C@@H](CCCc1ccccc1)CCCc1cccnc1'
+# smiles = 'CN(O)C'
 
 # Sulfonyl-like
 # PDB: 1IDB
@@ -419,9 +425,10 @@ smiles = 'CN(O)C'
 # smiles = 'CS(C)=O'
 
 # Imine
-# PDB: 1NJF
-# Lig: ADP
+# PDB: 1NJF, Lig: ADP
 # smiles = 'Nc1ncnc2n(cnc12)[C@@H]1O[C@H](CO[P@@](O)(=O)OP(O)(O)=O)[C@@H](O)[C@H]1O'
+# methyl(propan-2-ylidene)amine
+# smiles = 'CN=C(C)C'
 
 # Ether
 # PDB: 1NM9
@@ -432,8 +439,7 @@ smiles = 'CN(O)C'
 # smiles = 'c1ccoc1'
 
 # Thioether
-# PDB: 1JFH
-# Lig: MA2
+# PDB: 1JFH, Lig: MA2
 # smiles = 'CS[C@@H]1[C@@H](CO)O[C@H](O)[C@H](O)[C@H]1O'
 # Thiophene
 # smiles = 'c1ccsc1'
@@ -592,31 +598,84 @@ smiles = 'CN(O)C'
 
 
 # ALA
-smiles = 'C[C@H](N)C(O)=O'
+# smiles = 'C[C@H](N)C(O)=O'
 
 # ASP
 # smiles = 'N[C@@H](CC(N)=O)C(O)=O'
 
-smiles = 'C#N'
+# smiles = 'C#N'
 
 
 # Guanidine-like
-smiles = 'NC(N)=N'
-smiles = 'CCNC(N)=N'
-# Guanidine-like tautomer
-smiles = 'CCN=C(N)N'
-smiles = 'CC[NH+]=C(N)N'
+# smiles = 'NC(N)=N'
+# smiles = 'CCNC(N)=N'
+# # Guanidine-like tautomer
+# smiles = 'CCN=C(N)N'
+# smiles = 'CC[NH+]=C(N)N'
 
 
 # Aromatic diformamide substructures.
 # Methyluracil
-smiles = 'Cn1ccc(=O)[nH]c1=O'
-# Uracil
-smiles = 'O=C1NC=CC(=O)N1'
+# smiles = 'Cn1ccc(=O)[nH]c1=O'
+# # Uracil
+# smiles = 'O=C1NC=CC(=O)N1'
 
 
 
+# # Chalcogen donors analysis
 
+# # Ligand id: MET
+# smiles = 'CSCC[C@H](N)C(O)=O'
+
+# # Ligand id: 798
+# smiles = 'O=C(c1ccc(OC[C@H]2CCCN2)cc1)c1ccc(cc1)-c1ccsc1'
+
+# # Ligand id: MCV
+# smiles = 'COc1ccc(OC)c(CCc2csc3nc(N)nc(N)c23)c1'
+
+# # Ligand id: BLT
+# smiles = 'OC[C@@H](OS([O-])([O-])[O-])[C@@H](O)C[Se+]1C[C@@H](O)[C@H](O)[C@H]1CO'
+
+# # Ligand id: 30V
+# smiles = 'N[C@@H](CS[Se]c1ccccc1C(N)=O)C(O)=O'
+
+# # Ligand id: TPP
+# smiles = 'Cc1c(CCO[P@@](O)(=O)OP(O)(O)=O)sc[n+]1Cc1cnc(C)nc1N'
+
+# # Ligand id: MTD
+# # smiles = 'C[Te]CC([O-])=O'
+
+# # Not contain chalcogen donor
+# # Ligand id: CYS
+# # smiles = 'N[C@@H](CS)C(O)=O'
+
+# #
+# # Isothiazoles: Chalcogen donors
+# #
+# smiles = 'S1C=CC=N1'
+
+# # Ligand id: 49J
+# smiles = 'COc1cc(ccc1N)-c1cnc2c(snc2c1)N1CCOCC1'
+
+# # Ligand id: NF6
+# smiles = 'CN(C)c1ccc2C(=O)N(CCNCc3nnc(C)s3)C(=O)c3cccc1c23'
+
+# # Ligand id: 69V
+# smiles = 'O=C(Cc1ccccc1)Nc1nnc(OC2CCN(CC2)c2nnc(NC(=O)Cc3ccccc3)s2)s1'
+
+# # Ligand id: A65
+# smiles = 'CSc1nsc(SC)c1CO'
+
+# # Ligand id: LTI
+# smiles = 'NC(=O)\\N=c1/s[nH]c(S[C@@H]2CCCCc3ccccc23)c1C(N)=O'
+
+# # Not contain chalcogen donor
+# # Ligand id: GBD
+# # smiles = 'OC(=O)c1nsnc1O'
+
+# smiles = 'CSc1cc([nH]n1)-c1sc(nc1C)-c1cccs1'
+
+# smiles = 'N[C@@H](CS)C(O)=O'
 
 print()
 print(smiles)
@@ -624,51 +683,28 @@ print()
 
 mols = [Chem.MolFromSmiles(smiles)]
 
-
-
-# sdf = '../tmp/pharma_rules/ligand/4PO_ideal.sdf'
-# mols = [Chem.MolFromMolFile(sdf)]
-
-# print()
-# print(Chem.MolToSmiles(mols[0]))
-# print()
-
-
-# pharm_symbols = {
-#     "Donor": "D",
-#     "WeakDonor": "d",
-#     "HalogenDonor": "x",
-#     "ChalcogenDonor": "y",
-#     "Acceptor": "A",
-#     "WeakAcceptor": "a",
-#     "PositiveIonizable": "+",
-#     "NegativeIonizable": "-",
-#     "Nucleophile": "n",
-#     "Electrophile": "e",
-#     "Aromatic": "r",
-#     "Hydrophobic": "h"
-# }
-
-# for rdmol in mols:
-#     mol_name = rdmol.GetProp("_Name")
-
-#     print()
-#     print([a.GetSymbol() for a in rdmol.GetAtoms()])
-#     print()
-
-#     features_by_atom = feature_extractor.get_features_by_atoms(rdmol)
-#     all_features = []
-
-#     for atm in rdmol.GetAtoms():
-#         features = ''
-#         if atm.GetIdx() in features_by_atom:
-#             features = [pharm_symbols[c.name] for c in features_by_atom[atm.GetIdx()]]
-
-#         all_features.append("/".join(features))
-
-#     print(all_features)
-
-# exit()
+CHEMICAL_FEATURE_IDS = {
+    # "Aromatic": 1,
+    # "Acceptor": 2,
+    # "Donor": 3,
+    # "Hydrophobe": 4,
+    # "Hydrophobic": 5,
+    # "Negative": 6,
+    # "Positive": 7,
+    # "Negatively ionizable": 8,
+    # "Positively ionizable": 9,
+    # "Halogen donor": 10,
+    # "Halogen acceptor": 11,
+    # "Metal": 12,
+    # "Lumped hydrophobe": 13,
+    # "Weak donor": 14,
+    # "Weak acceptor": 15,
+    "Electrophile": 16,
+    "Nucleophile": 17,
+    # "Chalcogen donor": 19,
+    # "Amide": 21,
+    # "Atom": 22
+}
 
 for rdmol in mols:
     group_features = feature_extractor.get_features_by_groups(rdmol)
@@ -676,7 +712,12 @@ for rdmol in mols:
         atm_ids = group_features[grp]["atm_ids"]
         atom_symbols = [rdmol.GetAtomWithIdx(i).GetSymbol() for i in atm_ids]
 
-        print("%s: %s, %s" % (group_features[grp]["features"], atm_ids, atom_symbols))
+        features = []
+        for f in group_features[grp]["features"]:
+            if f.name in CHEMICAL_FEATURE_IDS:
+                features.append(f.name)
+
+        print("%s, %s:\t%s" % (atm_ids, atom_symbols, features))
 
 exit()
 
