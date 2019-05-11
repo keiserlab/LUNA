@@ -23,6 +23,12 @@ Modifications included by Alexandre Fassio (alexandrefassio@dcc.ufmg.br).
 
 1) Now it recognizes different labels for waters: 'HOH', 'DOD', 'WAT', 'H2O', 'OH2'
 
+Modifications included by Alexandre Fassio (alexandrefassio@dcc.ufmg.br).
+    Date: 04/09/19
+
+1) Modified the line where the residue name is captured. There, I applied a strip function to remove any whitespace characters.
+    E.g.: Sodium id is in the format ' NA' and we want something like 'NA'.
+
 Each line or block with modifications contain a MODBY tag.
 
 ###################################################################
@@ -121,8 +127,11 @@ class PDBParser(object):
 
             self.header = None
             self.trailer = None
+
             # Make a StructureBuilder instance (pass id of structure as parameter)
-            self.structure_builder.init_structure(id)
+            # MODBY: Alexandre Fassio
+            # Now it pass the PDB file as a parameter
+            self.structure_builder.init_structure(id, file)
 
             with as_handle(file, mode='rU') as handle:
                 self._parse(handle.readlines())
@@ -242,7 +251,9 @@ class PDBParser(object):
                     # atom name is like " CA ", so we can strip spaces
                     name = split_list[0]
                 altloc = line[16]
-                resname = line[17:20]
+                # MODBY: Alexandre Fassio
+                # Applying a strip() on the residue name because some of them may have external whitespace characters.
+                resname = line[17:20].strip()
                 chainid = line[21]
                 try:
                     serial_number = int(line[6:11])

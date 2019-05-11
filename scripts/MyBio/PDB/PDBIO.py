@@ -143,7 +143,9 @@ class PDBIO(object):
             sb = StructureBuilder()
             # MODBY: Alexandre
             # Keeps the id from the original structure.
-            sb.init_structure(parent_struct.id)
+            # MODBY: Alexandre
+            # Now it pass the PDB file as a parameter
+            sb.init_structure(parent_struct.id, parent_struct.pdb_file)
             sb.init_seg(' ')
             # Build parts as necessary
             if pdb_object.level == "M":

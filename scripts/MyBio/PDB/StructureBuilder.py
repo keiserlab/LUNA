@@ -11,11 +11,14 @@
 
 # 1) Inherit inhouse modifications. Package: MyBio.
 # 2) StructureBuilder now keeps information of CONECT records.
-# 3) Identify hetero residues already added to a chain. 
-     If a hetero residue id already exists, i.e., a target residue was already added to the 
-     current chain, the algorithm checks if this residue has the same name as the already 
-     existing one. If so, all atoms from the target residue will be included as part of the 
+# 3) Identify hetero residues already added to a chain.
+     If a hetero residue id already exists, i.e., a target residue was already added to the
+     current chain, the algorithm checks if this residue has the same name as the already
+     existing one. If so, all atoms from the target residue will be included as part of the
      already existing one, otherwise, a new residue will be created.
+
+# Date: 04/08/19
+# 1) Create a new residue passing the new property (idx) as parameter.
 
 # Each line or block with modifications contain a MODBY tag.
 
@@ -86,14 +89,18 @@ class StructureBuilder(object):
         """
         self.line_counter = line_counter
 
-    def init_structure(self, structure_id):
+    # MODBY: Alexandre Fassio
+    # New parameter: the PDB file
+    def init_structure(self, structure_id, pdb_file=None):
         """Initiate a new Structure object with given id.
 
         Arguments:
          - id - string
 
         """
-        self.structure = Structure(structure_id)
+        # MODBY: Alexandre Fassio
+        # Now it pass the PDB file as a parameter to the Structure constructor.
+        self.structure = Structure(structure_id, pdb_file)
 
     def init_model(self, model_id, serial_num=None):
         """Initiate a new Model object with given id.
@@ -166,7 +173,9 @@ class StructureBuilder(object):
                     else:
                         # Make a new residue and add it to the already
                         # present DisorderedResidue
-                        new_residue = Residue(res_id, resname, self.segid)
+                        # MODBY: Alexandre Fassio
+                        # Create a new residue with the new property (idx) added to the Residue class.
+                        new_residue = Residue(res_id, resname, self.segid, len(self.chain.child_list))
                         duplicate_residue.disordered_add(new_residue)
                         self.residue = duplicate_residue
                         return
@@ -189,7 +198,10 @@ class StructureBuilder(object):
                             "Blank altlocs in duplicate residue %s ('%s', %i, '%s')"
                             % (resname, field, resseq, icode))
                     self.chain.detach_child(res_id)
-                    new_residue = Residue(res_id, resname, self.segid)
+
+                    # MODBY: Alexandre Fassio
+                    # Create a new residue with the new property (idx) added to the Residue class.
+                    new_residue = Residue(res_id, resname, self.segid, len(self.chain.child_list))
                     disordered_residue = DisorderedResidue(res_id)
                     self.chain.add(disordered_residue)
                     disordered_residue.disordered_add(duplicate_residue)
@@ -198,7 +210,7 @@ class StructureBuilder(object):
                     return
         else:
             # MODBY: Alexandre Fassio
-            # Identify hetero residues already added to a chain. 
+            # Identify hetero residues already added to a chain.
             if self.chain.has_id(res_id):
                 # There already is a hetero residue with the id (field, resseq, icode).
                 # It can occur when hydrogen atoms are added in the final of the PDB file.
@@ -214,7 +226,10 @@ class StructureBuilder(object):
                           PDBConstructionWarning)
                     self.residue = duplicate_residue
                     return
-        self.residue = Residue(res_id, resname, self.segid)
+
+        # MODBY: Alexandre Fassio
+        # Create a new residue with the new property (idx) added to the Residue class.
+        self.residue = Residue(res_id, resname, self.segid, len(self.chain.child_list))
         self.chain.add(self.residue)
 
     def init_atom(self, name, coord, b_factor, occupancy, altloc, fullname,

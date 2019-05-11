@@ -24,7 +24,10 @@ from MyBio.PDB.Entity import Entity
 class Structure(Entity):
     """The Structure class contains a collection of Model instances."""
 
-    def __init__(self, id):
+    # MODBY: Alexandre Fassio
+    # New property: PDB file.
+    def __init__(self, id, pdb_file=None):
+        self.pdb_file = pdb_file
         self.level = "S"
         Entity.__init__(self, id)
 
