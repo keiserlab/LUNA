@@ -212,6 +212,7 @@ class MolWrapper:
             if wrapped:
                 return [AtomWrapper(atm) for atm in atoms]
             return atoms
+        return []
 
     def get_bonds(self, wrapped=False):
         if self.is_rdkit_obj():
