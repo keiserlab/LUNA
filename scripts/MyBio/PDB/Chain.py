@@ -42,8 +42,8 @@ class Chain(Entity):
 
     # MODBY: Alexandre Fassio.
     # __lt__ method overwritten.
-    def __lt__(self, r2):
-        return self.id < r2.id
+    def __lt__(self, c2):
+        return self.id < c2.id
 
     # Private methods
 

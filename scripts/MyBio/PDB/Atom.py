@@ -7,10 +7,17 @@
 ###################################################################
 
 # Modifications included by Alexandre Fassio (alexandrefassio@dcc.ufmg.br).
-# Date: 19/02/2018.
 
+# Date: 02/19/2018.
+#
 # 1) Inherit inhouse modifications. Package: MyBio.
 # 2) Included function get_parent_by_level.
+#
+
+# Date: 03/26/2018.
+#
+# 1) The module __lt__ was overwritten to allow sorting in Python 3
+#
 
 # Each line or block with modifications contain a MODBY tag.
 
@@ -141,6 +148,11 @@ class Atom(object):
         diff = self.coord - other.coord
         return numpy.sqrt(numpy.dot(diff, diff))
 
+    # MODBY: Alexandre Fassio.
+    # __lt__ method overwritten.
+    def __lt__(self, a2):
+        return self.id < a2.id
+
     # set methods
 
     def set_serial_number(self, n):
@@ -233,7 +245,7 @@ class Atom(object):
     # As the Atom class only partly implements the Entity interface, this function were included in both classes.
     def get_parent_by_level(self, level):
         """Return the parent Entity object in the specified level."""
-        if (self.level == level):
+        if self.level == level:
             return self
         else:
             return self.parent.get_parent_by_level(level)
