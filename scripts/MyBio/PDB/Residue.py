@@ -23,8 +23,11 @@
 # 2) Added function "is_target() to verify the status of the is_target variable.
 # 3) Added function "set_as_target()" to allow the definition if a residue is a target or not.
 
-# Data: 01/10/2019
+# Date: 01/10/2019
 # 1) Added function "get_class()" to get the compound class: amino acid, hetatm, water, nucleotide, or unknown.
+
+# Data: 04/08/2019
+# 1) New property idx added to Residue. This property stores the position of a residue in the list stored by its parent chain.
 
 # Each line or block with modifications contain a MODBY tag.
 
@@ -53,11 +56,15 @@ _atom_name_dict["O"] = 4
 class Residue(Entity):
     """Represents a residue. A Residue object stores atoms."""
 
-    def __init__(self, id, resname, segid):
+    def __init__(self, id, resname, segid, idx):
         self.level = "R"
         self.disordered = 0
         self.resname = resname
         self.segid = segid
+
+        # MODBY: Alexandre Fassio
+        # This property stores the position of a residue in the list stored by its chain parent.
+        self.idx = idx
 
         # MODBY: Alexandre Fassio
         # By default: no residue is a target for any calculations.
@@ -108,6 +115,7 @@ class Residue(Entity):
             return -1
         if index2:
             return 1
+        print(name1, name2)
         return cmp(name1, name2)
 
     # Public methods
