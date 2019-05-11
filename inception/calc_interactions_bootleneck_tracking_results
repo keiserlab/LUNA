@@ -1,0 +1,63 @@
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    51                                               @profile
+    52                                               def calc_interactions(self, trgt_comp_grps, nb_comp_grps=None):
+    53         1          2.0      2.0      0.0          all_interactions = []
+    54
+    55                                                   # TODO: Water-bridged interaction with weak hydrogen bond
+    56                                                   # TODO: threshold for including slightly out of limit interactions. For example, a hydrogen bond not included for 0.01A.
+    57                                                   #           Distances: 0.2 and Angles: 5
+    58
+    59                                                   # If nb_comp_grps was not informed, it uses the trgt_comp_grps as the neighbors.
+    60                                                   # In this case, the interactions will be target x target.
+    61         1          0.0      0.0      0.0          nb_comp_grps = nb_comp_grps or trgt_comp_grps
+    62
+    63      2051       1564.0      0.8      0.0          for (trgt_comp_group, nb_comp_grp) in product(trgt_comp_grps, nb_comp_grps):
+    64     73042      67880.0      0.9      0.0              for (trgt_atms_grp, nb_atms_grp) in product(trgt_comp_group.atm_grps, nb_comp_grp.atm_grps):
+    65
+    66     70992      70648.0      1.0      0.0                  if isinstance(self.inter_filter, InteractionFilter):
+    67     70992    7710835.0    108.6      4.0                      if not self.inter_filter.is_valid_pair(trgt_atms_grp, nb_atms_grp):
+    68       782        643.0      0.8      0.0                          continue
+    69
+    70     70210     177728.0      2.5      0.1                  feat_pairs = list(product(trgt_atms_grp.features, nb_atms_grp.features))
+    71     70210      83130.0      1.2      0.0                  feat_pairs = filter(lambda x: self.is_feature_pair_valid(*x), feat_pairs)
+    72
+    73                                                           # If the groups belongs to the same molecule (intramolecule interaction).
+    74     70210     517407.0      7.4      0.3                  is_intramol_inter = self.is_intramol_inter(trgt_atms_grp, nb_atms_grp)
+    75     70210      57213.0      0.8      0.0                  shortest_path_size = None
+    76
+    77    138982     977269.0      7.0      0.5                  for pair in feat_pairs:
+    78                                                               # It will ignore interactions for atoms in the same molecule that are separated from each other by only N bonds.
+    79                                                               # Covalent bonds keep atoms very tightly, producing distances lower than their sum of Van der Waals radius.
+    80                                                               # As a consequence the algorithm will find a lot of false interactions.
+    81                                                               #
+    82                                                               # But, it will never skip pairs of Atom features because they are used to calculate covalent interactions.
+    83     68772      74256.0      1.1      0.0                      if pair[0].name != "Atom" and pair[1].name != "Atom" and is_intramol_inter:
+    84                                                                   # Compute shortest path only once. The reason not to precompute it outside the For is to avoid computing
+    85                                                                   # the Bellman-Ford algorithm if the groups only have Atom features.
+    86      1906       1866.0      1.0      0.0                          if shortest_path_size is None:
+    87      1790   68098225.0  38043.7     35.3                              shortest_path_size = trgt_atms_grp.get_shortest_path_size(nb_atms_grp)
+    88                                                                   # Ignore groups according to the min bond separation threshold.
+    89      1906       8660.0      4.5      0.0                          if shortest_path_size <= self.inter_conf.conf.get("min_bond_separation", 0):
+    90       284        277.0      1.0      0.0                              continue
+    91
+    92     68488      63755.0      0.9      0.0                      calc_inter_params = (trgt_atms_grp, nb_atms_grp) + pair
+    93     68488  114829119.0   1676.6     59.5                      interactions = self.resolve_interactions(*calc_inter_params)
+    94     68488      85460.0      1.2      0.0                      all_interactions.extend(interactions)
+    95
+    96         1          1.0      1.0      0.0          if self.add_dependent_inter:
+    97                                                       dependent_interactions = self.find_dependent_interactions(all_interactions)
+    98                                                       all_interactions.extend(dependent_interactions)
+    99
+   100                                                   # Get only unique interactions.
+   101         1       1205.0   1205.0      0.0          all_interactions = set(all_interactions)
+   102
+   103                                                   # Remove potential inconsistences. For example: a hydrogen bond and an unfavorable interation between the same atoms.
+   104         1       2725.0   2725.0      0.0          self.remove_inconsistencies(all_interactions)
+   105
+   106         1          1.0      1.0      0.0          if not self.add_h2o_pairs_with_no_target:
+   107         1       5378.0   5378.0      0.0              self.remove_h2o_pairs_with_no_target(all_interactions)
+   108
+   109         1        156.0    156.0      0.0          logger.info("Number of potential interactions found: %d" % len(all_interactions))
+   110
+   111         1          8.0      8.0      0.0          return list(all_interactions)
