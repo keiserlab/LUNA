@@ -1,5 +1,6 @@
 from pymol import cmd
 from pymol import util
+from mol.wrappers.cgo_arrow import cgo_arrow
 
 from util.file import get_filename, get_file_format
 
@@ -31,8 +32,24 @@ class PymolWrapper:
         opts = opts or {}
         cmd.pseudoatom(name, **opts)
 
+    def sel_exists(self, name):
+        return name in cmd.get_names("selections")
+
+    def obj_exists(self, name):
+        return name in cmd.get_names("objects")
+
+    def group_exists(self, name):
+        return name in cmd.get_names("group_objects")
+
+    def get_coords(self, selection):
+        return cmd.get_coords(selection)
+
     def distance(self, name, sel1, sel2):
         cmd.distance(name, sel1, sel2)
+
+    def arrow(self, name, atm_sel1, atm_sel2, opts=None):
+        opts = opts or {}
+        cgo_arrow(atm_sel1, atm_sel2, name=name, **opts)
 
     def save_png(self, output_file, width=1200, height=1200, dpi=100, ray=1):
         cmd.png(output_file, width, height, dpi, ray)
@@ -83,6 +100,9 @@ class PymolWrapper:
 
     def quit(self):
         cmd.quit()
+
+    def run(self, func_name, opts):
+        return getattr(cmd, func_name)(**opts)
 
     def run_cmds(self, commands):
         for func_name, opts in commands:
