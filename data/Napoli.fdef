@@ -123,11 +123,26 @@ EndFeature
 ########################################################################################
 #                                   Chalcogen donor                                    #
 #
-# Sigma-holes exist when an electronegative atom is bound to Carbon.
+# Sigma-holes exist when an electronegative atom is bound to Carbon/Sulfur.
 # Clark T. σ-Holes. Wiley Interdisciplinary Reviews: Computational Molecular Science. 2013;3:13–20.
 # Beno BR, Yeung K-S, Bartberger MD, Pennington LD, Meanwell NA. A Survey of the Role of Noncovalent Sulfur Interactions in Drug Design. Journal of Medicinal Chemistry. 2015;58:4383–438.
 #
-DefineFeature YDonor [$([#16;v2;H0]-,:[#6])]
+# It should be noted that the recognized chalcogen bonds mainly involve divalent chalcogens.
+# Mahmudov, Kamran T., Maximilian N. Kopylovich, M. Fátima C. Guedes da Silva, and Armando J. L. Pombeiro. 2017. “Chalcogen Bonding in Synthesis, Catalysis and Design of Materials.” Dalton Transactions 46 (31): 10121–38. https://doi.org/10.1039/C7DT01685A.
+#
+DefineFeature YDonor [$([#16,#34,#52;v2;H0](-,:[#6,#16])-,:[#6,#16]),$([#16,#34,#52;v2;H1][#6,#16])]
+  Family ChalcogenDonor
+  Weights 1.0
+EndFeature
+
+#
+# Isothiazole-like molecules: n-y-c, where y is a chalcogen aromatic atom. Is it too generic?
+# Isothiazoles contain only one sigma-hole. In this case, only one chalcogen bond should be recogned.
+#
+# Beno, Brett R., Kap-Sun Yeung, Michael D. Bartberger, Lewis D. Pennington, and Nicholas A. Meanwell. 2015. “A Survey of the Role of Noncovalent Sulfur Interactions in Drug Design.” Journal of Medicinal Chemistry 58 (11): 4383–4438. https://doi.org/10.1021/jm501853m.
+# Thomas, Sajesh P., K. Satheeshkumar, Govindasamy Mugesh, and T. N. Guru Row. 2015. “Unusually Short Chalcogen Bonds Involving Organoselenium: Insights into the Se-N Bond Cleavage Mechanism of the Antioxidant Ebselen and Analogues.” Chemistry (Weinheim an Der Bergstrasse, Germany) 21 (18): 6793–6800.
+#
+DefineFeature IsothiazoleLikeGroup [$([#16,#34,#52;v2;H0;a](n)c)]
   Family ChalcogenDonor
   Weights 1.0
 EndFeature
@@ -501,57 +516,73 @@ EndFeature
 # Ref: Paulini R, Müller K, Diederich F. Orthogonal multipolar interactions in structural chemistry and biology.
 
 # Halogens
-AtomType NucleophilicAtom [$([F,Cl,Br,I;X1]-[#6])]
+DefineFeature HalogenNuclGroup [F,Cl,Br,I;X1][#6]
+    Family Nucleophile
+    Weights 1.0,1.0
+EndFeature
 
-# Carbonyl oxygen and oxygens double bonded to carbons.
-AtomType NucleophilicAtom [$(O=[#6])]
-
-# Negative carboxylic acid oxygen
-AtomType NucleophilicAtom [$([O;H1,H0&-1]-C=[O,S])]
-
-# Ketene acetal oxygen
-AtomType NucleophilicAtom [$([O;H1,H0&-1]-[#6;X3]-,:[#8])]
-
-# Cyano/Nitrile nitrogen
-AtomType NucleophilicAtom [$(N#C)]
-
-# R3N
-AtomType NucleophilicAtom [N;X3;H0]
-
-# Nitro/Nitrate group oxygen: *-NO2
-AtomType NucleophilicAtom [$(O=[N;D3;+][O-]),$([O-][N;D3;+]=O)]
-
-# R2NO group oxygen
-# R cannot be a hydrogen.
-# NO is N=O or N-O
-AtomType NucleophilicAtom [$(O~[#7;H0;X3])]
-
-# Sulfonyl and Sulfinyl-like oxygen: C2S=O
-AtomType NucleophilicAtom [$(O=[S;v4,v6]([#6])[#6])]
-
-# Imine nitrogen: C2N
-# It includes aromatic imines
-AtomType NucleophilicAtom [$([#7;X2](=,:[#6;X3])(-,:[#6]))]
-
-# Tautomeric nitrogen from aromatic imine: C2N
-AtomType NucleophilicAtom [$([n;H1](c)cn)]
-
-# Ether oxygen: C2O
-AtomType NucleophilicAtom [$([#8;v2]([#6])[#6])]
-
-# Thioether sulfur: C2S
-AtomType NucleophilicAtom [$([#16;v2]([#6])[#6])]
+# Carbonyl-like group.
+# It ignores carboxylic-like groups because they are anionic groups, establishing so anion-dipole interactions.
+DefineFeature CarbonylNuclGroup [O;!$(O=C[O;H1,H0&-1])]=[C;!$(C([O;H1,H0&-1])=O)]
+    Family Nucleophile
+    Weights 1.0,1.0
+EndFeature
 
 # Alcohol oxygen
-AtomType NucleophilicAtom [$([O;v2;H1][#6])]
+# It ignores carboxylic-like groups because they are anionic groups, establishing so anion-dipole interactions.
+DefineFeature AlcoholNuclGroup [O;v2;H1;!$(OC=[O,S])][#6;!$(C(=[O,S])[O;v2;H1])]
+    Family Nucleophile
+    Weights 1.0,1.0
+EndFeature
+
+# Cyano/Nitrile nitrogen
+DefineFeature NitrileNuclGroup N#C
+    Family Nucleophile
+    Weights 1.0,1.0
+EndFeature
 
 # Water oxygen
-AtomType NucleophilicAtom [$([O;v2;H2])]
-
-DefineFeature Nucleophile [{NucleophilicAtom}]
+DefineFeature WaterNuclGroup [O;v2;H2]
     Family Nucleophile
     Weights 1.0
 EndFeature
+
+# Sulfonyl and Sulfinyl-like oxygen: C2S=O
+DefineFeature SulfurNuclGroup [$(O=[S;v4,v6]([#6])[#6])]=[$([S;v4,v6]([#6])([#6])=O)]
+    Family Nucleophile
+    Weights 1.0,1.0
+EndFeature
+
+# Ketene acetal oxygen
+DefineFeature KeteneAcetalNuclGroup [$([O;H1,H0&-1]-[#6;X3]-,:[#8])][$([#6;X3](-,:[#8])[O;H1,H0&-1])]
+    Family Nucleophile
+    Weights 1.0,1.0
+EndFeature
+
+# Nitro/Nitrate group oxygen: *-NO2
+DefineFeature NitroNuclGroup [$(O=[N;D3;+][O-]),$([O-][N;D3;+]=O)]~[$([N;D3;+](=O)[O-])]
+    Family Nucleophile
+    Weights 1.0,1.0
+EndFeature
+
+# R2N-O group oxygen. R is a Nitrogen or Carbon.
+DefineFeature HydroxylamineNuclGroup [$(O-[#7;H0;X3]([#7,#6])[#7,#6])][$([#7;H0;X3]([#7,#6])([#7,#6])O)]
+    Family Nucleophile
+    Weights 1.0,1.0
+EndFeature
+
+# Ether oxygen: C2O
+DefineFeature EtherNuclGroup [$([#8;v2]([#6])[#6])][$([#6][#8;v2][#6])]
+    Family Nucleophile
+    Weights 1.0,1.0
+EndFeature
+
+# Thioether sulfur: C2S
+DefineFeature ThioetherNuclGroup [$([#16;v2]([#6])[#6])][$([#6][#16;v2][#6])]
+    Family Nucleophile
+    Weights 1.0,1.0
+EndFeature
+
 
 
 ########################################################################################
@@ -563,24 +594,28 @@ EndFeature
 #
 
 # Carbonyl carbon and carbons double bonded to oxygens.
-AtomType ElectrophilicAtom [$([#6]=O)]
+# It ignores carboxylic groups because they are anionic groups, establishing so ion-dipole interactions.
+DefineFeature CarbonylElectGroup [#6;!$(C([O;H1,H0&-1])=[O,S])]=[O;!$([O;H1,H0&-1]C=[O,S])]
+    Family Electrophile
+    Weights 1.0,1.0
+EndFeature
 
 # Cyano/Nitrile carbon
-AtomType ElectrophilicAtom [$(C#N)]
-
-# Amidine/Guanidine carbon: R-CN2
-AtomType ElectrophilicAtom [$([CX3](=[N;!{AmideLikeN}])[N;!{AmideLikeN}])]
+DefineFeature NitrileElectGroup C#N
+    Family Electrophile
+    Weights 1.0,1.0
+EndFeature
 
 # Nitro/Nitrate nitrogen: *-NO2
-# Reference: G. P. A. Yap, I. Alkorta, N. Jagerovic , J. Elguero (2004)
-AtomType ElectrophilicAtom [$([N;D3;+](=O)[O-])]
-
-# Halogens
-AtomType ElectrophilicAtom [$([#6]-[F,Cl,Br,I;X1])]
-
-DefineFeature Electrophile [{ElectrophilicAtom}]
+DefineFeature NitroElectGroup [$([N;D3;+](=O)[O-])]~[$(O=[N;D3;+][O-]),$([O-][N;D3;+]=O)]
     Family Electrophile
-    Weights 1.0
+    Weights 1.0,1.0
+EndFeature
+
+# Halogen-Carbon
+DefineFeature HalogenElectGroup [#6][F,Cl,Br,I;X1]
+    Family Electrophile
+    Weights 1.0,1.0
 EndFeature
 
 
