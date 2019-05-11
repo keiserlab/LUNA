@@ -8,7 +8,6 @@ from os.path import exists
 
 from MyBio.PDB.PDBParser import PDBParser
 from MyBio.PDB.Entity import Entity
-from Bio.PDB.Polypeptide import is_aa
 
 from rdkit.Chem import MolToPDBBlock
 
@@ -117,6 +116,31 @@ class DBEntry(Entry):
         super().__init__(pdb_id, chain_id, comp_name, comp_num, comp_icode)
 
 
+class LigandEntry(Entry):
+
+    def __init__(self, pdb_id, chain_id, comp_name, comp_num, comp_icode=None, sep=ENTRY_SEPARATOR):
+        super().__init__(pdb_id, chain_id, comp_name, comp_num, comp_icode, is_hetatm=True, sep=ENTRY_SEPARATOR)
+
+    @classmethod
+    def from_string(cls, entry_str, sep=ENTRY_SEPARATOR):
+        entries = entry_str.split(sep)
+        if len(entries) == 4:
+            # Separate ligand number from insertion code.
+            matched = REGEX_RESNUM_ICODE.match(entries[3])
+            if matched:
+                comp_num = matched.group(1)
+                icode = None if matched.group(2) == "" else matched.group(2)
+                entries = entries[0:3] + [comp_num, icode]
+            else:
+                raise IllegalArgumentError("The field residue/ligand number and its insertion code (if applicable) '%s' is invalid. "
+                                           "It must be an integer followed by one insertion code character when applicable." % entries[3])
+            return cls(*entries, sep=sep)
+        else:
+            raise IllegalArgumentError("The number of fields in the informed string '%s' is incorrect. A valid ligand entry must contain "
+                                       "four obligatory fields: PDB, chain id, residue name, and residue number followed by its insertion "
+                                       "code when applicable)." % entry_str)
+
+
 class ChainEntry(Entry):
 
     def __init__(self, pdb_id, chain_id, sep=ENTRY_SEPARATOR):
@@ -205,7 +229,6 @@ class MolEntry(Entry):
         logger.info("Molecule '%s' was successfully loaded." % self.mol_id)
 
     def get_biopython_structure(self, entity=None, parser=PDB_PARSER):
-
         if self.mol_obj_type == "openbabel":
             pdb_block = self.mol_obj.write('pdb')
             chain_id = "A"
@@ -275,3 +298,38 @@ class PPIEntryValidator(EntryValidator):
             pattern = r'^\w{4}:\w$'
 
         super().__init__(pattern)
+
+
+def recover_entries_from_entity(entity, get_ligands=True, get_chains=True, sep=ENTRY_SEPARATOR):
+
+    if entity.level == "S":
+        if get_ligands:
+            residues = entity[0].get_residues()
+        if get_chains:
+            chains = entity[0].get_chains()
+
+    elif entity.level == "M":
+        if get_ligands:
+            residues = entity.get_residues()
+        if get_chains:
+            chains = entity.get_chains()
+    else:
+        if get_ligands:
+            # If the entity is already a Chain, get_parent_by_level() returns the same object.
+            # But, if the entity is a Residue or Atom, it will return its corresponding chain parent.
+            residues = entity.get_parent_by_level("C").get_residues()
+        if get_chains:
+            chains = entity.get_parent_by_level("M").get_chains()
+
+    if get_ligands:
+        pdb_id = entity.get_parent_by_level("S").id
+        for res in residues:
+            if res.is_hetatm():
+                entry = sep.join([pdb_id, res.parent.id, res.resname, "%d%s" % res.id[1:]])
+                yield entry
+
+    if get_chains:
+        pdb_id = entity.get_parent_by_level("S").id
+        for chain in chains:
+            entry = sep.join([pdb_id, chain.id])
+            yield entry
