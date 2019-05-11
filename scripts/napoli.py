@@ -30,7 +30,6 @@ from mol.fingerprint import generate_fp_for_mols
 from mol.entry import DBEntry, MolEntry, PLIEntryValidator, PPIEntryValidator
 from mol.groups import CompoundGroupPerceiver
 from mol.interaction.contact import get_contacts_for_entity
-from mol.interaction.calc_interactions import calc_all_interactions, apply_interaction_criteria
 from mol.interaction.calc import InteractionCalculator
 from mol.interaction.conf import InteractionConf
 from mol.interaction.filter import InteractionFilter
@@ -38,6 +37,7 @@ from mol.interaction.fp.shell import ShellGenerator, Fingerprint, CountFingerpri
 from mol.wrappers.base import MolWrapper
 from mol.wrappers.obabel import convert_molecule
 from mol.wrappers.rdkit import RDKIT_FORMATS, read_multimol_file
+from mol.amino_features import DEFAULT_AMINO_ATM_FEATURES
 from util.default_values import *
 from util.exceptions import *
 from util.file import create_directory, is_file_valid, get_file_format, get_filename, get_unique_filename
@@ -133,7 +133,7 @@ class ExceptionWrapper(object):
 
                 proj_obj.logger.warning("The function '%s' finished successfully." % func.__name__)
 
-                return 
+                return
             except Exception as e:
                 proj_obj.logger.warning("The function '%s' failed." % func.__name__)
                 proj_obj.logger.exception(e)
@@ -186,6 +186,7 @@ class InteractionsProject:
                  ifp_length=IFP_LENGTH,
                  similarity_func="BulkTanimotoSimilarity",
                  preload_mol_files=False,
+                 default_properties=DEFAULT_AMINO_ATM_FEATURES,
                  butina_cutoff=0.2,
                  run_from_step=None,
                  run_until_step=None):
@@ -219,10 +220,10 @@ class InteractionsProject:
         self.ifp_length = ifp_length
         self.similarity_func = similarity_func
         self.butina_cutoff = butina_cutoff
+        self.default_properties = default_properties
         self.run_from_step = run_from_step
         self.run_until_step = run_until_step
         self.preload_mol_files = preload_mol_files
-
         self.step_controls = {}
 
         load_default_logging_conf()
@@ -309,8 +310,8 @@ class InteractionsProject:
                 self.db.session.add(db_message)
 
                 db_target_entry = (self.db.session
-                                   .query(LigandEntry)
-                                   .filter(LigandEntry.id == self.current_entry.id)
+                                   .query(LigandEntryTable)
+                                   .filter(LigandEntryTable.id == self.current_entry.id)
                                    .first())
 
                 db_target_entry.step_messages.append(db_message)
@@ -343,7 +344,7 @@ class InteractionsProject:
             pdb_file = "%s/%s.pdb" % (working_pdb_path, pdb_id)
 
             try:
-                download_pdb(pdb_id=pdb_id, output_path=working_pdb_path, output_file=pdb_file)
+                download_pdb(pdb_id=pdb_id, output_path=working_pdb_path)
             except Exception as e:
                 logger.exception(e)
                 raise FileNotCreated("PDB file '%s' was not created." % pdb_file) from e
@@ -415,9 +416,10 @@ class InteractionsProject:
 
     def perceive_chemical_groups(self, entity, ligand, add_h=False):
         perceiver = CompoundGroupPerceiver(self.feature_extractor, add_h=add_h, ph=self.ph, amend_mol=self.amend_mol,
-                                           mol_obj_type=self.mol_obj_type, tmp_path="%s/tmp" % self.working_path)
+                                           mol_obj_type=self.mol_obj_type, default_properties=self.default_properties,
+                                           tmp_path="%s/tmp" % self.working_path)
 
-        nb_compounds = get_contacts_for_entity(entity, ligand, level='R')
+        nb_compounds = get_contacts_for_entity(entity, ligand, level='R', radius=getattr(self.interaction_conf, "boundary_cutoff", 7))
 
         grps_by_compounds = {}
         for comp in set([x[1] for x in nb_compounds]):
@@ -513,7 +515,7 @@ class InteractionsProject:
             self.project_id = db_proj.id
 
     def recover_all_entries(self):
-        db_ligand_entries = LigandEntryManager(self.db).get_entries(self.project_id)
+        db_ligand_entries = LigandEntryTableManager(self.db).get_entries(self.project_id)
 
         if not db_ligand_entries:
             raise NoResultFound("No ligand entries for the informed job code "
@@ -1007,18 +1009,17 @@ class DB_PLI_Project(InteractionsProject):
                                      "possible." % entry_str)
 
         db_ligand_entity = (self.db.session
-                            .query(LigandEntry)
-                            .filter(LigandEntry.id == target_entry.id and
-                                    LigandEntry.inter_proj_project_id == self.project_id and
-                                    LigandEntry.pdb_id == target_entry.pdb_id and
-                                    LigandEntry.chain_id == target_entry.chain_id and
-                                    LigandEntry.lig_name == target_entry.lig_name and
-                                    LigandEntry.lig_num == target_entry.lig_num and
-                                    LigandEntry.lig_icode == target_entry.lig_icode)
+                            .query(LigandEntryTable)
+                            .filter(LigandEntryTable.id == target_entry.id and
+                                    LigandEntryTable.inter_proj_project_id == self.project_id and
+                                    LigandEntryTable.pdb_id == target_entry.pdb_id and
+                                    LigandEntryTable.chain_id == target_entry.chain_id and
+                                    LigandEntryTable.lig_name == target_entry.lig_name and
+                                    LigandEntryTable.lig_num == target_entry.lig_num and
+                                    LigandEntryTable.lig_icode == target_entry.lig_icode)
                             .first())
 
-        # If this entry does not exist in the database,
-        # raise an error.
+        # If this entry does not exist in the database, raise an error.
         if db_ligand_entity is None:
             message = ("Entry '%s' does not exist in the database." % target_entry.to_string(ENTRY_SEPARATOR))
             raise InvalidNapoliEntry(message)
@@ -1026,13 +1027,13 @@ class DB_PLI_Project(InteractionsProject):
         return db_ligand_entity
 
 
-class Fingerprint_PLI_Project(InteractionsProject):
+class Fingerprint_Project(InteractionsProject):
 
     def __init__(self, entries, working_path, mfp_output=None, ifp_output=None, **kwargs):
         self.mfp_output = mfp_output
         self.ifp_output = ifp_output
 
-        super().__init__(project_type=PLI_PROJECT, entries=entries, working_path=working_path, **kwargs)
+        super().__init__(entries=entries, working_path=working_path, **kwargs)
 
     def _process_entries(self, entries):
         for target_entry in entries:
@@ -1042,7 +1043,8 @@ class Fingerprint_PLI_Project(InteractionsProject):
 
                 # # Check if the entry is in the correct format.
                 # # It also accepts entries whose pdb_id is defined by the filename.
-                self.validate_entry_format(target_entry)
+                if isinstance(target_entry, MolEntry) is False:
+                    self.validate_entry_format(target_entry)
 
                 if self.calc_ifp:
                     # # TODO: allow the person to pass a pdb_file into entries.
@@ -1090,7 +1092,7 @@ class Fingerprint_PLI_Project(InteractionsProject):
                 if isinstance(target_entry, MolEntry):
                     result["smiles"] = MolWrapper(target_entry.mol_obj).to_smiles()
                 else:
-                    # Get Smiles from PDB
+                    # TODO: Get Smiles from PDB
                     result["smiles"] = ""
                     pass
                 self.result.append(result)
@@ -1193,8 +1195,8 @@ class Local_Project(InteractionsProject):
         elif self.project_type == PPI_PROJECT:
             self.entry_validator = PPIEntryValidator(free_filename_format)
 
-        self.mfp = []
-        self.ifp = []
+        self.mfps = []
+        self.ifps = []
         self.interactions = []
         self.neighborhoods = []
 
@@ -1213,7 +1215,8 @@ class Local_Project(InteractionsProject):
 
             # Check if the entry is in the correct format.
             # It also accepts entries whose pdb_id is defined by the filename.
-            self.validate_entry_format(target_entry)
+            if isinstance(target_entry, MolEntry) is False:
+                self.validate_entry_format(target_entry)
 
             # TODO: allow the person to pass a pdb_file into entries.
             pdb_file = self.get_pdb_file(target_entry.pdb_id)
@@ -1231,15 +1234,13 @@ class Local_Project(InteractionsProject):
             ligand.set_as_target(is_target=True)
 
             grps_by_compounds = self.perceive_chemical_groups(structure[0], ligand, add_hydrogen)
-            src_grps = [grps_by_compounds[x] for x in grps_by_compounds if x.is_target()]
+            src_grps = [grps_by_compounds[x] for x in grps_by_compounds if x.is_target() or x.is_water()]
             trgt_grps = [grps_by_compounds[x] for x in grps_by_compounds]
 
             neighborhood = [ag for c in grps_by_compounds.values() for ag in c.atm_grps]
             self.neighborhoods.append((target_entry, neighborhood))
 
-            continue
-
-            # # Calculate interactions
+            # Calculate interactions
             if self.project_type == PLI_PROJECT:
                 inter_filter = InteractionFilter.new_pli_filter(inter_conf=self.interaction_conf)
             elif self.project_type == PPI_PROJECT:
@@ -1251,6 +1252,7 @@ class Local_Project(InteractionsProject):
             interactions = ic.calc_interactions(src_grps, trgt_grps)
 
             self.interactions.append((pdb_file, interactions))
+            continue
 
             inter_file = "%s/results/%s.tsv" % (self.working_path, target_entry.to_string())
             with open(inter_file, "w") as OUT:
@@ -1266,7 +1268,7 @@ class Local_Project(InteractionsProject):
             sm = shells.create_shells(neighborhood)
             fp = sm.to_fingerprint(fold_to_size=self.ifp_length)
 
-            self.ifp.append((target_entry, fp))
+            self.ifps.append((target_entry, fp))
 
             #
             # Count the number of compound types for each ligand
@@ -1538,7 +1540,7 @@ class NAPOLI_PLI:
                 db.new_mapper(CompTypeCount, "comp_type_count")
                 db.new_mapper(InterTypeCount, "inter_type_count")
                 db.new_mapper(Project, "project")
-                db.new_mapper(LigandEntry, "target_entry")
+                db.new_mapper(LigandEntryTable, "target_entry")
                 db.new_mapper(Status, "status")
 
                 if self.job_code:
@@ -1571,7 +1573,7 @@ class NAPOLI_PLI:
                         logger.info("No ligand entry was defined. "
                                     "It will try to recover a ligand entry "
                                     "list from the database.")
-                        db_ligand_entries = (LigandEntryManager(db)
+                        db_ligand_entries = (LigandEntryTableManager(db)
                                              .get_entries(projectId))
                         self.entries = format_db_ligand_entries(db_ligand_entries)
 
@@ -1656,8 +1658,8 @@ class NAPOLI_PLI:
                             raise InvalidNapoliEntry(message)
                         else:
                             db_ligand_entity = (db.session
-                                                .query(LigandEntry)
-                                                .filter(LigandEntry.id == target_entry.id)
+                                                .query(LigandEntryTable)
+                                                .filter(LigandEntryTable.id == target_entry.id)
                                                 .first())
                             if db_ligand_entity is None:
                                 message = ("Entry '%s' with id equal "
