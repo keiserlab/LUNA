@@ -1,22 +1,22 @@
 from collections import defaultdict
 from rdkit.Chem import MolFromMolBlock, MolFromMolFile, SanitizeFlags, SanitizeMol
 from pybel import readfile
-
+from openbabel import etab
 
 from MyBio.selector import ResidueSelector, AtomSelector
-from MyBio.util import save_to_file, get_residue_neighbors
+from MyBio.util import save_to_file
 
-from mol.interaction.contact import get_contacts_for_entity
+from graph.bellman_ford import bellman_ford
+from mol.interaction.contact import get_contacts_for_entity, get_cov_contacts_for_entity
 from mol.neighborhood import NbAtom, NbAtomData
 from mol.charge_model import OpenEyeModel
 from mol.validator import MolValidator
 from mol.wrappers.obabel import convert_molecule
 from mol.wrappers.base import MolWrapper
-from mol.amino_features import DEFAULT_AMINO_ATM_FEATURES
 from mol.features import ChemicalFeature
 from util.file import get_unique_filename, remove_files
 from util.exceptions import MoleculeSizeError, IllegalArgumentError, MoleculeObjectError
-from util.default_values import ACCEPTED_MOL_OBJ_TYPES
+from util.default_values import ACCEPTED_MOL_OBJ_TYPES, COV_SEARCH_RADIUS
 
 import mol.interaction.math as im
 
@@ -24,7 +24,7 @@ import logging
 logger = logging.getLogger()
 
 
-COV_CUTOFF = 2
+SS_BOND_FEATURES = ["Atom", "Acceptor", "ChalcogenDonor", "Hydrophobic"]
 
 
 class AtomGroup():
@@ -94,6 +94,17 @@ class AtomGroup():
 
         return target_interactions
 
+    def get_shortest_path_size(self, trgt_grp):
+        shortest_path_size = float('inf')
+        for src_atm in self.atoms:
+            # d stores the path size from the source to the target, and p stores the predecessors from each target.
+            d, p = bellman_ford(src_atm.neighborhood, src_atm.serial_number)
+            for trgt_atm in trgt_grp.atoms:
+                if trgt_atm.serial_number in d:
+                    if d[trgt_atm.serial_number] < shortest_path_size:
+                        shortest_path_size = d[trgt_atm.serial_number]
+        return shortest_path_size
+
     def add_interaction(self, interaction):
         self.interactions = list(set(self.interactions + [interaction]))
 
@@ -141,7 +152,7 @@ class AtomGroup():
         return any([a.parent.is_target() for a in self.atoms])
 
     def __repr__(self):
-        return '<AtomGroup: [%s]' % ', '.join([str(x) for x in self.atoms])
+        return '<AtomGroup: [%s]>' % ', '.join([str(x) for x in self.atoms])
 
     def __eq__(self, other):
         """Overrides the default implementation"""
@@ -167,10 +178,9 @@ class AtomGroup():
 
 class CompoundGroups():
 
-    def __init__(self, target_residue, atm_grps=None, only_grps_with_target=True):
+    def __init__(self, target_residue, atm_grps=None):
         self.residue = target_residue
         self.atm_grps = atm_grps or []
-        self.only_grps_with_target = only_grps_with_target
 
     @property
     def summary(self):
@@ -189,7 +199,8 @@ class CompoundGroups():
 class CompoundGroupPerceiver():
 
     def __init__(self, feature_extractor, add_h=False, ph=None, amend_mol=True, mol_obj_type="rdkit",
-                 charge_model=OpenEyeModel(), tmp_path=None, expand_selection=True, radius=COV_CUTOFF):
+                 charge_model=OpenEyeModel(), tmp_path=None, expand_selection=True, default_properties=None,
+                 radius=COV_SEARCH_RADIUS):
 
         if mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES:
             raise IllegalArgumentError("Objects of type '%s' are not currently accepted. "
@@ -202,38 +213,94 @@ class CompoundGroupPerceiver():
         self.mol_obj_type = mol_obj_type
         self.charge_model = charge_model
         self.tmp_path = tmp_path
-        self.expand_selection = expand_selection,
+        self.expand_selection = expand_selection
+        self.default_properties = default_properties
         self.radius = radius
 
-    def perceive_compound_groups(self, target_residue, mol_obj=None, only_grps_with_target=True):
+    def perceive_compound_groups(self, target_residue, mol_obj=None):
+        comp_grps = None
+        if self.default_properties is not None:
+            comp_grps = self._get_default_properties(target_residue)
 
-        print(target_residue)
-        print()
+        if comp_grps is None:
+            logger.info("It will calculate the properties ")
 
-        if target_residue.resname in DEFAULT_AMINO_ATM_FEATURES:
+            # If no OBMol object was defined and expand_selection was set ON, it will get all residues around the
+            # target and create a new OBMol object with them.
+            if mol_obj is None and self.expand_selection:
+                res_list = self._get_all_around_residue(target_residue)
+            # Otherwise, the residue list will be composed only by the target residue.
+            else:
+                res_list = [target_residue]
 
-            # Recover all atoms from the previous selected residues.
-            res_list = [target_residue]
+            # Sorted by residue order as in the PDB.
+            res_list = sorted(res_list, key=lambda r: r.get_full_id())
+
+            # Select residues based on the residue list defined previously.
             res_sel = ResidueSelector(res_list, keep_altloc=False, keep_hydrog=False)
-            atoms = [a for r in res_list for a in r.get_unpacked_list() if res_sel.accept_atom(a)]
+            # Recover all atoms from the previous selected residues.
+            atoms = tuple([a for r in res_list for a in r.get_unpacked_list() if res_sel.accept_atom(a)])
 
-            atm_map = {atm.name: NbAtom(atm) for atm in atoms}
+            comp_grps = self._get_calculated_properties(target_residue, atoms, res_sel, mol_obj)
 
-            comp_grps = CompoundGroups(target_residue, only_grps_with_target=only_grps_with_target)
-            # atm_grp = AtomGroup(atoms, grp_obj["features"], recursive=True)
-            # comp_grps.add_group(atm_grp)
+        return comp_grps
 
-            neighbors = get_residue_neighbors(target_residue, AtomSelector(keep_altloc=False, keep_hydrog=False))
+    def _get_all_around_residue(self, target_residue):
+        model = target_residue.get_parent_by_level('M')
+        proximal = get_contacts_for_entity(entity=model, source=target_residue, radius=self.radius, level='R')
 
-            print()
-            print(neighbors)
-            print()
+        return sorted(list(set([p[1] for p in proximal])), key=lambda r: r.id)
 
-            # TODO: How to detect if the residue is the first one? In this case the N is +.
-            # TODO: What to do when there is a covalent ligand?
-            # TODO: What to do with hydrogens if the person asked to add it?
+    def _get_default_properties(self, target_residue):
+        #
+        # TODO: Limitations in this method, although not so impactful:
+        #           - How to detect if the residue is the first one? In this case the N should be +.
+        #           - What to do when there is a covalently bonded ligand? It may change some atom properties.
+        #           - What to do with coordinated metals (similar to the previous problem)? It may change some atom properties.
+        #           - What to do with hydrogens if the users asked to add it?
+        #
+        # Although this cases are not so important they may slightly change the results of the analysis.
+        #
+        # This function only works if the user informed default properties to the target residue.
+        if target_residue.resname in self.default_properties:
 
-            for atms_str in DEFAULT_AMINO_ATM_FEATURES[target_residue.resname]:
+            atm_sel = AtomSelector(keep_altloc=False, keep_hydrog=False)
+            atm_map = {atm.name: NbAtom(atm) for atm in target_residue.get_atoms() if atm_sel.accept_atom(atm)}
+
+            atms_in_ss_bonds = set()
+
+            if target_residue.is_water() is False:
+                model = target_residue.get_parent_by_level('M')
+                cov_atoms = get_cov_contacts_for_entity(entity=model, source=target_residue)
+
+                neighbors = set()
+                for atm1, atm2 in cov_atoms:
+                    # Validate the atoms using the AtomSelector created previously.
+                    if atm_sel.accept_atom(atm1) and atm_sel.accept_atom(atm2):
+                        # Add all residues covalently bonded to the target residue into the neighbors list.
+                        if atm1.parent != target_residue:
+                            neighbors.add(atm1.parent)
+                        if atm2.parent != target_residue:
+                            neighbors.add(atm2.parent)
+
+                        if atm1.parent != atm2.parent and atm1.parent.resname == "CYS" and atm2.parent.resname == "CYS":
+                            atms_in_ss_bonds.add(atm_map[atm1.name])
+                            atms_in_ss_bonds.add(atm_map[atm2.name])
+
+                        # If at least one of the atoms are a non-hydrogen atom.
+                        if atm1.element != "H" or atm2.element != "H":
+                            # If the atom 1 belongs to the target and is not a hydrogen, add atom 2 to its neighbor list.
+                            if atm1.parent == target_residue and atm1.element != "H":
+                                atom_info = NbAtomData(etab.GetAtomicNum(atm2.element), atm2.coord, atm2.serial_number)
+                                atm_map[atm1.name].add_nb_atom(atom_info)
+                            # If the atom 2 belongs to the target and is not a hydrogen, add atom 1 to its neighbor list.
+                            if atm2.parent == target_residue and atm2.element != "H":
+                                atom_info = NbAtomData(etab.GetAtomicNum(atm1.element), atm1.coord, atm1.serial_number)
+                                atm_map[atm2.name].add_nb_atom(atom_info)
+
+            comp_grps = CompoundGroups(target_residue)
+
+            for atms_str in self.default_properties[target_residue.resname]:
                 nb_atoms = []
                 missing_atoms = []
                 for atm_name in atms_str.split(","):
@@ -257,47 +324,72 @@ class CompoundGroupPerceiver():
                                        "the residue %s. The missing atoms are: %s." % (atms_str.replace(",", ", "), target_residue,
                                                                                        ", ".join(missing_atoms)))
                 else:
-                    features = [ChemicalFeature(f) for f in DEFAULT_AMINO_ATM_FEATURES[target_residue.resname][atms_str].split(",")]
-                    atm_grp = AtomGroup(nb_atoms, features, recursive=True)
+                    # It checks if a cysteine atom is establishing a disulfide bond. If it does, it will read a predefined set of
+                    # properties (SS_BOND_FEATURES). In this case, the SG is hydrophobic and is not a donor anymore.
+                    if target_residue.is_aminoacid() and target_residue.resname == "CYS" and nb_atoms[0] in atms_in_ss_bonds:
+                        features = [ChemicalFeature(f) for f in SS_BOND_FEATURES]
+                    else:
+                        features = [ChemicalFeature(f) for f in self.default_properties[target_residue.resname][atms_str].split(",")]
+
+                    # It considers all first residues in the chain as the N-terminal and won't evaluate if there are missing residues
+                    # in the N-terminal. Since not all PDBs will have a 'REMARK 465 MISSING RESIDUES' field and, also, given that this
+                    # field is not reliable enough, the best way to deal with the N-terminal would be by aligning the structure with
+                    # the protein sequence. However, it would force one to provide the sequence and it would also increase the processing
+                    # time only to identify if the residue is an N-terminal or not. In most of the cases, the first residue will be the
+                    # N-terminal. Moreover, in general (maybe always), the binding sites will not be at the ends of the protein.
+                    # Therefore, I opted to always attribute a 'PositivelyIonizable' property to the N atom from the first
+                    # residue in the chain.
+                    if atms_str == "N" and target_residue.idx == 0:
+                        features.append(ChemicalFeature("PositivelyIonizable"))
+
+                    atm_grp = AtomGroup(nb_atoms, list(set(features)), recursive=True)
                     comp_grps.add_group(atm_grp)
 
-            # if "previous" in neighbors:
-                # TODO: How to add amide groups?
-                    # N + prev(O, C)
-                    # O, C + next(N)
+            # Check for amides only when the target is an amino acid.
+            if target_residue.is_aminoacid():
+                for nb in neighbors:
+                    # Ignore residues that are not amino acids.
+                    if not nb.is_aminoacid():
+                        continue
+                    # Recover valid atoms by applying an atom selection.
+                    nb_atms = {atm.name: atm for atm in nb.get_atoms() if atm_sel.accept_atom(atm)}
+                    if nb.idx < target_residue.idx:
+                        # If this residue is neighbor of the target residue N, then they form an amide (N-C=O).
+                        if "N" in atm_map and "O" in nb_atms and "C" in nb_atms and atm_map["N"].is_neighbor(nb_atms["C"]):
+                            # Define an amide group and add it to the compound groups.
+                            # In the atm_map, the atoms were already transformed into NbAtoms().
+                            amide = [atm_map["N"], NbAtom(nb_atms["C"]), NbAtom(nb_atms["O"])]
+                            atm_grp = AtomGroup(amide, [ChemicalFeature("Amide")], recursive=True)
+                            comp_grps.add_group(atm_grp)
+                    elif nb.idx > target_residue.idx:
+                        # If this residue is neighbor of the target residue C, then they form an amide (N-C=O).
+                        if "N" in nb_atms and "O" in atm_map and "C" in atm_map and atm_map["C"].is_neighbor(nb_atms["N"]):
+                            # Define an amide group and add it to the compound groups.
+                            # In the atm_map, the atoms were already transformed into NbAtoms().
+                            amide = [NbAtom(nb_atms["N"]), atm_map["C"], atm_map["O"]]
+                            atm_grp = AtomGroup(amide, [ChemicalFeature("Amide")], recursive=True)
+                            comp_grps.add_group(atm_grp)
 
+            # Define a new graph as a dict object: each key is a serial number and the values are dictionaries with the serial
+            # number of each neighbor of an atom. The algorithm of Bellman Ford requires weights, so we set all weights to 1.
+            nb_graph = {atm.serial_number: None for atm in atm_map.values()}
+            for atm in atm_map.values():
+                # Add the neighbors of this atom. The number '1' defined below represents the edge weight. But, right now it's not used.
+                nb_graph[atm.serial_number] = {i.serial_number: 1 for i in atm.neighbors_info if i.serial_number in nb_graph}
+                # Set the graph dictionary to each NbAtom object. Since, dictionaries are passed as references, we can change
+                # the variable nb_graph and the changes will be updated in each NbAtom object automatically.
+                atm.set_neighborhood(nb_graph)
 
-        # Select atoms from the target to remove occupancy
-        # Create a NBAtom for each atom.
-        # Get Neighbors:
-            # Check distance: 0.4 <= d(a1, a2) <= cov_rad(a1) + cov_rad(a2) + 0.45 (OpenBabel)
-            # Coord
-            # NBAtomData
-            # Add nb atom
-        # Add features
+            return comp_grps
 
-        exit()
+    def _get_calculated_properties(self, target_residue, target_atoms, residue_selector, mol_obj=None):
 
-        # If no OBMol object was defined and expand_selection was set ON, it will get all residues around the
-        # target and create a new OBMol object with them.
-        if mol_obj is None and self.expand_selection:
-            res_list = self._get_all_around_residue(target_residue)
-        # Otherwise, the residue list will be composed only by the target residue.
-        else:
-            res_list = [target_residue]
-
-        # Select residues based on the residue list defined previously.
-        res_sel = ResidueSelector(res_list, keep_altloc=False, keep_hydrog=False)
         # If no OBMol was defined, create a new one through the residue list.
-        mol_obj = mol_obj or self._get_mol_from_entity(target_residue.get_parent_by_level('M'), res_sel)
-
-        # Recover all atoms from the previous selected residues.
-        atoms = [a for r in res_list for a in r.get_unpacked_list() if res_sel.accept_atom(a)]
-        atoms = tuple(sorted(atoms, key=lambda a: a.serial_number))
-
+        mol_obj = mol_obj or self._get_mol_from_entity(target_residue.get_parent_by_level('M'), residue_selector)
+        # Wrap the molecule object.
         mol_obj = MolWrapper(mol_obj)
 
-        if mol_obj.get_num_heavy_atoms() != len(atoms):
+        if mol_obj.get_num_heavy_atoms() != len(target_atoms):
             raise MoleculeSizeError("The number of heavy atoms in the PDB selection and in the MOL file are different.")
 
         # Ignore hydrogen atoms
@@ -306,9 +398,8 @@ class CompoundGroupPerceiver():
         atm_map = {}
         trgt_atms = {}
         for i, atm_obj in enumerate(atm_obj_list):
-            atm_map[atm_obj.get_idx()] = atoms[i].serial_number
-            trgt_atms[atoms[i].serial_number] = NbAtom(atoms[i])
-
+            atm_map[atm_obj.get_idx()] = target_atoms[i].serial_number
+            trgt_atms[target_atoms[i].serial_number] = NbAtom(target_atoms[i])
         # Set all neighbors, i.e., covalently bonded atoms.
         for bond_obj in mol_obj.get_bonds(wrapped=True):
             bgn_atm_obj = bond_obj.get_begin_atom(wrapped=True)
@@ -331,27 +422,29 @@ class CompoundGroupPerceiver():
 
         group_features = self.feature_extractor.get_features_by_groups(mol_obj, atm_map)
 
-        comp_grps = CompoundGroups(target_residue, only_grps_with_target=only_grps_with_target)
+        comp_grps = CompoundGroups(target_residue)
         for key in group_features:
             grp_obj = group_features[key]
 
-            # If has_target is set ON, it will only accept groups containing at least one atom from the target residue.
-            if (only_grps_with_target and
-                    any([trgt_atms[i].parent == target_residue for i in grp_obj["atm_ids"]]) is False):
+            # It only accepts groups containing at least one atom from the target residue.
+            if any([trgt_atms[i].parent == target_residue for i in grp_obj["atm_ids"]]) is False:
                 continue
 
             atoms = [trgt_atms[i] for i in grp_obj["atm_ids"]]
             atm_grp = AtomGroup(atoms, grp_obj["features"], recursive=True)
             comp_grps.add_group(atm_grp)
 
+        # Define a new graph as a dict object: each key is a serial number and the values are dictionaries with the serial
+        # number of each neighbor of an atom. The algorithm of Bellman Ford requires weights, so we set all weights to 1.
+        nb_graph = {atm.serial_number: None for atm in trgt_atms.values()}
+        for atm in trgt_atms.values():
+            # Add the neighbors of this atom. The number '1' defined below represents the edge weight. But, right now it's not used.
+            nb_graph[atm.serial_number] = {i.serial_number: 1 for i in atm.neighbors_info if i.serial_number in nb_graph}
+            # Set the graph dictionary to each NbAtom object. Since, dictionaries are passed as references, we can change
+            # the variable nb_graph and the changes will be updated in each NbAtom object automatically.
+            atm.set_neighborhood(nb_graph)
+
         return comp_grps
-
-    def _get_all_around_residue(self, target_residue):
-        model = target_residue.get_parent_by_level('M')
-        proximal = get_contacts_for_entity(entity=model, source=target_residue, radius=self.radius, level='R')
-        res_list = sorted(list(set([p[1] for p in proximal])), key=lambda r: r.id)
-
-        return res_list
 
     def _get_mol_from_entity(self, entity, residue_selector):
         # First it saves the selection into a PDB file and then it converts the file to .mol.
