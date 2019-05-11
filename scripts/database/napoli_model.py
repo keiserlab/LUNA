@@ -10,7 +10,7 @@ class Project(object):
     pass
 
 
-class LigandEntry(object):
+class LigandEntryTable(object):
 
     def __init__(self, pdb_id, chain_id, lig_name=None, lig_num=None,
                  lig_icode=None, cluster=None, status_id=None,
