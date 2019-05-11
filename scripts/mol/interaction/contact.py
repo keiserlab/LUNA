@@ -1,5 +1,7 @@
 from util.exceptions import EntityLevelError
 
+from util.default_values import COV_SEARCH_RADIUS
+from mol.interaction.calc import is_covalently_bonded
 from MyBio.util import get_entity_level_name
 from MyBio.PDB.NeighborSearch import NeighborSearch
 from MyBio.PDB import Selection
@@ -65,3 +67,14 @@ def get_contacts_for_entity(entity, source, target=None, radius=7, level='A'):
     except Exception as e:
         logger.exception(e)
         raise
+
+
+def get_cov_contacts_for_entity(entity, source, target=None):
+    entities = get_contacts_for_entity(entity, source, target, radius=COV_SEARCH_RADIUS, level='A')
+
+    cov_bonds = set()
+    for atm1, atm2 in entities:
+        if is_covalently_bonded(atm1, atm2):
+            cov_bonds.add(tuple(sorted([atm1, atm2], key=lambda x: x.serial_number)))
+
+    return cov_bonds
