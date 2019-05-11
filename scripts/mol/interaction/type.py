@@ -48,6 +48,14 @@ class InteractionType():
 
         return partner
 
+    def is_intramol_interaction(self):
+        comps1 = self.atm_grp1.compounds
+        comps2 = self.atm_grp2.compounds
+        return len(comps1) == 1 and len(comps2) == 1 and comps1 == comps2
+
+    def is_intermol_interaction(self):
+        return not self.is_intramol_interaction()
+
     def clear_refs(self):
         if self._recursive:
             self.atm_grp1.remove_interaction(self)
