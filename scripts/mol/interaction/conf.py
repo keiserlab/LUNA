@@ -110,7 +110,7 @@ class DefaultInteractionConf(InteractionConf):
         # Interaction model: C-X ---- A-R,
         # Where C is a carbon, X a halogen, A an acceptor and
         # R is an atom bonded to A.
-        # Distance X-A when A is an single atom.
+        # Distance X-A when A is a single atom.
         # Ref: Halogen bonds in biological molecules [Auffinger, 2004]
         # Ref: The Important Role of Halogen Bond in Substrate Selectivity of Enzymatic Catalysis [Jiang, 2016]
         conf["max_xa_dist_xbond_inter"] = 4
@@ -120,13 +120,58 @@ class DefaultInteractionConf(InteractionConf):
         conf["min_xar_ang_xbond_inter"] = 80
         conf["max_disp_ang_xbond_inter"] = 60
 
+        # Chalcogen bond.
+        # Interaction model: R-Y ---- A-N,
+        # Where R is a carbon/sulfur, Y a chalcogen (S, Se, Te), A an acceptor, and N a covalently bonded atom to A.
+        # Ref: Mining and Structural Characterization of S···X Chalcogen Bonds in Protein Database [Iwaoka, Michio, and Natsuki Babe, 2015].
+        # Ref: Chalcogen Bonding ‘2S–2N Squares’ versus Competing Interactions: Exploring the Recognition Properties of Sulfur [Ams et al, 2018].
+        # Ref: S···O and S···N Sulfur Bonding Interactions in Protein–Ligand Complexes: Empirical Considerations and Scoring Function [Koebel, 2016].
+        #
+        # Distance Y-A when A is a single atom.
+        conf["max_ya_dist_ybond_inter"] = 4
+        # Distance Y-A, when A (acceptor) is an aromatic ring, so C stands for Centroid.
+        conf["max_yc_dist_ybond_inter"] = 4.5
+        # Angles
+        conf["min_rya_ang_ybond_inter"] = 120
+        conf["min_yan_ang_ybond_inter"] = 80
+        # When A (acceptor) is an aromatic ring.
+        conf["max_disp_ang_ybond_inter"] = 60
+
+        # Orthogonal multipolar interaction (dipole-dipole)
+        # All rules were obtained departing from Paulini R, Müller K, Diederich F. 2005. Orthogonal multipolar interactions in structural chemistry and biology.
+        # Model: A-N ... E-Y, where N and E are the nucleophilic and electrophilic atom, respectively.
+        # Distance between the nucleophilic and electrophilic atom.
+        conf["max_ne_dist_multipolar_inter"] = 4
+        # The angle NEY have a min and a max angle.
+        conf["min_ney_ang_multipolar_inter"] = 70
+        conf["max_ney_ang_multipolar_inter"] = 110
+        conf["max_disp_ang_multipolar_inter"] = 40
+        # Orthogonal multipolar
+        conf["min_an_ey_ang_ortho_multipolar_inter"] = 70
+        conf["max_an_ey_ang_ortho_multipolar_inter"] = 110
+        # Parallelannd antiparallel
+        conf["max_an_ey_ang_para_multipolar_inter"] = 25
+        conf["min_an_ey_ang_antipara_multipolar_inter"] = 155
+
+        # Ion-multipole interaction (ion-dipole)
+        # Model: I ... D-Y, where I is the ion, D the dipole atom of interest (the electrophile or nucleophile) and Y is its counterpart.
+        conf["max_id_dist_ion_multipole_inter"] = 4.5
+        conf["min_idy_ang_ion_multipole_inter"] = 60
+        conf["max_disp_ang_ion_multipole_inter"] = 40
+
         # Proximal interactions
         conf["max_dist_proximal"] = 6
         conf["min_dist_proximal"] = 2
 
-        # Covalent interactions
+        # Covalent interactions. From: Arpeggio.
         conf["vdw_tolerance"] = 0.1
 
-        conf["boundary_cutoff"] = 7
+        # From Chimera: https://www.cgl.ucsf.edu/chimerax/docs/user/commands/clashes.html
+        conf["vdw_clash_tolerance"] = 0.6
+
+        # From Chimera: https://www.cgl.ucsf.edu/chimerax/docs/user/commands/clashes.html
+        conf["min_bond_separation"] = 3
+
+        conf["boundary_cutoff"] = 6.2
 
         super().__init__(conf)
