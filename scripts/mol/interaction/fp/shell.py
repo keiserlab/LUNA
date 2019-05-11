@@ -125,11 +125,11 @@ class ShellManager:
         return shells
 
     def get_shells_by_center(self, center, unique_shells=False):
-        shells = []
+        shells = {}
 
         if center in self.centers:
             if unique_shells:
-                shells = [s for s in self.centers[center] if s.is_valid]
+                shells = {i: s for i, s in self.centers[center].items() if s.is_valid}
             else:
                 shells = self.centers[center]
         elif self.verbose:
