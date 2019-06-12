@@ -1,7 +1,10 @@
-from util.file import (is_file_valid, try_validate_file, get_file_format)
-from subprocess import (Popen, PIPE)
-from util.exceptions import (FileNotCreated, InvalidFileFormat)
-from pybel import (informats, outformats)
+from pybel import informats, outformats
+from subprocess import Popen, PIPE
+
+from util.exceptions import FileNotCreated, InvalidFileFormat
+from util.default_values import OPENBABEL
+from util.file import is_file_valid, try_validate_file, get_file_format
+
 
 import logging
 logger = logging.getLogger()
@@ -58,7 +61,7 @@ def _get_options(opt, prefix=""):
 
 
 def convert_molecule(infile, output, infile_format=None,
-                     output_format=None, opt=None, openbabel='obabel'):
+                     output_format=None, opt=None, openbabel=OPENBABEL):
     """Convert a molecule file to other format using OpenBabel.
 
         @param infile: a file to be converted.
