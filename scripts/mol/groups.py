@@ -1,4 +1,6 @@
 from collections import defaultdict
+from itertools import chain
+
 from rdkit.Chem import MolFromMolBlock, MolFromMolFile, SanitizeFlags, SanitizeMol
 from pybel import readfile
 from openbabel import etab
@@ -16,7 +18,7 @@ from mol.wrappers.base import MolWrapper
 from mol.features import ChemicalFeature
 from util.file import get_unique_filename, remove_files
 from util.exceptions import MoleculeSizeError, IllegalArgumentError, MoleculeObjectError
-from util.default_values import ACCEPTED_MOL_OBJ_TYPES, COV_SEARCH_RADIUS
+from util.default_values import ACCEPTED_MOL_OBJ_TYPES, COV_SEARCH_RADIUS, OPENBABEL
 
 import mol.interaction.math as im
 
@@ -27,36 +29,64 @@ logger = logging.getLogger()
 SS_BOND_FEATURES = ["Atom", "Acceptor", "ChalcogenDonor", "Hydrophobic"]
 
 
+class CompoundGroups():
+
+    def __init__(self, target_residue, atm_grps=None):
+        self._residue = target_residue
+        self._atm_grps = atm_grps or []
+
+    @property
+    def residue(self):
+        return self._residue
+
+    @property
+    def atm_grps(self):
+        return self._atm_grps
+
+    @property
+    def summary(self):
+        summary = defaultdict(int)
+        for grp in self.atm_grps:
+            for feature in grp.features:
+                summary[feature] += 1
+
+        return summary
+
+    def add_atm_grps(self, atm_grps):
+        self._atm_grps = list(set(self._atm_grps + atm_grps))
+
+    def remove_atm_grps(self, atm_grps):
+        self._atm_grps = list(set(self._atm_grps) - set(atm_grps))
+
+        # NbAtom objects keep a list of all AtomGroup objects to which they belong to. So, if we don't clear the references directly,
+        # the AtomGroup objects will still exist in the NbAtom list even when they were already removed from an instance of CompoundGroups.
+        for atm_grp in atm_grps:
+            atm_grp.clear_refs()
+
+
 class AtomGroup():
 
     def __init__(self, atoms, features, interactions=None, recursive=True):
-        self.features = features
 
-        # Update the atoms and coordinate properties.
         self._atoms = atoms
+
+        # Atom properties
         self._coords = im.atom_coordinates(atoms)
         self._centroid = im.centroid(self.coords)
         self._normal = None
 
-        self.interactions = interactions or []
-
+        self.features = features
+        self._interactions = interactions or []
+        self._recursive = recursive
         self._hash_cache = None
 
         if recursive:
-            for a in self.atoms:
-                a.add_atm_grp(self)
+            for atm in self.atoms:
+                atm.add_atm_grps([self])
 
     @property
     def atoms(self):
         return self._atoms
-
-    @atoms.setter
-    def atoms(self, new_atoms):
-        self._atoms = new_atoms
-        self._coords = im.atom_coordinates(new_atoms)
-        self._centroid = im.centroid(self.coords)
-        self._normal = None
-        self._hash_cache = None
 
     @property
     def compounds(self):
@@ -75,6 +105,14 @@ class AtomGroup():
         if self._normal is None:
             self._normal = im.calc_normal(self.coords)
         return self._normal
+
+    @property
+    def feature_names(self):
+        return [f.name for f in self.features]
+
+    @property
+    def interactions(self):
+        return self._interactions
 
     def has_atom(self, atom):
         return atom in self.atoms
@@ -105,11 +143,11 @@ class AtomGroup():
                         shortest_path_size = d[trgt_atm.serial_number]
         return shortest_path_size
 
-    def add_interaction(self, interaction):
-        self.interactions = list(set(self.interactions + [interaction]))
+    def add_interactions(self, interactions):
+        self._interactions = list(set(self.interactions + interactions))
 
-    def remove_interaction(self, interaction):
-        self.interactions.remove(interaction)
+    def remove_interactions(self, interactions):
+        self._interactions = list(set(self.interactions) - set(interactions))
 
     def is_water(self):
         """Return 1 if all compounds are water molecules."""
@@ -151,6 +189,11 @@ class AtomGroup():
         """Return 1 if at least one compound is the target."""
         return any([a.parent.is_target() for a in self.atoms])
 
+    def clear_refs(self):
+        if self._recursive:
+            for atm in self.atoms:
+                atm.remove_atm_grps([self])
+
     def __repr__(self):
         return '<AtomGroup: [%s]>' % ', '.join([str(x) for x in self.atoms])
 
@@ -176,31 +219,11 @@ class AtomGroup():
         return self._hash_cache
 
 
-class CompoundGroups():
-
-    def __init__(self, target_residue, atm_grps=None):
-        self.residue = target_residue
-        self.atm_grps = atm_grps or []
-
-    @property
-    def summary(self):
-        summary = defaultdict(int)
-        for grp in self.atm_grps:
-            for feature in grp.features:
-                summary[feature] += 1
-
-        return summary
-
-    def add_group(self, group):
-        atm_grps = set(self.atm_grps + [group])
-        self.atm_grps = list(atm_grps)
-
-
 class CompoundGroupPerceiver():
 
     def __init__(self, feature_extractor, add_h=False, ph=None, amend_mol=True, mol_obj_type="rdkit",
                  charge_model=OpenEyeModel(), tmp_path=None, expand_selection=True, default_properties=None,
-                 radius=COV_SEARCH_RADIUS):
+                 radius=COV_SEARCH_RADIUS, group_hydrophobes=True):
 
         if mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES:
             raise IllegalArgumentError("Objects of type '%s' are not currently accepted. "
@@ -216,6 +239,7 @@ class CompoundGroupPerceiver():
         self.expand_selection = expand_selection
         self.default_properties = default_properties
         self.radius = radius
+        self.group_hydrophobes = group_hydrophobes
 
     def perceive_compound_groups(self, target_residue, mol_obj=None):
         comp_grps = None
@@ -242,6 +266,9 @@ class CompoundGroupPerceiver():
             atoms = tuple([a for r in res_list for a in r.get_unpacked_list() if res_sel.accept_atom(a)])
 
             comp_grps = self._get_calculated_properties(target_residue, atoms, res_sel, mol_obj)
+
+        if self.group_hydrophobes:
+            self._merge_hydrophobes(comp_grps)
 
         return comp_grps
 
@@ -287,16 +314,14 @@ class CompoundGroupPerceiver():
                             atms_in_ss_bonds.add(atm_map[atm1.name])
                             atms_in_ss_bonds.add(atm_map[atm2.name])
 
-                        # If at least one of the atoms are a non-hydrogen atom.
-                        if atm1.element != "H" or atm2.element != "H":
-                            # If the atom 1 belongs to the target and is not a hydrogen, add atom 2 to its neighbor list.
-                            if atm1.parent == target_residue and atm1.element != "H":
-                                atom_info = NbAtomData(etab.GetAtomicNum(atm2.element), atm2.coord, atm2.serial_number)
-                                atm_map[atm1.name].add_nb_atom(atom_info)
-                            # If the atom 2 belongs to the target and is not a hydrogen, add atom 1 to its neighbor list.
-                            if atm2.parent == target_residue and atm2.element != "H":
-                                atom_info = NbAtomData(etab.GetAtomicNum(atm1.element), atm1.coord, atm1.serial_number)
-                                atm_map[atm2.name].add_nb_atom(atom_info)
+                        # If the atom 1 belongs to the target and is not a hydrogen, add atom 2 to its neighbor list.
+                        if atm1.parent == target_residue and atm1.element != "H":
+                            atom_info = NbAtomData(etab.GetAtomicNum(atm2.element), atm2.coord, atm2.serial_number)
+                            atm_map[atm1.name].add_nb_info([atom_info])
+                        # If the atom 2 belongs to the target and is not a hydrogen, add atom 1 to its neighbor list.
+                        if atm2.parent == target_residue and atm2.element != "H":
+                            atom_info = NbAtomData(etab.GetAtomicNum(atm1.element), atm1.coord, atm1.serial_number)
+                            atm_map[atm2.name].add_nb_info([atom_info])
 
             comp_grps = CompoundGroups(target_residue)
 
@@ -343,7 +368,7 @@ class CompoundGroupPerceiver():
                         features.append(ChemicalFeature("PositivelyIonizable"))
 
                     atm_grp = AtomGroup(nb_atoms, list(set(features)), recursive=True)
-                    comp_grps.add_group(atm_grp)
+                    comp_grps.add_atm_grps([atm_grp])
 
             # Check for amides only when the target is an amino acid.
             if target_residue.is_aminoacid():
@@ -360,7 +385,7 @@ class CompoundGroupPerceiver():
                             # In the atm_map, the atoms were already transformed into NbAtoms().
                             amide = [atm_map["N"], NbAtom(nb_atms["C"]), NbAtom(nb_atms["O"])]
                             atm_grp = AtomGroup(amide, [ChemicalFeature("Amide")], recursive=True)
-                            comp_grps.add_group(atm_grp)
+                            comp_grps.add_atm_grps([atm_grp])
                     elif nb.idx > target_residue.idx:
                         # If this residue is neighbor of the target residue C, then they form an amide (N-C=O).
                         if "N" in nb_atms and "O" in atm_map and "C" in atm_map and atm_map["C"].is_neighbor(nb_atms["N"]):
@@ -368,7 +393,7 @@ class CompoundGroupPerceiver():
                             # In the atm_map, the atoms were already transformed into NbAtoms().
                             amide = [NbAtom(nb_atms["N"]), atm_map["C"], atm_map["O"]]
                             atm_grp = AtomGroup(amide, [ChemicalFeature("Amide")], recursive=True)
-                            comp_grps.add_group(atm_grp)
+                            comp_grps.add_atm_grps([atm_grp])
 
             # Define a new graph as a dict object: each key is a serial number and the values are dictionaries with the serial
             # number of each neighbor of an atom. The algorithm of Bellman Ford requires weights, so we set all weights to 1.
@@ -412,13 +437,13 @@ class CompoundGroupPerceiver():
                     serial_number = atm_map.get(end_atm_obj.get_idx())
                     coord = mol_obj.get_atom_coord_by_id(end_atm_obj.get_id())
                     atom_info = NbAtomData(end_atm_obj.get_atomic_num(), coord, serial_number)
-                    trgt_atms[atm_map[bgn_atm_obj.get_idx()]].add_nb_atom(atom_info)
+                    trgt_atms[atm_map[bgn_atm_obj.get_idx()]].add_nb_info([atom_info])
                 # If the atom 2 is not a hydrogen, add atom 1 to its neighbor list.
                 if end_atm_obj.get_atomic_num() != 1:
                     serial_number = atm_map.get(bgn_atm_obj.get_idx())
                     coord = mol_obj.get_atom_coord_by_id(bgn_atm_obj.get_id())
                     atom_info = NbAtomData(bgn_atm_obj.get_atomic_num(), coord, serial_number)
-                    trgt_atms[atm_map[end_atm_obj.get_idx()]].add_nb_atom(atom_info)
+                    trgt_atms[atm_map[end_atm_obj.get_idx()]].add_nb_info([atom_info])
 
         group_features = self.feature_extractor.get_features_by_groups(mol_obj, atm_map)
 
@@ -432,7 +457,7 @@ class CompoundGroupPerceiver():
 
             atoms = [trgt_atms[i] for i in grp_obj["atm_ids"]]
             atm_grp = AtomGroup(atoms, grp_obj["features"], recursive=True)
-            comp_grps.add_group(atm_grp)
+            comp_grps.add_atm_grps([atm_grp])
 
         # Define a new graph as a dict object: each key is a serial number and the values are dictionaries with the serial
         # number of each neighbor of an atom. The algorithm of Bellman Ford requires weights, so we set all weights to 1.
@@ -465,7 +490,7 @@ class CompoundGroupPerceiver():
                 ob_opt["p"] = self.ph
             else:
                 ob_opt["h"] = ""
-        convert_molecule(pdb_file, mol_file, opt=ob_opt, openbabel='/usr/bin/obabel')
+        convert_molecule(pdb_file, mol_file, opt=ob_opt, openbabel=OPENBABEL)
 
         mol_obj = None
         if self.amend_mol:
@@ -516,3 +541,53 @@ class CompoundGroupPerceiver():
         remove_files([pdb_file, mol_file])
 
         return mol_obj
+
+    def _merge_hydrophobes(self, comp_grps):
+        # Only hydrophobic atom groups.
+        hydrop_atm_grps = [g for g in comp_grps.atm_grps if "Hydrophobic" in g.feature_names]
+        # Hydrophobic islands dictionary. Keys are integer values and items are defined by a set of atom groups.
+        hydrop_islands = defaultdict(set)
+        # It stores a mapping of an atom (represented by its serial number) and a hydrophobic island (defined by its keys).
+        atm_mapping = {}
+
+        grp_id = 0
+        for atm_grp in hydrop_atm_grps:
+            # Hydrophobic atoms are defined always as only one atom.
+            atm = atm_grp.atoms[0]
+
+            # Recover the groups of all neighbors of this atom (it will merge all existing groups).
+            nb_grps = set([atm_mapping[nb] for nb in atm.neighborhood[atm.serial_number].keys() if nb in atm_mapping])
+
+            # Already there are hydrophobe groups formed by the neighbors of this atom.
+            if nb_grps:
+                # Merge all groups of the neighbors of this atom.
+                new_grp = set(chain.from_iterable([hydrop_islands.pop(nb_grp_id) for nb_grp_id in nb_grps]))
+                # Include this atom to the merged group.
+                new_grp.add(atm)
+
+                for k in atm_mapping:
+                    if atm_mapping[k] in nb_grps:
+                        atm_mapping[k] = grp_id
+
+                hydrop_islands[grp_id] = new_grp
+                atm_mapping[atm.serial_number] = grp_id
+            else:
+                atm_mapping[atm.serial_number] = grp_id
+                hydrop_islands[grp_id].add(atm)
+            grp_id += 1
+
+        for atms in hydrop_islands.values():
+            atm_grp = AtomGroup(atms, [ChemicalFeature("Hydrophobe")], recursive=True)
+            comp_grps.add_atm_grps([atm_grp])
+
+        for atm_grp in hydrop_atm_grps:
+            features = [f for f in atm_grp.features if f.name != "Hydrophobic"]
+
+            # If the atom group does not have any feature, we can remove it from the CompoundGroup object.
+            # This is unlikely to occur as all atoms (by default) will have at least the feature 'Atom'. So, I added this test only
+            # to avoid cases in which one edits the feature definitions in a way that an atom ends up having no features at all after
+            # removing its hydrophobic feature.
+            if len(features) == 0:
+                comp_grps.remove_atm_grps([atm_grp])
+            else:
+                atm_grp.features = features
