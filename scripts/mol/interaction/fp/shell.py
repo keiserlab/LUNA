@@ -292,10 +292,10 @@ class Shell:
 
             if len(self.central_atm_grp.atoms) == 1:
                 features = set()
-                for a in self.central_atm_grp.atoms:
-                    for ga in a.atm_grps:
-                        if ga != self.central_atm_grp:
-                            features.update(ga.features)
+                for atm in self.central_atm_grp.atoms:
+                    for atm_grp in atm.atm_grps:
+                        if atm_grp != self.central_atm_grp:
+                            features.update(atm_grp.features)
 
                 data += [self.feature_mapper[cf.format_name()] for cf in features]
             data.sort()
