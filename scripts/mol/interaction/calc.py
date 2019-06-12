@@ -212,6 +212,7 @@ class InteractionCalculator:
         return dependent_interactions
 
     def remove_inconsistencies(self, interactions):
+
         amide_inconsistences = defaultdict(list)
         hbond_inconsistences = defaultdict(list)
         for inter in interactions:
@@ -316,10 +317,10 @@ class InteractionCalculator:
 
     def _default_functions(self):
         return {
+                    ("Donor", "Acceptor"): [self.calc_hbond],
+
                     ("Hydrophobic", "Hydrophobic"): [self.calc_hydrop],
                     ("Hydrophobe", "Hydrophobe"): [self.calc_hydrop],
-
-                    ("Donor", "Acceptor"): [self.calc_hbond],
 
                     ("WeakDonor", "Acceptor"): [self.calc_weak_hbond],
                     ("WeakDonor", "WeakAcceptor"): [self.calc_weak_hbond],
@@ -358,7 +359,7 @@ class InteractionCalculator:
                     ("Nucleophile", "Nucleophile"): [self.calc_multipolar],
                     ("Electrophile", "Electrophile"): [self.calc_multipolar],
 
-                    # # # Favorable ion-dipole interactions
+                    # Favorable ion-dipole interactions
                     ("Nucleophile", "PositivelyIonizable"): [self.calc_ion_multipole],
                     ("Nucleophile", "PosIonizable"): [self.calc_ion_multipole],
                     ("Nucleophile", "Positive"): [self.calc_ion_multipole],
@@ -366,7 +367,7 @@ class InteractionCalculator:
                     ("Electrophile", "NegIonizable"): [self.calc_ion_multipole],
                     ("Electrophile", "Negative"): [self.calc_ion_multipole],
 
-                    # # Unfavorable ion-dipole interactions
+                    # Unfavorable ion-dipole interactions
                     ("Nucleophile", "NegativelyIonizable"): [self.calc_ion_multipole],
                     ("Nucleophile", "NegIonizable"): [self.calc_ion_multipole],
                     ("Nucleophile", "Negative"): [self.calc_ion_multipole],
@@ -460,14 +461,14 @@ class InteractionCalculator:
         group1, group2, feat1, feat2 = params
         interactions = []
 
-        if (feat1.name == "Aromatic" and feat2.name == "Amide"):
+        if feat1.name == "Aromatic" and feat2.name == "Amide":
             ring_grp = group1
             amide_grp = group2
-        elif (feat2.name == "Aromatic" and feat1.name == "Amide"):
+        elif feat2.name == "Aromatic" and feat1.name == "Amide":
             ring_grp = group2
             amide_grp = group1
         else:
-            logger.warning("Amide-aromatic interactions requires an aromatic and an amide group.")
+            logger.warning("Amide-aromatic interactions require an aromatic and an amide group.")
             logger.warning("However, the informed groups have the features '%s' and '%s'" % (group1.features, group2.features))
             return []
 
@@ -499,18 +500,30 @@ class InteractionCalculator:
         group1, group2, feat1, feat2 = params
         interactions = []
 
-        # Check if the interaction involves the same compound. For this cases we ignore hydrophobic interactions.
+        if ((feat1.name != "Hydrophobic" and feat1.name != "Hydrophobe") or
+                (feat2.name != "Hydrophobic" and feat2.name != "Hydrophobe")):
+            logger.warning("Hydrophobic interactions require hydrophobic atoms or hydrophobes (group of hydrophobic atoms).")
+            logger.warning("However, the informed groups have the features '%s' and '%s'" % (group1.features, group2.features))
+            return []
+
+        # Check if the interaction involves the same compound. For these cases, we ignore hydrophobic interactions.
         if self.is_intramol_inter(group1, group2):
             return []
 
-        cc_dist = im.euclidean_distance(group1.centroid, group2.centroid)
+        min_cc_dist = float('Inf')
+        for atm1, atm2 in product(group1.atoms, group2.atoms):
+            cc_dist = atm1 - atm2
 
-        if (self.is_within_boundary(cc_dist, "boundary_cutoff", le) and
-                self.is_within_boundary(cc_dist, "max_dist_hydrop_inter", le)):
+            if cc_dist < min_cc_dist:
+                min_cc_dist = cc_dist
 
-                params = {"dist_hydrop_inter": cc_dist}
-                inter = InteractionType(group1, group2, "Hydrophobic", params)
-                interactions.append(inter)
+        if (self.is_within_boundary(min_cc_dist, "boundary_cutoff", le) and
+                self.is_within_boundary(min_cc_dist, "max_dist_hydrop_inter", le)):
+
+            params = {"dist_hydrop_inter": min_cc_dist}
+            inter = InteractionType(group1, group2, "Hydrophobic", params)
+            interactions.append(inter)
+            
         return interactions
 
     def calc_ion_multipole(self, params):
