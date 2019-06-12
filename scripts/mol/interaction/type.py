@@ -5,13 +5,12 @@ class InteractionType():
         self._atm_grp2 = atm_grp2
         self._type = inter_type
         self._params = params or {}
-
+        self._recursive = recursive
         self._hash_cache = None
 
         if recursive:
-            self.atm_grp1.add_interaction(self)
-            self.atm_grp2.add_interaction(self)
-        self._recursive = recursive
+            self.atm_grp1.add_interactions([self])
+            self.atm_grp2.add_interactions([self])
 
         self._expand_dict()
 
@@ -58,8 +57,8 @@ class InteractionType():
 
     def clear_refs(self):
         if self._recursive:
-            self.atm_grp1.remove_interaction(self)
-            self.atm_grp2.remove_interaction(self)
+            self.atm_grp1.remove_interactions([self])
+            self.atm_grp2.remove_interactions([self])
 
     def _expand_dict(self):
         for key in self._params:
