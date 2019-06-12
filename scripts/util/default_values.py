@@ -24,6 +24,8 @@ IFP_LENGTH = 1024
 
 ACCEPTED_MOL_OBJ_TYPES = ("rdkit", "openbabel")
 
+OPENBABEL = "/usr/bin/obabel"
+
 ATOM_TYPES_COLOR = ColorPallete({
     "Acceptor": (252, 141, 89),
     "Donor": (145, 191, 219),
