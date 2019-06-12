@@ -1,5 +1,8 @@
 ########################################################################################
+#                                                                                      #
 #                                  Atom type definition                                #
+#                                                                                      #
+########################################################################################
 #
 #
 AtomType NegAtom [*;-1,-2,-3]
@@ -44,7 +47,10 @@ AtomType NitroLikeO [$([O-]-[N+])]
 
 
 ########################################################################################
+#                                                                                      #
 #                                  Hydrogen donor                                      #
+#                                                                                      #
+########################################################################################
 #
 #
 # Adapted from RDKit (Markus Kossner) and based on Good and Oprea (2018).
@@ -112,7 +118,11 @@ EndFeature
 
 
 ########################################################################################
+#                                                                                      #
 #                                    Halogen donor                                     #
+#                                                                                      #
+########################################################################################
+#
 #
 DefineFeature XDonor [$([Cl,Br,I;X1]-[#6])]
   Family HalogenDonor
@@ -121,7 +131,11 @@ EndFeature
 
 
 ########################################################################################
+#                                                                                      #
 #                                   Chalcogen donor                                    #
+#                                                                                      #
+########################################################################################
+#
 #
 # Sigma-holes exist when an electronegative atom is bound to Carbon/Sulfur.
 # Clark T. σ-Holes. Wiley Interdisciplinary Reviews: Computational Molecular Science. 2013;3:13–20.
@@ -149,10 +163,14 @@ EndFeature
 
 
 ########################################################################################
+#                                                                                      #
 #                Acceptors for:                                                        #
 #                                - Hydrogen   bond                                     #
 #                                - Halogen    bond                                     #
 #                                - Chalcogen  bond                                     #
+#                                                                                      #
+########################################################################################
+#
 #
 # Joule JA, Mills K. Heterocyclic chemistry. 5th ed. Hoboken, N.J: Wiley; 2009.
 # Li S, Hong M. Protonation, Tautomerization, and Rotameric Structure of Histidine: A Comprehensive Study by Magic-Angle-Spinning Solid-State NMR. Journal of the American Chemical Society. 2011;133:1534–44.
@@ -190,7 +208,10 @@ EndFeature
 
 
 ########################################################################################
+#                                                                                      #
 #                                 Weak hydrogen acceptor                               #
+#                                                                                      #
+########################################################################################
 #
 #
 # Capture: Aromatic oxygens like furans, oxazoles, etc.
@@ -220,7 +241,11 @@ EndFeature
 
 
 ########################################################################################
+#                                                                                      #
 #                                  Weak hydrogen donor                                 #
+#                                                                                      #
+########################################################################################
+#
 #
 # Capture: Carbons bonded to hydrogens
 # Desiraju GR, Steiner T. The weak hydrogen bond: in structural chemistry and biology. first publ. in paperback. Oxford: Oxford University Press; 2001.
@@ -232,7 +257,10 @@ EndFeature
 
 
 ########################################################################################
+#                                                                                      #
 #                                 Positive ionizable                                   #
+#                                                                                      #
+########################################################################################
 #
 #
 # Capture: Amines
@@ -245,7 +273,6 @@ DefineFeature BasicGroup [{BasicNH2},{BasicNH1},{BasicNH0};!{AnilineLikeN}]
   Weights 1.0
 EndFeature
 
-#
 # Rule adapted from RDKit and Langer et. al. (2006).
 # Langer T, Hoffmann RD, editors. Pharmacophores and pharmacophore searches. Weinheim: WILEY-VCH; 2006.
 #
@@ -259,7 +286,6 @@ DefineFeature Guanidine N[CH0X3](=N)N
   Weights 1.0,1.0,1.0,1.0
 EndFeature
 
-#
 # We do not match any aromatic systems here.
 # Amidine substructures when part of an aromatic ring are composed of 2 or more different groups.
 # So, the behavior should not be considered the same as the one from an amidine.
@@ -274,7 +300,6 @@ DefineFeature Amidine [N;!{AmideLikeN}]=[CX3][N;!{AmideLikeN}]
   Weights 1.0,1.0,1.0
 EndFeature
 
-#
 # Capture: 4-aminopyridines
 #
 DefineFeature Aminopyridine4 Nc1cc[nH0]cc1
@@ -282,7 +307,6 @@ DefineFeature Aminopyridine4 Nc1cc[nH0]cc1
   Weights 1.0,1.0,1.0,1.0,1.0,1.0,1.0
 EndFeature
 
-#
 # Capture: 2-aminopyridines
 #
 DefineFeature Aminopyridine2 Nc1cccc[nH0]1
@@ -290,7 +314,6 @@ DefineFeature Aminopyridine2 Nc1cccc[nH0]1
   Weights 1.0,1.0,1.0,1.0,1.0,1.0,1.0
 EndFeature
 
-#
 # Capture: Imidazoles
 #
 DefineFeature Imidazole [n;R1]1[c;R1][n;R1][c;R1][c;R1]1
@@ -298,7 +321,6 @@ DefineFeature Imidazole [n;R1]1[c;R1][n;R1][c;R1][c;R1]1
   Weights 1.0,1.0,1.0,1.0,1.0
 EndFeature
 
-#
 # Capture: any positive atom not adjacent to a negative atom.
 # Rule adapted from Langer et. al. (2006).
 #
@@ -309,7 +331,11 @@ EndFeature
 
 
 ########################################################################################
+#                                                                                      #
 #                                 Negative ionizable                                   #
+#                                                                                      #
+########################################################################################
+#
 #
 # Capture: Carboxylic acid and Carboxylate
 # It also captures thiocarboxylic acids
@@ -319,7 +345,6 @@ DefineFeature CarboxGroup C(=[O,S])-[O;H1,H0&-1]
     Weights 1.0,1.0,1.0
 EndFeature
 
-#
 # Capture: Ketene acetal like compounds, including cyclic ones
 #
 DefineFeature KeteneAcetalGroup [O;H1,H0&-1]-[#6;X3]-,:[#8]
@@ -327,7 +352,6 @@ DefineFeature KeteneAcetalGroup [O;H1,H0&-1]-[#6;X3]-,:[#8]
     Weights 1.0,1.0,1.0
 EndFeature
 
-#
 # Capture: Tetrazole
 #
 DefineFeature Tetrazole c1nnn[nH,n-1]1
@@ -335,7 +359,6 @@ DefineFeature Tetrazole c1nnn[nH,n-1]1
     Weights 1.0,1.0,1.0,1.0,1.0
 EndFeature
 
-#
 # Capture: Barbiturates
 #
 # Good AC, Oprea TI. Optimization of CAMD techniques 3. Virtual screening enrichment studies: a help or hindrance in tool selection? Journal of Computer-Aided Molecular Design. 2008;22:169–78.
@@ -344,7 +367,6 @@ DefineFeature Barbiturate O=C1CC(=O)[NH1,NH0-1;R]C(=O)[NH1,NH0-1;R]1
     Weights 1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
 EndFeature
 
-#
 # Capture: Thiazolidinediones and rhodanines
 #
 # Good AC, Oprea TI. Optimization of CAMD techniques 3. Virtual screening enrichment studies: a help or hindrance in tool selection? Journal of Computer-Aided Molecular Design. 2008;22:169–78.
@@ -353,7 +375,6 @@ DefineFeature ThiazolidinedioneGroup O=C1[NH1,NH0-1;R]C(=[O,S])[SX2H0R]C1
     Weights 1.0,1.0,1.0,1.0,1.0,1.0,1.0
 EndFeature
 
-#
 # Capture: Diformamide-like
 #
 # Generic constraint for barbiturates/thiazolidinediones...
@@ -366,11 +387,8 @@ EndFeature
 
 
 ########################################################################################
-#                                                                                      #
 #                          Hydroxamic acids - RC(=O)N(R’)OH                            #
-#                                                                                      #
-########################################################################################
-#
+
 # Hydroxamic acids bind metals
 # Bertrand S, Hélesbeux J-J, Larcher G, Duval O. Hydroxamate, a key pharmacophore exhibiting a wide range of biological activities. Mini Rev Med Chem. 2013;13:1311–26.
 # Zuccotto F. Pharmacophore Features Distributions in Different Classes of Compounds. J Chem Inf Comput Sci. 2003;43:1542–52.
@@ -383,28 +401,25 @@ DefineFeature Hydroxamic_O_anion C(=O)[NX3]-[O;H1,H0&-1]
   Family NegativelyIonizable
   Weights 1.0,1.0,1.0,1.0
 EndFeature
-#
+
 # Capture: Hydroxamic N-anion (1st resonance form)
 #
 DefineFeature Hydroxamic_N_anion C(=O)[N-1]-[OH1]
   Family NegativelyIonizable
   Weights 1.0,1.0,1.0,1.0
 EndFeature
-#
+
 # Capture: Hydroxamic N-anion (2nd resonance form)
 #
 DefineFeature Hydroxamic_N_anion2 C(-[O-1])=N-[OH1]
   Family NegativelyIonizable
   Weights 1.0,1.0,1.0,1.0
 EndFeature
-########################################################################################
+
 
 ########################################################################################
-#                                                                                      #
 #                                 Sulfur groups                                        #
-#                                                                                      #
-########################################################################################
-#
+
 # Capture: Sulfuric acids and Sulfates
 # It also captures Thioketones, i.e., compounds with a double bonded S, instead of a double bonded O.
 # It has higher priority over SulfonicGroup.
@@ -449,6 +464,7 @@ DefineFeature AcylSulfonamide [NH,NH0-1](S(=O)(=O))(C(=O))
   Family NegativelyIonizable
   Weights 1.0,1.0,1.0,1.0,1.0,1.0
 EndFeature
+
 #
 # General sulfonamides
 #
@@ -457,16 +473,10 @@ DefineFeature Sulfonamide [N;!H0,H0&-1]S(=O)(=O)
   Weights 1.0,1.0,1.0,1.0
 EndFeature
 
-########################################################################################
-
-
 
 ########################################################################################
-#                                                                                      #
 #                                 Phosphorus groups                                    #
-#                                                                                      #
-########################################################################################
-#
+
 # Capture: Phosphoric acids and phosphates.
 # It also captures Thioketones, i.e., compounds with a double bonded S, instead of a double bonded O.
 # It has higher priority over PhosphonicGroup.
@@ -477,7 +487,6 @@ DefineFeature PhosphoricGroup P(=[O,S])(-O)(-O)-[O;H1,H0&-1]
     Weights 1.0,1.0,1.0,1.0,1.0
 EndFeature
 
-#
 # Capture: Phosphonic acids and phosphonate.
 # It also captures Thioketones, i.e., compounds with a double bonded S, instead of a double bonded O.
 # It has higher priority over PhosphinicGroup.
@@ -488,7 +497,6 @@ DefineFeature PhosphonicGroup P(=[O,S])(-O)-[O;H1,H0&-1]
     Weights 1.0,1.0,1.0,1.0
 EndFeature
 
-#
 # Capture: Phosphinic acid (Hypophosphorous acid) and Phosphinate
 # It also captures Thioketones, i.e., compounds with a double bonded S, instead of a double bonded O.
 #
@@ -496,9 +504,7 @@ DefineFeature PhosphinicGroup [P](=[O,S])-[O;H1,H0&-1]
     Family NegativelyIonizable
     Weights 1.0,1.0,1.
 EndFeature
-########################################################################################
 
-#
 # Capture: any negative atom not adjacent to a negative atom.
 # Rule adapted from Langer et. al. (2006).
 #
@@ -508,10 +514,14 @@ DefineFeature NegAtom [{NegAtom};!$(*~[{PosAtom}])]
 EndFeature
 
 
-########################################################################################
-#                               Negative dipole - Nucleophile                          #
-#
 
+########################################################################################
+#                                                                                      #
+#                               Negative dipole - Nucleophile                          #
+#                                                                                      #
+########################################################################################
+#
+#
 # All rules were obtained departing from Pauline et. al. (2005)
 # Ref: Paulini R, Müller K, Diederich F. Orthogonal multipolar interactions in structural chemistry and biology.
 
@@ -586,7 +596,10 @@ EndFeature
 
 
 ########################################################################################
+#                                                                                      #
 #                              Positive dipole - Electrophile                          #
+#                                                                                      #
+########################################################################################
 #
 #
 # All rules were obtained departing from Pauline et. al. (2005)
@@ -620,12 +633,15 @@ EndFeature
 
 
 ########################################################################################
+#                                                                                      #
 #                                   Aromatic rings                                     #
+#                                                                                      #
+########################################################################################
 #
-
+#
 # Obtained from RDKit
-
-# aromatic rings of various sizes:
+#
+# Aromatic rings of various sizes:
 #
 # Note that with the aromatics, it's important to include the ring-size queries along with
 # the aromaticity query for two reasons:
@@ -666,7 +682,11 @@ EndFeature
 
 
 ########################################################################################
+#                                                                                      #
 #                                      Hydrophobic                                     #
+#                                                                                      #
+########################################################################################
+#
 #
 # Obtained from RDKit
 # any carbon that is not bonded to a polar atom is considered a hydrophobic
@@ -674,7 +694,7 @@ EndFeature
 AtomType Carbon_Polar [#6;$([#6]~[#7,#8,#9])]
 AtomType Carbon_NonPolar [#6;+0;!{Carbon_Polar}]
 
-AtomType Hphobe [s,S&H0&v2,Br,I,Cl,F,At,{Carbon_NonPolar};+0]
+AtomType Hphobe [s,S&H0&v2,Br,I,Cl,At,{Carbon_NonPolar};+0]
 
 DefineFeature Hphobe [{Hphobe}]
  Family Hydrophobic
@@ -703,6 +723,7 @@ EndFeature
 #                                                                                      #
 ########################################################################################
 #
+#
 # For amide-pi interactions
 # Amide–π interactions between formamide and benzene (Imai et al, 2009).
 #
@@ -717,6 +738,7 @@ EndFeature
 #                                      Atom                                            #
 #                                                                                      #
 ########################################################################################
+#
 #
 DefineFeature AtomGroup [!#1]
   Family Atom
