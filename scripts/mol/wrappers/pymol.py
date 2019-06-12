@@ -28,6 +28,10 @@ class PymolWrapper:
     def hide_all(self):
         self.hide([('everything', '')])
 
+    def label(self, tuples):
+        for selection, expression in tuples:
+            cmd.label(selection, expression)
+
     def add_pseudoatom(self, name, opts=None):
         opts = opts or {}
         cmd.pseudoatom(name, **opts)
