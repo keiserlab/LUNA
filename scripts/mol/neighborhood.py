@@ -4,32 +4,6 @@ from openbabel import etab
 from graph.bellman_ford import bellman_ford
 
 
-class NbCoordinates():
-
-    def __init__(self, coords):
-        self.coords = coords
-
-    @property
-    def size(self):
-        return len(self.coords)
-
-    def __eq__(self, other):
-        """Overrides the default implementation"""
-        if isinstance(self, other.__class__):
-            return self.coords == other.coords
-        return False
-
-    def __ne__(self, other):
-        """Overrides the default implementation"""
-        return not self.__eq__(other)
-
-    def __hash__(self):
-        """Overrides the default implementation"""
-        # The list is sorted in order to avoid dependence on appending order.
-        coords_tuple = tuple(sorted(self.coords, key=hash))
-        return hash(coords_tuple)
-
-
 class NbAtomData:
 
     def __init__(self, atomic_num, coord, serial_number=None):
@@ -124,11 +98,17 @@ class NbAtom:
     def set_neighborhood(self, nb_graph):
         self._neighborhood = nb_graph
 
-    def add_nb_atom(self, nb_atom):
-        self._nb_info = list(set(self._nb_info + [nb_atom]))
+    def add_nb_info(self, nb_info):
+        self._nb_info = list(set(self._nb_info + nb_info))
 
-    def add_atm_grp(self, atm_grp):
-        self._atm_grps = list(set(self._atm_grps + [atm_grp]))
+    def add_atm_grps(self, atm_grps):
+        self._atm_grps = list(set(self._atm_grps + atm_grps))
+
+    def remove_nb_info(self, nb_info):
+        self._nb_info = list(set(self._nb_info) - set(nb_info))
+
+    def remove_atm_grps(self, atm_grps):
+        self._atm_grps = list(set(self._atm_grps) - set(atm_grps))
 
     def is_neighbor(self, atom):
         return atom.serial_number in [i.serial_number for i in self._nb_info]
@@ -144,6 +124,10 @@ class NbAtom:
 
     def __repr__(self):
         return "<NBAtom: %s>" % self.full_atom_name
+
+    def __sub__(self, other):
+        # It calls __sub__() from Biopython.
+        return self._atom - other._atom
 
     def __eq__(self, other):
         """Overrides the default implementation"""
