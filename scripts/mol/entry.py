@@ -1,19 +1,22 @@
-from pybel import readfile
-from pybel import informats as OB_FORMATS
-from mol.wrappers.rdkit import RDKIT_FORMATS, read_multimol_file
-from util.default_values import ACCEPTED_MOL_OBJ_TYPES, ENTRY_SEPARATOR
-from util.file import get_file_format
-from util.exceptions import IllegalArgumentError, MoleculeObjectError, MoleculeNotFoundError
-from os.path import exists
-
-from MyBio.PDB.PDBParser import PDBParser
-from MyBio.PDB.Entity import Entity
-
-from rdkit.Chem import MolToPDBBlock
-
 import re
 import logging
 from operator import xor
+from os.path import exists
+
+
+from rdkit.Chem import MolToPDBBlock
+from pybel import readfile
+from pybel import informats as OB_FORMATS
+
+
+from mol.wrappers.rdkit import RDKIT_FORMATS, read_multimol_file
+from mol.interaction.filter import InteractionFilter
+from util.default_values import ACCEPTED_MOL_OBJ_TYPES, ENTRY_SEPARATOR
+from util.file import get_file_format
+from util.exceptions import InvalidEntry, IllegalArgumentError, MoleculeObjectError, MoleculeNotFoundError
+from MyBio.PDB.PDBParser import PDBParser
+from MyBio.PDB.Entity import Entity
+
 
 logger = logging.getLogger()
 
@@ -24,18 +27,33 @@ PDB_PARSER = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=False
 
 REGEX_RESNUM_ICODE = re.compile(r'^(\d+)([a-zA-z]?)$')
 
+PCI_ENTRY_REGEX = re.compile(r'^%s:\w:\w{1,3}:\-?\d{1,4}[a-zA-z]?$' % FILENAME_REGEX)
+PPI_ENTRY_REGEX = re.compile(r'^%s:\w$' % FILENAME_REGEX)
+
 
 class Entry:
 
-    def __init__(self, pdb_id, chain_id, comp_name=None, comp_num=None, comp_icode=None, is_hetatm=True, sep=ENTRY_SEPARATOR):
+    def __init__(self, pdb_id, chain_id, comp_name=None, comp_num=None, comp_icode=None, is_hetatm=True, sep=ENTRY_SEPARATOR,
+                 inter_filter=None):
+
         if xor(comp_name is None, comp_num is None):
             raise IllegalArgumentError("You tried to define a compound, so you must inform its name and number.")
 
-        if comp_num:
+        if comp_num is not None:
             try:
+                assert float(comp_num).is_integer()
                 comp_num = int(comp_num)
-            except ValueError:
+            except (ValueError, AssertionError):
                 raise IllegalArgumentError("The informed residue number '%s' is invalid. It must be an integer." % str(comp_num))
+
+        if comp_icode is not None:
+            comp_icode = str(comp_icode)
+            if comp_icode.isdigit() or len(comp_icode) > 1:
+                raise IllegalArgumentError("The informed residue icode '%s' is invalid. It must be a character." % str(comp_icode))
+
+        if inter_filter is not None and isinstance(inter_filter, InteractionFilter) is False:
+            raise IllegalArgumentError("The informed interaction filter must be an instance of '%s'." % InteractionFilter)
+
 
         self.pdb_id = pdb_id
         self.chain_id = chain_id
@@ -44,9 +62,13 @@ class Entry:
         self._comp_icode = comp_icode
         self.is_hetatm = is_hetatm
         self.sep = sep
+        self.inter_filter = inter_filter
+
+        if not self.is_valid():
+            raise InvalidEntry("Entry '%s' does not match the PDB format." % self.to_string())
 
     @classmethod
-    def from_string(cls, entry_str, is_hetatm=True, sep=ENTRY_SEPARATOR):
+    def from_string(cls, entry_str, is_hetatm=True, sep=ENTRY_SEPARATOR, inter_filter=None):
         entries = entry_str.split(sep)
         if len(entries) >= 2 and len(entries) <= 4:
             if len(entries) == 4:
@@ -60,7 +82,7 @@ class Entry:
                     raise IllegalArgumentError("The field residue/ligand number and its insertion code (if applicable) '%s' is invalid. "
                                                "It must be an integer followed by one insertion code character when applicable."
                                                % entries[3])
-            return cls(*entries, is_hetatm=is_hetatm, sep=sep)
+            return cls(*entries, is_hetatm=is_hetatm, sep=sep, inter_filter=inter_filter)
         else:
             raise IllegalArgumentError("The number of fields in the informed string '%s' is incorrect. A valid string must contain "
                                        "two obligatory fields (PDB and chain id) and may contain two optional fields (residue name "
@@ -77,22 +99,33 @@ class Entry:
     def full_id(self):
         return (self.pdb_id, self.chain_id, self.comp_name, self.comp_num, self.comp_icode)
 
-    def to_string(self, sep=':'):
+    def to_string(self, sep=None):
         full_id = self.full_id
 
         # An entry object will always have a PDB and chain id.
         entry = list(full_id[0:2])
         # If it contains additional information about the residue it will also include them.
-        if len(full_id) > 2 and (full_id[2] or full_id[3]):
+        if full_id[2] and full_id[3]:
             comp_name = str(full_id[2]) if full_id[2] else ""
 
-            if full_id[3]:
-                comp_num_and_icode = str(full_id[3]) if full_id[3] else ""
-                comp_num_and_icode += str(full_id[4]) if full_id[4].strip() else ""
-                entry += [comp_name, comp_num_and_icode]
-            else:
-                entry += [comp_name]
+            comp_num_and_icode = str(full_id[3]) if full_id[3] else ""
+            comp_num_and_icode += str(full_id[4]) if full_id[4].strip() else ""
+            entry += [comp_name, comp_num_and_icode]
+
+        sep = sep or self.sep
+
         return sep.join(entry)
+
+    def is_valid(self):
+        full_id = self.full_id
+
+        # If it contains additional information about the residue it will also include them.
+        if full_id[2] and full_id[3]:
+            regex = PCI_ENTRY_REGEX
+        else:
+            regex = PPI_ENTRY_REGEX
+
+        return regex.match(self.to_string(":")) is not None
 
     def get_biopython_key(self):
         if self.comp_name and self.comp_num:
@@ -112,17 +145,19 @@ class Entry:
 class DBEntry(Entry):
 
     def __init__(self, ligand_entry_id, pdb_id, chain_id, comp_name=None, comp_num=None, comp_icode=None):
+
         self.id = ligand_entry_id
         super().__init__(pdb_id, chain_id, comp_name, comp_num, comp_icode)
 
 
-class LigandEntry(Entry):
+class CompoundEntry(Entry):
 
-    def __init__(self, pdb_id, chain_id, comp_name, comp_num, comp_icode=None, sep=ENTRY_SEPARATOR):
-        super().__init__(pdb_id, chain_id, comp_name, comp_num, comp_icode, is_hetatm=True, sep=ENTRY_SEPARATOR)
+    def __init__(self, pdb_id, chain_id, comp_name, comp_num, comp_icode=None, sep=ENTRY_SEPARATOR, inter_filter=None):
+
+        super().__init__(pdb_id, chain_id, comp_name, comp_num, comp_icode, is_hetatm=True, sep=sep, inter_filter=inter_filter)
 
     @classmethod
-    def from_string(cls, entry_str, sep=ENTRY_SEPARATOR):
+    def from_string(cls, entry_str, sep=ENTRY_SEPARATOR, inter_filter=None):
         entries = entry_str.split(sep)
         if len(entries) == 4:
             # Separate ligand number from insertion code.
@@ -134,7 +169,7 @@ class LigandEntry(Entry):
             else:
                 raise IllegalArgumentError("The field residue/ligand number and its insertion code (if applicable) '%s' is invalid. "
                                            "It must be an integer followed by one insertion code character when applicable." % entries[3])
-            return cls(*entries, sep=sep)
+            return cls(*entries, sep=sep, inter_filter=inter_filter)
         else:
             raise IllegalArgumentError("The number of fields in the informed string '%s' is incorrect. A valid ligand entry must contain "
                                        "four obligatory fields: PDB, chain id, residue name, and residue number followed by its insertion "
@@ -143,14 +178,14 @@ class LigandEntry(Entry):
 
 class ChainEntry(Entry):
 
-    def __init__(self, pdb_id, chain_id, sep=ENTRY_SEPARATOR):
-        super().__init__(pdb_id, chain_id, is_hetatm=False)
+    def __init__(self, pdb_id, chain_id, sep=ENTRY_SEPARATOR, inter_filter=None):
+        super().__init__(pdb_id, chain_id, is_hetatm=False, sep=sep, inter_filter=inter_filter)
 
     @classmethod
-    def from_string(cls, entry_str, sep=ENTRY_SEPARATOR):
+    def from_string(cls, entry_str, sep=ENTRY_SEPARATOR, inter_filter=None):
         entries = entry_str.split(sep)
         if len(entries) == 2:
-            return cls(*entries, sep=sep)
+            return cls(*entries, sep=sep, inter_filter=inter_filter)
         else:
             raise IllegalArgumentError("The number of fields in the informed string '%s' is incorrect. A valid string must contain "
                                        "two obligatory fields: PDB and chain id." % entry_str)
@@ -158,7 +193,8 @@ class ChainEntry(Entry):
 
 class MolEntry(Entry):
 
-    def __init__(self, pdb_id, mol_id, mol_file=None, mol_file_ext=None, mol_obj_type='rdkit'):
+    def __init__(self, pdb_id, mol_id, mol_file=None, mol_file_ext=None, mol_obj_type='rdkit', sep=ENTRY_SEPARATOR, inter_filter=None):
+
         if mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES:
             raise IllegalArgumentError("Objects of type '%s' are not currently accepted. "
                                        "The available options are: %s." % (mol_obj_type, ", ".join(ACCEPTED_MOL_OBJ_TYPES)))
@@ -169,7 +205,7 @@ class MolEntry(Entry):
         self.mol_obj_type = mol_obj_type
         self._mol_obj = None
 
-        super().__init__(pdb_id, "z", "LIG", 9999)
+        super().__init__(pdb_id, "z", "LIG", 9999, sep=sep, inter_filter=inter_filter)
 
     @property
     def full_id(self):
@@ -266,38 +302,6 @@ class MolEntry(Entry):
 
     def __repr__(self):
         return '<MolEntry: %s%s%s>' % (self.pdb_id, self.sep, self.mol_id)
-
-
-class EntryValidator:
-
-    def __init__(self, pattern):
-        self.pattern = pattern
-        self.regex = re.compile(pattern, flags=0)
-
-    def is_valid(self, entry):
-        return self.regex.match(entry) is not None
-
-
-class PLIEntryValidator(EntryValidator):
-
-    def __init__(self, free_filename_format=False):
-        if free_filename_format:
-            pattern = r'^%s:\w:\w{1,3}:\-?\d{1,4}[a-zA-z]?$' % FILENAME_REGEX
-        else:
-            pattern = r'^\w{4}:\w:\w{1,3}:\-?\d{1,4}[a-zA-z]?$'
-
-        super().__init__(pattern)
-
-
-class PPIEntryValidator(EntryValidator):
-
-    def __init__(self, free_filename_format=False):
-        if free_filename_format:
-            pattern = r'^%s:\w$' % FILENAME_REGEX
-        else:
-            pattern = r'^\w{4}:\w$'
-
-        super().__init__(pattern)
 
 
 def recover_entries_from_entity(entity, get_ligands=True, get_chains=True, sep=ENTRY_SEPARATOR):
