@@ -68,7 +68,7 @@ class AtomGroup():
 
     def __init__(self, atoms, features, interactions=None, recursive=True):
 
-        self._atoms = atoms
+        self._atoms = list(atoms)
 
         # Atom properties
         self._coords = im.atom_coordinates(atoms)
