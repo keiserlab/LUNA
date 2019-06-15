@@ -1,5 +1,5 @@
 import mol.interaction.math as im
-from mol.interaction.conf import DefaultInteractionConf
+from mol.interaction.conf import DefaultInteractionConf, InteractionConf
 from mol.interaction.filter import InteractionFilter
 from mol.interaction.type import InteractionType
 from mol.features import ChemicalFeature
@@ -20,31 +20,33 @@ ANIONS = ("NegativelyIonizable", "NegIonizable", "Negative")
 
 class InteractionCalculator:
 
-    def __init__(self, inter_conf=DefaultInteractionConf(), inter_filter=None,
-                 inter_funcs=None, add_non_cov=True, add_proximal=False, add_atom_atom=True,
-                 add_dependent_inter=False, add_h2o_pairs_with_no_target=False, strict_donor_rules=False):
+    def __init__(self, inter_conf=DefaultInteractionConf(), inter_filter=None, inter_funcs=None,
+                 add_non_cov=True, add_proximal=False, add_atom_atom=True, add_dependent_inter=False,
+                 add_h2o_pairs_with_no_target=False, strict_donor_rules=False):
+
+        if inter_conf is not None and isinstance(inter_conf, InteractionConf) is False:
+            raise IllegalArgumentError("The informed interaction configuration must be an instance of '%s'." % InteractionConf)
+
+        if inter_filter is not None and isinstance(inter_filter, InteractionFilter) is False:
+            raise IllegalArgumentError("The informed interaction filter must be an instance of '%s'." % InteractionFilter)
 
         self.inter_conf = inter_conf
-
         self.add_non_cov = add_non_cov
         self.add_proximal = add_proximal
         self.add_atom_atom = add_atom_atom
         self.add_dependent_inter = add_dependent_inter
         self.add_h2o_pairs_with_no_target = add_h2o_pairs_with_no_target
         self.strict_donor_rules = strict_donor_rules
-
-        if inter_filter is None:
-            inter_filter = InteractionFilter(inter_conf=inter_conf)
         self.inter_filter = inter_filter
-
-        if inter_funcs is None:
-            inter_funcs = self._default_functions()
-
-        self._inter_funcs = inter_funcs
+        self._inter_funcs = inter_funcs or self._default_functions()
 
     @property
     def funcs(self):
         return self._inter_funcs
+
+    @funcs.setter
+    def funcs(self, funcs):
+        self._inter_funcs = funcs
 
     def calc_interactions(self, trgt_comp_grps, nb_comp_grps=None):
         all_interactions = []
@@ -67,9 +69,10 @@ class InteractionCalculator:
             computed_pairs.add((trgt_comp_group, nb_comp_grp))
 
             for (trgt_atms_grp, nb_atms_grp) in product(trgt_comp_group.atm_grps, nb_comp_grp.atm_grps):
-                if isinstance(self.inter_filter, InteractionFilter):
-                    if not self.inter_filter.is_valid_pair(trgt_atms_grp, nb_atms_grp):
-                        continue
+
+                # If no filter was informed, it will accept everything.
+                if self.inter_filter is not None and not self.inter_filter.is_valid_pair(trgt_atms_grp, nb_atms_grp):
+                    continue
 
                 feat_pairs = list(product(trgt_atms_grp.features, nb_atms_grp.features))
                 feat_pairs = filter(lambda x: self.is_feature_pair_valid(*x), feat_pairs)
@@ -122,7 +125,8 @@ class InteractionCalculator:
 
         interactions = []
         for func in funcs:
-            interactions.extend(func((group1, group2, feat1, feat2)))
+            result = func(self, (group1, group2, feat1, feat2)) or []
+            interactions.extend(result)
 
         return interactions
 
@@ -394,6 +398,7 @@ class InteractionCalculator:
         # REF: https://onlinelibrary.wiley.com/doi/epdf/10.1002/anie.200390319
         # aromatic between hbond arrays
 
+    @staticmethod
     def calc_cation_pi(self, params):
         if not self.add_non_cov:
             return []
@@ -411,6 +416,7 @@ class InteractionCalculator:
                 interactions.append(inter)
         return interactions
 
+    @staticmethod
     def calc_pi_pi(self, params):
         if not self.add_non_cov:
             return []
@@ -454,6 +460,7 @@ class InteractionCalculator:
                 interactions.append(inter)
         return interactions
 
+    @staticmethod
     def calc_amide_pi(self, params):
         if not self.add_non_cov:
             return []
@@ -493,6 +500,7 @@ class InteractionCalculator:
                 interactions.append(inter)
         return interactions
 
+    @staticmethod
     def calc_hydrop(self, params):
         if not self.add_non_cov:
             return []
@@ -523,9 +531,10 @@ class InteractionCalculator:
             params = {"dist_hydrop_inter": min_cc_dist}
             inter = InteractionType(group1, group2, "Hydrophobic", params)
             interactions.append(inter)
-            
+
         return interactions
 
+    @staticmethod
     def calc_ion_multipole(self, params):
         if not self.add_non_cov:
             return []
@@ -626,6 +635,7 @@ class InteractionCalculator:
                         interactions.append(inter)
         return interactions
 
+    @staticmethod
     def calc_multipolar(self, params):
         if not self.add_non_cov:
             return []
@@ -766,6 +776,7 @@ class InteractionCalculator:
                             interactions.append(inter)
         return interactions
 
+    @staticmethod
     def calc_xbond_pi(self, params):
         if not self.add_non_cov:
             return []
@@ -816,6 +827,7 @@ class InteractionCalculator:
                         interactions.append(inter)
         return interactions
 
+    @staticmethod
     def calc_xbond(self, params):
         if not self.add_non_cov:
             return []
@@ -917,6 +929,7 @@ class InteractionCalculator:
 
         return interactions
 
+    @staticmethod
     def calc_chalc_bond(self, params):
         if not self.add_non_cov:
             return []
@@ -1027,6 +1040,7 @@ class InteractionCalculator:
                             interactions.append(inter)
         return interactions
 
+    @staticmethod
     def calc_chalc_bond_pi(self, params):
         if not self.add_non_cov:
             return []
@@ -1088,6 +1102,7 @@ class InteractionCalculator:
                         interactions.append(inter)
         return interactions
 
+    @staticmethod
     def calc_hbond(self, params):
         if not self.add_non_cov:
             return []
@@ -1266,6 +1281,7 @@ class InteractionCalculator:
 
         return interactions
 
+    @staticmethod
     def calc_weak_hbond(self, params):
         if not self.add_non_cov:
             return []
@@ -1440,6 +1456,7 @@ class InteractionCalculator:
                                 interactions.append(inter)
         return interactions
 
+    @staticmethod
     def calc_hbond_pi(self, params):
         if not self.add_non_cov:
             return []
@@ -1531,6 +1548,7 @@ class InteractionCalculator:
                             interactions.append(inter)
         return interactions
 
+    @staticmethod
     def calc_ionic(self, params):
         if not self.add_non_cov:
             return []
@@ -1548,6 +1566,7 @@ class InteractionCalculator:
             interactions.append(inter)
         return interactions
 
+    @staticmethod
     def calc_repulsive(self, params):
         if not self.add_non_cov:
             return []
@@ -1565,6 +1584,7 @@ class InteractionCalculator:
             interactions.append(inter)
         return interactions
 
+    @staticmethod
     def calc_proximal(self, params):
         if not self.add_proximal:
             return []
@@ -1582,6 +1602,7 @@ class InteractionCalculator:
 
         return interactions
 
+    @staticmethod
     def calc_atom_atom(self, params):
         if not self.add_atom_atom:
             return []
@@ -1670,8 +1691,8 @@ class InteractionCalculator:
         else:
             return None
 
-    def set_function(self, pair, func):
-        self.funcs[pair] = func
+    def set_functions_to_pair(self, pair, funcs):
+        self.funcs[pair] = funcs
 
 
 def apply_interaction_criteria(interactions, conf=DefaultInteractionConf(),
