@@ -1289,17 +1289,21 @@ class InteractionCalculator:
         group1, group2, feat1, feat2 = params
         interactions = []
 
-        if len(group1.atoms) != 1 or len(group2.atoms) != 1:
-            logger.warning("One or more invalid atom groups were informed: '%s' and '%s" % (group1, group2))
-            logger.warning("In weak hydrogen bonds, weak donor and acceptor groups should always contain only one atom.")
-            return []
-
-        if (feat1.name == "Acceptor" and feat2.name == "WeakDonor"):
+        if (feat1.name == "Acceptor" or feat1.name == "WeakAcceptor") and feat2.name == "WeakDonor":
             donor_grp = group2
             acceptor_grp = group1
-        else:
+        elif feat1.name == "WeakDonor" and (feat2.name == "Acceptor" or feat2.name == "WeakAcceptor"):
             donor_grp = group1
             acceptor_grp = group2
+        else:
+            logger.warning("Weak hydrogen bond requires a weak donor and an (weak) acceptor groups. "
+                           "However, the informed groups have the features %s and %s" % (group1.feature_names, group2.feature_names))
+            return []
+
+        if len(group1.atoms) != 1 or len(group2.atoms) != 1:
+            logger.warning("One or more invalid atom groups were informed: '%s' and '%s'. In weak hydrogen bonds, weak donor and "
+                           "(weak) acceptor groups should always contain only one atom." % (group1, group2))
+            return []
 
         donor_atm = donor_grp.atoms[0]
         acceptor_atm = acceptor_grp.atoms[0]
