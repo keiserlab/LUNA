@@ -83,8 +83,7 @@ class StepControl:
             self.is_complete = True
 
     def __repr__(self):
-        return '<StepControl: [Step id=%d, Progress=%.2f%%]>' % (self.step_id,
-                                                                 self.progress)
+        return '<StepControl: [Step id=%d, Progress=%.2f%%]>' % (self.step_id, self.progress)
 
 
 class ExceptionWrapper(object):
@@ -98,7 +97,7 @@ class ExceptionWrapper(object):
     def __call__(self, func):
         @wraps(func)
         def callable(*args, **kwargs):
-            # InteractionsProject class
+            # Project class
             proj_obj = args[0]
 
             # TODO: update if it is critical based on the database if it is available
@@ -154,7 +153,7 @@ class ExceptionWrapper(object):
         return callable
 
 
-class InteractionsProject:
+class Project:
 
     def __init__(self,
                  entries,
@@ -170,7 +169,7 @@ class InteractionsProject:
                  mol_obj_type='rdkit',
                  inter_conf=INTERACTION_CONF,
                  inter_calc=None,
-                 add_hydrogen=True,
+                 try_h_addition=True,
                  calc_mfp=True,
                  mfp_opts=None,
                  calc_ifp=True,
@@ -205,6 +204,7 @@ class InteractionsProject:
         self.ph = ph
         self.amend_mol = amend_mol
         self.mol_obj_type = mol_obj_type
+        self.try_h_addition = try_h_addition
 
         # Interaction calculator parameters.
         self.inter_conf = inter_conf
@@ -357,68 +357,16 @@ class InteractionsProject:
         return pdb_file
 
     def decide_hydrogen_addition(self, pdb_header):
-        if self.add_hydrogen:
+        if self.try_h_addition:
             if "structure_method" in pdb_header:
                 method = pdb_header["structure_method"]
-                # If the method is not a NMR type does not add hydrogen as it usually already
-                # already has hydrogens.
+                # If the method is not a NMR type does not add hydrogen as it usually already has hydrogens.
                 if method.upper() in NMR_METHODS:
+                    logger.exception("The structure related to the entry '%s' was obtained by NMR, so it will "
+                                   "not add hydrogens to it." % self.current_entry)
                     return False
             return True
         return False
-
-    def add_hydrogen(self, pdb_file):
-        new_pdb_file = pdb_file
-
-        if self.add_hydrogen:
-            pdb_id = get_filename(pdb_file)
-            new_pdb_file = "%s/pdbs/%s.H.pdb" % (self.working_path, pdb_id)
-
-            if not exists(new_pdb_file):
-                run_obabel = False
-                # if self.has_local_files:
-                #     run_obabel = True
-                # else:
-                #     db_structure = (self.db.session
-                #                     .query(Structure)
-                #                     .filter(Structure.pdb_id == pdb_id)
-                #                     .first())
-
-                #     if db_structure:
-                #         # If the method is not a NMR type, which,
-                #         # in general, already have hydrogens
-                #         if db_structure.experimental_tech.name != "NMR":
-                #             run_obabel = True
-                #     else:
-                #         try:
-                #             PDB_PARSER.get_structure(pdb_id, pdb_file)
-                #             if PDB_PARSER.get_header():
-                #                 if "structure_method" in PDB_PARSER.get_header():
-                #                     method = (PDB_PARSER.get_header()["structure_method"])
-                #                     # If the method is not a NMR type, which,
-                #                     # in general, already have hydrogens
-                #                     if method.upper() not in NMR_METHODS:
-                #                         run_obabel = True
-                #             else:
-                #                 run_obabel = True
-                #         except Exception:
-                #             run_obabel = True
-
-                # TODO: REMOVE
-                run_obabel = True
-                if run_obabel:
-                    # First, it removes all hydrogen atoms.
-                    ob_opt = {"d": None, "error-level": 5}
-                    convert_molecule(pdb_file, new_pdb_file, opt=ob_opt)
-
-                    # Now, it adds hydrogen atoms.
-                    if self.ph:
-                        ob_opt = {"p": 7, "error-level": 5}
-                    else:
-                        ob_opt = {"h": None, "error-level": 5}
-                    convert_molecule(pdb_file, new_pdb_file, opt=ob_opt)
-
-        return new_pdb_file
 
     def perceive_chemical_groups(self, entity, ligand, add_h=False):
         perceiver = CompoundGroupPerceiver(self.feature_extractor, add_h=add_h, ph=self.ph, amend_mol=self.amend_mol,
@@ -699,7 +647,7 @@ class InteractionsProject:
 
 
 # POPULATE RCSB.
-class RCSB_PLI_Population(InteractionsProject):
+class RCSB_PLI_Population(Project):
     def __init__(self, entries, working_path, db_conf_file, **kwargs):
 
         super().__init__(entries=entries, working_path=working_path, db_conf_file=db_conf_file,
@@ -764,7 +712,7 @@ class RCSB_PLI_Population(InteractionsProject):
                                  % target_entry.to_string())
 
 
-class DB_PLI_Project(InteractionsProject):
+class DB_PLI_Project(Project):
 
     def __init__(self, db_conf_file, job_code, working_path=None, entries=None, keep_all_potential_inter=True,
                  has_local_files=False, **kwargs):
@@ -1027,7 +975,7 @@ class DB_PLI_Project(InteractionsProject):
         return db_ligand_entity
 
 
-class Fingerprint_Project(InteractionsProject):
+class FingerprintProject(Project):
 
     def __init__(self, entries, working_path, mfp_output=None, ifp_output=None, **kwargs):
         self.mfp_output = mfp_output
@@ -1159,7 +1107,7 @@ class Fingerprint_Project(InteractionsProject):
         logger.info("Processing time: %.2fs." % (end - start))
 
 
-class LocalProject(InteractionsProject):
+class LocalProject(Project):
 
     def __init__(self, entries, working_path, has_local_files=False, **kwargs):
         super().__init__(entries=entries, working_path=working_path, has_local_files=has_local_files, **kwargs)
@@ -1230,7 +1178,6 @@ class LocalProject(InteractionsProject):
             #
             # Calculate interactions
             #
-            print(self.inter_calc.add_proximal)
             interactions = self.inter_calc.calc_interactions(trgt_grps)
 
             self.interactions.append((pdb_file, interactions))
