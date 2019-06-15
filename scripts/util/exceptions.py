@@ -34,7 +34,7 @@ class InvalidFileFormat(ValueError):
     pass
 
 
-class InvalidNapoliEntry(ValueError):
+class InvalidEntry(ValueError):
     pass
 
 
