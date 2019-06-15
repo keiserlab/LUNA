@@ -156,7 +156,7 @@ class InteractionFilter:
             if not self.is_valid_pair(interaction.atm_grp1, interaction.atm_grp2):
                 return False
 
-        if (interaction.type not in self.funcs):
+        if interaction.type not in self.funcs:
             return True
         else:
             func = self.funcs[interaction.type]
@@ -189,9 +189,8 @@ class InteractionFilter:
     def filter_pi_pi(self, interaction):
         is_valid = False
         if self.is_within_boundary(interaction.cc_dist_pi_pi_inter, "max_cc_dist_pi_pi_inter", le):
-            # If the angle criteria were defined, test if the interaction fits the requirements.
-            if ("min_dihed_ang_pi_pi_inter" in self.inter_conf.conf and
-                    "max_disp_ang_pi_pi_inter" in self.inter_conf.conf):
+            # If the angle criteria is defined, test if the interaction fits the requirements.
+            if "min_dihed_ang_pi_pi_inter" in self.inter_conf.conf and "max_disp_ang_pi_pi_inter" in self.inter_conf.conf:
                 if self.is_within_boundary(interaction.dihed_ang_pi_pi_inter, "min_dihed_ang_pi_pi_inter", ge):
                     # It overwrites a general Pi-stacking interaction.
                     interaction.type = "Edge-to-face pi-stacking"
