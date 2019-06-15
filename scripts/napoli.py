@@ -11,7 +11,6 @@ from pybel import informats as OB_FORMATS
 from rdkit.Chem import ChemicalFeatures
 from rdkit.Chem.Pharm2D.SigFactory import SigFactory
 from rdkit.Chem import MolFromPDBBlock, MolFromSmiles
-from rdkit.Chem.rdDepictor import Compute2DCoords
 from sqlalchemy.orm.exc import NoResultFound
 
 # Local modules
@@ -27,13 +26,13 @@ from mol.depiction import ligand_pharm_figure
 from mol.clustering import cluster_fps_butina
 from mol.features import FeatureExtractor
 from mol.fingerprint import generate_fp_for_mols
-from mol.entry import DBEntry, MolEntry, PLIEntryValidator, PPIEntryValidator
+from mol.entry import DBEntry, MolEntry
 from mol.groups import CompoundGroupPerceiver
 from mol.interaction.contact import get_contacts_for_entity
 from mol.interaction.calc import InteractionCalculator
 from mol.interaction.conf import InteractionConf
 from mol.interaction.filter import InteractionFilter
-from mol.interaction.fp.shell import ShellGenerator, Fingerprint, CountFingerprint
+from mol.interaction.fp.shell import ShellGenerator
 from mol.wrappers.base import MolWrapper
 from mol.wrappers.obabel import convert_molecule
 from mol.wrappers.rdkit import RDKIT_FORMATS, read_multimol_file
@@ -52,9 +51,6 @@ from MyBio.util import download_pdb, entity_to_string, get_entity_from_entry
 
 
 PDB_PARSER = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=False, FIX_OBABEL_FLAGS=False)
-
-PLI_PROJECT = 1
-PPI_PROJECT = 2
 
 
 class StepControl:
@@ -161,7 +157,6 @@ class ExceptionWrapper(object):
 class InteractionsProject:
 
     def __init__(self,
-                 project_type,
                  entries,
                  working_path,
                  pdb_path=PDB_PATH,
@@ -170,14 +165,12 @@ class InteractionsProject:
                  db_conf_file=None,
                  pdb_template=None,
                  atom_prop_file=ATOM_PROP_FILE,
-                 interaction_conf=INTERACTION_CONF,
                  ph=7.4,
                  amend_mol=True,
                  mol_obj_type='rdkit',
+                 inter_conf=INTERACTION_CONF,
+                 inter_calc=None,
                  add_hydrogen=True,
-                 add_non_cov=True,
-                 add_atom_atom=True,
-                 add_proximal=False,
                  calc_mfp=True,
                  mfp_opts=None,
                  calc_ifp=True,
@@ -195,7 +188,12 @@ class InteractionsProject:
             raise IllegalArgumentError("Objects of type '%s' are not currently accepted. "
                                        "The available options are: %s." % (mol_obj_type, ", ".join(ACCEPTED_MOL_OBJ_TYPES)))
 
-        self.project_type = project_type
+        if inter_conf is not None and isinstance(inter_conf, InteractionConf) is False:
+            raise IllegalArgumentError("The informed interaction configuration must be an instance of '%s'." % InteractionConf)
+
+        if inter_calc is not None and isinstance(inter_calc, InteractionCalculator) is False:
+            raise IllegalArgumentError("The informed interaction configuration must be an instance of '%s'." % InteractionCalculator)
+
         self.entries = entries
         self.working_path = working_path
         self.pdb_path = pdb_path
@@ -204,20 +202,25 @@ class InteractionsProject:
         self.db_conf_file = db_conf_file
         self.pdb_template = pdb_template
         self.atom_prop_file = atom_prop_file
-        self.interaction_conf = interaction_conf
         self.ph = ph
         self.amend_mol = amend_mol
         self.mol_obj_type = mol_obj_type
-        self.add_hydrogen = add_hydrogen
-        self.add_non_cov = add_non_cov
-        self.add_atom_atom = add_atom_atom
-        self.add_proximal = add_proximal
+
+        # Interaction calculator parameters.
+        self.inter_conf = inter_conf
+
+        if inter_calc is None:
+            inter_calc = InteractionCalculator(inter_conf=self.inter_conf)
+        self.inter_calc = inter_calc
+
+        # Fingerprint parameters.
         self.calc_mfp = calc_mfp
         self.mfp_opts = mfp_opts
         self.calc_ifp = calc_ifp
         self.ifp_num_levels = ifp_num_levels
         self.ifp_radius_step = ifp_radius_step
         self.ifp_length = ifp_length
+
         self.similarity_func = similarity_func
         self.butina_cutoff = butina_cutoff
         self.default_properties = default_properties
@@ -231,7 +234,10 @@ class InteractionsProject:
         self.log_preferences()
 
     def __call__(self):
-        raise NotImplementedError("This class is not callable. The function __call__() is an abstract method.")
+        raise NotImplementedError("This class is not callable. Use a class that implements this method.")
+
+    def run(self):
+        self()
 
     def log_preferences(self):
         logger.info("New project initialized...")
@@ -329,9 +335,8 @@ class InteractionsProject:
         self.db.approve_session()
 
     def validate_entry_format(self, target_entry):
-        entry_str = target_entry.to_string(ENTRY_SEPARATOR)
-        if not self.entry_validator.is_valid(entry_str):
-            raise InvalidNapoliEntry("Entry '%s' does not match the nAPOLI entry format." % entry_str)
+        if not target_entry.is_valid():
+            raise InvalidEntry("Entry '%s' does not match the nAPOLI entry format." % target_entry.to_string())
 
     def get_pdb_file(self, pdb_id):
         pdb_file = "%s/%s.pdb" % (self.pdb_path, pdb_id)
@@ -355,7 +360,8 @@ class InteractionsProject:
         if self.add_hydrogen:
             if "structure_method" in pdb_header:
                 method = pdb_header["structure_method"]
-                # If the method is not a NMR type, which, in general, already have hydrogens.
+                # If the method is not a NMR type does not add hydrogen as it usually already
+                # already has hydrogens.
                 if method.upper() in NMR_METHODS:
                     return False
             return True
@@ -419,7 +425,7 @@ class InteractionsProject:
                                            mol_obj_type=self.mol_obj_type, default_properties=self.default_properties,
                                            tmp_path="%s/tmp" % self.working_path)
 
-        nb_compounds = get_contacts_for_entity(entity, ligand, level='R', radius=getattr(self.interaction_conf, "boundary_cutoff", 7))
+        nb_compounds = get_contacts_for_entity(entity, ligand, level='R', radius=getattr(self.inter_conf, "boundary_cutoff", 7))
 
         grps_by_compounds = {}
         for comp in set([x[1] for x in nb_compounds]):
@@ -453,7 +459,7 @@ class InteractionsProject:
         return next(generate_fp_for_mols([rdmol], **fp_opt))
 
     def recover_rcsb_interactions(self, target_entry, manager):
-        entry_str = target_entry.to_string(ENTRY_SEPARATOR)
+        entry_str = target_entry.to_string()
 
         logger.info("Trying to select pre-computed interactions for the entry '%s'." % entry_str)
 
@@ -489,8 +495,7 @@ class InteractionsProject:
         return db_interactions
 
     def set_step_details(self):
-        db_proj_type = (self.db.session.query(ProjectType)
-                        .filter(ProjectType.type == self.project_type).first())
+        db_proj_type = (self.db.session.query(ProjectType).filter(ProjectType.type == self.project_type).first())
 
         if not db_proj_type:
             raise NoResultFound("No step details found for the project "
@@ -709,7 +714,6 @@ class RCSB_PLI_Population(InteractionsProject):
 
         self.set_pharm_objects()
 
-        self.entry_validator = PLIEntryValidator()
         rcsb_inter_manager = RCSBInteractionManager(self.db)
 
         # Loop over each entry.
@@ -750,14 +754,14 @@ class RCSB_PLI_Population(InteractionsProject):
         # If this entry does not exist in the database,
         # raise an error.
         if db_ligand_entity is None:
-            message = ("Entry '%s' does not exist in the table 'ligand'." % target_entry.to_string(ENTRY_SEPARATOR))
+            message = ("Entry '%s' does not exist in the table 'ligand'." % target_entry.to_string())
             raise InvalidNapoliEntry(message)
 
         # If there are already interactions to this entry,
         # raise an error.
         elif status_by_id[db_ligand_entity.status_id] == "AVAILABLE":
             raise DuplicateEntry("Interactions to the entry '%s' already exists in the database."
-                                 % target_entry.to_string(ENTRY_SEPARATOR))
+                                 % target_entry.to_string())
 
 
 class DB_PLI_Project(InteractionsProject):
@@ -775,7 +779,6 @@ class DB_PLI_Project(InteractionsProject):
 
         self.keep_all_potential_inter = keep_all_potential_inter
 
-        self.project_type = PLI_PROJECT
         self.has_local_files = has_local_files
 
         super().__init__(db_conf_file=db_conf_file, working_path=working_path, entries=entries, **kwargs)
@@ -807,9 +810,6 @@ class DB_PLI_Project(InteractionsProject):
         self.prepare_project_path()
 
         self.set_pharm_objects()
-
-        free_filename_format = self.has_local_files
-        self.entry_validator = PLIEntryValidator(free_filename_format)
 
         rcsb_inter_manager = RCSBInteractionManager(self.db)
         proj_inter_manager = ProjectInteractionManager(self.db)
@@ -893,11 +893,11 @@ class DB_PLI_Project(InteractionsProject):
                                                       conf=BOUNDARY_CONF)
 
                     # Then it applies a filtering function.
-                    filtered_inter = apply_interaction_criteria(all_inter, conf=self.interaction_conf)
+                    filtered_inter = apply_interaction_criteria(all_inter, conf=self.inter_conf)
                     inter_to_be_stored = all_inter
                 else:
                     # It filters the interactions by using a cutoff at once.
-                    filtered_inter = calc_all_interactions(src_grps, trgt_grps, conf=self.interaction_conf)
+                    filtered_inter = calc_all_interactions(src_grps, trgt_grps, conf=self.inter_conf)
                     inter_to_be_stored = filtered_inter
 
                 # TODO: Remover comentario
@@ -934,7 +934,7 @@ class DB_PLI_Project(InteractionsProject):
             # TODO: Contar pra cada sitio o numero de interacoes
 
             # Select ligand and read it in a RDKit molecule object
-            rdmol_lig = self.get_rdkit_mol(structure[0], ligand, target_entry.to_string(ENTRY_SEPARATOR))
+            rdmol_lig = self.get_rdkit_mol(structure[0], ligand, target_entry.to_string())
 
             # Generate fingerprint for the ligand
             fp = self.get_fingerprint(rdmol_lig)
@@ -953,7 +953,7 @@ class DB_PLI_Project(InteractionsProject):
         inter_res_freq_by_cluster = defaultdict(InteractingResidues)
 
         for target_entry in self.entries:
-            cluster_id = clusters[target_entry.to_string(ENTRY_SEPARATOR)]
+            cluster_id = clusters[target_entry.to_string()]
 
             # TODO: REMOVER
             cluster_id = 1
@@ -1021,7 +1021,7 @@ class DB_PLI_Project(InteractionsProject):
 
         # If this entry does not exist in the database, raise an error.
         if db_ligand_entity is None:
-            message = ("Entry '%s' does not exist in the database." % target_entry.to_string(ENTRY_SEPARATOR))
+            message = ("Entry '%s' does not exist in the database." % target_entry.to_string())
             raise InvalidNapoliEntry(message)
 
         return db_ligand_entity
@@ -1036,6 +1036,7 @@ class Fingerprint_Project(InteractionsProject):
         super().__init__(entries=entries, working_path=working_path, **kwargs)
 
     def _process_entries(self, entries):
+
         for target_entry in entries:
             try:
                 logger.info("Starting processing entry %s." % target_entry)
@@ -1067,11 +1068,7 @@ class Fingerprint_Project(InteractionsProject):
                     trgt_grps = [grps_by_compounds[x] for x in grps_by_compounds]
 
                     # Calculate interactions
-                    inter_filter = InteractionFilter.new_pli_filter(inter_conf=self.interaction_conf, ignore_self_inter=False)
-                    ic = InteractionCalculator(inter_conf=self.interaction_conf, inter_filter=inter_filter,
-                                               add_non_cov=self.add_non_cov, add_atom_atom=self.add_atom_atom,
-                                               add_proximal=self.add_proximal)
-                    interactions = ic.calc_interactions(src_grps, trgt_grps)
+                    interactions = self.inter_calc.calc_interactions(src_grps, trgt_grps)
 
                 result = {"id": (target_entry.to_string())}
                 if self.calc_mfp:
@@ -1111,9 +1108,6 @@ class Fingerprint_Project(InteractionsProject):
         self.prepare_project_path()
         self.init_logging_file("%s/logs/project.log" % self.working_path)
         self.set_pharm_objects()
-
-        free_filename_format = self.has_local_files
-        self.entry_validator = PLIEntryValidator(free_filename_format)
 
         fingerprints = []
         pli_fingerprints = []
@@ -1165,7 +1159,7 @@ class Fingerprint_Project(InteractionsProject):
         logger.info("Processing time: %.2fs." % (end - start))
 
 
-class Local_Project(InteractionsProject):
+class LocalProject(InteractionsProject):
 
     def __init__(self, entries, working_path, has_local_files=False, **kwargs):
         super().__init__(entries=entries, working_path=working_path, has_local_files=has_local_files, **kwargs)
@@ -1188,12 +1182,6 @@ class Local_Project(InteractionsProject):
         self.prepare_project_path()
         self.init_logging_file("%s/logs/project.log" % self.working_path)
         self.set_pharm_objects()
-
-        free_filename_format = self.has_local_files
-        if self.project_type == PLI_PROJECT:
-            self.entry_validator = PLIEntryValidator(free_filename_format)
-        elif self.project_type == PPI_PROJECT:
-            self.entry_validator = PPIEntryValidator(free_filename_format)
 
         self.mfps = []
         self.ifps = []
@@ -1234,22 +1222,16 @@ class Local_Project(InteractionsProject):
             ligand.set_as_target(is_target=True)
 
             grps_by_compounds = self.perceive_chemical_groups(structure[0], ligand, add_hydrogen)
-            src_grps = [grps_by_compounds[x] for x in grps_by_compounds if x.is_target() or x.is_water()]
             trgt_grps = [grps_by_compounds[x] for x in grps_by_compounds]
 
-            neighborhood = [ag for c in grps_by_compounds.values() for ag in c.atm_grps]
+            neighborhood = [atm_grp for comp in grps_by_compounds.values() for atm_grp in comp.atm_grps]
             self.neighborhoods.append((target_entry, neighborhood))
 
+            #
             # Calculate interactions
-            if self.project_type == PLI_PROJECT:
-                inter_filter = InteractionFilter.new_pli_filter(inter_conf=self.interaction_conf)
-            elif self.project_type == PPI_PROJECT:
-                inter_filter = InteractionFilter.new_ppi_filter(inter_conf=self.interaction_conf)
-
-            ic = InteractionCalculator(inter_conf=self.interaction_conf, inter_filter=inter_filter,
-                                       add_non_cov=self.add_non_cov, add_atom_atom=self.add_atom_atom,
-                                       add_proximal=self.add_proximal)
-            interactions = ic.calc_interactions(src_grps, trgt_grps)
+            #
+            print(self.inter_calc.add_proximal)
+            interactions = self.inter_calc.calc_interactions(trgt_grps)
 
             self.interactions.append((pdb_file, interactions))
             continue
@@ -1299,7 +1281,7 @@ class Local_Project(InteractionsProject):
 
             # TODO: I cannot use RDKit directly in the PDB file or it will crash the molecule.
             #       First I need to convert it to MOL.
-            # rdmol_lig = self.get_rdkit_mol(structure[0], ligand, target_entry.to_string(ENTRY_SEPARATOR))
+            # rdmol_lig = self.get_rdkit_mol(structure[0], ligand, target_entry.to_string())
 
             # Generate fingerprint for the ligand
             # fp = self.get_fingerprint(rdmol_lig)
@@ -1346,7 +1328,7 @@ class Local_Project(InteractionsProject):
         # inter_res_freq_by_cluster = defaultdict(InteractingResidues)
 
         # for target_entry in self.entries:
-        #     cluster_id = clusters[target_entry.to_string(ENTRY_SEPARATOR)]
+        #     cluster_id = clusters[target_entry.to_string()]
 
         #     # TODO: REMOVER
         #     cluster_id = 1
@@ -1390,514 +1372,3 @@ class Local_Project(InteractionsProject):
 
     def update_res_freq_by_cluster(self, interacting_residues, inter_res_freq):
         inter_res_freq.update(interacting_residues)
-
-
-class NAPOLI_PLI:
-
-    def __init__(self,
-                 entries=None,
-                 pdb_path=None,
-                 working_path=None,
-                 overwrite_path=False,
-                 job_code=None,
-                 db_conf_file=None,
-                 populate_rcsb_tables=False,
-                 pdb_template=None,
-                 atom_prop_file=ATOM_PROP_FILE,
-                 interaction_conf=INTERACTION_CONF,
-                 # force_calc_interactions=False,
-                 save_all_interactions=True,
-                 ph=None,
-                 mfp_func="pharm2d_fp",
-                 similarity_func="BulkTanimotoSimilarity",
-                 run_from_step=None,
-                 run_until_step=None):
-
-        self.entries = entries
-
-        self.pdb_path = pdb_path
-        self.working_path = working_path
-        self.overwrite_path = overwrite_path
-        self.job_code = job_code
-        self.db_conf_file = db_conf_file
-
-        self.populate_rcsb_tables = populate_rcsb_tables
-
-        self.pdb_template = pdb_template
-        self.atom_prop_file = atom_prop_file
-        self.interaction_conf = interaction_conf
-        self.save_all_interactions = save_all_interactions
-        self.ph = ph
-        self.add_hydrog = True
-        self.mfp_func = mfp_func
-        self.similarity_func = similarity_func
-        self.run_from_step = run_from_step
-        self.run_until_step = run_until_step
-
-    def run(self):
-        # TODO: Create functions for reduce the amount of code in the run()
-        try:
-            if self.job_code and self.populate_rcsb_tables:
-                logger.info("You informed a job code and set RCSB's population mode to true. "
-                            "However, a job code has a higher prority over the latter. "
-                            "So, the RCSB tables will not be populated.")
-                self.populate_rcsb_tables = False
-
-            if self.job_code and not self.db_conf_file:
-                raise IllegalArgumentError("You informed a job code, but "
-                                           "none database configuration file "
-                                           "was informed. So, it would not "
-                                           "be possible to store interactions "
-                                           "and related information into the "
-                                           "database.")
-            elif self.populate_rcsb_tables and not self.db_conf_file:
-                raise IllegalArgumentError("You activate the RCSB's "
-                                           "population mode, but none "
-                                           "database configuration file "
-                                           "was informed. So, it would not "
-                                           "be possible to store interactions "
-                                           "and related information into the "
-                                           "database.")
-            elif not self.job_code and not self.working_path:
-                raise IllegalArgumentError("Neither a job code or a working "
-                                           "path was defined."
-                                           "Without them, it is not possible "
-                                           "to decide which output directory "
-                                           "to use.")
-
-            if self.populate_rcsb_tables:
-                logger.info("RCSB's population mode active. "
-                            "Interactions and related information will "
-                            "be stored into the defined database without "
-                            "relating them to a job code.")
-
-            ##########################################################
-            step = "Prepare project directory"
-            if self.working_path:
-                working_path = self.working_path
-            else:
-                working_path = "%s/projects/%s" % (NAPOLI_PATH, self.job_code)
-
-            working_pdb_path = "%s/pdbs" % working_path
-            create_directory(working_path, self.overwrite_path)
-            create_directory(working_pdb_path)
-
-            logger.info("Results and temporary files will be saved at '%s'." % working_path)
-
-            # Set the LOG file at the working path
-            # logfile = "%s/napoli.log" % working_path
-            # filehandler = logging.FileHandler(logfile, 'a')
-            # formatter = logging.Formatter('%(asctime)s - %(name)s - '
-            #                               '%(levelname)s - %(filename)s - '
-            #                               '%(funcName)s - %(lineno)d => '
-            #                               '%(message)s')
-            # filehandler.setFormatter(formatter)
-            # # Remove the existing file handlers
-            # for hdlr in logger.handlers[:]:
-            #     if isinstance(hdlr, logger.FileHander):
-            #         logger.removeHandler(hdlr)
-            # logger.addHandler(filehandler)      # set the new handler
-            # # Set the log level to INFO, DEBUG as the default is ERROR
-            # logger.setLevel("INFO")
-
-            # logger.info("Logs will be saved in '%s'." % logfile)
-
-            # TODO: avisar se eh csv ou salvar no BD.
-            # OUTPUT MODE:
-            if self.job_code:
-                logger.info("A job code ('%s') was informed. nAPOLI will try to save all results "
-                            "in the database using such id." % self.job_code)
-
-            # Define which PDB path to use.
-            if self.pdb_path is None:
-                # If none PDB path was defined and none DB conf was defined
-                # it is better to create a new directory to avoid
-                # overwriting Public directories
-                if self.db_conf_file is None:
-                    pdb_path = working_pdb_path
-                else:
-                    pdb_path = PDB_PATH
-            else:
-                pdb_path = self.pdb_path
-
-            logger.info("PDB files will be obtained from and/or downloaded "
-                        "to '%s'." % pdb_path)
-
-            ##########################################################
-            if self.db_conf_file:
-                step = "Preparing database"
-                logger.info("A database configuration file was defined. "
-                            "Starting a new database connection...")
-
-                config = Config(self.db_conf_file)
-                dbConf = config.get_section_map("database")
-                db = DBLoader(**dbConf)
-
-                rcsb_inter_manager = RCSBInteractionManager(db)
-                proj_inter_manager = ProjectInteractionManager(db)
-
-                # TODO: create all mappers at once
-                db.new_mapper(CompTypeCount, "comp_type_count")
-                db.new_mapper(InterTypeCount, "inter_type_count")
-                db.new_mapper(Project, "project")
-                db.new_mapper(LigandEntryTable, "target_entry")
-                db.new_mapper(Status, "status")
-
-                if self.job_code:
-                    projectRow = (db.session
-                                  .query(Project)
-                                  .filter(Project.job_code ==
-                                          self.job_code).one())
-                    projectId = projectRow.id
-
-                interTypeRows = db.session.query(InterType).all()
-                interIdByType = {r.type: r.id for r in interTypeRows}
-                interFilters = default_interaction_filters(interIdByType,
-                                                           self.interaction_conf)
-
-                compTypeRows = db.session.query(CompoundType).all()
-                compIdByType = {r.type: r.id for r in compTypeRows}
-
-                status_rows = db.session.query(Status).all()
-                status_by_id = {r.id: r.title for r in status_rows}
-
-                if self.entries is None:
-                    if self.job_code is None:
-                        raise IllegalArgumentError("No ligand entry list was "
-                                                   "defined. "
-                                                   "The program could try to "
-                                                   "recover a list from the "
-                                                   "database, but no job code "
-                                                   "was defined either.")
-                    else:
-                        logger.info("No ligand entry was defined. "
-                                    "It will try to recover a ligand entry "
-                                    "list from the database.")
-                        db_ligand_entries = (LigandEntryTableManager(db)
-                                             .get_entries(projectId))
-                        self.entries = format_db_ligand_entries(db_ligand_entries)
-
-            logger.info("Number of ligand entries to be processed: %d." %
-                        len(self.entries))
-
-            if self.add_hydrog:
-                if self.ph:
-                    logger.info("Hydrogen atoms will be added to the "
-                                "structures according to the pH %s." % self.ph)
-                else:
-                    logger.info("A pH value was not defined. "
-                                "Hydrogen atoms will be added to the "
-                                "structures without considering a pH "
-                                "value.")
-            else:
-                logger.info("Option ADD_HYDROG disabled. nAPOLI will not add "
-                            "hydrogen atoms to the structures.")
-
-            ##########################################################
-            # Set some variables
-            validator = PLIEntryValidator()
-            pdb_parser = PDBParser(PERMISSIVE=True,
-                                   QUIET=True,
-                                   FIX_ATOM_NAME_CONFLICT=False,
-                                   FIX_OBABEL_FLAGS=False)
-
-            feat_factory = (ChemicalFeatures.BuildFeatureFactory(self.atom_prop_file))
-
-            sigFactory = SigFactory(feat_factory, minPointCount=2,
-                                    maxPointCount=3,
-                                    trianglePruneBins=False)
-            sigFactory.SetBins([(0, 2), (2, 5), (5, 8)])
-            sigFactory.Init()
-
-            feat_extractor = FeatureExtractor(feat_factory)
-
-            boundary_conf = InteractionConf({"boundary_cutoff": 7})
-
-            fingerprints = []
-
-            # The calculus of interactions depend on the pharmacophore
-            # definition (ATOM_PROP_FILE) and the pH (PH).
-            # Thus, if the user has kept such values unchanged and has
-            # not uploaded any PDB file, nAPOLI can try to select the
-            # pre-computed interactions from a database.
-            is_inter_params_default = (self.pdb_path is None and
-                                       self.atom_prop_file == ATOM_PROP_FILE and
-                                       self.ph is None and
-                                       self.db_conf_file is not None)
-
-            if is_inter_params_default:
-                logger.info("Default configuration was kept unchanged. "
-                            "nAPOLI will try to select pre-computed "
-                            "interactions from the defined database")
-
-            ##########################################################
-
-            # Loop over each entry.
-            for target_entry in self.entries:
-                try:
-                    entry_str = target_entry.to_string(ENTRY_SEPARATOR)
-                    myBioLigand = ("H_%s" % target_entry.lig_name,
-                                   target_entry.lig_num,
-                                   target_entry.lig_icode)
-
-                    # TODO: Verificar se ligante existe no modelo (BioPDB)
-
-                    db_ligand_entity = None
-                    if self.db_conf_file and self.job_code:
-                        step = "Check ligand entry existance"
-                        if isinstance(target_entry, DBEntry) is False:
-                            message = ("Entry '%s' is not a DBEntry "
-                                       "object. So, nAPOLI cannot obtain an "
-                                       "id information for this ligand entry "
-                                       "and no database update will be "
-                                       "possible." % entry_str)
-                            raise InvalidNapoliEntry(message)
-                        elif target_entry.id is None:
-                            message = ("An invalid id for the entry '%s'"
-                                       "was defined." % entry_str)
-                            raise InvalidNapoliEntry(message)
-                        else:
-                            db_ligand_entity = (db.session
-                                                .query(LigandEntryTable)
-                                                .filter(LigandEntryTable.id == target_entry.id)
-                                                .first())
-                            if db_ligand_entity is None:
-                                message = ("Entry '%s' with id equal "
-                                           "to '%d' does not exist in the "
-                                           "database."
-                                           % (entry_str, target_entry.id))
-                                raise InvalidNapoliEntry(message)
-                    elif self.populate_rcsb_tables:
-                        step = "Check ligand existance in RCSB tables"
-                        db_ligand_entity = (db.session
-                                            .query(Ligand)
-                                            .filter(Ligand.pdb_id == target_entry.pdb_id and
-                                                    Ligand.chain_id == target_entry.chain_id and
-                                                    Ligand.lig_name == target_entry.lig_name and
-                                                    Ligand.lig_num == target_entry.lig_num and
-                                                    Ligand.lig_icode == target_entry.lig_icode)
-                                            .first())
-
-                        # If this entry does not exist in the database,
-                        # raise an error.
-                        if db_ligand_entity is None:
-                            message = ("Entry '%s' does not exist in the "
-                                       "table 'ligand'." % entry_str)
-                            raise InvalidNapoliEntry(message)
-                        # If there are already interactions to this entry,
-                        # raise an error.
-                        elif status_by_id[db_ligand_entity.status_id] == "AVAILABLE":
-                            raise DuplicateEntry("Interactions to the entry '%s' already exists in "
-                                                 "the database." % entry_str)
-
-                    ##########################################################
-                    step = "Validate nAPOLI entry"
-                    if not validator.is_valid(entry_str):
-                        raise InvalidNapoliEntry("Entry '%s' does not match the nAPOLI entry format." % entry_str)
-
-                    ##########################################################
-                    # TODO: option to change name of default PDB name.
-                    #      BioPython cria arquivo com .env
-                    step = "Check PDB file existance"
-                    # User has defined a specific directory.
-                    if self.pdb_path:
-                        pdb_file = "%s/%s.pdb" % (pdb_path, target_entry.pdb_id)
-                        # If the file does not exist or is invalid.
-                        if is_file_valid(pdb_file) is False:
-                            raise FileNotFoundError("The PDB file '%s' was not found." % pdb_file)
-                    # If none DB conf. was defined try to download the PDB.
-                    # Here, pdb_path is equal to the working_pdb_path
-                    elif self.db_conf_file is None:
-                        pdb_file = "%s/pdb%s.ent" % (working_pdb_path, target_entry.pdb_id.lower())
-                        download_pdb(target_entry.pdb_id, working_pdb_path)
-                    else:
-                        pdb_file = "%s/pdb%s.ent" % (pdb_path, target_entry.pdb_id.lower())
-
-                        # If the file does not exist or is invalid, it is
-                        # better to download a new PDB file at the working path.
-                        if not is_file_valid(pdb_file):
-                            pdb_file = "%s/pdb%s.ent" % (working_pdb_path, target_entry.pdb_id.lower())
-                            download_pdb(target_entry.pdb_id, working_pdb_path)
-                        else:
-                            # TODO: check if PDB is updated on the DB
-                            pass
-
-                    #####################################
-                    step = "Prepare protein structure"
-                    # TODO: Distinguish between files that need to remove hydrogens (NMR, for example).
-                    # TODO: Add parameter to force remove hydrogens (user marks it)
-                    if self.add_hydrog:
-                        preppdb_file = "%s/%s.H.pdb" % (working_pdb_path, target_entry.pdb_id)
-
-                        if not exists(preppdb_file):
-                            if self.ph:
-                                obOpt = {"p": 7, "error-level": 5}
-                            else:
-                                obOpt = {"h": None, "error-level": 5}
-
-                            convert_molecule(pdb_file, preppdb_file, opt=obOpt)
-
-                        pdb_file = preppdb_file
-
-                    ##########################################################
-                    step = "Parse PDB file"
-                    structure = pdb_parser.get_structure(target_entry.pdb_id, pdb_file)
-                    ligand = structure[0][target_entry.chain_id][myBioLigand]
-                    ligand.set_as_target()
-
-                    ##########################################################
-                    step = "Generate structural fingerprint"
-                    lig_sel = ResidueSelector({ligand})
-                    lig_block = entity_to_string(structure, lig_sel, write_conects=False)
-                    rdLig = MolFromPDBBlock(lig_block)
-                    rdLig.SetProp("_Name", entry_str)
-                    fpOpt = {"sigFactory": sigFactory}
-                    fp = generate_fp_for_mols([rdLig], self.mfp_func,
-                                              fpOpt=fpOpt, critical=True)[0]
-                    fingerprints.append(fp)
-
-                    ##########################################################
-                    step = "Perceive chemical groups"
-                    nb_compounds = get_contacts_for_entity(structure[0],
-                                                           ligand,
-                                                           level='R')
-
-                    compounds = set([x[1] for x in nb_compounds])
-                    grps_by_compounds = {}
-                    for comp in compounds:
-                        # TODO: verificar se estou usando o ICODE nos residuos
-                        groups = find_compound_groups(comp, feat_extractor)
-                        grps_by_compounds[comp] = groups
-
-                    trgt_grps = [grps_by_compounds[x] for x in grps_by_compounds if x.is_water() or x.is_hetatm()]
-                    nb_grps = [grps_by_compounds[x] for x in grps_by_compounds if x != ligand]
-
-                    # TODO: Preparar estrutura somente se não for selecionar
-                    # da base de dados
-
-                    ##########################################################
-                    step = "Calculate interactions"
-
-                    calculate_interactions = True
-                    if (is_inter_params_default and
-                            not self.populate_rcsb_tables):
-                        logger.info("Trying to select pre-computed interactions for "
-                                    "the entry '%s'." % entry_str)
-
-                        db_ligand_entity = (db.session
-                                            .query(Ligand)
-                                            .filter(Ligand.pdb_id == target_entry.pdb_id and
-                                                    Ligand.chain_id == target_entry.chain_id and
-                                                    Ligand.lig_name == target_entry.lig_name and
-                                                    Ligand.lig_num == target_entry.lig_num and
-                                                    Ligand.lig_icode == target_entry.lig_icode)
-                                            .first())
-
-                        if db_ligand_entity:
-                            if status_by_id[db_ligand_entity.status_id] == "AVAILABLE":
-                                join_filter = get_ligand_tbl_join_filter(target_entry, Ligand)
-                                db_interactions = (rcsb_inter_manager
-                                                   .select_interactions(join_filter,
-                                                                        interFilters))
-                                filtered_inter = format_db_interactions(structure, db_interactions)
-
-                                logger.info("%d pre-computed interaction(s) found in the "
-                                            "database for the entry '%s'."
-                                            % (len(filtered_inter), entry_str))
-
-                                calculate_interactions = False
-                            else:
-                                logger.info("The entry '%s' exists in the database, but "
-                                            "there is no pre-computed interaction available. "
-                                            "So, nAPOLI will calculate the interactions to this "
-                                            "ligand." % entry_str)
-                        else:
-                            logger.info("The entry '%s' does not exist in the "
-                                        "database." % entry_str)
-
-                    if calculate_interactions:
-                        if self.save_all_interactions:
-                            # First it calculates all interactions using a
-                            # boundary limit. When using a database, it is
-                            # useful to save all potential interactions.
-                            # So, it is possible to filter interactions
-                            # faster than recalculate them for each
-                            # modification in the interaction criteria.
-                            all_inter = calc_all_interactions(trgt_grps,
-                                                              nb_grps,
-                                                              conf=boundary_conf)
-
-                            # Then it applies a filtering function.
-                            filtered_inter = apply_interaction_criteria(all_inter,
-                                                                        conf=self.interaction_conf)
-
-                            db_interactions = all_inter
-                        else:
-                            # It filters the interactions by using a cutoff at once.
-                            filtered_inter = calc_all_interactions(trgt_grps,
-                                                                   nb_grps,
-                                                                   conf=self.interaction_conf)
-                            db_interactions = filtered_inter
-
-                        ##########################################################
-                        if self.db_conf_file and self.job_code:
-                            #TODO: Remover comentario
-                            #TODO: Adicionar ICODE nas chaves de entrada que o usuario submete
-                            # proj_inter_manager.insert_interactions(db_interactions, db_ligand_entity)
-                            pass
-                        elif self.populate_rcsb_tables:
-                            # rcsb_inter_manager.insert_interactions(db_interactions, db_ligand_entity)
-                            pass
-                        else:
-                            #TODO: Criar arquivo de saida formato .tsv
-                            pass
-
-                    if not self.populate_rcsb_tables:
-                        ##########################################################
-                        step = "Calculate atom type statistics"
-                        ligand_grps = grps_by_compounds[ligand]
-                        grp_types = count_group_types(ligand_grps, compIdByType)
-                        if self.db_conf_file:
-                            for typeId in grp_types:
-                                db.session.add(CompTypeCount(target_entry.id, projectId,
-                                                             typeId, grp_types[typeId]))
-                            # TODO: Remover comentario
-                            db.approve_session()
-
-                        ##########################################################
-                        step = "Calculate interaction type statistics"
-                        summary_trgts = {ligand}
-                        summary_trgts = None
-                        interaction_types = count_interaction_types(filtered_inter,
-                                                                    summary_trgts,
-                                                                    interIdByType)
-                        if self.db_conf_file:
-                            for typeId in interaction_types:
-                                db.session.add(InterTypeCount(target_entry.id, projectId,
-                                                              typeId, interaction_types[typeId]))
-
-                            #TODO: Remover comentario
-                            db.approve_session()
-
-                        print("Last step: '%s'" % step)
-
-                except Exception as e:
-                    logger.exception(e)
-
-                    # TODO: Inform that the Entry failed
-
-            ##########################################################
-            # TODO: after clusterize molecules to align the ligands in a same way.
-
-            # step = "Generate 2D ligand structure"
-            # # pdbExtractor = Extractor(structure[0][target_entry.chain])
-            # # ligandpdb_file = "%s/%s.pdb" % (working_pdb_path, entry)
-            # # pdbExtractor.extract_residues([ligandBio], ligandpdb_file)
-            # lig_sel = ResidueSelector({ligand})
-            # lig_block = entity_to_string(structure, lig_sel,
-            #                              write_conects=False)
-            # rdLig = MolFromPDBBlock(lig_block)
-            # Compute2DCoords(rdLig)
-
-        except Exception as e:
-            logger.exception(e)
