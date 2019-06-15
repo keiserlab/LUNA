@@ -33,8 +33,7 @@ PPI_ENTRY_REGEX = re.compile(r'^%s:\w$' % FILENAME_REGEX)
 
 class Entry:
 
-    def __init__(self, pdb_id, chain_id, comp_name=None, comp_num=None, comp_icode=None, is_hetatm=True, sep=ENTRY_SEPARATOR,
-                 inter_filter=None):
+    def __init__(self, pdb_id, chain_id, comp_name=None, comp_num=None, comp_icode=None, is_hetatm=True, sep=ENTRY_SEPARATOR):
 
         if xor(comp_name is None, comp_num is None):
             raise IllegalArgumentError("You tried to define a compound, so you must inform its name and number.")
@@ -51,10 +50,6 @@ class Entry:
             if comp_icode.isdigit() or len(comp_icode) > 1:
                 raise IllegalArgumentError("The informed residue icode '%s' is invalid. It must be a character." % str(comp_icode))
 
-        if inter_filter is not None and isinstance(inter_filter, InteractionFilter) is False:
-            raise IllegalArgumentError("The informed interaction filter must be an instance of '%s'." % InteractionFilter)
-
-
         self.pdb_id = pdb_id
         self.chain_id = chain_id
         self.comp_name = comp_name
@@ -62,13 +57,12 @@ class Entry:
         self._comp_icode = comp_icode
         self.is_hetatm = is_hetatm
         self.sep = sep
-        self.inter_filter = inter_filter
 
         if not self.is_valid():
             raise InvalidEntry("Entry '%s' does not match the PDB format." % self.to_string())
 
     @classmethod
-    def from_string(cls, entry_str, is_hetatm=True, sep=ENTRY_SEPARATOR, inter_filter=None):
+    def from_string(cls, entry_str, is_hetatm=True, sep=ENTRY_SEPARATOR):
         entries = entry_str.split(sep)
         if len(entries) >= 2 and len(entries) <= 4:
             if len(entries) == 4:
@@ -82,7 +76,7 @@ class Entry:
                     raise IllegalArgumentError("The field residue/ligand number and its insertion code (if applicable) '%s' is invalid. "
                                                "It must be an integer followed by one insertion code character when applicable."
                                                % entries[3])
-            return cls(*entries, is_hetatm=is_hetatm, sep=sep, inter_filter=inter_filter)
+            return cls(*entries, is_hetatm=is_hetatm, sep=sep)
         else:
             raise IllegalArgumentError("The number of fields in the informed string '%s' is incorrect. A valid string must contain "
                                        "two obligatory fields (PDB and chain id) and may contain two optional fields (residue name "
@@ -150,14 +144,29 @@ class DBEntry(Entry):
         super().__init__(pdb_id, chain_id, comp_name, comp_num, comp_icode)
 
 
-class CompoundEntry(Entry):
+class ChainEntry(Entry):
 
-    def __init__(self, pdb_id, chain_id, comp_name, comp_num, comp_icode=None, sep=ENTRY_SEPARATOR, inter_filter=None):
-
-        super().__init__(pdb_id, chain_id, comp_name, comp_num, comp_icode, is_hetatm=True, sep=sep, inter_filter=inter_filter)
+    def __init__(self, pdb_id, chain_id, sep=ENTRY_SEPARATOR):
+        super().__init__(pdb_id, chain_id, is_hetatm=False, sep=sep)
 
     @classmethod
-    def from_string(cls, entry_str, sep=ENTRY_SEPARATOR, inter_filter=None):
+    def from_string(cls, entry_str, sep=ENTRY_SEPARATOR):
+        entries = entry_str.split(sep)
+        if len(entries) == 2:
+            return cls(*entries, sep=sep)
+        else:
+            raise IllegalArgumentError("The number of fields in the informed string '%s' is incorrect. A valid string must contain "
+                                       "two obligatory fields: PDB and chain id." % entry_str)
+
+
+class CompoundEntry(Entry):
+
+    def __init__(self, pdb_id, chain_id, comp_name, comp_num, comp_icode=None, sep=ENTRY_SEPARATOR):
+
+        super().__init__(pdb_id, chain_id, comp_name, comp_num, comp_icode, is_hetatm=True, sep=sep)
+
+    @classmethod
+    def from_string(cls, entry_str, sep=ENTRY_SEPARATOR):
         entries = entry_str.split(sep)
         if len(entries) == 4:
             # Separate ligand number from insertion code.
@@ -169,31 +178,16 @@ class CompoundEntry(Entry):
             else:
                 raise IllegalArgumentError("The field residue/ligand number and its insertion code (if applicable) '%s' is invalid. "
                                            "It must be an integer followed by one insertion code character when applicable." % entries[3])
-            return cls(*entries, sep=sep, inter_filter=inter_filter)
+            return cls(*entries, sep=sep)
         else:
             raise IllegalArgumentError("The number of fields in the informed string '%s' is incorrect. A valid ligand entry must contain "
                                        "four obligatory fields: PDB, chain id, residue name, and residue number followed by its insertion "
                                        "code when applicable)." % entry_str)
 
 
-class ChainEntry(Entry):
-
-    def __init__(self, pdb_id, chain_id, sep=ENTRY_SEPARATOR, inter_filter=None):
-        super().__init__(pdb_id, chain_id, is_hetatm=False, sep=sep, inter_filter=inter_filter)
-
-    @classmethod
-    def from_string(cls, entry_str, sep=ENTRY_SEPARATOR, inter_filter=None):
-        entries = entry_str.split(sep)
-        if len(entries) == 2:
-            return cls(*entries, sep=sep, inter_filter=inter_filter)
-        else:
-            raise IllegalArgumentError("The number of fields in the informed string '%s' is incorrect. A valid string must contain "
-                                       "two obligatory fields: PDB and chain id." % entry_str)
-
-
 class MolEntry(Entry):
 
-    def __init__(self, pdb_id, mol_id, mol_file=None, mol_file_ext=None, mol_obj_type='rdkit', sep=ENTRY_SEPARATOR, inter_filter=None):
+    def __init__(self, pdb_id, mol_id, mol_file=None, mol_file_ext=None, mol_obj_type='rdkit', sep=ENTRY_SEPARATOR):
 
         if mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES:
             raise IllegalArgumentError("Objects of type '%s' are not currently accepted. "
@@ -205,7 +199,7 @@ class MolEntry(Entry):
         self.mol_obj_type = mol_obj_type
         self._mol_obj = None
 
-        super().__init__(pdb_id, "z", "LIG", 9999, sep=sep, inter_filter=inter_filter)
+        super().__init__(pdb_id, "z", "LIG", 9999, sep=sep)
 
     @property
     def full_id(self):
