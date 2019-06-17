@@ -321,35 +321,41 @@ class InteractionCalculator:
 
     def _default_functions(self):
         return {
-                    ("Donor", "Acceptor"): [self.calc_hbond],
-
+                    # Hydrophobic interaction
                     ("Hydrophobic", "Hydrophobic"): [self.calc_hydrop],
                     ("Hydrophobe", "Hydrophobe"): [self.calc_hydrop],
 
+                    # Hydrogen bond
+                    ("Donor", "Acceptor"): [self.calc_hbond],
+
+                    # Weak hydrogen bond
                     ("WeakDonor", "Acceptor"): [self.calc_weak_hbond],
                     ("WeakDonor", "WeakAcceptor"): [self.calc_weak_hbond],
                     ("Donor", "Aromatic"): [self.calc_hbond_pi],
                     ("WeakDonor", "Aromatic"): [self.calc_hbond_pi],
 
+                    # Halogen bond
                     ("HalogenDonor", "Acceptor"): [self.calc_xbond],
                     ("HalogenDonor", "Aromatic"): [self.calc_xbond_pi],
 
+                    # Chalcogen bond
                     ("ChalcogenDonor", "Acceptor"): [self.calc_chalc_bond],
                     ("ChalcogenDonor", "WeakAcceptor"): [self.calc_chalc_bond],
                     ("ChalcogenDonor", "Aromatic"): [self.calc_chalc_bond_pi],
 
+                    # Stackings
                     ("Aromatic", "Aromatic"): [self.calc_pi_pi],
-
                     ("Amide", "Aromatic"): [self.calc_amide_pi],
-
                     ("Positive", "Aromatic"): [self.calc_cation_pi],
                     ("PosIonizable", "Aromatic"): [self.calc_cation_pi],
                     ("PositivelyIonizable", "Aromatic"): [self.calc_cation_pi],
 
+                    # Ionic interaction
                     ("NegativelyIonizable", "PositivelyIonizable"): [self.calc_ionic],
                     ("NegIonizable", "PosIonizable"): [self.calc_ionic],
                     ("Negative", "Positive"): [self.calc_ionic],
 
+                    # Repulsive interaction
                     ("NegativelyIonizable", "NegativelyIonizable"): [self.calc_repulsive],
                     ("PositivelyIonizable", "PositivelyIonizable"): [self.calc_repulsive],
                     ("NegIonizable", "NegIonizable"): [self.calc_repulsive],
@@ -379,6 +385,7 @@ class InteractionCalculator:
                     ("Electrophile", "PosIonizable"): [self.calc_ion_multipole],
                     ("Electrophile", "Positive"): [self.calc_ion_multipole],
 
+                    # Proximal, covalent, vdw, clash
                     ("Atom", "Atom"): [self.calc_atom_atom, self.calc_proximal]
             }
 
@@ -475,8 +482,8 @@ class InteractionCalculator:
             ring_grp = group2
             amide_grp = group1
         else:
-            logger.warning("Amide-aromatic interactions require an aromatic and an amide group.")
-            logger.warning("However, the informed groups have the features '%s' and '%s'" % (group1.features, group2.features))
+            logger.warning("Amide-aromatic interactions require an aromatic and an amide group. However, the informed "
+                           "groups have the features %s and %s." % (group1.feature_names, group2.feature_names))
             return []
 
         # Distance between the amide and ring centroids.
@@ -510,8 +517,8 @@ class InteractionCalculator:
 
         if ((feat1.name != "Hydrophobic" and feat1.name != "Hydrophobe") or
                 (feat2.name != "Hydrophobic" and feat2.name != "Hydrophobe")):
-            logger.warning("Hydrophobic interactions require hydrophobic atoms or hydrophobes (group of hydrophobic atoms).")
-            logger.warning("However, the informed groups have the features '%s' and '%s'" % (group1.features, group2.features))
+            logger.warning("Hydrophobic interactions require hydrophobic atoms or hydrophobes (group of hydrophobic atoms). "
+                           "However, the informed groups have the features %s and %s." % (group1.feature_names, group2.feature_names))
             return []
 
         # Check if the interaction involves the same compound. For these cases, we ignore hydrophobic interactions.
@@ -571,8 +578,8 @@ class InteractionCalculator:
             dipole_grp, dipole_type = group2, "Electrophile"
             ion_grp, ion_type = group1, "Cation"
         else:
-            logger.warning("Ion-dipole interactions require a dipole and an ion group.")
-            logger.warning("However, the informed groups have the features '%s' and '%s'" % (group1.features, group2.features))
+            logger.warning("Ion-dipole interactions require a dipole and an ion group. However, the informed groups "
+                           "have the features %s and %s." % (group1.feature_names, group2.feature_names))
             return []
 
         # A nucleophile may have only 1 atom (water oxygen).
@@ -644,29 +651,42 @@ class InteractionCalculator:
         interactions = []
 
         if len(group1.atoms) != 1 and len(group1.atoms) != 2 and len(group2.atoms) != 1 and len(group2.atoms) != 2:
-            logger.warning("A dipole group should have 1 (for cases when the atom only has hydrogens bonded to it) or 2 atoms. However, "
-                           "the informed groups %s and %s have %d and %d atoms, respectively." % (group1, group2, len(group1.atoms),
-                                                                                                  len(group2.atoms)))
+            logger.warning("A dipole group should have 1 (for cases when the atom has only hydrogens bonded to it) or 2 atoms. "
+                           "However, the informed groups '%s' and '%s' have %d and %d atoms, respectively."
+                           % (group1, group2, len(group1.atoms), len(group2.atoms)))
             return []
 
-        # Dipole 1 will always will the nucleophile and the Dipole 2 the nucleophile, except when both dipoles have the same characteristcs.
-        # Favorable interactions
+        # The reference dipole will always be the second one, i.e., one of its atom will be the center in the angle NEY.
+        #
+        # Favorable interactions: in these cases, the Dipole 1 will always be the nucleophile and the Dipole 2 the
+        # electrophile what represents the nucleophile atack, i.e., the angles calculated using the dipole 2 as reference
+        # represents how the nucleophile aproximate the electrophile.
         if feat1.name == "Nucleophile" and feat2.name == "Electrophile":
             dipole_grp1, dipole_type1 = group1, feat1.name
             dipole_grp2, dipole_type2 = group2, feat2.name
         elif feat2.name == "Nucleophile" and feat1.name == "Electrophile":
             dipole_grp1, dipole_type1 = group2, feat2.name
             dipole_grp2, dipole_type2 = group1, feat1.name
-        # Unfavorable interactions
+        # Unfavorable interactions: in these cases, the reference dipole will depend on the number of atoms in the dipoles.
+        # With dipoles containing 1 atom, it takes a generous approach by ignoring angles and accepting everything.
+        # With dipoles containing two atoms, it requires that at least one of the angles fits the rules to be accepted.
         elif feat1.name == feat2.name and (feat1.name == "Nucleophile" or feat1.name == "Electrophile"):
-            dipole_grp1, dipole_type1 = group1, feat1.name
-            dipole_grp2, dipole_type2 = group2, feat2.name
+            # If only one group contains 1 atom, use it as the dipole 2 because it is used as the reference to calculate
+            # the NEY angle. Since we take a generous approach, with one atom no angle will be calculated and the interaction
+            # will be accepted.
+            if len(group1.atoms) == 1 and len(group2.atoms) == 2:
+                dipole_grp1, dipole_type1 = group2, feat2.name
+                dipole_grp2, dipole_type2 = group1, feat1.name
+            # All the other number combinations ([2,1], [1,1], [2, 2]) come here.
+            else:
+                dipole_grp1, dipole_type1 = group1, feat1.name
+                dipole_grp2, dipole_type2 = group2, feat2.name
         else:
-            logger.warning("Multipolar interactions require a nucleophile and an electrophile group.")
-            logger.warning("However, the informed groups have the features '%s' and '%s'" % (group1.features, group2.features))
+            logger.warning("Multipolar interactions require a nucleophile and an electrophile group. "
+                           "However, the informed groups have the features %s and %s." % (group1.feature_names, group2.feature_names))
             return []
 
-        # Dipole 1
+        # Atom 1 => Dipole 1
         #
         # A nucleophile may have only 1 atom (water oxygen).
         dipole_atm1 = dipole_grp1.atoms[0]
@@ -679,7 +699,7 @@ class InteractionCalculator:
             dipole_atm1 = dipole_grp1.atoms[0] if (dipole_grp1.atoms[0].electronegativity <
                                                    dipole_grp1.atoms[1].electronegativity) else dipole_grp1.atoms[1]
 
-        # Dipole 2
+        # Atom 2 => Dipole 2
         #
         # An electrophile may have only 1 atom. E.g.: NH3, although by default we consider it as an ion.
         dipole_atm2 = dipole_grp2.atoms[0]
@@ -696,7 +716,7 @@ class InteractionCalculator:
         # Model for unfavorable interactions: A-N ... N-A, Y-E ... E-Y.
         #
         # Although there are two different models for unfavorable interactions, the method for them are equal to the
-        # favorable interaction. So, from now on we will deal with them as if it was the first model.
+        # favorable interaction. So, from now on, we will deal with them as if it was the first model.
         #
         # Distance between the nucleophile and electrophile.
         ne_dist = im.euclidean_distance(dipole_atm1.coord, dipole_atm2.coord)
@@ -704,8 +724,9 @@ class InteractionCalculator:
         if (self.is_within_boundary(ne_dist, "boundary_cutoff", le) and
                 self.is_within_boundary(ne_dist, "max_ne_dist_multipolar_inter", le)):
 
-            # No angle can be calculated if the electrophile has only one atom.
+            # No angle can be calculated if the electrophile (dipole 2) has only one atom.
             if len(dipole_grp2.atoms) == 1:
+
                 params = {"ne_dist_multipolar_inter": ne_dist,
                           "ney_ang_multipolar_inter": -1,
                           "disp_ang_multipolar_inter": -1,
@@ -715,65 +736,81 @@ class InteractionCalculator:
                               else "Unfavorable %s-%s" % (dipole_type1.lower(), dipole_type2.lower()))
                 inter = InteractionType(dipole_grp1, dipole_grp2, inter_type, params)
                 interactions.append(inter)
+
             else:
-                # Model: A-N ... E-Y
-                y_atm = dipole_grp2.atoms[1] if dipole_grp2.atoms[0] == dipole_atm2 else dipole_grp2.atoms[0]
-                en_vect = dipole_atm1.coord - dipole_atm2.coord
-                ey_vect = y_atm.coord - dipole_atm2.coord
-                ney_angle = im.angle(en_vect, ey_vect)
+                dipole1 = (dipole_grp1, dipole_atm1, dipole_type1)
+                dipole2 = (dipole_grp2, dipole_atm2, dipole_type2)
 
-                if (self.is_within_boundary(ney_angle, "min_ney_ang_multipolar_inter", ge) and
-                        self.is_within_boundary(ney_angle, "max_ney_ang_multipolar_inter", le)):
+                combinations = [(dipole1, dipole2)]
+                # For unfavorable interactions, it is necessary to evaluate each combination of dipoles. So, it can
+                # produce two interactions.
+                if feat1.name == feat2.name:
+                    combinations = [(dipole1, dipole2), (dipole2, dipole1)]
 
-                    elect_nb_coords = [nbi.coord for nbi in dipole_atm2.neighbors_info if nbi.atomic_num != 1]
-                    elect_normal = im.calc_normal(elect_nb_coords + [dipole_atm2.coord])
-                    disp_angle = im.to_quad1(im.angle(elect_normal, en_vect))
+                for d1, d2 in combinations:
+                    dipole_grp1, dipole_atm1, dipole_type1 = d1
+                    dipole_grp2, dipole_atm2, dipole_type2 = d2
 
-                    if self.is_within_boundary(disp_angle, "max_disp_ang_multipolar_inter", le):
+                    # Model: A-N ... E-Y
+                    y_atm = dipole_grp2.atoms[1] if dipole_grp2.atoms[0] == dipole_atm2 else dipole_grp2.atoms[0]
+                    en_vect = dipole_atm1.coord - dipole_atm2.coord
+                    ey_vect = y_atm.coord - dipole_atm2.coord
+                    ney_angle = im.angle(en_vect, ey_vect)
 
-                        # If the nucleophile has two atoms, then we will be able to calculate the angle between the vectors AN and EY.
-                        # This angle is necessary to define the orientation of the dipole.
-                        if len(dipole_grp1.atoms) == 2:
-                            # Model: A-N ... E-Y
-                            a_atm = dipole_grp1.atoms[1] if dipole_grp1.atoms[0] == dipole_atm1 else dipole_grp1.atoms[0]
-                            an_vect = dipole_atm1.coord - a_atm.coord
-                            # Angle between vectors AN and EY
-                            an_ey_vect_angle = im.angle(an_vect, ey_vect)
+                    if (self.is_within_boundary(ney_angle, "min_ney_ang_multipolar_inter", ge) and
+                            self.is_within_boundary(ney_angle, "max_ney_ang_multipolar_inter", le)):
 
-                            params = {"ne_dist_multipolar_inter": ne_dist,
-                                      "ney_ang_multipolar_inter": ney_angle,
-                                      "disp_ang_multipolar_inter": disp_angle,
-                                      "an_ey_ang_multipolar_inter": an_ey_vect_angle}
+                        elect_nb_coords = [nbi.coord for nbi in dipole_atm2.neighbors_info if nbi.atomic_num != 1]
+                        elect_normal = im.calc_normal(elect_nb_coords + [dipole_atm2.coord])
+                        disp_angle = im.to_quad1(im.angle(elect_normal, en_vect))
 
-                            if not dipole_type1 == dipole_type2:
-                                if self.is_within_boundary(an_ey_vect_angle, "max_an_ey_ang_para_multipolar_inter", le):
-                                    inter = InteractionType(dipole_grp1, dipole_grp2, "Parallel multipolar", params)
-                                    interactions.append(inter)
-                                elif self.is_within_boundary(an_ey_vect_angle, "min_an_ey_ang_antipara_multipolar_inter", ge):
-                                    inter = InteractionType(dipole_grp1, dipole_grp2, "Antiparallel multipolar", params)
-                                    interactions.append(inter)
-                                elif (self.is_within_boundary(an_ey_vect_angle, "min_an_ey_ang_ortho_multipolar_inter", ge) and
-                                        self.is_within_boundary(an_ey_vect_angle, "max_an_ey_ang_ortho_multipolar_inter", le)):
-                                    inter = InteractionType(dipole_grp1, dipole_grp2, "Orthogonal multipolar", params)
-                                    interactions.append(inter)
+                        if self.is_within_boundary(disp_angle, "max_disp_ang_multipolar_inter", le):
+
+                            # If the nucleophile has two atoms, then we will be able to calculate the angle between the vectors AN and EY.
+                            # This angle is necessary to define the orientation of the dipole.
+                            if len(dipole_grp1.atoms) == 2:
+                                # Model: A-N ... E-Y
+                                a_atm = dipole_grp1.atoms[1] if dipole_grp1.atoms[0] == dipole_atm1 else dipole_grp1.atoms[0]
+                                an_vect = dipole_atm1.coord - a_atm.coord
+                                # Angle between vectors AN and EY
+                                an_ey_vect_angle = im.angle(an_vect, ey_vect)
+
+                                params = {"ne_dist_multipolar_inter": ne_dist,
+                                          "ney_ang_multipolar_inter": ney_angle,
+                                          "disp_ang_multipolar_inter": disp_angle,
+                                          "an_ey_ang_multipolar_inter": an_ey_vect_angle}
+
+                                if not dipole_type1 == dipole_type2:
+                                    if self.is_within_boundary(an_ey_vect_angle, "max_an_ey_ang_para_multipolar_inter", le):
+                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Parallel multipolar", params)
+                                        interactions.append(inter)
+                                    elif self.is_within_boundary(an_ey_vect_angle, "min_an_ey_ang_antipara_multipolar_inter", ge):
+                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Antiparallel multipolar", params)
+                                        interactions.append(inter)
+                                    elif (self.is_within_boundary(an_ey_vect_angle, "min_an_ey_ang_ortho_multipolar_inter", ge) and
+                                            self.is_within_boundary(an_ey_vect_angle, "max_an_ey_ang_ortho_multipolar_inter", le)):
+                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Orthogonal multipolar", params)
+                                        interactions.append(inter)
+                                    else:
+                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Tilted multipolar", params)
+                                        interactions.append(inter)
                                 else:
-                                    inter = InteractionType(dipole_grp1, dipole_grp2, "Tilted multipolar", params)
+                                    inter_type = "Unfavorable %s-%s" % (dipole_type1.lower(), dipole_type2.lower())
+                                    inter = InteractionType(dipole_grp1, dipole_grp2, inter_type, params)
                                     interactions.append(inter)
+
+                            # Otherwise, ignore the angle AN and EY and add a general interaction (Multipolar) without a specific
+                            # definition of the orientation. It will happen only with Water molecules.
                             else:
-                                inter_type = "Unfavorable %s-%s" % (dipole_type1.lower(), dipole_type2.lower())
+                                params = {"ne_dist_multipolar_inter": ne_dist,
+                                          "ney_ang_multipolar_inter": ney_angle,
+                                          "disp_ang_multipolar_inter": disp_angle,
+                                          "an_ey_ang_multipolar_inter": -1}
+                                inter_type = ("Multipolar" if not dipole_type1 == dipole_type2
+                                              else "Unfavorable %s-%s" % (dipole_type1.lower(), dipole_type2.lower()))
                                 inter = InteractionType(dipole_grp1, dipole_grp2, inter_type, params)
                                 interactions.append(inter)
-                        # Otherwise, ignore the angle AN and EY and add a general interaction (Multipolar) without a specific
-                        # definition for the orientation. It will happen only with Water molecules.
-                        else:
-                            params = {"ne_dist_multipolar_inter": ne_dist,
-                                      "ney_ang_multipolar_inter": ney_angle,
-                                      "disp_ang_multipolar_inter": disp_angle,
-                                      "an_ey_ang_multipolar_inter": -1}
-                            inter_type = ("Multipolar" if not dipole_type1 == dipole_type2
-                                          else "Unfavorable %s-%s" % (dipole_type1.lower(), dipole_type2.lower()))
-                            inter = InteractionType(dipole_grp1, dipole_grp2, inter_type, params)
-                            interactions.append(inter)
+
         return interactions
 
     @staticmethod
@@ -836,8 +873,8 @@ class InteractionCalculator:
         interactions = []
 
         if len(group1.atoms) != 1 or len(group2.atoms) != 1:
-            logger.warning("One or more invalid atom groups were informed: '%s' and '%s" % (group1, group2))
-            logger.warning("In halogen bonds, halogen donor and acceptor groups should always contain only one atom.")
+            logger.warning("One or more invalid atom groups were informed: %s and %s. In halogen bonds, halogen donor "
+                           "and acceptor groups should always contain only one atom." % (group1, group2))
             return []
 
         if (feat1.name == "Acceptor" and feat2.name == "HalogenDonor"):
@@ -938,8 +975,8 @@ class InteractionCalculator:
         interactions = []
 
         if len(group1.atoms) != 1 or len(group2.atoms) != 1:
-            logger.warning("One or more invalid atom groups were informed: '%s' and '%s" % (group1, group2))
-            logger.warning("In chalcogen bonds, chalcogen donor and acceptor groups should always contain only one atom.")
+            logger.warning("One or more invalid atom groups were informed: %s and %s. In chalcogen bonds, chalcogen donor "
+                           "and acceptor groups should always contain only one atom." % (group1, group2))
             return []
 
         if (feat1.name == "Acceptor" and feat2.name == "ChalcogenDonor"):
@@ -1111,8 +1148,8 @@ class InteractionCalculator:
         interactions = []
 
         if len(group1.atoms) != 1 or len(group2.atoms) != 1:
-            logger.warning("One or more invalid atom groups were informed: '%s' and '%s" % (group1, group2))
-            logger.warning("In hydrogen bonds, donor and acceptor groups should always contain only one atom.")
+            logger.warning("One or more invalid atom groups were informed: %s and %s. In hydrogen bonds, donor and acceptor "
+                           "groups should always contain only one atom." % (group1, group2))
             return []
 
         if (feat1.name == "Acceptor" and feat2.name == "Donor"):
@@ -1289,6 +1326,11 @@ class InteractionCalculator:
         group1, group2, feat1, feat2 = params
         interactions = []
 
+        if len(group1.atoms) != 1 or len(group2.atoms) != 1:
+            logger.warning("One or more invalid atom groups were informed: %s and %s. In weak hydrogen bonds, weak donor and "
+                           "(weak) acceptor groups should always contain only one atom." % (group1, group2))
+            return []
+
         if (feat1.name == "Acceptor" or feat1.name == "WeakAcceptor") and feat2.name == "WeakDonor":
             donor_grp = group2
             acceptor_grp = group1
@@ -1297,12 +1339,7 @@ class InteractionCalculator:
             acceptor_grp = group2
         else:
             logger.warning("Weak hydrogen bond requires a weak donor and an (weak) acceptor groups. "
-                           "However, the informed groups have the features %s and %s" % (group1.feature_names, group2.feature_names))
-            return []
-
-        if len(group1.atoms) != 1 or len(group2.atoms) != 1:
-            logger.warning("One or more invalid atom groups were informed: '%s' and '%s'. In weak hydrogen bonds, weak donor and "
-                           "(weak) acceptor groups should always contain only one atom." % (group1, group2))
+                           "However, the informed groups have the features %s and %s." % (group1.feature_names, group2.feature_names))
             return []
 
         donor_atm = donor_grp.atoms[0]
@@ -1475,13 +1512,13 @@ class InteractionCalculator:
             ring_grp = group2
             donor_grp = group1
         else:
-            logger.warning("Hydrogen bond involving pi-systems requires an aromatic and donor (weak donor) groups.")
-            logger.warning("However, the informed groups have the features '%s' and '%s'" % (group1.features, group2.features))
+            logger.warning("Hydrogen bond involving pi-systems requires an aromatic and donor (weak donor) groups. However, "
+                           "the informed groups have the features %s and %s." % (group1.feature_names, group2.feature_names))
             return []
 
         if len(donor_grp.atoms) != 1:
-            logger.warning("Invalid donor (weak donor) group was informed: '%s'" % donor_grp)
-            logger.warning("In hydrogen bonds involving pi-systems, donor (weak donor) groups should always contain only one atom.")
+            logger.warning("Invalid (weak) donor group was informed: %s. In hydrogen bonds involving pi-systems, (weak) donor "
+                           "groups should always contain only one atom." % donor_grp)
             return []
 
         # There are always just one donor/acceptor atom.

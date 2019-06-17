@@ -149,7 +149,7 @@ class DefaultInteractionConf(InteractionConf):
         # Orthogonal multipolar
         conf["min_an_ey_ang_ortho_multipolar_inter"] = 70
         conf["max_an_ey_ang_ortho_multipolar_inter"] = 110
-        # Parallelannd antiparallel
+        # Parallel and antiparallel multipolar
         conf["max_an_ey_ang_para_multipolar_inter"] = 25
         conf["min_an_ey_ang_antipara_multipolar_inter"] = 155
 
