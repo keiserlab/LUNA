@@ -127,7 +127,7 @@ class AtomGroup():
         target_interactions = []
 
         for i in self.interactions:
-            if i.atm_grp1 == atm_grp or i.atm_grp2 == atm_grp:
+            if i.src_grp == atm_grp or i.trgt_grp == atm_grp:
                 target_interactions.append(i)
 
         return target_interactions
@@ -257,9 +257,6 @@ class CompoundGroupPerceiver():
             else:
                 res_list = [target_residue]
 
-            # Sorted by residue order as in the PDB.
-            res_list = sorted(res_list, key=lambda r: r.get_full_id())
-
             # Select residues based on the residue list defined previously.
             res_sel = ResidueSelector(res_list, keep_altloc=False, keep_hydrog=False)
             # Recover all atoms from the previous selected residues.
@@ -276,7 +273,8 @@ class CompoundGroupPerceiver():
         model = target_residue.get_parent_by_level('M')
         proximal = get_contacts_for_entity(entity=model, source=target_residue, radius=self.radius, level='R')
 
-        return sorted(list(set([p[1] for p in proximal])), key=lambda r: r.id)
+        # Sorted by residue order as in the PDB.
+        return sorted(list(set([p[1] for p in proximal])), key=lambda r: (r.id[0][0], r.id[1], r.id[2]))
 
     def _get_default_properties(self, target_residue):
         #
@@ -408,7 +406,6 @@ class CompoundGroupPerceiver():
             return comp_grps
 
     def _get_calculated_properties(self, target_residue, target_atoms, residue_selector, mol_obj=None):
-
         # If no OBMol was defined, create a new one through the residue list.
         mol_obj = mol_obj or self._get_mol_from_entity(target_residue.get_parent_by_level('M'), residue_selector)
         # Wrap the molecule object.
@@ -417,7 +414,7 @@ class CompoundGroupPerceiver():
         if mol_obj.get_num_heavy_atoms() != len(target_atoms):
             raise MoleculeSizeError("The number of heavy atoms in the PDB selection and in the MOL file are different.")
 
-        # Ignore hydrogen atoms
+        # Ignore hydrogen atoms.
         atm_obj_list = [atm for atm in mol_obj.get_atoms(wrapped=True) if atm.get_atomic_num() != 1]
 
         atm_map = {}
@@ -425,6 +422,7 @@ class CompoundGroupPerceiver():
         for i, atm_obj in enumerate(atm_obj_list):
             atm_map[atm_obj.get_idx()] = target_atoms[i].serial_number
             trgt_atms[target_atoms[i].serial_number] = NbAtom(target_atoms[i])
+
         # Set all neighbors, i.e., covalently bonded atoms.
         for bond_obj in mol_obj.get_bonds(wrapped=True):
             bgn_atm_obj = bond_obj.get_begin_atom(wrapped=True)
