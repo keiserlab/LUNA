@@ -139,19 +139,19 @@ class InteractionCalculator:
         # Save all hydrogen bonds involving waters and ionic interactions.
         for inter in interactions:
             if inter.type == "Hydrogen bond":
-                comp1 = next(iter(inter.atm_grp1.compounds))
-                comp2 = next(iter(inter.atm_grp2.compounds))
+                comp1 = next(iter(inter.src_grp.compounds))
+                comp2 = next(iter(inter.trgt_grp.compounds))
 
                 if comp1.is_water():
-                    h2o_key = inter.atm_grp1
-                    secondKey = inter.atm_grp2
+                    h2o_key = inter.src_grp
+                    secondKey = inter.trgt_grp
 
                     if secondKey not in h2o_pairs[h2o_key]:
                         h2o_pairs[h2o_key][secondKey] = inter
 
                 if comp2.is_water():
-                    h2o_key = inter.atm_grp2
-                    secondKey = inter.atm_grp1
+                    h2o_key = inter.trgt_grp
+                    secondKey = inter.src_grp
 
                     if secondKey not in h2o_pairs[h2o_key]:
                         h2o_pairs[h2o_key][secondKey] = inter
@@ -163,22 +163,22 @@ class InteractionCalculator:
         for h2o_key in h2o_pairs:
             pairs = combinations(h2o_pairs[h2o_key].keys(), 2)
 
-            for (atm_grp1, atm_grp2) in pairs:
+            for (src_grp, trgt_grp) in pairs:
 
                 # It ignores intramolecular interactions.
-                if self.is_intramol_inter(atm_grp1, atm_grp2):
+                if self.is_intramol_inter(src_grp, trgt_grp):
                     pass
 
-                comp1 = next(iter(atm_grp1.compounds))
-                comp2 = next(iter(atm_grp2.compounds))
+                comp1 = next(iter(src_grp.compounds))
+                comp2 = next(iter(trgt_grp.compounds))
 
                 if isinstance(self.inter_filter, InteractionFilter):
-                    if not self.inter_filter.is_valid_pair(atm_grp1, atm_grp2):
+                    if not self.inter_filter.is_valid_pair(src_grp, trgt_grp):
                         continue
 
-                params = {"depends_on": [h2o_pairs[h2o_key][atm_grp1], h2o_pairs[h2o_key][atm_grp2]]}
+                params = {"depends_on": [h2o_pairs[h2o_key][src_grp], h2o_pairs[h2o_key][trgt_grp]]}
 
-                inter = InteractionType(atm_grp1, atm_grp2, "Water-bridged hydrogen bond", params)
+                inter = InteractionType(src_grp, trgt_grp, "Water-bridged hydrogen bond", directional=True, params=params)
                 dependent_interactions.add(inter)
 
         # It will try to match Hydrogen bonds and Ionic interactions involving the same chemical
@@ -186,31 +186,31 @@ class InteractionCalculator:
         sb_groups = set()
         for (hbond, ionic) in product(hbond_set, ionic_set):
 
-            condA = (ionic.atm_grp1.has_atom(hbond.atm_grp1.atoms[0]) and
-                     ionic.atm_grp2.has_atom(hbond.atm_grp2.atoms[0]))
+            condA = (ionic.src_grp.has_atom(hbond.src_grp.atoms[0]) and
+                     ionic.trgt_grp.has_atom(hbond.trgt_grp.atoms[0]))
 
-            condB = (ionic.atm_grp1.has_atom(hbond.atm_grp2.atoms[0]) and
-                     ionic.atm_grp2.has_atom(hbond.atm_grp1.atoms[0]))
+            condB = (ionic.src_grp.has_atom(hbond.trgt_grp.atoms[0]) and
+                     ionic.trgt_grp.has_atom(hbond.src_grp.atoms[0]))
 
             # If an acceptor atom belongs to a negative group, and the donor to a positive group
             # (and vice-versa), it means that the interaction occurs between the same meioties.
             # However, just one condition should occur. For example, it is not possible that an acceptor
             # atom belongs to a negative and positive group at the same time.
             if condA ^ condB:
-                key1 = (ionic.atm_grp1, ionic.atm_grp2)
-                key2 = (ionic.atm_grp2, ionic.atm_grp1)
+                key1 = (ionic.src_grp, ionic.trgt_grp)
+                key2 = (ionic.trgt_grp, ionic.src_grp)
 
                 if key1 in sb_groups or key2 in sb_groups:
                     continue
 
                 if isinstance(self.inter_filter, InteractionFilter):
-                    if not self.inter_filter.is_valid_pair(ionic.atm_grp1, ionic.atm_grp2):
+                    if not self.inter_filter.is_valid_pair(ionic.src_grp, ionic.trgt_grp):
                         continue
 
                 sb_groups.add(key1)
                 params = {"depends_on": [hbond, ionic]}
 
-                inter = InteractionType(ionic.atm_grp1, ionic.atm_grp2, "Salt bridge", params)
+                inter = InteractionType(ionic.src_grp, ionic.trgt_grp, "Salt bridge", params=params)
                 dependent_interactions.add(inter)
 
         return dependent_interactions
@@ -222,24 +222,24 @@ class InteractionCalculator:
         for inter in interactions:
             if inter.type == "Unfavorable nucleophile-nucleophile":
                 # A nucleophile may have only 1 atom (water oxygen).
-                atm1 = inter.atm_grp1.atoms[0]
+                atm1 = inter.src_grp.atoms[0]
                 # If a nucleophile has 2 atoms, it will select the partially negative atom based on the electronegativity.
-                if len(inter.atm_grp1.atoms) == 2:
-                    atm1 = inter.atm_grp1.atoms[0] if (inter.atm_grp1.atoms[0].electronegativity >
-                                                       inter.atm_grp1.atoms[1].electronegativity) else inter.atm_grp1.atoms[1]
+                if len(inter.src_grp.atoms) == 2:
+                    atm1 = inter.src_grp.atoms[0] if (inter.src_grp.atoms[0].electronegativity >
+                                                       inter.src_grp.atoms[1].electronegativity) else inter.src_grp.atoms[1]
 
                 # A nucleophile may have only 1 atom (water oxygen).
-                atm2 = inter.atm_grp2.atoms[0]
+                atm2 = inter.trgt_grp.atoms[0]
                 # If a nucleophile has 2 atoms, it will select the partially negative atom based on the electronegativity.
-                if len(inter.atm_grp2.atoms) == 2:
-                    atm2 = inter.atm_grp2.atoms[0] if (inter.atm_grp2.atoms[0].electronegativity >
-                                                       inter.atm_grp2.atoms[1].electronegativity) else inter.atm_grp2.atoms[1]
+                if len(inter.trgt_grp.atoms) == 2:
+                    atm2 = inter.trgt_grp.atoms[0] if (inter.trgt_grp.atoms[0].electronegativity >
+                                                       inter.trgt_grp.atoms[1].electronegativity) else inter.trgt_grp.atoms[1]
                 key = (atm1, atm2)
                 if (atm2, atm1) in hbond_inconsistences:
                     key = (atm2, atm1)
                 hbond_inconsistences[key].append(inter)
             elif inter.type == "Unfavorable anion-nucleophile":
-                nucl_grp = inter.atm_grp1 if any([f.name == "Nucleophile" for f in inter.atm_grp1.features]) else inter.atm_grp2
+                nucl_grp = inter.src_grp if any([f.name == "Nucleophile" for f in inter.src_grp.features]) else inter.trgt_grp
                 # A nucleophile may have only 1 atom (water oxygen).
                 nucl_atm = nucl_grp.atoms[0]
                 # If a nucleophile has 2 atoms, it will select the partially negative atom based on the electronegativity.
@@ -254,19 +254,19 @@ class InteractionCalculator:
                     hbond_inconsistences[key].append(inter)
             elif inter.type == "Hydrogen bond":
                 # Acceptor and donor atoms always have only one atom.
-                atm1, atm2 = (inter.atm_grp1.atoms[0], inter.atm_grp2.atoms[0])
+                atm1, atm2 = (inter.src_grp.atoms[0], inter.trgt_grp.atoms[0])
 
                 key = (atm1, atm2)
                 if (atm2, atm1) in hbond_inconsistences:
                     key = (atm2, atm1)
                 hbond_inconsistences[key].append(inter)
             elif inter.type == "Amide-aromatic stacking":
-                amide_grp = inter.atm_grp1 if any([f.name == "Amide" for f in inter.atm_grp1.features]) else inter.atm_grp2
+                amide_grp = inter.src_grp if any([f.name == "Amide" for f in inter.src_grp.features]) else inter.trgt_grp
                 arom_grp = inter.get_partner(amide_grp)
                 for amide_atm in amide_grp.atoms:
                     amide_inconsistences[(amide_atm, arom_grp)].append(inter)
             elif inter.type == "Unfavorable cation-electrophile":
-                elect_grp = inter.atm_grp1 if any([f.name == "Nucleophile" for f in inter.atm_grp1.features]) else inter.atm_grp2
+                elect_grp = inter.src_grp if any([f.name == "Nucleophile" for f in inter.src_grp.features]) else inter.trgt_grp
                 # A nucleophile may have only 1 atom (water oxygen).
                 elect_atm = elect_grp.atoms[0]
                 # If a nucleophile has 2 atoms, it will select the partially negative atom based on the electronegativity.
@@ -297,20 +297,20 @@ class InteractionCalculator:
         invalid_inters = defaultdict(set)
 
         for inter in interactions:
-            if inter.atm_grp1.is_water() and not inter.atm_grp2.has_target() and inter.atm_grp1 not in valid_h2o_set:
-                invalid_inters[inter.atm_grp1].add(inter)
-            elif inter.atm_grp2.is_water() and not inter.atm_grp1.has_target() and inter.atm_grp2 not in valid_h2o_set:
-                invalid_inters[inter.atm_grp2].add(inter)
+            if inter.src_grp.is_water() and not inter.trgt_grp.has_target() and inter.src_grp not in valid_h2o_set:
+                invalid_inters[inter.src_grp].add(inter)
+            elif inter.trgt_grp.is_water() and not inter.src_grp.has_target() and inter.trgt_grp not in valid_h2o_set:
+                invalid_inters[inter.trgt_grp].add(inter)
             else:
-                if inter.atm_grp1.is_water() and inter.atm_grp2.has_target():
-                    valid_h2o_set.add(inter.atm_grp1)
-                    if inter.atm_grp1 in invalid_inters:
-                        del invalid_inters[inter.atm_grp1]
+                if inter.src_grp.is_water() and inter.trgt_grp.has_target():
+                    valid_h2o_set.add(inter.src_grp)
+                    if inter.src_grp in invalid_inters:
+                        del invalid_inters[inter.src_grp]
 
-                if inter.atm_grp2.is_water() and inter.atm_grp1.has_target():
-                    valid_h2o_set.add(inter.atm_grp2)
-                    if inter.atm_grp2 in invalid_inters:
-                        del invalid_inters[inter.atm_grp2]
+                if inter.trgt_grp.is_water() and inter.src_grp.has_target():
+                    valid_h2o_set.add(inter.trgt_grp)
+                    if inter.trgt_grp in invalid_inters:
+                        del invalid_inters[inter.trgt_grp]
 
         inters_to_remove = set([i for k in invalid_inters for i in invalid_inters[k]])
         interactions -= inters_to_remove
@@ -341,7 +341,7 @@ class InteractionCalculator:
                     # Chalcogen bond
                     ("ChalcogenDonor", "Acceptor"): [self.calc_chalc_bond],
                     ("ChalcogenDonor", "WeakAcceptor"): [self.calc_chalc_bond],
-                    ("ChalcogenDonor", "Aromatic"): [self.calc_chalc_bond_pi],
+                    # ("ChalcogenDonor", "Aromatic"): [self.calc_chalc_bond_pi],
 
                     # Stackings
                     ("Aromatic", "Aromatic"): [self.calc_pi_pi],
@@ -418,7 +418,7 @@ class InteractionCalculator:
         if (self.is_within_boundary(cc_dist, "boundary_cutoff", le) and
                 self.is_within_boundary(cc_dist, "max_dist_cation_pi_inter", le)):
                 params = {"dist_cation_pi_inter": cc_dist}
-                inter = InteractionType(group1, group2, "Cation-pi", params)
+                inter = InteractionType(group1, group2, "Cation-pi", params=params)
 
                 interactions.append(inter)
         return interactions
@@ -436,35 +436,54 @@ class InteractionCalculator:
         if (self.is_within_boundary(cc_dist, "boundary_cutoff", le) and
                 self.is_within_boundary(cc_dist, "max_cc_dist_pi_pi_inter", le)):
 
-                dihedral_angle = im.to_quad1(im.angle(ring1.normal, ring2.normal))
-                cc_vect = ring2.centroid - ring1.centroid
-                disp_angle = im.to_quad1(im.angle(ring1.normal, cc_vect))
+            dihedral_angle = im.to_quad1(im.angle(ring1.normal, ring2.normal))
 
-                # If the angle criteria were not defined, a specific Pi-stacking definition is not
-                # possible as it depends on angle criteria. Therefore, a more general classification
-                # is used instead, i.e., all interactions will be Pi-stacking.
-                if ("min_dihed_ang_pi_pi_inter" not in self.inter_conf.conf and
-                        "max_disp_ang_pi_pi_inter" not in self.inter_conf.conf):
-                    inter_type = "Pi-stacking"
+            min_disp_angle = float("Inf")
+            for r1, r2 in [(ring1, ring2), (ring2, ring1)]:
+
+                cc_vect = r2.centroid - r1.centroid
+                disp_angle = im.to_quad1(im.angle(r1.normal, cc_vect))
+
+                if disp_angle < min_disp_angle:
+                    ring1, ring2 = r1, r2
+                    min_disp_angle = disp_angle
+
+            criteria = ["min_dihed_ang_slope_pi_pi_inter", "max_dihed_ang_slope_pi_pi_inter", "min_disp_ang_offset_pi_pi_inter",
+                        "max_disp_ang_offset_pi_pi_inter"]
+
+            # If the angle criteria were not defined, a specific Pi-stacking definition is not possible as it depends on
+            # angle criteria. Therefore, a more general classification is used instead, i.e., all interactions will be Pi-stacking.
+            if any([c not in self.inter_conf.conf for c in criteria]):
+                inter_type = "Pi-stacking"
+            elif self.is_within_boundary(min_disp_angle, "min_disp_ang_offset_pi_pi_inter", le):
+                if self.is_within_boundary(dihedral_angle, "min_dihed_ang_slope_pi_pi_inter", le):
+                    inter_type = "Face-to-face pi-stacking"
+                elif self.is_within_boundary(dihedral_angle, "max_dihed_ang_slope_pi_pi_inter", ge):
+                    inter_type = "Face-to-edge pi-stacking"
                 else:
-                    if (self.is_within_boundary(dihedral_angle, "min_dihed_ang_pi_pi_inter", ge)):
-                        inter_type = "Edge-to-face pi-stacking"
-                    elif (self.is_within_boundary(disp_angle, "max_disp_ang_pi_pi_inter", le)):
-                        inter_type = "Face-to-face pi-stacking"
-                    else:
-                        # Contention rule to avoid displaced interactions between two rings in the same molecule and in the same plane.
-                        # Here, the rings are covalently bonded and near from each other.
-                        if self.is_intramol_inter(ring1, ring2) and dihedral_angle < 10:
-                            return []
+                    inter_type = "Face-to-slope pi-stacking"
+            elif self.is_within_boundary(min_disp_angle, "max_disp_ang_offset_pi_pi_inter", ge):
+                if self.is_within_boundary(dihedral_angle, "min_dihed_ang_slope_pi_pi_inter", le):
+                    inter_type = "Edge-to-edge pi-stacking"
+                elif self.is_within_boundary(dihedral_angle, "max_dihed_ang_slope_pi_pi_inter", ge):
+                    inter_type = "Edge-to-face pi-stacking"
+                else:
+                    inter_type = "Edge-to-slope pi-stacking"
+            else:
+                if self.is_within_boundary(dihedral_angle, "min_dihed_ang_slope_pi_pi_inter", le):
+                    inter_type = "Displaced face-to-face pi-stacking"
+                elif self.is_within_boundary(dihedral_angle, "max_dihed_ang_slope_pi_pi_inter", ge):
+                    inter_type = "Displaced face-to-edge pi-stacking"
+                else:
+                    inter_type = "Displaced face-to-slope pi-stacking"
 
-                        inter_type = "Parallel-displaced pi-stacking"
+            params = {"cc_dist_pi_pi_inter": cc_dist,
+                      "dihed_ang_pi_pi_inter": dihedral_angle,
+                      "disp_ang_pi_pi_inter": min_disp_angle}
 
-                params = {"cc_dist_pi_pi_inter": cc_dist,
-                          "dihed_ang_pi_pi_inter": dihedral_angle,
-                          "disp_ang_pi_pi_inter": disp_angle}
+            inter = InteractionType(ring1, ring2, inter_type, directional=True, params=params)
+            interactions.append(inter)
 
-                inter = InteractionType(ring1, ring2, inter_type, params)
-                interactions.append(inter)
         return interactions
 
     @staticmethod
@@ -503,7 +522,7 @@ class InteractionCalculator:
                           "dihed_ang_amide_pi_inter": dihedral_angle,
                           "disp_ang_amide_pi_inter": disp_angle}
 
-                inter = InteractionType(group1, group2, "Amide-aromatic stacking", params)
+                inter = InteractionType(group1, group2, "Amide-aromatic stacking", params=params)
                 interactions.append(inter)
         return interactions
 
@@ -536,7 +555,7 @@ class InteractionCalculator:
                 self.is_within_boundary(min_cc_dist, "max_dist_hydrop_inter", le)):
 
             params = {"dist_hydrop_inter": min_cc_dist}
-            inter = InteractionType(group1, group2, "Hydrophobic", params)
+            inter = InteractionType(group1, group2, "Hydrophobic", params=params)
             interactions.append(inter)
 
         return interactions
@@ -629,16 +648,16 @@ class InteractionCalculator:
 
                 if params:
                     if dipole_type == "Nucleophile" and ion_type == "Cation":
-                        inter = InteractionType(dipole_grp, ion_grp, "Cation-nucleophile", params)
+                        inter = InteractionType(dipole_grp, ion_grp, "Cation-nucleophile", params=params)
                         interactions.append(inter)
                     elif dipole_type == "Nucleophile" and ion_type == "Anion":
-                        inter = InteractionType(dipole_grp, ion_grp, "Unfavorable anion-nucleophile", params)
+                        inter = InteractionType(dipole_grp, ion_grp, "Unfavorable anion-nucleophile", params=params)
                         interactions.append(inter)
                     elif dipole_type == "Electrophile" and ion_type == "Anion":
-                        inter = InteractionType(ion_grp, dipole_grp, "Anion-electrophile", params)
+                        inter = InteractionType(ion_grp, dipole_grp, "Anion-electrophile", params=params)
                         interactions.append(inter)
                     elif dipole_type == "Electrophile" and ion_type == "Cation":
-                        inter = InteractionType(ion_grp, dipole_grp, "Unfavorable cation-electrophile", params)
+                        inter = InteractionType(ion_grp, dipole_grp, "Unfavorable cation-electrophile", params=params)
                         interactions.append(inter)
         return interactions
 
@@ -734,7 +753,7 @@ class InteractionCalculator:
 
                 inter_type = ("Multipolar" if not dipole_type1 == dipole_type2
                               else "Unfavorable %s-%s" % (dipole_type1.lower(), dipole_type2.lower()))
-                inter = InteractionType(dipole_grp1, dipole_grp2, inter_type, params)
+                inter = InteractionType(dipole_grp1, dipole_grp2, inter_type, directional=True, params=params)
                 interactions.append(inter)
 
             else:
@@ -782,21 +801,21 @@ class InteractionCalculator:
 
                                 if not dipole_type1 == dipole_type2:
                                     if self.is_within_boundary(an_ey_vect_angle, "max_an_ey_ang_para_multipolar_inter", le):
-                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Parallel multipolar", params)
+                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Parallel multipolar", directional=True, params=params)
                                         interactions.append(inter)
                                     elif self.is_within_boundary(an_ey_vect_angle, "min_an_ey_ang_antipara_multipolar_inter", ge):
-                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Antiparallel multipolar", params)
+                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Antiparallel multipolar", directional=True, params=params)
                                         interactions.append(inter)
                                     elif (self.is_within_boundary(an_ey_vect_angle, "min_an_ey_ang_ortho_multipolar_inter", ge) and
                                             self.is_within_boundary(an_ey_vect_angle, "max_an_ey_ang_ortho_multipolar_inter", le)):
-                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Orthogonal multipolar", params)
+                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Orthogonal multipolar", directional=True, params=params)
                                         interactions.append(inter)
                                     else:
-                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Tilted multipolar", params)
+                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Tilted multipolar", directional=True, params=params)
                                         interactions.append(inter)
                                 else:
                                     inter_type = "Unfavorable %s-%s" % (dipole_type1.lower(), dipole_type2.lower())
-                                    inter = InteractionType(dipole_grp1, dipole_grp2, inter_type, params)
+                                    inter = InteractionType(dipole_grp1, dipole_grp2, inter_type, directional=True, params=params)
                                     interactions.append(inter)
 
                             # Otherwise, ignore the angle AN and EY and add a general interaction (Multipolar) without a specific
@@ -808,7 +827,7 @@ class InteractionCalculator:
                                           "an_ey_ang_multipolar_inter": -1}
                                 inter_type = ("Multipolar" if not dipole_type1 == dipole_type2
                                               else "Unfavorable %s-%s" % (dipole_type1.lower(), dipole_type2.lower()))
-                                inter = InteractionType(dipole_grp1, dipole_grp2, inter_type, params)
+                                inter = InteractionType(dipole_grp1, dipole_grp2, inter_type, directional=True, params=params)
                                 interactions.append(inter)
 
         return interactions
@@ -860,7 +879,7 @@ class InteractionCalculator:
                                   "disp_ang_xbond_inter": disp_angle,
                                   "cxa_ang_xbond_inter": cxa_angle}
 
-                        inter = InteractionType(donor_grp, ring_grp, "Halogen-pi", params)
+                        inter = InteractionType(donor_grp, ring_grp, "Halogen-pi", directional=True, params=params)
                         interactions.append(inter)
         return interactions
 
@@ -935,7 +954,7 @@ class InteractionCalculator:
                                   "cxa_ang_xbond_inter": cxa_angle,
                                   "xar_ang_xbond_inter": -1}
 
-                        inter = InteractionType(donor_grp, acceptor_grp, "Halogen bond", params)
+                        inter = InteractionType(donor_grp, acceptor_grp, "Halogen bond", directional=True, params=params)
                         interactions.append(inter)
                     else:
                         # AX vector is always the same.
@@ -961,7 +980,7 @@ class InteractionCalculator:
                                       "cxa_ang_xbond_inter": cxa_angle,
                                       "xar_ang_xbond_inter": lowest_xar_angle}
 
-                            inter = InteractionType(donor_grp, acceptor_grp, "Halogen bond", params)
+                            inter = InteractionType(donor_grp, acceptor_grp, "Halogen bond", directional=True, params=params)
                             interactions.append(inter)
 
         return interactions
@@ -1047,7 +1066,7 @@ class InteractionCalculator:
                                   "rya_ang_ybond_inter": rya_angle,
                                   "yan_ang_ybond_inter": -1}
 
-                        inter = InteractionType(donor_grp, acceptor_grp, "Chalcogen bond", params)
+                        inter = InteractionType(donor_grp, acceptor_grp, "Chalcogen bond", directional=True, params=params)
                         interactions.append(inter)
                     else:
                         # AY vector is always the same.
@@ -1073,7 +1092,7 @@ class InteractionCalculator:
                                       "rya_ang_ybond_inter": rya_angle,
                                       "yan_ang_ybond_inter": lowest_yan_angle}
 
-                            inter = InteractionType(donor_grp, acceptor_grp, "Chalcogen bond", params)
+                            inter = InteractionType(donor_grp, acceptor_grp, "Chalcogen bond", directional=True, params=params)
                             interactions.append(inter)
         return interactions
 
@@ -1135,7 +1154,7 @@ class InteractionCalculator:
                                   "disp_ang_ybond_inter": disp_angle,
                                   "rya_ang_ybond_inter": rya_angle}
 
-                        inter = InteractionType(donor_grp, ring_grp, "Chalcogen-pi", params)
+                        inter = InteractionType(donor_grp, ring_grp, "Chalcogen-pi", directional=True, params=params)
                         interactions.append(inter)
         return interactions
 
@@ -1203,7 +1222,7 @@ class InteractionCalculator:
                                   "har_ang_hb_inter": -1,
                                   "dar_ang_hb_inter": -1}
 
-                        inter = InteractionType(donor_grp, acceptor_grp, "Hydrogen bond", params)
+                        inter = InteractionType(donor_grp, acceptor_grp, "Hydrogen bond", directional=True, params=params)
                         interactions.append(inter)
                     else:
                         # AD vector is always the same.
@@ -1230,7 +1249,7 @@ class InteractionCalculator:
                                       "har_ang_hb_inter": -1,
                                       "dar_ang_hb_inter": lowest_dar_angle}
 
-                            inter = InteractionType(donor_grp, acceptor_grp, "Hydrogen bond", params)
+                            inter = InteractionType(donor_grp, acceptor_grp, "Hydrogen bond", directional=True, params=params)
                             interactions.append(inter)
             else:
                 # Check if the interaction involves the same compound.
@@ -1268,7 +1287,7 @@ class InteractionCalculator:
                                       "har_ang_hb_inter": -1,
                                       "dar_ang_hb_inter": -1}
 
-                            inter = InteractionType(donor_grp, acceptor_grp, "Hydrogen bond", params)
+                            inter = InteractionType(donor_grp, acceptor_grp, "Hydrogen bond", directional=True, params=params)
                             interactions.append(inter)
                         else:
                             # Interaction model: D-H ---- A-R
@@ -1313,7 +1332,7 @@ class InteractionCalculator:
                                           "har_ang_hb_inter": lowest_har_angle,
                                           "dar_ang_hb_inter": lowest_dar_angle}
 
-                                inter = InteractionType(donor_grp, acceptor_grp, "Hydrogen bond", params)
+                                inter = InteractionType(donor_grp, acceptor_grp, "Hydrogen bond", directional=True, params=params)
                                 interactions.append(inter)
 
         return interactions
@@ -1383,7 +1402,7 @@ class InteractionCalculator:
                                   "har_ang_whb_inter": -1,
                                   "dar_ang_whb_inter": -1}
 
-                        inter = InteractionType(donor_grp, acceptor_grp, "Weak hydrogen bond", params)
+                        inter = InteractionType(donor_grp, acceptor_grp, "Weak hydrogen bond", directional=True, params=params)
                         interactions.append(inter)
                     else:
                         # AD vector is always the same.
@@ -1410,7 +1429,7 @@ class InteractionCalculator:
                                       "har_ang_whb_inter": -1,
                                       "dar_ang_whb_inter": lowest_dar_angle}
 
-                            inter = InteractionType(donor_grp, acceptor_grp, "Weak hydrogen bond", params)
+                            inter = InteractionType(donor_grp, acceptor_grp, "Weak hydrogen bond", directional=True, params=params)
                             interactions.append(inter)
             else:
                 # Check if the interaction involves the same compound.
@@ -1447,7 +1466,7 @@ class InteractionCalculator:
                                       "har_ang_whb_inter": -1,
                                       "dar_ang_whb_inter": -1}
 
-                            inter = InteractionType(donor_grp, acceptor_grp, "Weak hydrogen bond", params)
+                            inter = InteractionType(donor_grp, acceptor_grp, "Weak hydrogen bond", directional=True, params=params)
                             interactions.append(inter)
                         else:
                             # Interaction model: D-H ---- A-R
@@ -1493,7 +1512,7 @@ class InteractionCalculator:
                                           "har_ang_whb_inter": lowest_har_angle,
                                           "dar_ang_whb_inter": lowest_dar_angle}
 
-                                inter = InteractionType(donor_grp, acceptor_grp, "Weak hydrogen bond", params)
+                                inter = InteractionType(donor_grp, acceptor_grp, "Weak hydrogen bond", directional=True, params=params)
                                 interactions.append(inter)
         return interactions
 
@@ -1558,7 +1577,7 @@ class InteractionCalculator:
                                   "dhc_ang_whb_inter": -1,
                                   "disp_ang_whb_inter": disp_angle}
 
-                        inter = InteractionType(donor_grp, ring_grp, "Weak hydrogen bond", params)
+                        inter = InteractionType(donor_grp, ring_grp, "Weak hydrogen bond", directional=True, params=params)
                         interactions.append(inter)
             else:
                 # It may happen that D is covalently bound to more than one hydrogen atom.
@@ -1585,7 +1604,7 @@ class InteractionCalculator:
                                       "dhc_ang_whb_inter": dha_angle,
                                       "disp_ang_whb_inter": disp_angle}
 
-                            inter = InteractionType(donor_grp, ring_grp, "Weak hydrogen bond", params)
+                            inter = InteractionType(donor_grp, ring_grp, "Weak hydrogen bond", directional=True, params=params)
                             interactions.append(inter)
         return interactions
 
@@ -1602,7 +1621,7 @@ class InteractionCalculator:
                 self.is_within_boundary(cc_dist, "max_dist_attract_inter", le)):
 
             params = {"dist_attract_inter": cc_dist}
-            inter = InteractionType(group1, group2, "Ionic", params)
+            inter = InteractionType(group1, group2, "Ionic", params=params)
 
             interactions.append(inter)
         return interactions
@@ -1620,7 +1639,7 @@ class InteractionCalculator:
                 self.is_within_boundary(cc_dist, "max_dist_repuls_inter", le)):
 
             params = {"dist_repuls_inter": cc_dist}
-            inter = InteractionType(group1, group2, "Repulsive", params)
+            inter = InteractionType(group1, group2, "Repulsive", params=params)
 
             interactions.append(inter)
         return interactions
@@ -1638,7 +1657,7 @@ class InteractionCalculator:
                 self.is_within_boundary(cc_dist, "max_dist_proximal", le)):
 
             params = {"dist_proximal": cc_dist}
-            inter = InteractionType(group1, group2, "Proximal", params)
+            inter = InteractionType(group1, group2, "Proximal", params=params)
             interactions.append(inter)
 
         return interactions
@@ -1662,14 +1681,14 @@ class InteractionCalculator:
         # states that two atoms are covalently bonded if:
         #       0.4 <= d(a1, a2) <= cov_rad(a1) + cov_rad(a2) + 0.45
         if atm1.is_neighbor(atm2):
-            inter = InteractionType(group1, group2, "Covalent bond", params)
+            inter = InteractionType(group1, group2, "Covalent bond", params=params)
             interactions.append(inter)
         else:
             cov1 = etab.GetCovalentRad(etab.GetAtomicNum(atm1.element))
             cov2 = etab.GetCovalentRad(etab.GetAtomicNum(atm2.element))
 
             if cc_dist <= cov1 + cov2:
-                inter = InteractionType(group1, group2, "Atom overlap", params)
+                inter = InteractionType(group1, group2, "Atom overlap", params=params)
                 interactions.append(inter)
             else:
                 rdw1 = etab.GetVdwRad(etab.GetAtomicNum(atm1.element))
@@ -1686,10 +1705,10 @@ class InteractionCalculator:
                 # r1 + r2 - d = 0 => in the limit, i.e., spheres are touching.
                 # r1 + r2 - d = 0 => clash.
                 if (rdw1 + rdw2 - cc_dist) >= self.inter_conf.conf.get("vdw_clash_tolerance", 0):
-                    inter = InteractionType(group1, group2, "Van der Waals clash", params)
+                    inter = InteractionType(group1, group2, "Van der Waals clash", params=params)
                     interactions.append(inter)
                 elif cc_dist <= rdw1 + rdw2 + self.inter_conf.conf.get("vdw_tolerance", 0):
-                    inter = InteractionType(group1, group2, "Van der Waals", params)
+                    inter = InteractionType(group1, group2, "Van der Waals", params=params)
                     interactions.append(inter)
 
         return interactions
