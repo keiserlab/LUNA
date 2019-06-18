@@ -64,27 +64,27 @@ class InteractionFilter:
                 "Halogen bond": self.filter_xbond,
                 "Repulsive": self.filter_repulsive}
 
-    def is_valid_pair(self, atm_grp1, atm_grp2):
+    def is_valid_pair(self, src_grp, trgt_grp):
 
         # It will always ignore interactions involving the same atom groups.
         # Loops in the graph is not permitted and does not make any sense.
-        if atm_grp1 == atm_grp2:
+        if src_grp == trgt_grp:
             return False
 
         # It will always ignore interactions involving atoms and the group to which they belong to.
         # For example, the centroid of an aromatic ring cannot interact with an atom
         # that belongs to the ring. It is a type of Loop.
-        if atm_grp1.contain_group(atm_grp2) or atm_grp2.contain_group(atm_grp1):
+        if src_grp.contain_group(trgt_grp) or trgt_grp.contain_group(src_grp):
             return False
 
         # If one of the groups contain atoms from different compounds.
-        has_multi_comps = (len(atm_grp1.compounds) > 1 or len(atm_grp2.compounds) > 1)
+        has_multi_comps = (len(src_grp.compounds) > 1 or len(trgt_grp.compounds) > 1)
         if self.ignore_multi_comps and has_multi_comps:
             return False
 
         # If one of the groups contain compounds from different classes as, for instance, residue and ligand.
         # It means that compounds from different classes are covalently bonded to each other.
-        has_any_mixed = (atm_grp1.is_mixed() or atm_grp2.is_mixed())
+        has_any_mixed = (src_grp.is_mixed() or trgt_grp.is_mixed())
         if self.ignore_mixed_class and has_any_mixed:
             return False
 
@@ -94,58 +94,58 @@ class InteractionFilter:
         # it means that these molecules are covalently bonded and should be considered the same molecule.
         # For example: a carbohydrate can be expressed in a PDB as its subparts:
         # GLC + GLC = CBI
-        is_same_compounds = len(atm_grp1.compounds.intersection(atm_grp2.compounds)) >= 1
+        is_same_compounds = len(src_grp.compounds.intersection(trgt_grp.compounds)) >= 1
         if self.ignore_self_inter and is_same_compounds:
             return False
         # It promptly accepts all pairs composed by atom groups from the same target compound when
         # ignore_self_inter is set off.
-        elif not self.ignore_self_inter and is_same_compounds and atm_grp1.has_target():
+        elif not self.ignore_self_inter and is_same_compounds and src_grp.has_target():
             return True
 
         # It ignores protein-protein interactions if it is required.
-        is_prot_prot = (atm_grp1.is_aminoacid() and atm_grp2.is_aminoacid())
+        is_prot_prot = (src_grp.is_aminoacid() and trgt_grp.is_aminoacid())
         if self.ignore_prot_prot and is_prot_prot:
             return False
 
         # It ignores protein-nucleic acid interactions if it is required.
-        is_prot_nucl = ((atm_grp1.is_aminoacid() and atm_grp2.is_nucleotide()) or
-                        (atm_grp1.is_nucleotide() and atm_grp2.is_aminoacid()))
+        is_prot_nucl = ((src_grp.is_aminoacid() and trgt_grp.is_nucleotide()) or
+                        (src_grp.is_nucleotide() and trgt_grp.is_aminoacid()))
         if self.ignore_prot_nucl and is_prot_nucl:
             return False
 
         # It ignores protein-ligand interactions if it is required.
-        is_prot_lig = ((atm_grp1.is_aminoacid() and atm_grp2.is_hetatm()) or
-                       (atm_grp1.is_hetatm() and atm_grp2.is_aminoacid()))
+        is_prot_lig = ((src_grp.is_aminoacid() and trgt_grp.is_hetatm()) or
+                       (src_grp.is_hetatm() and trgt_grp.is_aminoacid()))
         if self.ignore_prot_lig and is_prot_lig:
             return False
 
         # It ignores nucleic acid-nucleic acid interactions if it is required.
-        is_nucl_nucl = (atm_grp1.is_nucleotide() and atm_grp2.is_nucleotide())
+        is_nucl_nucl = (src_grp.is_nucleotide() and trgt_grp.is_nucleotide())
         if self.ignore_nucl_nucl and is_nucl_nucl:
             return False
 
         # It ignores nucleic acid-ligand interactions if it is required.
-        is_nucl_lig = ((atm_grp1.is_nucleotide() and atm_grp2.is_hetatm()) or
-                       (atm_grp1.is_hetatm() and atm_grp2.is_nucleotide()))
+        is_nucl_lig = ((src_grp.is_nucleotide() and trgt_grp.is_hetatm()) or
+                       (src_grp.is_hetatm() and trgt_grp.is_nucleotide()))
         if self.ignore_nucl_lig and is_nucl_lig:
             return False
 
         # It ignores ligand-ligand interactions if it is required.
-        is_lig_lig = (atm_grp1.is_hetatm() and atm_grp2.is_hetatm())
+        is_lig_lig = (src_grp.is_hetatm() and trgt_grp.is_hetatm())
         if self.ignore_lig_lig and is_lig_lig:
             return False
 
         # It ignores interactions of other molecule types with water.
         # It enables the possibility of identifying water-bridged interaction.
         # Eg: residue-water, ligand-water = residue -- water -- ligand.
-        is_any_h2o = (atm_grp1.is_water() or atm_grp2.is_water())
+        is_any_h2o = (src_grp.is_water() or trgt_grp.is_water())
         if self.ignore_any_h2o and is_any_h2o:
             return False
 
         # It ignores interactions involving two waters if it is required.
         # If it is on, it will produce water-bridged interactions of multiple levels
         # Eg: residue -- h2o -- h2o -- ligand, residue -- residue -- h2o -- h2o -- ligand.
-        is_h2o_h2o = (atm_grp1.is_water() and atm_grp2.is_water())
+        is_h2o_h2o = (src_grp.is_water() and trgt_grp.is_water())
         if self.ignore_h2o_h2o and is_h2o_h2o:
             return False
 
@@ -153,7 +153,7 @@ class InteractionFilter:
 
     def is_valid_interaction(self, interaction, validate_pair=True):
         if validate_pair:
-            if not self.is_valid_pair(interaction.atm_grp1, interaction.atm_grp2):
+            if not self.is_valid_pair(interaction.src_grp, interaction.trgt_grp):
                 return False
 
         if interaction.type not in self.funcs:
@@ -170,7 +170,7 @@ class InteractionFilter:
             if (interaction.ha_dist_hb_inter == -1 and interaction.dha_ang_hb_inter == -1):
                 # If the angle DHA and the distance HA is equal -1, it is
                 # expected that the molecules to be water molecules. "
-                if (interaction.atm_grp1.compound.is_water() or interaction.atm_grp2.compound.is_water()):
+                if (interaction.src_grp.compound.is_water() or interaction.trgt_grp.compound.is_water()):
                     ha_dist = interaction.da_dist_hb_inter - 1
                     if (self.is_within_boundary(ha_dist, "max_ha_dist_hb_inter", le)):
                         is_valid = True
@@ -215,7 +215,7 @@ class InteractionFilter:
 
     def filter_xbond(self, interaction):
         # Halogen bond involving a PI system (aromatic ring)
-        if (interaction.atm_grp1 == "Aromatic" or interaction.atm_grp2 == "Aromatic"):
+        if (interaction.src_grp == "Aromatic" or interaction.trgt_grp == "Aromatic"):
             return (self.is_within_boundary(interaction.xc_dist_xbond_inter, "max_xc_dist_xbond_inter", le) and
                     self.is_within_boundary(interaction.disp_ang_xbond_inter, "max_disp_ang_xbond_inter", le) and
                     self.is_within_boundary(interaction.cxa_ang_xbond_inter, "min_cxa_ang_xbond_inter", ge))

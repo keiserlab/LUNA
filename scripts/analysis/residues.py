@@ -33,17 +33,17 @@ def get_interacting_residues(interactions, targets, key_map={}):
     res_inter_atm = set()
 
     for i in interactions:
-        if (i.atm_grp1.compound in targets and i.atm_grp2.compound.is_aminoacid()):
+        if (i.src_grp.compound in targets and i.trgt_grp.compound.is_aminoacid()):
 
         # TODO: fix this code to accept the new format of AtomGroups as the atoms can be from different compounds
-        # if (any([c in targets for c in i.atm_grp1.compounds]) and i.atm_grp2.is_aminoacid())
+        # if (any([c in targets for c in i.src_grp.compounds]) and i.trgt_grp.is_aminoacid())
 
-            res.add(i.atm_grp2.compound)
-            res_inter.add((i.atm_grp2.compound, i.type))
-            res_inter_atm.add((i.atm_grp2.compound, i.type, i.atm_grp2))
-        elif (i.atm_grp2.compound in targets and i.atm_grp1.compound.is_aminoacid()):
-            res.add(i.atm_grp1.compound)
-            res_inter.add((i.atm_grp1.compound, i.type))
-            res_inter_atm.add((i.atm_grp1.compound, i.type, i.atm_grp1))
+            res.add(i.trgt_grp.compound)
+            res_inter.add((i.trgt_grp.compound, i.type))
+            res_inter_atm.add((i.trgt_grp.compound, i.type, i.trgt_grp))
+        elif (i.trgt_grp.compound in targets and i.src_grp.compound.is_aminoacid()):
+            res.add(i.src_grp.compound)
+            res_inter.add((i.src_grp.compound, i.type))
+            res_inter_atm.add((i.src_grp.compound, i.type, i.src_grp))
 
     return InteractingResidues(res, res_inter, res_inter_atm)

@@ -81,17 +81,17 @@ class PymolShellViewer:
                 if inter.type == "Proximal":
                     continue
 
-                obj1_name = "obj%d_grp%s" % (t, hash(inter.atm_grp1))
-                obj2_name = "obj%d_grp%s" % (t, hash(inter.atm_grp2))
+                obj1_name = "obj%d_grp%s" % (t, hash(inter.src_grp))
+                obj2_name = "obj%d_grp%s" % (t, hash(inter.trgt_grp))
 
                 # Pseudoatoms
                 if not self.wrapper.obj_exists(obj1_name):
-                    self.wrapper.add_pseudoatom(obj1_name, {"vdw": 1, "pos": list(inter.atm_grp1.centroid)})
+                    self.wrapper.add_pseudoatom(obj1_name, {"vdw": 1, "pos": list(inter.src_grp.centroid)})
                 if not self.wrapper.obj_exists(obj2_name):
-                    self.wrapper.add_pseudoatom(obj2_name, {"vdw": 1, "pos": list(inter.atm_grp2.centroid)})
+                    self.wrapper.add_pseudoatom(obj2_name, {"vdw": 1, "pos": list(inter.trgt_grp.centroid)})
 
                 # Set the representation for each compound in the groups involved in the interaction.
-                for compound in inter.atm_grp1.compounds.union(inter.atm_grp2.compounds):
+                for compound in inter.src_grp.compounds.union(inter.trgt_grp.compounds):
                     comp_repr = "sphere" if compound.is_water() else "sticks"
                     comp_sel = mybio_to_pymol_selection(compound)
                     self.wrapper.show([(comp_repr, comp_sel)])
@@ -118,7 +118,7 @@ class PymolShellViewer:
                     self.wrapper.arrow(arrow_name, obj1_name, obj2_name, arrow_opts)
 
                 # If a group object contains more than one atom, the centroid object will be displayed.
-                if len(inter.atm_grp1.atoms) > 1:
+                if len(inter.src_grp.atoms) > 1:
                     # Add the centroids to the group "grps" and append them to the main group
                     self.wrapper.group("%s.grps" % sphere_obj, [obj1_name])
                     self._set_centroid_style(obj1_name)
@@ -128,7 +128,7 @@ class PymolShellViewer:
                     self.wrapper.delete([obj1_name])
 
                 # If a group object contains more than one atom, the centroid object will be displayed.
-                if len(inter.atm_grp2.atoms) > 1:
+                if len(inter.trgt_grp.atoms) > 1:
                     # Add the centroids to the group "grps" and append them to the main group
                     self.wrapper.group("%s.grps" % sphere_obj, [obj2_name])
                     self._set_centroid_style(obj2_name)

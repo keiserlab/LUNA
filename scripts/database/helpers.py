@@ -110,8 +110,8 @@ class InteractionManager(Manager):
         self.db.approve_session()
 
     def new_interaction(self, interaction, ligand_entity):
-        g1 = self.new_atom_group(interaction.atm_grp1)
-        g2 = self.new_atom_group(interaction.atm_grp2)
+        g1 = self.new_atom_group(interaction.src_grp)
+        g2 = self.new_atom_group(interaction.trgt_grp)
 
         interType = interaction.type
         dbInterType = (self.db.session.query(InterType).filter(InterType.type == interType).all())

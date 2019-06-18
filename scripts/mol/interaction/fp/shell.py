@@ -416,7 +416,7 @@ class ShellGenerator:
                     all_interactions = tuple(chain.from_iterable([g.interactions for g in last_shell.neighborhood]))
                     # It considers only interactions whose atom groups exist in the neigborhood.
                     valid_interactions = set([i for i in all_interactions
-                                             if i.atm_grp1 in neighborhood and i.atm_grp2 in neighborhood])
+                                             if i.src_grp in neighborhood and i.trgt_grp in neighborhood])
 
                     current_interactions = last_shell.interactions
 
