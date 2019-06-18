@@ -4,6 +4,16 @@ from util.file import get_filename
 from util.exceptions import PymolSessionNotInitialized
 
 
+NUCLEOPHILE_INTERS = ["Orthogonal multipolar", "Parallel multipolar", "Antiparallel multipolar", "Tilted multipolar", "Multipolar",
+                      "Cation-nucleophile", "Unfavorable anion-nucleophile", "Unfavorable nucleophile-nucleophile"]
+
+ELECTROPHILE_INTERS = ["Orthogonal multipolar", "Parallel multipolar", "Antiparallel multipolar", "Tilted multipolar", "Multipolar",
+                       "Anion-electrophile", "Unfavorable cation-electrophile", "Unfavorable electrophile-electrophile"]
+
+UNFAVORABLE_INTERS = ["Repulsive", "Unfavorable anion-nucleophile", "Unfavorable cation-electrophile",
+                      "Unfavorable nucleophile-nucleophile", "Unfavorable electrophile-electrophile"]
+
+
 class PymolInteractionViewer:
 
     def __init__(self, show_cartoon=False, bg_color="white", pharm_color=None,
@@ -35,18 +45,6 @@ class PymolInteractionViewer:
         if not isinstance(self.wrapper, PymolWrapper):
             raise PymolSessionNotInitialized("No session was initialized.")
 
-        directional_inters = ["Hydrogen bond", "Water-bridged hydrogen bond", "Weak hydrogen bond", "Halogen bond", "Halogen-pi",
-                              "Chalcogen bond", "Chalcogen-pi", "Parallel multipolar", "Antiparallel multipolar", "Tilted multipolar",
-                              "Orthogonal multipolar", "Multipolar"]
-
-        nucleophile_inters = ["Orthogonal multipolar", "Parallel multipolar", "Antiparallel multipolar", "Tilted multipolar", "Multipolar",
-                              "Cation-nucleophile", "Unfavorable anion-nucleophile", "Unfavorable nucleophile-nucleophile"]
-        electrophile_inters = ["Orthogonal multipolar", "Parallel multipolar", "Antiparallel multipolar", "Tilted multipolar", "Multipolar",
-                               "Anion-electrophile", "Unfavorable cation-electrophile", "Unfavorable electrophile-electrophile"]
-
-        unfavorable_inters = ["Repulsive", "Unfavorable anion-nucleophile", "Unfavorable cation-electrophile",
-                              "Unfavorable nucleophile-nucleophile", "Unfavorable electrophile-electrophile"]
-
         pdb_files_read = set()
 
         for t, (pdb_file, interactions) in enumerate(inter_tuples):
@@ -69,37 +67,37 @@ class PymolInteractionViewer:
                 if inter.type == "Proximal":
                     continue
 
-                obj1_name = "obj%d_grp%s" % (t, hash(inter.atm_grp1))
-                centroid_obj1 = inter.atm_grp1.centroid
+                obj1_name = "obj%d_grp%s" % (t, hash(inter.src_grp))
+                centroid_obj1 = inter.src_grp.centroid
                 # Define the centroid in a nucleophile with two atoms as the position of its more electronegative atom.
                 # Remember that the position in the interaction object matters. We have defined that the first group is always
                 # the nucleophile for both dipole-dipole and ion-dipole interactions.
-                if inter.type in nucleophile_inters and len(inter.atm_grp1.atoms) == 2:
-                    dipole_atm = inter.atm_grp1.atoms[0] if (inter.atm_grp1.atoms[0].electronegativity >
-                                                             inter.atm_grp1.atoms[1].electronegativity) else inter.atm_grp1.atoms[1]
+                if inter.type in NUCLEOPHILE_INTERS and len(inter.src_grp.atoms) == 2:
+                    dipole_atm = inter.src_grp.atoms[0] if (inter.src_grp.atoms[0].electronegativity >
+                                                             inter.src_grp.atoms[1].electronegativity) else inter.src_grp.atoms[1]
                     obj1_name += "_%s" % hash(dipole_atm.name)
                     centroid_obj1 = dipole_atm.coord
                 # For unfavorable multipolar interactions, it may happen that the first atom group is an electrophile as well.
-                elif inter.type == "Unfavorable electrophile-electrophile" and len(inter.atm_grp1.atoms) == 2:
-                    dipole_atm = inter.atm_grp1.atoms[0] if (inter.atm_grp1.atoms[0].electronegativity <
-                                                             inter.atm_grp1.atoms[1].electronegativity) else inter.atm_grp1.atoms[1]
+                elif inter.type == "Unfavorable electrophile-electrophile" and len(inter.src_grp.atoms) == 2:
+                    dipole_atm = inter.src_grp.atoms[0] if (inter.src_grp.atoms[0].electronegativity <
+                                                             inter.src_grp.atoms[1].electronegativity) else inter.src_grp.atoms[1]
                     obj1_name += "_%s" % hash(dipole_atm.name)
                     centroid_obj1 = dipole_atm.coord
 
-                obj2_name = "obj%d_grp%s" % (t, hash(inter.atm_grp2))
-                centroid_obj2 = inter.atm_grp2.centroid
+                obj2_name = "obj%d_grp%s" % (t, hash(inter.trgt_grp))
+                centroid_obj2 = inter.trgt_grp.centroid
                 # Define the centroid in an electrophile with two atoms as the position of its less electronegative atom.
                 # Remember that the position in the interaction object matters. We have defined that the second group is always
                 # the electrophile for both dipole-dipole and ion-dipole interactions.
-                if inter.type in electrophile_inters and len(inter.atm_grp2.atoms) == 2:
-                    dipole_atm = inter.atm_grp2.atoms[0] if (inter.atm_grp2.atoms[0].electronegativity <
-                                                             inter.atm_grp2.atoms[1].electronegativity) else inter.atm_grp2.atoms[1]
+                if inter.type in ELECTROPHILE_INTERS and len(inter.trgt_grp.atoms) == 2:
+                    dipole_atm = inter.trgt_grp.atoms[0] if (inter.trgt_grp.atoms[0].electronegativity <
+                                                             inter.trgt_grp.atoms[1].electronegativity) else inter.trgt_grp.atoms[1]
                     obj2_name += "_%s" % hash(dipole_atm.name)
                     centroid_obj2 = dipole_atm.coord
                 # For unfavorable multipolar interactions, it may happen that the second atom group is an nucleophile as well.
-                elif inter.type == "Unfavorable nucleophile-nucleophile" and len(inter.atm_grp2.atoms) == 2:
-                    dipole_atm = inter.atm_grp2.atoms[0] if (inter.atm_grp2.atoms[0].electronegativity >
-                                                             inter.atm_grp2.atoms[1].electronegativity) else inter.atm_grp2.atoms[1]
+                elif inter.type == "Unfavorable nucleophile-nucleophile" and len(inter.trgt_grp.atoms) == 2:
+                    dipole_atm = inter.trgt_grp.atoms[0] if (inter.trgt_grp.atoms[0].electronegativity >
+                                                             inter.trgt_grp.atoms[1].electronegativity) else inter.trgt_grp.atoms[1]
                     obj2_name += "_%s" % hash(dipole_atm.name)
                     centroid_obj2 = dipole_atm.coord
 
@@ -111,7 +109,7 @@ class PymolInteractionViewer:
                     self.wrapper.add_pseudoatom(obj2_name, {"vdw": 1, "pos": list(centroid_obj2)})
 
                 # Set the representation for each compound in the groups involved in the interaction.
-                for compound in inter.atm_grp1.compounds.union(inter.atm_grp2.compounds):
+                for compound in inter.src_grp.compounds.union(inter.trgt_grp.compounds):
                     comp_repr = "sphere" if compound.is_water() else "sticks"
                     comp_sel = mybio_to_pymol_selection(compound)
                     self.wrapper.show([(comp_repr, comp_sel)])
@@ -129,15 +127,8 @@ class PymolInteractionViewer:
                 self.wrapper.color([(self.inter_color.get_color(inter.type), inter_name)])
 
                 if self.add_directional_arrows:
-                    # Add arrows over the interaction lines to represent directional interactions
-                    if inter.type in directional_inters:
-                        arrow_name = "%s.all_inters.%s.%s.obj%d_inter%d.arrow" % (main_grp, inter_grp,
-                                                                                  INTERACTION_SHORT_NAMES[inter.type], t, i)
-                        arrow_opts = {"radius": 0.03, "gap": 0.9, "hlength": 0.5, "hradius": 0.2,
-                                      "color": self.inter_color.get_color(inter.type)}
-                        self.wrapper.arrow(arrow_name, obj1_name, obj2_name, arrow_opts)
 
-                    if inter.type in unfavorable_inters:
+                    if inter.type in UNFAVORABLE_INTERS:
                         arrow_name1 = "%s.all_inters.%s.%s.obj%d_inter%d.arrow1" % (main_grp, inter_grp,
                                                                                     INTERACTION_SHORT_NAMES[inter.type], t, i)
                         arrow_name2 = "%s.all_inters.%s.%s.obj%d_inter%d.arrow2" % (main_grp, inter_grp,
@@ -152,12 +143,22 @@ class PymolInteractionViewer:
 
                         # Two arrows in different directions
                         self.wrapper.arrow(arrow_name1, obj1_name, obj2_name, arrow_opts)
-                        self.wrapper.arrow(arrow_name2, obj2_name, obj1_name, arrow_opts)
+
+                        if not inter.is_directional():
+                            self.wrapper.arrow(arrow_name2, obj2_name, obj1_name, arrow_opts)
+
                         # Add a square-like object
                         self.wrapper.arrow(square_name, obj1_name, obj2_name, square_opts)
+                    # Add arrows over the interaction lines to represent directional interactions
+                    elif inter.is_directional():
+                        arrow_name = "%s.all_inters.%s.%s.obj%d_inter%d.arrow" % (main_grp, inter_grp,
+                                                                                  INTERACTION_SHORT_NAMES[inter.type], t, i)
+                        arrow_opts = {"radius": 0.03, "gap": 0.9, "hlength": 0.5, "hradius": 0.2,
+                                      "color": self.inter_color.get_color(inter.type)}
+                        self.wrapper.arrow(arrow_name, obj1_name, obj2_name, arrow_opts)
 
                 # If a group object contains more than one atom, the centroid object will be displayed.
-                if len(inter.atm_grp1.atoms) > 1:
+                if len(inter.src_grp.atoms) > 1:
                     # Add the centroids to the group "grps" and append them to the main group
                     self.wrapper.group("%s.grps" % main_grp, [obj1_name])
                     self._set_centroid_style(obj1_name)
@@ -167,7 +168,7 @@ class PymolInteractionViewer:
                     self.wrapper.delete([obj1_name])
 
                 # If a group object contains more than one atom, the centroid object will be displayed.
-                if len(inter.atm_grp2.atoms) > 1:
+                if len(inter.trgt_grp.atoms) > 1:
                     # Add the centroids to the group "grps" and append them to the main group
                     self.wrapper.group("%s.grps" % main_grp, [obj2_name])
                     self._set_centroid_style(obj2_name)
