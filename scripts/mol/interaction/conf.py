@@ -81,10 +81,15 @@ class DefaultInteractionConf(InteractionConf):
         conf["max_dist_repuls_inter"] = 6
         conf["max_dist_attract_inter"] = 6
 
-        # Aromatic stacking
+        # Aromatic stacking:
+        # Ref: Bhattacharyya et al. 2003. Geometry of Interaction of the Histidine Ring with Other Planar and Basic Residues.
         conf["max_cc_dist_pi_pi_inter"] = 6
-        conf["min_dihed_ang_pi_pi_inter"] = 30
-        conf["max_disp_ang_pi_pi_inter"] = 20
+        # Define if a ring is tilted, same plane or in a T-format
+        conf["min_dihed_ang_slope_pi_pi_inter"] = 30
+        conf["max_dihed_ang_slope_pi_pi_inter"] = 60
+        # Define if the ring is offset or aligned with another ring center.
+        conf["min_disp_ang_offset_pi_pi_inter"] = 30
+        conf["max_disp_ang_offset_pi_pi_inter"] = 60
 
         # Amide-aromatic stacking
         # [1] A systematic analysis of atomic protein–ligand interactions in the PDB [Freitas, 2007].
