@@ -678,7 +678,11 @@ DefineFeature Arom8 [{AromR8}]1:[{AromR8}]:[{AromR8}]:[{AromR8}]:[{AromR8}]:[{Ar
  Family Aromatic
  Weights 1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
 EndFeature
-
+AtomType AromR9 [a;r9,!R1&r8,!R1&r7,!R1&r6,!R1&r5,!R1&r4,!R1&r3]
+DefineFeature Arom9 [{AromR9}]1:[{AromR9}]:[{AromR9}]:[{AromR9}]:[{AromR9}]:[{AromR9}]:[{AromR9}]:[{AromR9}]:[{AromR9}]:1
+ Family Aromatic
+ Weights 1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+EndFeature
 
 
 ########################################################################################
