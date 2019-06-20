@@ -107,6 +107,8 @@ class DefaultInteractionConf(InteractionConf):
 
         # Hydrophobic interaction
         conf["max_dist_hydrop_inter"] = 4.5
+        conf["min_surf_size"] = 1
+        conf["min_inter_atom_in_surf"] = 1
 
         # Cation-pi interaction
         conf["max_dist_cation_pi_inter"] = 6

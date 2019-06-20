@@ -544,16 +544,31 @@ class InteractionCalculator:
         if self.is_intramol_inter(group1, group2):
             return []
 
+        # Verify if the groups contain the required number of atoms to form a valid surface.
+        if (not self.is_within_boundary(len(group1.atoms), "min_surf_size", ge) or
+                not self.is_within_boundary(len(group2.atoms), "min_surf_size", ge)):
+            return []
+
+        interacting_atms_in_surf1 = set()
+        interacting_atms_in_surf2 = set()
         min_cc_dist = float('Inf')
         for atm1, atm2 in product(group1.atoms, group2.atoms):
             cc_dist = atm1 - atm2
 
-            if cc_dist < min_cc_dist:
-                min_cc_dist = cc_dist
+            if self.is_within_boundary(cc_dist, "max_dist_hydrop_inter", le):
+                interacting_atms_in_surf1.add(atm1)
+                interacting_atms_in_surf2.add(atm2)
+
+                if cc_dist < min_cc_dist:
+                    min_cc_dist = cc_dist
+
+        # Verify if the number of interacting atoms attends the required number of interating atoms per surface.
+        if (not self.is_within_boundary(len(interacting_atms_in_surf1), "min_inter_atom_in_surf", ge) or
+                not self.is_within_boundary(len(interacting_atms_in_surf2), "min_inter_atom_in_surf", ge)):
+            return []
 
         if (self.is_within_boundary(min_cc_dist, "boundary_cutoff", le) and
                 self.is_within_boundary(min_cc_dist, "max_dist_hydrop_inter", le)):
-
             params = {"dist_hydrop_inter": min_cc_dist}
             inter = InteractionType(group1, group2, "Hydrophobic", params=params)
             interactions.append(inter)
