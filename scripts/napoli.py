@@ -19,9 +19,8 @@ from analysis.summary import *
 from database.loader import *
 from database.napoli_model import *
 from database.helpers import *
-from database.util import (get_ligand_tbl_join_filter, default_interaction_filters,
-                           format_db_ligand_entries, format_db_interactions,
-                           object_as_dict, get_default_mappers_list)
+from database.util import (get_ligand_tbl_join_filter, default_interaction_filters, format_db_ligand_entries,
+                           format_db_interactions, object_as_dict, get_default_mappers_list)
 from mol.depiction import ligand_pharm_figure
 from mol.clustering import cluster_fps_butina
 from mol.features import FeatureExtractor
@@ -363,7 +362,7 @@ class Project:
                 # If the method is not a NMR type does not add hydrogen as it usually already has hydrogens.
                 if method.upper() in NMR_METHODS:
                     logger.exception("The structure related to the entry '%s' was obtained by NMR, so it will "
-                                   "not add hydrogens to it." % self.current_entry)
+                                     "not add hydrogens to it." % self.current_entry)
                     return False
             return True
         return False
@@ -1187,11 +1186,11 @@ class LocalProject(Project):
             with open(inter_file, "w") as OUT:
                 OUT.write("atom_group1\tfeatures1\tatom_group2\tfeatures2\tinteraction_type\n")
                 for i in interactions:
-                    atm_grp1 = ", ".join([x.full_atom_name for x in i.atm_grp1.atoms])
-                    atm_grp2 = ", ".join([x.full_atom_name for x in i.atm_grp2.atoms])
-                    feat1 = ", ".join([x.name for x in i.atm_grp1.features if x.name != "Atom"])
-                    feat2 = ", ".join([x.name for x in i.atm_grp2.features if x.name != "Atom"])
-                    OUT.write("%s\t%s\t%s\t%s\t%s\n" % (atm_grp1, feat1, atm_grp2, feat2, i.type))
+                    src_grp = ", ".join([x.full_atom_name for x in i.src_grp.atoms])
+                    trgt_grp = ", ".join([x.full_atom_name for x in i.trgt_grp.atoms])
+                    feat1 = ", ".join([x.name for x in i.src_grp.features if x.name != "Atom"])
+                    feat2 = ", ".join([x.name for x in i.trgt_grp.features if x.name != "Atom"])
+                    OUT.write("%s\t%s\t%s\t%s\t%s\n" % (src_grp, feat1, trgt_grp, feat2, i.type))
 
             shells = ShellGenerator(self.ifp_num_levels, self.ifp_radius_step)
             sm = shells.create_shells(neighborhood)
