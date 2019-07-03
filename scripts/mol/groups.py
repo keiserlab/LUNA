@@ -1,13 +1,14 @@
 from collections import defaultdict
 from itertools import chain
-
 from rdkit.Chem import MolFromMolBlock, MolFromMolFile, SanitizeFlags, SanitizeMol
 from pybel import readfile
 from openbabel import etab
+import numpy as np
+from Bio.KDTree import KDTree
+
 
 from MyBio.selector import ResidueSelector, AtomSelector
 from MyBio.util import save_to_file
-
 from graph.bellman_ford import bellman_ford
 from mol.interaction.contact import get_contacts_for_entity, get_cov_contacts_for_entity
 from mol.neighborhood import NbAtom, NbAtomData
@@ -19,8 +20,8 @@ from mol.features import ChemicalFeature
 from util.file import get_unique_filename, remove_files
 from util.exceptions import MoleculeSizeError, IllegalArgumentError, MoleculeObjectError
 from util.default_values import ACCEPTED_MOL_OBJ_TYPES, COV_SEARCH_RADIUS, OPENBABEL
-
 import mol.interaction.math as im
+
 
 import logging
 logger = logging.getLogger()
@@ -223,7 +224,7 @@ class CompoundGroupPerceiver():
 
     def __init__(self, feature_extractor, add_h=False, ph=None, amend_mol=True, mol_obj_type="rdkit",
                  charge_model=OpenEyeModel(), tmp_path=None, expand_selection=True, default_properties=None,
-                 radius=COV_SEARCH_RADIUS, group_hydrophobes=True):
+                 radius=COV_SEARCH_RADIUS, group_hydrophobes=False):
 
         if mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES:
             raise IllegalArgumentError("Objects of type '%s' are not currently accepted. "
@@ -274,7 +275,7 @@ class CompoundGroupPerceiver():
         proximal = get_contacts_for_entity(entity=model, source=target_residue, radius=self.radius, level='R')
 
         # Sorted by residue order as in the PDB.
-        return sorted(list(set([p[1] for p in proximal])), key=lambda r: (r.id[0][0], r.id[1], r.id[2]))
+        return sorted(list(set([p[1] for p in proximal])), key=lambda r: r.idx)
 
     def _get_default_properties(self, target_residue):
         #
@@ -589,3 +590,31 @@ class CompoundGroupPerceiver():
                 comp_grps.remove_atm_grps([atm_grp])
             else:
                 atm_grp.features = features
+
+
+class AtomGroupNeighborhood:
+
+    def __init__(self, atm_grps, bucket_size=10):
+        self.atm_grps = atm_grps
+
+        # get the coordinates
+        coord_list = [ga.centroid for ga in self.atm_grps]
+
+        # to Nx3 array of type float
+        self.coords = np.array(coord_list).astype("f")
+        assert(bucket_size > 1)
+        assert(self.coords.shape[1] == 3)
+        self.kdt = KDTree(3, bucket_size)
+        self.kdt.set_coords(self.coords)
+
+    def search(self, center, radius):
+
+        self.kdt.search(center, radius)
+        indices = self.kdt.get_indices()
+        n_grps_list = []
+        atm_grps = self.atm_grps
+        for i in indices:
+            a = atm_grps[i]
+            n_grps_list.append(a)
+
+        return n_grps_list
