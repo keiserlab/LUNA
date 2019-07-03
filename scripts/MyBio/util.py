@@ -3,8 +3,9 @@ from io import StringIO
 from os.path import exists
 from shutil import move as rename_pdb_file
 from itertools import product, combinations
+from openbabel import etab
 
-from mol.interaction.calc import is_covalently_bonded
+
 from util.exceptions import IllegalArgumentError, MoleculeNotFoundError, ChainNotFoundError
 from util.file import is_directory_valid
 from util.default_values import ENTRY_SEPARATOR
@@ -141,6 +142,19 @@ def get_entity_from_entry(entity, entry, model=0):
                                  (entry.chain_id, entry.to_string(ENTRY_SEPARATOR), structure.get_id()))
 
     return target_entity
+
+
+def is_covalently_bonded(mybio_atm1, mybio_atm2):
+    # Distance atom-atom
+    dist = mybio_atm1 - mybio_atm2
+    # Covalent radius
+    cov1 = etab.GetCovalentRad(etab.GetAtomicNum(mybio_atm1.element))
+    cov2 = etab.GetCovalentRad(etab.GetAtomicNum(mybio_atm2.element))
+
+    # OpenBabel thresholds.
+    if 0.4 <= dist <= cov1 + cov2 + 0.45:
+        return True
+    return False
 
 
 def get_residue_cov_bonds(residue, select=Select()):
