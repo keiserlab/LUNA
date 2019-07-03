@@ -1,12 +1,12 @@
-from util.exceptions import EntityLevelError
+from itertools import product
+
 
 from util.default_values import COV_SEARCH_RADIUS
-from mol.interaction.calc import is_covalently_bonded
-from MyBio.util import get_entity_level_name
+from util.exceptions import EntityLevelError
+from MyBio.util import get_entity_level_name, is_covalently_bonded
 from MyBio.PDB.NeighborSearch import NeighborSearch
 from MyBio.PDB import Selection
 
-from itertools import product
 
 import logging
 
