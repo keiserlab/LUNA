@@ -144,7 +144,7 @@ def get_entity_from_entry(entity, entry, model=0):
     return target_entity
 
 
-def is_covalently_bonded(mybio_atm1, mybio_atm2):
+def is_covalently_bound(mybio_atm1, mybio_atm2):
     # Distance atom-atom
     dist = mybio_atm1 - mybio_atm2
     # Covalent radius
@@ -164,7 +164,7 @@ def get_residue_cov_bonds(residue, select=Select()):
 
     cov_bonds = []
     for atm1, atm2 in combinations(trgt_res_atms.values(), 2):
-        if is_covalently_bonded(atm1, atm2):
+        if is_covalently_bound(atm1, atm2):
             cov_bonds.append((atm1, atm2))
 
     return cov_bonds
@@ -197,7 +197,7 @@ def get_residue_neighbors(residue, select=Select()):
 
             # A peptide bond exists between the C of one amino acid and the N of another.
             if "C" in prev_res_atms and "N" in trgt_res_atms:
-                if is_covalently_bonded(trgt_res_atms["N"], prev_res_atms["C"]):
+                if is_covalently_bound(trgt_res_atms["N"], prev_res_atms["C"]):
                     neighbors["previous"] = prev_res
                 else:
                     logger.warning("The first residue before %s is too distant to fulfill the covalent thresholds. "
@@ -220,7 +220,7 @@ def get_residue_neighbors(residue, select=Select()):
 
             # A peptide bond exists between the C of one amino acid and the N of another.
             if "C" in trgt_res_atms and "N" in next_res_atms:
-                if is_covalently_bonded(trgt_res_atms["C"], next_res_atms["N"]):
+                if is_covalently_bound(trgt_res_atms["C"], next_res_atms["N"]):
                     neighbors["next"] = next_res
                 else:
                     logger.warning("The first residue after %s is too distant to fulfill the covalent thresholds. "
@@ -250,7 +250,7 @@ def get_residue_neighbors(residue, select=Select()):
             prev_res_atms = {atm.name: atm for atm in prev_res.get_atoms() if select.accept_atom(atm)}
 
             for trgt_atm, prev_atm in product(trgt_res_atms.values(), prev_res_atms.values()):
-                if is_covalently_bonded(trgt_atm, prev_atm):
+                if is_covalently_bound(trgt_atm, prev_atm):
                     neighbors["previous"] = prev_res
                     break
 
@@ -271,7 +271,7 @@ def get_residue_neighbors(residue, select=Select()):
 
             # Check each pair of atoms for covalently bonded atoms.
             for trgt_atm, next_atm in product(trgt_res_atms.values(), next_res_atms.values()):
-                if is_covalently_bonded(trgt_atm, next_atm):
+                if is_covalently_bound(trgt_atm, next_atm):
                     neighbors["next"] = next_res
                     break
 
