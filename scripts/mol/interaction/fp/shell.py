@@ -1,47 +1,17 @@
-from util.exceptions import ShellCenterNotFound
-
-from util.default_values import CHEMICAL_FEATURE_IDS, INTERACTION_IDS
-
-from Bio.KDTree import KDTree
-
 from itertools import chain, product
 from collections import defaultdict
-
-from mol.interaction.fp.fingerprint import DEFAULT_SHELL_NBITS, Fingerprint, CountFingerprint
-
 import numpy as np
 import mmh3
+
+
+from util.exceptions import ShellCenterNotFound
+from util.default_values import CHEMICAL_FEATURE_IDS, INTERACTION_IDS
+from mol.interaction.fp.fingerprint import DEFAULT_SHELL_NBITS, Fingerprint, CountFingerprint
+from mol.groups import AtomGroupNeighborhood
+
 import logging
 
 logger = logging.getLogger()
-
-
-class ShellSearch:
-
-    def __init__(self, atm_grps, bucket_size=10):
-        self.atm_grps = atm_grps
-
-        # get the coordinates
-        coord_list = [ga.centroid for ga in self.atm_grps]
-
-        # to Nx3 array of type float
-        self.coords = np.array(coord_list).astype("f")
-        assert(bucket_size > 1)
-        assert(self.coords.shape[1] == 3)
-        self.kdt = KDTree(3, bucket_size)
-        self.kdt.set_coords(self.coords)
-
-    def search(self, center, radius):
-
-        self.kdt.search(center, radius)
-        indices = self.kdt.get_indices()
-        n_grps_list = []
-        atm_grps = self.atm_grps
-        for i in indices:
-            a = atm_grps[i]
-            n_grps_list.append(a)
-
-        return n_grps_list
 
 
 class ShellManager:
@@ -349,7 +319,7 @@ class ShellGenerator:
 
     def create_shells(self, neighborhood):
         sm = ShellManager(self.num_levels, self.radius_step, self.num_bits)
-        ss = ShellSearch(neighborhood, self.bucket_size)
+        nbs = AtomGroupNeighborhood(neighborhood, self.bucket_size)
 
         neighborhood = set(neighborhood)
         skip_atm_grps = set()
@@ -371,7 +341,7 @@ class ShellGenerator:
                     prev_atm_grps = prev_shell.neighborhood
                     prev_interactions = prev_shell.interactions
 
-                    nb_atm_grps = set(ss.search(atm_grp.centroid, radius))
+                    nb_atm_grps = set(nbs.search(atm_grp.centroid, radius))
 
                     inter_tuples = set()
                     # For each atom group from the previous shell
