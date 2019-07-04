@@ -294,7 +294,7 @@ class Shell:
 
         np_array = np.array(data, self.np_dtype)
 
-        # TODO: Let user to define hash function
+        # TODO: Let the user define hash function
         hashed_shell = mmh3.hash(np_array, self.seed, signed=False)
 
         return hashed_shell
@@ -351,9 +351,8 @@ class ShellGenerator:
 
                                 new_tuple = (inter, inter.get_partner(prev_atm_grp))
 
-                                # Ignore interactions that already exists in the previous shell only if the previous
-                                # source atom group does not correspond to the current one. It avoids duplications
-                                # on the list of interactions. For example, without this control, an interaction I
+                                # Ignore interactions that already exists in the previous shell to avoid duplications
+                                # in the list of interactions. For example, without this control, an interaction I
                                 # between atom A1 and A2 would appear twice in the list: (I, A1) and (I, A2).
                                 # Thus, it keeps only the first interaction that appears while increasing the shell.
                                 if inter in prev_interactions and new_tuple not in prev_shell.inter_tuples:
