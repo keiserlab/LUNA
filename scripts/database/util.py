@@ -10,7 +10,7 @@ from database.helpers import MapperConfiguration
 from mol.entry import DBEntry
 from mol.interaction.type import InteractionType
 from mol.groups import AtomGroup
-from mol.neighborhood import NbAtom
+from mol.atom import ExtendedAtom
 from mol.features import ChemicalFeature
 
 

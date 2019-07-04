@@ -4,7 +4,7 @@ from openbabel import etab
 from graph.bellman_ford import bellman_ford
 
 
-class NbAtomData:
+class AtomData:
 
     def __init__(self, atomic_num, coord, serial_number=None):
         self.atomic_num = atomic_num
@@ -36,7 +36,7 @@ class NbAtomData:
         self._coord = np.array(xyz)
 
     def __repr__(self):
-        return ("<NbAtomData: atomic number=%d, coord=(%.3f, %.3f, %.3f), serial number=%s>"
+        return ("<ExtendedAtomData: atomic number=%d, coord=(%.3f, %.3f, %.3f), serial number=%s>"
                 % (self.atomic_num, self.x, self.y, self.z, str(self.serial_number)))
 
     def __eq__(self, other):
@@ -56,7 +56,7 @@ class NbAtomData:
         return hash((self.atomic_num, tuple(self._coord), self.serial_number))
 
 
-class NbAtom:
+class ExtendedAtom:
 
     def __init__(self, mybio_atom, nb_info=None, atm_grps=None, neighborhood=None):
         self._atom = mybio_atom
@@ -123,7 +123,7 @@ class NbAtom:
         return getattr(self._atom, attr)
 
     def __repr__(self):
-        return "<NBAtom: %s>" % self.full_atom_name
+        return "<ExtendedAtom: %s>" % self.full_atom_name
 
     def __sub__(self, other):
         # It calls __sub__() from Biopython.
