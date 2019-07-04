@@ -14,7 +14,7 @@ DB_CONF_FILE = "%s/.mysql.ini" % CONF_PATH
 ATOM_PROP_FILE = "%s/Napoli.fdef" % CONF_PATH
 
 INTERACTION_CONF = DefaultInteractionConf()
-BOUNDARY_CONF = InteractionConf({"boundary_cutoff": 7})
+BOUNDARY_CONF = InteractionConf({"boundary_cutoff": 6.2})
 
 NMR_METHODS = ["SOLID-STATE NMR", "SOLUTION NMR"]
 
