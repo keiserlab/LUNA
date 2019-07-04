@@ -10,7 +10,6 @@ from pybel import informats as OB_FORMATS
 
 
 from mol.wrappers.rdkit import RDKIT_FORMATS, read_multimol_file
-from mol.interaction.filter import InteractionFilter
 from util.default_values import ACCEPTED_MOL_OBJ_TYPES, ENTRY_SEPARATOR
 from util.file import get_file_format
 from util.exceptions import InvalidEntry, IllegalArgumentError, MoleculeObjectError, MoleculeNotFoundError
@@ -98,13 +97,15 @@ class Entry:
 
         # An entry object will always have a PDB and chain id.
         entry = list(full_id[0:2])
-        # If it contains additional information about the residue it will also include them.
-        if full_id[2] and full_id[3]:
-            comp_name = str(full_id[2]) if full_id[2] else ""
 
-            comp_num_and_icode = str(full_id[3]) if full_id[3] else ""
-            comp_num_and_icode += str(full_id[4]) if full_id[4].strip() else ""
-            entry += [comp_name, comp_num_and_icode]
+        if len(full_id) > 2:
+            # If it contains additional information about the residue it will also include them.
+            if full_id[2] and full_id[3]:
+                comp_name = str(full_id[2]) if full_id[2] else ""
+
+                comp_num_and_icode = str(full_id[3]) if full_id[3] else ""
+                comp_num_and_icode += str(full_id[4]) if full_id[4].strip() else ""
+                entry += [comp_name, comp_num_and_icode]
 
         sep = sep or self.sep
 
@@ -114,10 +115,11 @@ class Entry:
         full_id = self.full_id
 
         # If it contains additional information about the residue it will also include them.
-        if full_id[2] and full_id[3]:
-            regex = PCI_ENTRY_REGEX
-        else:
-            regex = PPI_ENTRY_REGEX
+        if len(full_id) > 2:
+            if full_id[2] and full_id[3]:
+                regex = PCI_ENTRY_REGEX
+            else:
+                regex = PPI_ENTRY_REGEX
 
         return regex.match(self.to_string(":")) is not None
 
@@ -215,6 +217,9 @@ class MolEntry(Entry):
     @mol_obj.setter
     def mol_obj(self, obj):
         self._mol_obj = obj
+
+    def is_valid(self):
+        return True
 
     def is_mol_obj_loaded(self):
         return self._mol_obj is not None
