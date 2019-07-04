@@ -3,7 +3,7 @@ import util.stringcase as case
 from util.exceptions import MoleculeObjectTypeError
 from mol.wrappers.base import MolWrapper
 from rdkit.Chem import Mol as RDMol
-from openbabel import (OBMol, OBSmartsPattern)
+from openbabel import OBMol, OBSmartsPattern
 from pybel import Molecule as PybelMol
 
 from collections import defaultdict
@@ -130,7 +130,7 @@ class FeatureExtractor:
 
     def _get_features_from_obmol(self, ob_mol):
         grp_features = defaultdict(set)
-        for (key, smarts) in self.feature_factory.GetFeatureDefs().items():
+        for key, smarts in self.feature_factory.GetFeatureDefs().items():
             grp_type = key.split(".")[0]
 
             ob_smart = OBSmartsPattern()

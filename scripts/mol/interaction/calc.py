@@ -577,7 +577,6 @@ class InteractionCalculator:
 
             min_disp_angle = float("Inf")
             for r1, r2 in [(ring1, ring2), (ring2, ring1)]:
-
                 cc_vect = r2.centroid - r1.centroid
                 disp_angle = im.to_quad1(im.angle(r1.normal, cc_vect))
 
@@ -1856,7 +1855,7 @@ class InteractionCalculator:
 
                 # r1 + r2 - d < 0 => no clash
                 # r1 + r2 - d = 0 => in the limit, i.e., spheres are touching.
-                # r1 + r2 - d = 0 => clash.
+                # r1 + r2 - d > 0 => clash.
                 if (rdw1 + rdw2 - cc_dist) >= self.inter_conf.conf.get("vdw_clash_tolerance", 0):
                     inter = InteractionType(group1, group2, "Van der Waals clash", params=params)
                     interactions.append(inter)
