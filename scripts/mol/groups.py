@@ -11,7 +11,7 @@ from MyBio.selector import ResidueSelector, AtomSelector
 from MyBio.util import save_to_file
 from graph.bellman_ford import bellman_ford
 from mol.interaction.contact import get_contacts_for_entity, get_cov_contacts_for_entity
-from mol.neighborhood import NbAtom, NbAtomData
+from mol.atom import ExtendedAtom, AtomData
 from mol.charge_model import OpenEyeModel
 from mol.validator import MolValidator
 from mol.wrappers.obabel import convert_molecule
@@ -59,8 +59,9 @@ class CompoundGroups():
     def remove_atm_grps(self, atm_grps):
         self._atm_grps = list(set(self._atm_grps) - set(atm_grps))
 
-        # NbAtom objects keep a list of all AtomGroup objects to which they belong to. So, if we don't clear the references directly,
-        # the AtomGroup objects will still exist in the NbAtom list even when they were already removed from an instance of CompoundGroups.
+        # ExtendedAtom objects keep a list of all AtomGroup objects to which they belong to. So, if we don't clear the references directly,
+        # the AtomGroup objects will still exist in the ExtendedAtom list even when they were already removed from an instance of
+        # CompoundGroups.
         for atm_grp in atm_grps:
             atm_grp.clear_refs()
 
@@ -291,7 +292,7 @@ class CompoundGroupPerceiver():
         if target_residue.resname in self.default_properties:
 
             atm_sel = AtomSelector(keep_altloc=False, keep_hydrog=False)
-            atm_map = {atm.name: NbAtom(atm) for atm in target_residue.get_atoms() if atm_sel.accept_atom(atm)}
+            atm_map = {atm.name: ExtendedAtom(atm) for atm in target_residue.get_atoms() if atm_sel.accept_atom(atm)}
 
             atms_in_ss_bonds = set()
 
@@ -315,11 +316,11 @@ class CompoundGroupPerceiver():
 
                         # If the atom 1 belongs to the target and is not a hydrogen, add atom 2 to its neighbor list.
                         if atm1.parent == target_residue and atm1.element != "H":
-                            atom_info = NbAtomData(etab.GetAtomicNum(atm2.element), atm2.coord, atm2.serial_number)
+                            atom_info = AtomData(etab.GetAtomicNum(atm2.element), atm2.coord, atm2.serial_number)
                             atm_map[atm1.name].add_nb_info([atom_info])
                         # If the atom 2 belongs to the target and is not a hydrogen, add atom 1 to its neighbor list.
                         if atm2.parent == target_residue and atm2.element != "H":
-                            atom_info = NbAtomData(etab.GetAtomicNum(atm1.element), atm1.coord, atm1.serial_number)
+                            atom_info = AtomData(etab.GetAtomicNum(atm1.element), atm1.coord, atm1.serial_number)
                             atm_map[atm2.name].add_nb_info([atom_info])
 
             comp_grps = CompoundGroups(target_residue)
@@ -381,16 +382,16 @@ class CompoundGroupPerceiver():
                         # If this residue is neighbor of the target residue N, then they form an amide (N-C=O).
                         if "N" in atm_map and "O" in nb_atms and "C" in nb_atms and atm_map["N"].is_neighbor(nb_atms["C"]):
                             # Define an amide group and add it to the compound groups.
-                            # In the atm_map, the atoms were already transformed into NbAtoms().
-                            amide = [atm_map["N"], NbAtom(nb_atms["C"]), NbAtom(nb_atms["O"])]
+                            # In the atm_map, the atoms were already transformed into ExtendedAtoms().
+                            amide = [atm_map["N"], ExtendedAtom(nb_atms["C"]), ExtendedAtom(nb_atms["O"])]
                             atm_grp = AtomGroup(amide, [ChemicalFeature("Amide")], recursive=True)
                             comp_grps.add_atm_grps([atm_grp])
                     elif nb.idx > target_residue.idx:
                         # If this residue is neighbor of the target residue C, then they form an amide (N-C=O).
                         if "N" in nb_atms and "O" in atm_map and "C" in atm_map and atm_map["C"].is_neighbor(nb_atms["N"]):
                             # Define an amide group and add it to the compound groups.
-                            # In the atm_map, the atoms were already transformed into NbAtoms().
-                            amide = [NbAtom(nb_atms["N"]), atm_map["C"], atm_map["O"]]
+                            # In the atm_map, the atoms were already transformed into ExtendedAtoms().
+                            amide = [ExtendedAtom(nb_atms["N"]), atm_map["C"], atm_map["O"]]
                             atm_grp = AtomGroup(amide, [ChemicalFeature("Amide")], recursive=True)
                             comp_grps.add_atm_grps([atm_grp])
 
@@ -400,34 +401,33 @@ class CompoundGroupPerceiver():
             for atm in atm_map.values():
                 # Add the neighbors of this atom. The number '1' defined below represents the edge weight. But, right now it's not used.
                 nb_graph[atm.serial_number] = {i.serial_number: 1 for i in atm.neighbors_info if i.serial_number in nb_graph}
-                # Set the graph dictionary to each NbAtom object. Since, dictionaries are passed as references, we can change
-                # the variable nb_graph and the changes will be updated in each NbAtom object automatically.
+                # Set the graph dictionary to each ExtendedAtom object. Since, dictionaries are passed as references, we can change
+                # the variable nb_graph and the changes will be updated in each ExtendedAtom object automatically.
                 atm.set_neighborhood(nb_graph)
 
             return comp_grps
 
     def _get_calculated_properties(self, target_residue, target_atoms, residue_selector, mol_obj=None):
+
         # If no OBMol was defined, create a new one through the residue list.
         mol_obj = mol_obj or self._get_mol_from_entity(target_residue.get_parent_by_level('M'), residue_selector)
-        # Wrap the molecule object.
-        mol_obj = MolWrapper(mol_obj)
 
         if mol_obj.get_num_heavy_atoms() != len(target_atoms):
             raise MoleculeSizeError("The number of heavy atoms in the PDB selection and in the MOL file are different.")
 
         # Ignore hydrogen atoms.
-        atm_obj_list = [atm for atm in mol_obj.get_atoms(wrapped=True) if atm.get_atomic_num() != 1]
+        atm_obj_list = [atm for atm in mol_obj.get_atoms() if atm.get_atomic_num() != 1]
 
         atm_map = {}
         trgt_atms = {}
         for i, atm_obj in enumerate(atm_obj_list):
             atm_map[atm_obj.get_idx()] = target_atoms[i].serial_number
-            trgt_atms[target_atoms[i].serial_number] = NbAtom(target_atoms[i])
+            trgt_atms[target_atoms[i].serial_number] = ExtendedAtom(target_atoms[i])
 
         # Set all neighbors, i.e., covalently bonded atoms.
-        for bond_obj in mol_obj.get_bonds(wrapped=True):
-            bgn_atm_obj = bond_obj.get_begin_atom(wrapped=True)
-            end_atm_obj = bond_obj.get_end_atom(wrapped=True)
+        for bond_obj in mol_obj.get_bonds():
+            bgn_atm_obj = bond_obj.get_begin_atom()
+            end_atm_obj = bond_obj.get_end_atom()
 
             # At least one of the atoms must be a non-hydrogen atom.
             if bgn_atm_obj.get_atomic_num() != 1 or end_atm_obj.get_atomic_num() != 1:
@@ -435,13 +435,13 @@ class CompoundGroupPerceiver():
                 if bgn_atm_obj.get_atomic_num() != 1:
                     serial_number = atm_map.get(end_atm_obj.get_idx())
                     coord = mol_obj.get_atom_coord_by_id(end_atm_obj.get_id())
-                    atom_info = NbAtomData(end_atm_obj.get_atomic_num(), coord, serial_number)
+                    atom_info = AtomData(end_atm_obj.get_atomic_num(), coord, serial_number)
                     trgt_atms[atm_map[bgn_atm_obj.get_idx()]].add_nb_info([atom_info])
                 # If the atom 2 is not a hydrogen, add atom 1 to its neighbor list.
                 if end_atm_obj.get_atomic_num() != 1:
                     serial_number = atm_map.get(bgn_atm_obj.get_idx())
                     coord = mol_obj.get_atom_coord_by_id(bgn_atm_obj.get_id())
-                    atom_info = NbAtomData(bgn_atm_obj.get_atomic_num(), coord, serial_number)
+                    atom_info = AtomData(bgn_atm_obj.get_atomic_num(), coord, serial_number)
                     trgt_atms[atm_map[end_atm_obj.get_idx()]].add_nb_info([atom_info])
 
         group_features = self.feature_extractor.get_features_by_groups(mol_obj, atm_map)
@@ -464,8 +464,8 @@ class CompoundGroupPerceiver():
         for atm in trgt_atms.values():
             # Add the neighbors of this atom. The number '1' defined below represents the edge weight. But, right now it's not used.
             nb_graph[atm.serial_number] = {i.serial_number: 1 for i in atm.neighbors_info if i.serial_number in nb_graph}
-            # Set the graph dictionary to each NbAtom object. Since, dictionaries are passed as references, we can change
-            # the variable nb_graph and the changes will be updated in each NbAtom object automatically.
+            # Set the graph dictionary to each ExtendedAtom object. Since, dictionaries are passed as references, we can change
+            # the variable nb_graph and the changes will be updated in each ExtendedAtom object automatically.
             atm.set_neighborhood(nb_graph)
 
         return comp_grps
@@ -502,7 +502,7 @@ class CompoundGroupPerceiver():
                 raise MoleculeObjectError("An error occurred while parsing the file '%s' with Open Babel and the molecule "
                                           "object could not be created. Check the logs for more information." % mol_file)
 
-            mv = MolValidator(fix_charges=True, fix_implicit_valence=True)
+            mv = MolValidator()
             is_valid = mv.validate_mol(mol_obj)
             logger.info('Validation finished!!!')
             if not is_valid:
@@ -539,7 +539,7 @@ class CompoundGroupPerceiver():
         # Remove temporary files.
         remove_files([pdb_file, mol_file])
 
-        return mol_obj
+        return MolWrapper(mol_obj)
 
     def _merge_hydrophobes(self, comp_grps):
         # Only hydrophobic atom groups.
