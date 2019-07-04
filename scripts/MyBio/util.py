@@ -113,11 +113,11 @@ def entity_to_string(entity, select=Select(), write_conects=True, write_end=True
 
 def get_entity_level_name():
     return {
-        "A": "atom",
-        "R": "residue",
-        "C": "chain",
-        "M": "model",
-        "S": "structure"
+        "A": "Atom",
+        "R": "Residue",
+        "C": "Chain",
+        "M": "Model",
+        "S": "Structure"
     }
 
 
