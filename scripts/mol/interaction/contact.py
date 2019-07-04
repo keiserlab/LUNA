@@ -1,7 +1,7 @@
 from itertools import product
 
 
-from util.default_values import COV_SEARCH_RADIUS
+from util.default_values import COV_SEARCH_RADIUS, BOUNDARY_CONF
 from util.exceptions import EntityLevelError
 from MyBio.util import get_entity_level_name, is_covalently_bound
 from MyBio.PDB.NeighborSearch import NeighborSearch
@@ -13,23 +13,22 @@ import logging
 logger = logging.getLogger()
 
 
-def all_contacts_nh_search(entity, radius=7, level='A'):
+def all_contacts_search(entity, radius=BOUNDARY_CONF.boundary_cutoff, level='A'):
     try:
         if level == 'S' or level == 'M' or level == 'C':
-            raise EntityLevelError('Minimum entity level to be chosen is: R (residues) or A (atoms)')
+            raise EntityLevelError("Maximum entity level to be chosen is: R (residues) or A (atoms)")
 
         entity_names = get_entity_level_name()
         if level not in entity_names:
-            raise EntityLevelError('The defined level %s does not exist' % level)
+            raise EntityLevelError("The defined level '%s' does not exist" % level)
 
-        logger.info('Trying to select all contacts in the PDB file %s.'
-                    % entity.get_parent_by_level('S').id)
+        logger.info("Trying to select all contacts in the PDB file %s." % entity.get_parent_by_level('S').id)
 
         all_atoms = list(entity.get_atoms())
         ns = NeighborSearch(all_atoms)
         pairs = ns.search_all(radius, level)
 
-        logger.info('Number of nearby %s(s) found: %d.' % (entity_names[level], len(pairs)))
+        logger.info("Number of nearby %s(s) found: %d." % (entity_names[level].lower(), len(pairs)))
 
         return pairs
     except Exception as e:
@@ -37,14 +36,14 @@ def all_contacts_nh_search(entity, radius=7, level='A'):
         raise
 
 
-def get_contacts_for_entity(entity, source, target=None, radius=7, level='A'):
+def get_contacts_for_entity(entity, source, target=None, radius=BOUNDARY_CONF.boundary_cutoff, level='A'):
     try:
         if level == 'S' or level == 'M' or level == 'C':
-            raise EntityLevelError('Minimum entity level to be chosen is: R (residues) or A (atoms)')
+            raise EntityLevelError("Maximum entity level to be chosen is: R (residues) or A (atoms)")
 
         entity_names = get_entity_level_name()
         if level not in entity_names:
-            raise EntityLevelError('The defined level %s does not exist' % level)
+            raise EntityLevelError("The defined level '%s' does not exist" % level)
 
         source_atoms = Selection.unfold_entities([source], 'A')
         target_atoms = []
@@ -61,8 +60,7 @@ def get_contacts_for_entity(entity, source, target=None, radius=7, level='A'):
             pairs = set(product([entity], nb_entities))
             entities.update(pairs)
 
-        logger.info('Number of nearby %s(s) found: %d.' % (entity_names[level], len(entities)))
-
+        logger.info("Number of nearby %s(s) found: %d." % (entity_names[level].lower(), len(entities)))
         return entities
     except Exception as e:
         logger.exception(e)
