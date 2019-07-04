@@ -225,7 +225,7 @@ class CompoundGroupPerceiver():
 
     def __init__(self, feature_extractor, add_h=False, ph=None, amend_mol=True, mol_obj_type="rdkit",
                  charge_model=OpenEyeModel(), tmp_path=None, expand_selection=True, default_properties=None,
-                 radius=COV_SEARCH_RADIUS, group_hydrophobes=False):
+                 radius=COV_SEARCH_RADIUS):
 
         if mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES:
             raise IllegalArgumentError("Objects of type '%s' are not currently accepted. "
@@ -241,7 +241,6 @@ class CompoundGroupPerceiver():
         self.expand_selection = expand_selection
         self.default_properties = default_properties
         self.radius = radius
-        self.group_hydrophobes = group_hydrophobes
 
     def perceive_compound_groups(self, target_residue, mol_obj=None):
         comp_grps = None
@@ -265,9 +264,6 @@ class CompoundGroupPerceiver():
             atoms = tuple([a for r in res_list for a in r.get_unpacked_list() if res_sel.accept_atom(a)])
 
             comp_grps = self._get_calculated_properties(target_residue, atoms, res_sel, mol_obj)
-
-        if self.group_hydrophobes:
-            self._merge_hydrophobes(comp_grps)
 
         return comp_grps
 
@@ -540,56 +536,6 @@ class CompoundGroupPerceiver():
         remove_files([pdb_file, mol_file])
 
         return MolWrapper(mol_obj)
-
-    def _merge_hydrophobes(self, comp_grps):
-        # Only hydrophobic atom groups.
-        hydrop_atm_grps = [g for g in comp_grps.atm_grps if "Hydrophobic" in g.feature_names]
-        # Hydrophobic islands dictionary. Keys are integer values and items are defined by a set of atom groups.
-        hydrop_islands = defaultdict(set)
-        # It stores a mapping of an atom (represented by its serial number) and a hydrophobic island (defined by its keys).
-        atm_mapping = {}
-
-        grp_id = 0
-        for atm_grp in hydrop_atm_grps:
-            # Hydrophobic atoms are defined always as only one atom.
-            atm = atm_grp.atoms[0]
-
-            # Recover the groups of all neighbors of this atom (it will merge all existing groups).
-            nb_grps = set([atm_mapping[nb] for nb in atm.neighborhood[atm.serial_number].keys() if nb in atm_mapping])
-
-            # Already there are hydrophobe groups formed by the neighbors of this atom.
-            if nb_grps:
-                # Merge all groups of the neighbors of this atom.
-                new_grp = set(chain.from_iterable([hydrop_islands.pop(nb_grp_id) for nb_grp_id in nb_grps]))
-                # Include this atom to the merged group.
-                new_grp.add(atm)
-
-                for k in atm_mapping:
-                    if atm_mapping[k] in nb_grps:
-                        atm_mapping[k] = grp_id
-
-                hydrop_islands[grp_id] = new_grp
-                atm_mapping[atm.serial_number] = grp_id
-            else:
-                atm_mapping[atm.serial_number] = grp_id
-                hydrop_islands[grp_id].add(atm)
-            grp_id += 1
-
-        for atms in hydrop_islands.values():
-            atm_grp = AtomGroup(atms, [ChemicalFeature("Hydrophobe")], recursive=True)
-            comp_grps.add_atm_grps([atm_grp])
-
-        for atm_grp in hydrop_atm_grps:
-            features = [f for f in atm_grp.features if f.name != "Hydrophobic"]
-
-            # If the atom group does not have any feature, we can remove it from the CompoundGroup object.
-            # This is unlikely to occur as all atoms (by default) will have at least the feature 'Atom'. So, I added this test only
-            # to avoid cases in which one edits the feature definitions in a way that an atom ends up having no features at all after
-            # removing its hydrophobic feature.
-            if len(features) == 0:
-                comp_grps.remove_atm_grps([atm_grp])
-            else:
-                atm_grp.features = features
 
 
 class AtomGroupNeighborhood:
