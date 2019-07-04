@@ -12,7 +12,8 @@ class Selector(Select):
         self.altloc = altloc
 
     def accept_atom(self, atom):
-        if not self.keep_hydrog and atom.element == "H":
+        # Hydrogen and Deuterium
+        if not self.keep_hydrog and atom.element in ["H", "D"]:
             return False
 
         if self.keep_altloc:
