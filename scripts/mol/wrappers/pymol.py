@@ -2,6 +2,7 @@ from pymol import cmd
 from pymol import util
 
 from mol.wrappers.cgo_arrow import cgo_arrow
+from mol.wrappers.base import MolWrapper
 from util.exceptions import PymolSessionNotInitialized
 from util.default_values import PYMOL_INTERACTION_COLOR, INTERACTION_SHORT_NAMES
 from util.file import get_filename, get_file_format
@@ -109,6 +110,9 @@ class PymolWrapper:
         for name, selection in tuples:
             cmd.extract(name, selection)
 
+    def load_mol_from_pdb_block(self, pdb_block, obj_name):
+        cmd.read_pdbstr(pdb_block, obj_name)
+
     def reinitialize(self):
         cmd.reinitialize('everything')
         self.input_file = None
@@ -153,11 +157,14 @@ class PymolSessionManager:
     def set_view(self, data):
         raise NotImplementedError("Use a class that implements this method.")
 
-    def set_pdb_view(self, pdb_file, pdb_obj):
+    def set_pdb_view(self, pdb_file, pdb_obj, mol_obj=None):
         prot_obj = "%s.prot" % pdb_obj
-        self.wrapper.load(pdb_file, prot_obj)
 
+        self.wrapper.load(pdb_file, prot_obj)
         self.wrapper.extract([("%s.hets" % pdb_obj, "hetatm and %s" % prot_obj)])
+
+        if mol_obj is not None:
+            self.wrapper.load_mol_from_pdb_block(MolWrapper(mol_obj).to_pdb_block(), "%s.hets" % pdb_obj)
 
         self.wrapper.color_by_element([pdb_obj])
         self.wrapper.hide([("everything", pdb_obj)])
