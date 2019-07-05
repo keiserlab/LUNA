@@ -2,7 +2,7 @@ from util.exceptions import AtomObjectTypeError, MoleculeObjectTypeError
 from rdkit.Chem import Atom as RDAtom
 from rdkit.Chem import Mol as RDMol
 from rdkit.Chem import Bond as RDBond
-from rdkit.Chem import MolToSmiles, GetPeriodicTable
+from rdkit.Chem import MolToSmiles, MolToPDBBlock, GetPeriodicTable
 from openbabel import OBMol, OBAtom, OBBond, OBMolAtomIter, OBAtomAtomIter, OBAtomBondIter, OBMolBondIter
 from openbabel import etab
 from pybel import Molecule as PybelMol
@@ -299,6 +299,12 @@ class MolWrapper:
             return MolToSmiles(self._mol_obj)
         elif self.is_openbabel_obj():
             return PybelMol(self._mol_obj).write("smi").split("\t")[0]
+
+    def to_pdb_block(self):
+        if self.is_rdkit_obj():
+            return MolToPDBBlock(self._mol_obj)
+        elif self.is_openbabel_obj():
+            return PybelMol(self._mol_obj).write("pdb")
 
     def unwrap(self):
         return self._mol_obj
