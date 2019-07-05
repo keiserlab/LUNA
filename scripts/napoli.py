@@ -372,7 +372,7 @@ class Project:
                                            mol_obj_type=self.mol_obj_type, default_properties=self.default_properties,
                                            tmp_path="%s/tmp" % self.working_path)
 
-        nb_compounds = get_contacts_for_entity(entity, ligand, level='R', radius=getattr(self.inter_conf, "boundary_cutoff", 7))
+        nb_compounds = get_contacts_for_entity(entity, ligand, level='R', radius=getattr(self.inter_conf, "boundary_cutoff", 6.2))
 
         grps_by_compounds = {}
         for comp in set([x[1] for x in nb_compounds]):
@@ -771,7 +771,7 @@ class DB_PLI_Project(Project):
         # select the pre-computed interactions from a database.
         is_inter_params_default = (self.pdb_path is PDB_PATH and
                                    self.atom_prop_file == ATOM_PROP_FILE and
-                                   self.ph == 7 and self.db_conf_file is not None)
+                                   self.ph == 7.4 and self.db_conf_file is not None)
         if is_inter_params_default:
             logger.info("Default configuration was kept unchanged. nAPOLI will try to select pre-computed "
                         "interactions from the defined database")
@@ -835,9 +835,7 @@ class DB_PLI_Project(Project):
                     # TODO: detectar complexos metalicos
                     # TODO: detectar CLASH
 
-                    all_inter = calc_all_interactions(src_grps,
-                                                      trgt_grps,
-                                                      conf=BOUNDARY_CONF)
+                    all_inter = calc_all_interactions(src_grps, trgt_grps, conf=BOUNDARY_CONF)
 
                     # Then it applies a filtering function.
                     filtered_inter = apply_interaction_criteria(all_inter, conf=self.inter_conf)
@@ -1153,8 +1151,9 @@ class LocalProject(Project):
             if isinstance(target_entry, MolEntry) is False:
                 self.validate_entry_format(target_entry)
 
-            # TODO: allow the person to pass a pdb_file into entries.
+            # TODO: allow the user to pass a pdb_file into entries.
             pdb_file = self.get_pdb_file(target_entry.pdb_id)
+            target_entry.pdb_file = pdb_file
 
             # # TODO: resolver o problema dos hidrogenios.
             # #       Vou adicionar hidrogenio a pH 7?
@@ -1179,7 +1178,7 @@ class LocalProject(Project):
             #
             interactions = self.inter_calc.calc_interactions(trgt_grps)
 
-            self.interactions.append((pdb_file, interactions))
+            self.interactions.append((target_entry, interactions))
             continue
 
             inter_file = "%s/results/%s.tsv" % (self.working_path, target_entry.to_string())
