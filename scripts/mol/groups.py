@@ -1,5 +1,4 @@
 from collections import defaultdict
-from itertools import chain
 from rdkit.Chem import MolFromMolBlock, MolFromMolFile, SanitizeFlags, SanitizeMol
 from pybel import readfile
 from openbabel import etab
@@ -408,6 +407,9 @@ class CompoundGroupPerceiver():
         # If no OBMol was defined, create a new one through the residue list.
         mol_obj = mol_obj or self._get_mol_from_entity(target_residue.get_parent_by_level('M'), residue_selector)
 
+        # Wrap the molecule.
+        mol_obj = MolWrapper(mol_obj)
+
         if mol_obj.get_num_heavy_atoms() != len(target_atoms):
             raise MoleculeSizeError("The number of heavy atoms in the PDB selection and in the MOL file are different.")
 
@@ -535,7 +537,7 @@ class CompoundGroupPerceiver():
         # Remove temporary files.
         remove_files([pdb_file, mol_file])
 
-        return MolWrapper(mol_obj)
+        return mol_obj
 
 
 class AtomGroupNeighborhood:
