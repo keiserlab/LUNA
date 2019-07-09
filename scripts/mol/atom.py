@@ -99,10 +99,10 @@ class ExtendedAtom:
         self._neighborhood = nb_graph
 
     def add_nb_info(self, nb_info):
-        self._nb_info = list(set(self._nb_info + nb_info))
+        self._nb_info = list(set(self._nb_info + list(nb_info)))
 
     def add_atm_grps(self, atm_grps):
-        self._atm_grps = list(set(self._atm_grps + atm_grps))
+        self._atm_grps = list(set(self._atm_grps + list(atm_grps)))
 
     def remove_nb_info(self, nb_info):
         self._nb_info = list(set(self._nb_info) - set(nb_info))
@@ -138,6 +138,10 @@ class ExtendedAtom:
     def __ne__(self, other):
         """Overrides the default implementation"""
         return not self.__eq__(other)
+
+    def __lt__(self, a2):
+        # It calls __lt__() from Biopython
+        return self._atom < a2._atom
 
     def __hash__(self):
         """Overrides the default implementation"""
