@@ -8,11 +8,16 @@ from rdkit.Chem import MolToPDBBlock
 from pybel import readfile
 from pybel import informats as OB_FORMATS
 
+from rdkit.Chem import Mol as RDMol
+from openbabel import OBMol
+from pybel import Molecule as PybelMol
+
 
 from mol.wrappers.rdkit import RDKIT_FORMATS, read_multimol_file
+from mol.wrappers.base import MolWrapper
 from util.default_values import ACCEPTED_MOL_OBJ_TYPES, ENTRY_SEPARATOR
 from util.file import get_file_format
-from util.exceptions import InvalidEntry, IllegalArgumentError, MoleculeObjectError, MoleculeNotFoundError
+from util.exceptions import InvalidEntry, IllegalArgumentError, MoleculeObjectError, MoleculeObjectTypeError, MoleculeNotFoundError
 from MyBio.PDB.PDBParser import PDBParser
 from MyBio.PDB.Entity import Entity
 
@@ -189,17 +194,31 @@ class CompoundEntry(Entry):
 
 class MolEntry(Entry):
 
-    def __init__(self, pdb_id, mol_id, mol_file=None, mol_file_ext=None, mol_obj_type='rdkit', sep=ENTRY_SEPARATOR):
+    def __init__(self, pdb_id, mol_id, mol_obj=None, mol_file=None, mol_file_ext=None, mol_obj_type='rdkit', sep=ENTRY_SEPARATOR):
 
-        if mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES:
-            raise IllegalArgumentError("Objects of type '%s' are not currently accepted. "
-                                       "The available options are: %s." % (mol_obj_type, ", ".join(ACCEPTED_MOL_OBJ_TYPES)))
+        if mol_obj is not None:
+            if isinstance(mol_obj, MolWrapper):
+                mol_obj = mol_obj.unwrap()
+            elif isinstance(mol_obj, PybelMol):
+                mol_obj = mol_obj.OBMol
+
+            if isinstance(mol_obj, RDMol):
+                mol_obj_type = "rdkit"
+            elif isinstance(mol_obj, OBMol):
+                mol_obj_type = "openbabel"
+            else:
+                logger.exception("Objects of type '%s' are not currently accepted." % mol_obj.__class__)
+                raise MoleculeObjectTypeError("Objects of type '%s' are not currently accepted." % mol_obj.__class__)
+        else:
+            if mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES:
+                raise IllegalArgumentError("Objects of type '%s' are not currently accepted. "
+                                           "The available options are: %s." % (mol_obj_type, ", ".join(ACCEPTED_MOL_OBJ_TYPES)))
 
         self.mol_id = mol_id
+        self._mol_obj = mol_obj
         self.mol_file = mol_file
         self.mol_file_ext = mol_file_ext
         self.mol_obj_type = mol_obj_type
-        self._mol_obj = None
 
         super().__init__(pdb_id, "z", "LIG", 9999, sep=sep)
 
