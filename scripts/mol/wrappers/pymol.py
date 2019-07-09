@@ -39,6 +39,9 @@ class PymolWrapper:
     def hide_all(self):
         self.hide([('everything', '')])
 
+    def center(self, selection):
+        cmd.center(selection)
+
     def label(self, tuples):
         for selection, expression in tuples:
             cmd.label(selection, expression)
@@ -171,8 +174,8 @@ class PymolSessionManager:
             if inter.type == "Proximal":
                 continue
 
-            obj1_name = "obj%d_grp%s" % (uid, hash(inter.src_grp))
-            centroid_obj1 = inter.src_grp.centroid
+            obj1_name = "obj%d_grp%s" % (uid, hash(tuple(sorted(inter.src_interacting_atms))))
+            centroid_obj1 = inter.src_centroid
             # Define the centroid in a nucleophile with two atoms as the position of its more electronegative atom.
             # Remember that the position in the interaction object matters. We have defined that the first group is always
             # the nucleophile for both dipole-dipole and ion-dipole interactions.
@@ -188,8 +191,8 @@ class PymolSessionManager:
                 obj1_name += "_%s" % hash(dipole_atm.name)
                 centroid_obj1 = dipole_atm.coord
 
-            obj2_name = "obj%d_grp%s" % (uid, hash(inter.trgt_grp))
-            centroid_obj2 = inter.trgt_grp.centroid
+            obj2_name = "obj%d_grp%s" % (uid, hash(tuple(sorted(inter.trgt_interacting_atms))))
+            centroid_obj2 = inter.trgt_centroid
             # Define the centroid in an electrophile with two atoms as the position of its less electronegative atom.
             # Remember that the position in the interaction object matters. We have defined that the second group is always
             # the electrophile for both dipole-dipole and ion-dipole interactions.
@@ -289,6 +292,7 @@ class PymolSessionManager:
     def set_last_details_to_view(self):
         self.wrapper.set("sphere_scale", "0.3", {"selection": "visible and resn hoh"})
         self.wrapper.hide([("everything", "elem H")])
+        self.wrapper.center("visible")
 
     def save_session(self, output_file):
         if not isinstance(self.wrapper, PymolWrapper):
