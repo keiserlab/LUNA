@@ -20,6 +20,7 @@ from mol.features import ChemicalFeature
 from util.file import get_unique_filename, remove_files
 from util.exceptions import MoleculeSizeError, IllegalArgumentError, MoleculeObjectError
 from util.default_values import ACCEPTED_MOL_OBJ_TYPES, COV_SEARCH_RADIUS, OPENBABEL
+from mol.interaction.type import InteractionType
 import mol.interaction.math as im
 
 
@@ -30,19 +31,18 @@ logger = logging.getLogger()
 SS_BOND_FEATURES = ["Atom", "Acceptor", "ChalcogenDonor", "Hydrophobic"]
 
 
-class CompoundGroups():
+class AtomGroupsManager():
 
-    def __init__(self, residue, atm_grps=None):
-        self._residue = residue
-        self._atm_grps = atm_grps or []
-
-    @property
-    def residue(self):
-        return self._residue
+    def __init__(self, atm_grps=None):
+        self._atm_grps = list(atm_grps) or []
 
     @property
     def atm_grps(self):
         return self._atm_grps
+
+    @property
+    def size(self):
+        return len(self._atm_grps)
 
     @property
     def summary(self):
@@ -53,22 +53,130 @@ class CompoundGroups():
 
         return summary
 
+    def filter_by_types(self, types):
+        for atm_grp in self.atm_grps:
+            if set(types).issubset(set(atm_grp.feature_names)):
+                yield atm_grp
+
     def add_atm_grps(self, atm_grps):
-        self._atm_grps = list(set(self._atm_grps + atm_grps))
+        self._atm_grps = list(set(self._atm_grps + list(atm_grps)))
 
     def remove_atm_grps(self, atm_grps):
         self._atm_grps = list(set(self._atm_grps) - set(atm_grps))
 
         # ExtendedAtom objects keep a list of all AtomGroup objects to which they belong to. So, if we don't clear the references directly,
         # the AtomGroup objects will still exist in the ExtendedAtom list even when they were already removed from an instance of
-        # CompoundGroups.
+        # AtomGroupsManager().
         for atm_grp in atm_grps:
             atm_grp.clear_refs()
+
+    def merge_hydrophobic_atoms(self, interactions_mngr):
+
+        # Only hydrophobic atom groups.
+        hydrop_atm_grps = list(self.filter_by_types(["Hydrophobic"]))
+
+        # Hydrophobic islands dictionary. Keys are integer values and items are defined by a set of atom groups.
+        hydrop_islands = defaultdict(set)
+
+        # It stores a mapping of an atom (represented by its serial number) and a hydrophobic island (defined by its keys).
+        atm_mapping = {}
+
+        island_id = 0
+        for atm_grp in hydrop_atm_grps:
+            # Hydrophobic atoms are defined always as only one atom.
+            atm = atm_grp.atoms[0]
+
+            # Recover the groups of all neighbors of this atom (it will merge all existing islands).
+            nb_grps = set([atm_mapping[nb] for nb in atm.neighborhood[atm.serial_number].keys() if nb in atm_mapping])
+
+            # Already there are hydrophobic islands formed by the neighbors of this atom.
+            if nb_grps:
+                # Merge all groups of the neighbors of this atom.
+                new_island = set(chain.from_iterable([hydrop_islands.pop(nb_grp_id) for nb_grp_id in nb_grps]))
+                # Include this atom to the merged group.
+                new_island.add(atm)
+
+                for k in atm_mapping:
+                    if atm_mapping[k] in nb_grps:
+                        atm_mapping[k] = island_id
+
+                hydrop_islands[island_id] = new_island
+                atm_mapping[atm.serial_number] = island_id
+            else:
+                atm_mapping[atm.serial_number] = island_id
+                hydrop_islands[island_id].add(atm)
+            island_id += 1
+
+        # Create AtomGroup objects for the hydrophobe islands
+        for island_id in hydrop_islands:
+            hydrophobe = AtomGroup(hydrop_islands[island_id], [ChemicalFeature("Hydrophobe")])
+            hydrop_islands[island_id] = hydrophobe
+
+        hydrop_interactions = list(interactions_mngr.filter_by_types(["Hydrophobic"]))
+        island_island_inter = defaultdict(set)
+        for inter in hydrop_interactions:
+            src_atm = inter.src_grp.atoms[0]
+            trgt_atm = inter.trgt_grp.atoms[0]
+
+            # The two island ids are used as key.
+            key = tuple(sorted([atm_mapping[src_atm.serial_number], atm_mapping[trgt_atm.serial_number]]))
+
+            island_island_inter[key].add(inter)
+
+        interactions = set()
+        for k in sorted(island_island_inter):
+
+            island_atms = defaultdict(set)
+
+            centroids = {}
+            min_cc_dist = float("Inf")
+
+            for inter in island_island_inter[k]:
+                src_atm = inter.src_grp.atoms[0]
+                trgt_atm = inter.trgt_grp.atoms[0]
+
+                island_atms[atm_mapping[src_atm.serial_number]].add(src_atm)
+                island_atms[atm_mapping[trgt_atm.serial_number]].add(trgt_atm)
+
+                if inter.dist_hydrop_inter < min_cc_dist:
+                    centroids[atm_mapping[src_atm.serial_number]] = src_atm.coord
+                    centroids[atm_mapping[trgt_atm.serial_number]] = trgt_atm.coord
+                    min_cc_dist = inter.dist_hydrop_inter
+
+            params = {"dist_hydrop_inter": min_cc_dist}
+
+            inter = InteractionType(hydrop_islands[k[0]], hydrop_islands[k[1]], "Hydrophobic",
+                                    src_interacting_atms=island_atms[k[0]], trgt_interacting_atms=island_atms[k[1]],
+                                    src_centroid=centroids[k[0]], trgt_centroid=centroids[k[1]], directional=False, params=params)
+            interactions.add(inter)
+
+        # Update the list of interactions with the new island-island interactions.
+        interactions_mngr.add_interactions(interactions)
+        # Remove atom-atom hydrophobic interactions.
+        interactions_mngr.remove_interactions(hydrop_interactions)
+
+        # Update the list of atom groups with the new atom groups (hydrophobic islands).
+        self.add_atm_grps(hydrop_islands.values())
+
+        for atm_grp in hydrop_atm_grps:
+            features = [f for f in atm_grp.features if f.name != "Hydrophobic"]
+
+            # If the atom group ended up having no feature after the remotion of the feature "Hydrophobic", we can remove this atom group.
+            # This is unlikely to occur as all atoms (by default) will have at least the feature 'Atom'. But, depending one the
+            # pharmacophore rules definition, it can occur.
+            if len(features) == 0:
+                self.remove_atm_grps([atm_grp])
+            else:
+                atm_grp.features = features
+
+    def __len__(self):
+        # Number of atom groups.
+        return self.size
 
 
 class AtomGroup():
 
-    def __init__(self, atoms, features, interactions=None, recursive=True):
+    def __init__(self, atoms, features, interactions=None):
 
         self._atoms = list(atoms)
 
@@ -79,12 +187,10 @@ class AtomGroup():
 
         self.features = features
         self._interactions = interactions or []
-        self._recursive = recursive
         self._hash_cache = None
 
-        if recursive:
-            for atm in self.atoms:
-                atm.add_atm_grps([self])
+        for atm in self.atoms:
+            atm.add_atm_grps([self])
 
     @property
     def atoms(self):
@@ -146,7 +252,7 @@ class AtomGroup():
         return shortest_path_size
 
     def add_interactions(self, interactions):
-        self._interactions = list(set(self.interactions + interactions))
+        self._interactions = list(set(self.interactions + list(interactions)))
 
     def remove_interactions(self, interactions):
         self._interactions = list(set(self.interactions) - set(interactions))
@@ -192,9 +298,8 @@ class AtomGroup():
         return any([a.parent.is_target() for a in self.atoms])
 
     def clear_refs(self):
-        if self._recursive:
-            for atm in self.atoms:
-                atm.remove_atm_grps([self])
+        for atm in self.atoms:
+            atm.remove_atm_grps([self])
 
     def __repr__(self):
         return '<AtomGroup: [%s]>' % ', '.join([str(x) for x in self.atoms])
@@ -225,7 +330,7 @@ class AtomGroupPerceiver():
 
     def __init__(self, feature_extractor, add_h=False, ph=None, amend_mol=True, mol_obj_type="rdkit",
                  charge_model=OpenEyeModel(), tmp_path=None, expand_selection=True, default_properties=None,
-                 radius=COV_SEARCH_RADIUS, group_hydrophobes=False):
+                 radius=COV_SEARCH_RADIUS):
 
         if mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES:
             raise IllegalArgumentError("Objects of type '%s' are not currently accepted. "
@@ -241,15 +346,13 @@ class AtomGroupPerceiver():
         self.expand_selection = expand_selection
         self.default_properties = default_properties
         self.radius = radius
-        self.group_hydrophobes = group_hydrophobes
 
-    def perceive_compound_groups(self, compounds, mol_objs_dict=None):
+    def perceive_atom_groups(self, compounds, mol_objs_dict=None):
         mol_objs_dict = mol_objs_dict or {}
 
         perceived_atm_grps = set()
 
         for comp in compounds:
-
             atm_grps = None
             if self.default_properties is not None:
                 atm_grps = self._get_default_properties(comp)
@@ -278,37 +381,7 @@ class AtomGroupPerceiver():
             if atm_grps:
                 perceived_atm_grps.update(atm_grps)
 
-        print(len(perceived_atm_grps))
-        exit()
-
-    def perceive_compound_groups2(self, target_compound, mol_obj=None):
-        comp_grps = None
-        if self.default_properties is not None:
-            comp_grps = self._get_default_properties(target_compound)
-
-        if comp_grps is None:
-            logger.info("It will try to perceive the features of the compound %s as no predefined properties was provided."
-                        % target_compound)
-
-            # If no OBMol object was defined and expand_selection was set ON, it will get all residues around the
-            # target and create a new OBMol object with them.
-            if mol_obj is None and self.expand_selection:
-                comp_list = self._get_proximal_compounds(target_compound)
-            # Otherwise, the residue list will be composed only by the target residue.
-            else:
-                comp_list = [target_compound]
-
-            # Select residues based on the residue list defined previously.
-            comp_sel = ResidueSelector(comp_list, keep_altloc=False, keep_hydrog=False)
-            # Recover all atoms from the previous selected residues.
-            atoms = tuple([a for r in comp_list for a in r.get_unpacked_list() if comp_sel.accept_atom(a)])
-
-            comp_grps = self._get_calculated_properties(target_compound, atoms, comp_sel, mol_obj)
-
-        if self.group_hydrophobes:
-            self._merge_hydrophobes(comp_grps)
-
-        return comp_grps
+        return AtomGroupsManager(perceived_atm_grps)
 
     def _get_proximal_compounds(self, target_compound):
         model = target_compound.get_parent_by_level('M')
@@ -407,7 +480,7 @@ class AtomGroupPerceiver():
                     if atms_str == "N" and target_compound.idx == 0:
                         features.append(ChemicalFeature("PositivelyIonizable"))
 
-                    atm_grps.add(AtomGroup(nb_atoms, list(set(features)), recursive=True))
+                    atm_grps.add(AtomGroup(nb_atoms, list(set(features))))
 
             # Check for amides only when the target is an amino acid.
             if target_compound.is_aminoacid():
@@ -423,14 +496,14 @@ class AtomGroupPerceiver():
                             # Define an amide group and add it to the compound groups.
                             # In the atm_map, the atoms were already transformed into ExtendedAtoms().
                             amide = [atm_map["N"], ExtendedAtom(nb_atms["C"]), ExtendedAtom(nb_atms["O"])]
-                            atm_grps.add(AtomGroup(amide, [ChemicalFeature("Amide")], recursive=True))
+                            atm_grps.add(AtomGroup(amide, [ChemicalFeature("Amide")]))
                     elif nb.idx > target_compound.idx:
                         # If this compound is neighbor of the target compound C, then they form an amide (N-C=O).
                         if "N" in nb_atms and "O" in atm_map and "C" in atm_map and atm_map["C"].is_neighbor(nb_atms["N"]):
                             # Define an amide group and add it to the compound groups.
                             # In the atm_map, the atoms were already transformed into ExtendedAtoms().
                             amide = [ExtendedAtom(nb_atms["N"]), atm_map["C"], atm_map["O"]]
-                            atm_grps.add(AtomGroup(amide, [ChemicalFeature("Amide")], recursive=True))
+                            atm_grps.add(AtomGroup(amide, [ChemicalFeature("Amide")]))
 
             # Define a new graph as a dict object: each key is a serial number and the values are dictionaries with the serial
             # number of each neighbor of an atom. The algorithm of Bellman Ford requires weights, so we set all weights to 1.
@@ -494,7 +567,7 @@ class AtomGroupPerceiver():
                 continue
 
             atoms = [trgt_atms[i] for i in grp_obj["atm_ids"]]
-            atm_grps.add(AtomGroup(atoms, grp_obj["features"], recursive=True))
+            atm_grps.add(AtomGroup(atoms, grp_obj["features"]))
 
         # Define a new graph as a dict object: each key is a serial number and the values are dictionaries with the serial
         # number of each neighbor of an atom. The algorithm of Bellman Ford requires weights, so we set all weights to 1.
@@ -579,56 +652,6 @@ class AtomGroupPerceiver():
 
         return mol_obj
 
-    def _merge_hydrophobes(self, comp_grps):
-        # Only hydrophobic atom groups.
-        hydrop_atm_grps = [g for g in comp_grps.atm_grps if "Hydrophobic" in g.feature_names]
-        # Hydrophobic islands dictionary. Keys are integer values and items are defined by a set of atom groups.
-        hydrop_islands = defaultdict(set)
-        # It stores a mapping of an atom (represented by its serial number) and a hydrophobic island (defined by its keys).
-        atm_mapping = {}
-
-        grp_id = 0
-        for atm_grp in hydrop_atm_grps:
-            # Hydrophobic atoms are defined always as only one atom.
-            atm = atm_grp.atoms[0]
-
-            # Recover the groups of all neighbors of this atom (it will merge all existing groups).
-            nb_grps = set([atm_mapping[nb] for nb in atm.neighborhood[atm.serial_number].keys() if nb in atm_mapping])
-
-            # Already there are hydrophobe groups formed by the neighbors of this atom.
-            if nb_grps:
-                # Merge all groups of the neighbors of this atom.
-                new_island = set(chain.from_iterable([hydrop_islands.pop(nb_grp_id) for nb_grp_id in nb_grps]))
-                # Include this atom to the merged group.
-                new_island.add(atm)
-
-                for k in atm_mapping:
-                    if atm_mapping[k] in nb_grps:
-                        atm_mapping[k] = grp_id
-
-                hydrop_islands[grp_id] = new_island
-                atm_mapping[atm.serial_number] = grp_id
-            else:
-                atm_mapping[atm.serial_number] = grp_id
-                hydrop_islands[grp_id].add(atm)
-            grp_id += 1
-
-        for atms in hydrop_islands.values():
-            atm_grp = AtomGroup(atms, [ChemicalFeature("Hydrophobe")], recursive=True)
-            comp_grps.add_atm_grps([atm_grp])
-
-        for atm_grp in hydrop_atm_grps:
-            features = [f for f in atm_grp.features if f.name != "Hydrophobic"]
-
-            # If the atom group does not have any feature, we can remove it from the CompoundGroup object.
-            # This is unlikely to occur as all atoms (by default) will have at least the feature 'Atom'. So, I added this test only
-            # to avoid cases in which one edits the feature definitions in a way that an atom ends up having no features at all after
-            # removing its hydrophobic feature.
-            if len(features) == 0:
-                comp_grps.remove_atm_grps([atm_grp])
-            else:
-                atm_grp.features = features
-
 
 class AtomGroupNeighborhood:
 
@@ -646,7 +669,6 @@ class AtomGroupNeighborhood:
         self.kdt.set_coords(self.coords)
 
     def search(self, center, radius):
-
         self.kdt.search(center, radius)
         indices = self.kdt.get_indices()
         n_grps_list = []
@@ -656,162 +678,3 @@ class AtomGroupNeighborhood:
             n_grps_list.append(a)
 
         return n_grps_list
-
-
-def create_hydrophobic_islands(interactions):
-
-    hydrop_partner_mapping = defaultdict(set)
-
-    atm_grps_by_serial_num = {}
-
-    # It stores a mapping of an atom (represented by its serial number) and a hydrophobic island (defined by its keys).
-    atm_mapping = {}
-    # Hydrophobic islands dictionary. Keys are integer values and items are defined by a set of atom groups.
-    hydrop_islands = defaultdict(set)
-
-    for inter in interactions:
-        if inter.type == "Hydrophobic":
-            hydrop_partner_mapping[inter.src_grp.atoms[0].serial_number].add(inter.trgt_grp.atoms[0].serial_number)
-            hydrop_partner_mapping[inter.trgt_grp.atoms[0].serial_number].add(inter.src_grp.atoms[0].serial_number)
-
-            atm_grps_by_serial_num[inter.src_grp.atoms[0].serial_number] = inter.src_grp
-            atm_grps_by_serial_num[inter.trgt_grp.atoms[0].serial_number] = inter.trgt_grp
-
-    print()
-
-    grp_id = 0
-    for serial_number in sorted(atm_grps_by_serial_num.keys()):
-        atm = atm_grps_by_serial_num[serial_number].atoms[0]
-        print("===================================")
-        print(">>> STARTING...")
-        print(atm)
-
-        # Recover the serial numbers of all neighbors (covalently bound atoms) of the current atom.
-        nb_in_islands = set([sn for sn in atm.neighborhood[serial_number].keys() if sn in atm_mapping])
-
-        # If there are already hydrophobe islands formed by the neighbors of the current atom.
-        if nb_in_islands:
-            print()
-            print("It will try to merge groups...")
-            print()
-
-            new_island = set()
-
-            for nb_serial_number in nb_in_islands:
-
-                # Partners of the current atom, i.e., all atoms (given by their serial number) that interact with the current atom.
-                partners1 = hydrop_partner_mapping[serial_number]
-                # Partners of all atoms in the island to which the neighbor of the current atom belongs to.
-                partners2 = set(chain.from_iterable([hydrop_partner_mapping[atm_grp.atoms[0].serial_number]
-                                                     for atm_grp in hydrop_islands[atm_mapping[nb_serial_number]]]))
-
-                # Neighbors of the atoms in partners1, i.e., the neighbors of the partners of the current atom.
-                nbs_of_partners1 = set(chain.from_iterable([atm_grps_by_serial_num[sn].atoms[0].neighborhood[sn].keys()
-                                                            for sn in partners1]))
-                # Neighbors of the atoms in partners2, i.e., the neighbors of the partners of the neighbors of the current atom.
-                nbs_of_partners2 = set(chain.from_iterable([atm_grps_by_serial_num[sn].atoms[0].neighborhood[sn].keys()
-                                                            for sn in partners2]))
-
-                print()
-                print("...............")
-                print("=> Current atm: ", atm)
-                print("Partners from current atom:")
-                print([(atm_grps_by_serial_num[sn], sn) for sn in partners1])
-                print(">>> Neighbors of partners 1", nbs_of_partners1)
-                print()
-
-                print("=> NB: ", atm_grps_by_serial_num[nb_serial_number], "--- group: ", atm_mapping[nb_serial_number])
-                print("Partners from NB group:")
-                print([(atm_grps_by_serial_num[s], s) for s in partners2])
-                print(">>> Neighbors of partners 2", nbs_of_partners2)
-                print()
-
-                # Let X be the current atom and I the island of its neighbor N. Then, it will add the atom X to its neighbor island if:
-                #    - the atom X and the atoms in the island I have at least one common partner.
-                #    - at least one partner of the atom X has a neighbor that interacts with one atom of the island I, and vice versa.
-                if len(partners1 & partners2) or (len(partners1 & nbs_of_partners2) and len(partners2 & nbs_of_partners1)):
-                    print("IT WILL JOIN THE GROUPS...because")
-                    print("Has common interacting atoms: ", len(partners1 & partners2))
-                    print("Has common connected atoms: ", (len(partners1 & nbs_of_partners2) and len(partners2 & nbs_of_partners1)))
-                    print()
-
-                    # Include all atom groups into the new island
-                    new_island.update(hydrop_islands[atm_mapping[nb_serial_number]])
-                    # Remove the older island.
-                    del hydrop_islands[atm_mapping[nb_serial_number]]
-
-            # At least the current atom will belong to the new island, but it can also contain the atoms from the merged islands.
-            new_island.add(atm_grps_by_serial_num[serial_number])
-
-            # Updates the island information for each atom.
-            for atm in new_island:
-                atm_mapping[serial_number] = grp_id
-
-            # Include the new island to the dictionary of islands.
-            hydrop_islands[grp_id] = new_island
-
-            print("NEW GROUP %d" % grp_id)
-            print(">>>", new_island)
-            print()
-        # So far, no neighbor of the current atom belongs to an island.
-        else:
-            # Create a new island and appends the current atom to it.
-            atm_mapping[serial_number] = grp_id
-            print(atm_grps_by_serial_num[serial_number])
-            hydrop_islands[grp_id].add(atm_grps_by_serial_num[serial_number])
-
-            print("NEW GROUP %d" % grp_id)
-
-        print()
-        print("+++++++++++++ UPDATED GROUPS ++++++++++++")
-        for g in hydrop_islands:
-            print(g, "> ", [(ag.atoms[0].parent.resname + "'" + str(ag.atoms[0].parent.id[1]), ag.atoms[0].name) for ag in hydrop_islands[g]])
-            print()
-        print()
-
-        print("----------------------------------//----------------------------------")
-        print()
-
-        grp_id += 1
-
-    # for atm_grps in hydrop_islands.values():
-    #     atms = [ag.atoms[0] for ag in atm_grps]
-
-    #     for  set([atm.parent for atm in atms])
-    #     hydrophobe = AtomGroup(atms, [ChemicalFeature("Hydrophobe")], recursive=True)
-
-    #     print(hydrophobe)
-    #     print(generators)
-    #     exit()
-    exit()
-
-    island_island_inter = defaultdict(set)
-
-    for inter in interactions:
-        src_atm = inter.src_grp.atoms[0]
-        trgt_atm = inter.trgt_grp.atoms[0]
-
-        key = tuple(sorted([atm_mapping[src_atm.serial_number], atm_mapping[trgt_atm.serial_number]]))
-        island_island_inter[key].add(inter)
-
-    print("########################################")
-    print("Island interations...")
-    for k in sorted(island_island_inter):
-
-        island_atms = defaultdict(set)
-
-        for inter in island_island_inter[k]:
-            src_atm = inter.src_grp.atoms[0]
-            trgt_atm = inter.trgt_grp.atoms[0]
-
-            island_atms[atm_mapping[src_atm.serial_number]].add(src_atm)
-            island_atms[atm_mapping[trgt_atm.serial_number]].add(trgt_atm)
-
-        print(k, len(island_island_inter[k]))
-        print(hydrop_islands[k[0]])
-        print(hydrop_islands[k[1]])
-        print()
-        print(island_atms)
-        print()
-        print("------------------------------------------------")
-    exit()
