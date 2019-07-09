@@ -20,6 +20,43 @@ CATIONS = ("PositivelyIonizable", "PosIonizable", "Positive")
 ANIONS = ("NegativelyIonizable", "NegIonizable", "Negative")
 
 
+class InteractionsManager:
+
+    def __init__(self, interactions=None):
+        self._interactions = list(interactions) or []
+
+    @property
+    def interactions(self):
+        return self._interactions
+
+    @property
+    def size(self):
+        return len(self._interactions)
+
+    @property
+    def summary(self):
+        return self._summary
+
+    def add_interactions(self, interactions):
+        self._interactions = list(set(self.interactions + list(interactions)))
+
+    def remove_interactions(self, interactions):
+        self._interactions = list(set(self.interactions) - set(interactions))
+
+    def find(self):
+        # TODO: implement
+        pass
+
+    def filter_by_types(self, types):
+        for inter in self.interactions:
+            if inter.type in types:
+                yield inter
+
+    def __len__(self):
+        # Number of interactions
+        return self.size
+
+
 class InteractionCalculator:
 
     def __init__(self, inter_conf=DefaultInteractionConf(), inter_filter=None, inter_funcs=None,
@@ -50,25 +87,24 @@ class InteractionCalculator:
     def funcs(self, funcs):
         self._inter_funcs = funcs
 
-    def calc_interactions(self, trgt_comp_grps, nb_comp_grps=None):
+    def calc_interactions(self, trgt_atm_grps, nb_atm_grps=None):
 
         # TODO: Water-bridged interaction with weak hydrogen bond
         # TODO: threshold for including slightly out of limit interactions. For example, a hydrogen bond not included for 0.01A.
         #           Distances: 0.2 and Angles: 5
 
-        # If nb_comp_grps was not informed, it uses the trgt_comp_grps as the neighbors.
+        # If nb_atm_grps was not informed, it uses the trgt_atm_grps as the neighbors.
         # In this case, the interactions will be target x target.
-        nb_comp_grps = nb_comp_grps or trgt_comp_grps
+        nb_comp_grps = nb_atm_grps or trgt_atm_grps
 
-        all_nb_atms_grp = [ag for c in nb_comp_grps for ag in c.atm_grps]
-        all_trgt_atms_grp = [ag for c in nb_comp_grps for ag in c.atm_grps]
-
-        ss = AtomGroupNeighborhood(all_nb_atms_grp, 10)
+        # Define the scope of the neighborhood search.
+        ss = AtomGroupNeighborhood(nb_comp_grps, 10)
 
         computed_pairs = set()
         all_interactions = []
 
-        for trgt_atms_grp in all_trgt_atms_grp:
+        for trgt_atms_grp in trgt_atm_grps:
+
             for nb_atms_grp in ss.search(trgt_atms_grp.centroid, self.inter_conf.boundary_cutoff):
 
                 # It will always ignore interactions involving the same atom groups.
@@ -76,6 +112,7 @@ class InteractionCalculator:
                 if trgt_atms_grp == nb_atms_grp:
                     continue
 
+                # If the pair has already been calculated.
                 if (trgt_atms_grp, nb_atms_grp) in computed_pairs or (nb_atms_grp, trgt_atms_grp) in computed_pairs:
                     continue
 
@@ -124,135 +161,9 @@ class InteractionCalculator:
         if not self.add_h2o_pairs_with_no_target:
             self.remove_h2o_pairs_with_no_target(all_interactions)
 
-        self.group_hydrophobes(all_interactions)
-
         logger.info("Number of potential interactions found: %d" % len(all_interactions))
 
-        return list(all_interactions)
-
-    def group_hydrophobes(self, interactions):
-
-
-        #
-        # It FAILED!!!
-        # When inserting the CD2 to the ligand atom it didn't capture a connection to the group {CG, CB, CD1} as it should have.
-        # The problem was that the CD2 interacts with the same atom as CB interacts to, but since CD2 and CB are not connected, then
-        # the algorithm didnt recognize both of them as part of the same group.
-        #
-        #
-
-
-
-        hydrop_inter_mapping = defaultdict(set)
-
-        atms_by_serial_num = {}
-
-        # It stores a mapping of an atom (represented by its serial number) and a hydrophobic island (defined by its keys).
-        atm_mapping = {}
-        # Hydrophobic islands dictionary. Keys are integer values and items are defined by a set of atom groups.
-        hydrop_islands = defaultdict(set)
-
-        for i in interactions:
-            if i.type == "Hydrophobic":
-                hydrop_inter_mapping[i.src_grp.atoms[0].serial_number].add(i.trgt_grp.atoms[0].serial_number)
-                hydrop_inter_mapping[i.trgt_grp.atoms[0].serial_number].add(i.src_grp.atoms[0].serial_number)
-
-                atms_by_serial_num[i.src_grp.atoms[0].serial_number] = i.src_grp.atoms[0]
-                atms_by_serial_num[i.trgt_grp.atoms[0].serial_number] = i.trgt_grp.atoms[0]
-
-        print(hydrop_inter_mapping)
-        print()
-
-        from itertools import chain
-
-        grp_id = 0
-        for k in sorted(atms_by_serial_num.keys()):
-            atm = atms_by_serial_num[k]
-            print("===================================")
-            print(">>> STARTING...")
-            print(atm)
-
-            # Recover the groups of all neighbors of this atom (it will merge all existing groups).
-            nb_grps = set([atm_mapping[nb] for nb in atm.neighborhood[atm.serial_number].keys() if nb in atm_mapping])
-
-            # Already there are hydrophobe groups formed by the neighbors of this atom.
-            if nb_grps:
-                print()
-                print("It will try to merge groups...")
-                print()
-
-                new_grp = set()
-
-                for nb_serial_number in atm.neighborhood[atm.serial_number].keys():
-
-                    if nb_serial_number not in atm_mapping:
-                        continue
-
-                    partners1 = hydrop_inter_mapping[atm.serial_number]
-                    partners2 = set(chain.from_iterable([hydrop_inter_mapping[nb.serial_number] for nb in hydrop_islands[atm_mapping[nb_serial_number]]]))
-
-                    partners_nb1 = set(chain.from_iterable([atms_by_serial_num[nb].neighborhood[nb].keys() for nb in partners1]))
-                    partners_nb2 = set(chain.from_iterable([atms_by_serial_num[nb].neighborhood[nb].keys() for nb in partners2]))
-
-                    print()
-                    print("...............")
-                    print("=> Current atm: ", atm)
-                    print("Partners from current atom:")
-                    print([(atms_by_serial_num[s], s) for s in partners1])
-                    print(">>> Neighbors of partners", partners_nb1,)
-                    print()
-
-                    print("=> NB: ", atms_by_serial_num[nb_serial_number], "--- group: ", atm_mapping[nb_serial_number])
-                    print("Partners from NB group:")
-                    print([(atms_by_serial_num[s], s) for s in partners2])
-                    print(">>> Neighbors of partners", partners_nb2)
-                    print()
-
-                    if len(partners1 & partners2) or (len(partners1 & partners_nb2) and len(partners2 & partners_nb1)):
-                        print("IT WILL JOIN THE GROUPS...because")
-                        print("Has common interacting atoms: ", len(partners1 & partners2))
-                        print("Has common connected atoms: ", (len(partners1 & partners_nb2) and len(partners2 & partners_nb1)))
-                        print()
-
-                        new_grp.update(hydrop_islands[atm_mapping[nb_serial_number]])
-
-                        del hydrop_islands[atm_mapping[nb_serial_number]]
-
-                # At least the current atom will belong to the new group.
-                # The group can also contains the atoms from the merged groups.
-                new_grp.add(atm)
-
-                for atm in new_grp:
-                    atm_mapping[atm.serial_number] = grp_id
-
-                hydrop_islands[grp_id] = new_grp
-
-                print("NEW GROUP %d" % grp_id)
-                print(">>>", new_grp)
-                print()
-            else:
-                atm_mapping[atm.serial_number] = grp_id
-                hydrop_islands[grp_id].add(atm)
-
-                print("NEW GROUP %d" % grp_id)
-
-            print()
-            print("+++++++++++++ UPDATED GROUPS ++++++++++++")
-            for g in hydrop_islands:
-                print(g, "> ", [(a.parent.resname + "'" + str(a.parent.id[1]), a.name) for a in hydrop_islands[g]])
-                print()
-            print()
-
-            print("----------------------------------//----------------------------------")
-            print()
-
-            grp_id += 1
-
-
-        # exit()
-
-
-
+        return InteractionsManager(all_interactions)
 
     def resolve_interactions(self, group1, group2, feat1, feat2):
         funcs = self.get_function(feat1.name, feat2.name)
@@ -462,68 +373,68 @@ class InteractionCalculator:
                     ("Hydrophobic", "Hydrophobic"): [self.calc_hydrop],
                     ("Hydrophobe", "Hydrophobe"): [self.calc_hydrop],
 
-                    # # Hydrogen bond
-                    # ("Donor", "Acceptor"): [self.calc_hbond],
+                    # Hydrogen bond
+                    ("Donor", "Acceptor"): [self.calc_hbond],
 
-                    # # Weak hydrogen bond
-                    # ("WeakDonor", "Acceptor"): [self.calc_weak_hbond],
-                    # ("WeakDonor", "WeakAcceptor"): [self.calc_weak_hbond],
-                    # ("Donor", "Aromatic"): [self.calc_hbond_pi],
-                    # ("WeakDonor", "Aromatic"): [self.calc_hbond_pi],
+                    # Weak hydrogen bond
+                    ("WeakDonor", "Acceptor"): [self.calc_weak_hbond],
+                    ("WeakDonor", "WeakAcceptor"): [self.calc_weak_hbond],
+                    ("Donor", "Aromatic"): [self.calc_hbond_pi],
+                    ("WeakDonor", "Aromatic"): [self.calc_hbond_pi],
 
-                    # # Halogen bond
-                    # ("HalogenDonor", "Acceptor"): [self.calc_xbond],
-                    # ("HalogenDonor", "Aromatic"): [self.calc_xbond_pi],
+                    # Halogen bond
+                    ("HalogenDonor", "Acceptor"): [self.calc_xbond],
+                    ("HalogenDonor", "Aromatic"): [self.calc_xbond_pi],
 
-                    # # Chalcogen bond
-                    # ("ChalcogenDonor", "Acceptor"): [self.calc_chalc_bond],
-                    # ("ChalcogenDonor", "WeakAcceptor"): [self.calc_chalc_bond],
-                    # ("ChalcogenDonor", "Aromatic"): [self.calc_chalc_bond_pi],
+                    # Chalcogen bond
+                    ("ChalcogenDonor", "Acceptor"): [self.calc_chalc_bond],
+                    ("ChalcogenDonor", "WeakAcceptor"): [self.calc_chalc_bond],
+                    ("ChalcogenDonor", "Aromatic"): [self.calc_chalc_bond_pi],
 
-                    # # Stackings
-                    # ("Aromatic", "Aromatic"): [self.calc_pi_pi],
-                    # ("Amide", "Aromatic"): [self.calc_amide_pi],
-                    # ("Positive", "Aromatic"): [self.calc_cation_pi],
-                    # ("PosIonizable", "Aromatic"): [self.calc_cation_pi],
-                    # ("PositivelyIonizable", "Aromatic"): [self.calc_cation_pi],
+                    # Stackings
+                    ("Aromatic", "Aromatic"): [self.calc_pi_pi],
+                    ("Amide", "Aromatic"): [self.calc_amide_pi],
+                    ("Positive", "Aromatic"): [self.calc_cation_pi],
+                    ("PosIonizable", "Aromatic"): [self.calc_cation_pi],
+                    ("PositivelyIonizable", "Aromatic"): [self.calc_cation_pi],
 
-                    # # Ionic interaction
-                    # ("NegativelyIonizable", "PositivelyIonizable"): [self.calc_ionic],
-                    # ("NegIonizable", "PosIonizable"): [self.calc_ionic],
-                    # ("Negative", "Positive"): [self.calc_ionic],
+                    # Ionic interaction
+                    ("NegativelyIonizable", "PositivelyIonizable"): [self.calc_ionic],
+                    ("NegIonizable", "PosIonizable"): [self.calc_ionic],
+                    ("Negative", "Positive"): [self.calc_ionic],
 
-                    # # Repulsive interaction
-                    # ("NegativelyIonizable", "NegativelyIonizable"): [self.calc_repulsive],
-                    # ("PositivelyIonizable", "PositivelyIonizable"): [self.calc_repulsive],
-                    # ("NegIonizable", "NegIonizable"): [self.calc_repulsive],
-                    # ("PosIonizable", "PosIonizable"): [self.calc_repulsive],
-                    # ("Negative", "Negative"): [self.calc_repulsive],
-                    # ("Positive", "Positive"): [self.calc_repulsive],
+                    # Repulsive interaction
+                    ("NegativelyIonizable", "NegativelyIonizable"): [self.calc_repulsive],
+                    ("PositivelyIonizable", "PositivelyIonizable"): [self.calc_repulsive],
+                    ("NegIonizable", "NegIonizable"): [self.calc_repulsive],
+                    ("PosIonizable", "PosIonizable"): [self.calc_repulsive],
+                    ("Negative", "Negative"): [self.calc_repulsive],
+                    ("Positive", "Positive"): [self.calc_repulsive],
 
-                    # # Favorable multipolar interactions.
-                    # ("Nucleophile", "Electrophile"): [self.calc_multipolar],
-                    # # Unfavorable multipolar interactions.
-                    # ("Nucleophile", "Nucleophile"): [self.calc_multipolar],
-                    # ("Electrophile", "Electrophile"): [self.calc_multipolar],
+                    # Favorable multipolar interactions.
+                    ("Nucleophile", "Electrophile"): [self.calc_multipolar],
+                    # Unfavorable multipolar interactions.
+                    ("Nucleophile", "Nucleophile"): [self.calc_multipolar],
+                    ("Electrophile", "Electrophile"): [self.calc_multipolar],
 
-                    # # Favorable ion-dipole interactions
-                    # ("Nucleophile", "PositivelyIonizable"): [self.calc_ion_multipole],
-                    # ("Nucleophile", "PosIonizable"): [self.calc_ion_multipole],
-                    # ("Nucleophile", "Positive"): [self.calc_ion_multipole],
-                    # ("Electrophile", "NegativelyIonizable"): [self.calc_ion_multipole],
-                    # ("Electrophile", "NegIonizable"): [self.calc_ion_multipole],
-                    # ("Electrophile", "Negative"): [self.calc_ion_multipole],
+                    # Favorable ion-dipole interactions
+                    ("Nucleophile", "PositivelyIonizable"): [self.calc_ion_multipole],
+                    ("Nucleophile", "PosIonizable"): [self.calc_ion_multipole],
+                    ("Nucleophile", "Positive"): [self.calc_ion_multipole],
+                    ("Electrophile", "NegativelyIonizable"): [self.calc_ion_multipole],
+                    ("Electrophile", "NegIonizable"): [self.calc_ion_multipole],
+                    ("Electrophile", "Negative"): [self.calc_ion_multipole],
 
-                    # # Unfavorable ion-dipole interactions
-                    # ("Nucleophile", "NegativelyIonizable"): [self.calc_ion_multipole],
-                    # ("Nucleophile", "NegIonizable"): [self.calc_ion_multipole],
-                    # ("Nucleophile", "Negative"): [self.calc_ion_multipole],
-                    # ("Electrophile", "PositivelyIonizable"): [self.calc_ion_multipole],
-                    # ("Electrophile", "PosIonizable"): [self.calc_ion_multipole],
-                    # ("Electrophile", "Positive"): [self.calc_ion_multipole],
+                    # Unfavorable ion-dipole interactions
+                    ("Nucleophile", "NegativelyIonizable"): [self.calc_ion_multipole],
+                    ("Nucleophile", "NegIonizable"): [self.calc_ion_multipole],
+                    ("Nucleophile", "Negative"): [self.calc_ion_multipole],
+                    ("Electrophile", "PositivelyIonizable"): [self.calc_ion_multipole],
+                    ("Electrophile", "PosIonizable"): [self.calc_ion_multipole],
+                    ("Electrophile", "Positive"): [self.calc_ion_multipole],
 
-                    # # Proximal, covalent, vdw, clash
-                    # ("Atom", "Atom"): [self.calc_atom_atom, self.calc_proximal]
+                    # Proximal, covalent, vdw, clash
+                    ("Atom", "Atom"): [self.calc_atom_atom, self.calc_proximal]
             }
 
         # TODO: Incluir:
