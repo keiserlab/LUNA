@@ -1,17 +1,29 @@
+import numpy as np
+
+from mol.interaction.math import atom_coordinates, centroid
+
+
 class InteractionType():
 
-    def __init__(self, src_grp, trgt_grp, inter_type, directional=False, params=None, recursive=True):
+    def __init__(self, src_grp, trgt_grp, inter_type, src_interacting_atms=None, trgt_interacting_atms=None,
+                 src_centroid=None, trgt_centroid=None, directional=False, params=None):
+
         self._src_grp = src_grp
         self._trgt_grp = trgt_grp
+
+        src_interacting_atms = src_interacting_atms or []
+        self._src_interacting_atms = list(src_interacting_atms)
+
+        trgt_interacting_atms = trgt_interacting_atms or []
+        self._trgt_interacting_atms = list(trgt_interacting_atms)
+
+        self._src_centroid = np.array(src_centroid) if src_centroid is not None else None
+        self._trgt_centroid = np.array(trgt_centroid) if trgt_centroid is not None else None
+
         self._type = inter_type
         self.directional = directional
         self._params = params or {}
-        self._recursive = recursive
         self._hash_cache = None
-
-        if recursive:
-            self.src_grp.add_interactions([self])
-            self.trgt_grp.add_interactions([self])
 
         self._expand_dict()
 
@@ -22,6 +34,46 @@ class InteractionType():
     @property
     def trgt_grp(self):
         return self._trgt_grp
+
+    @property
+    def src_interacting_atms(self):
+        return self._src_interacting_atms or self.src_grp.atoms
+
+    @property
+    def trgt_interacting_atms(self):
+        return self._trgt_interacting_atms or self.trgt_grp.atoms
+
+    @property
+    def src_centroid(self):
+        if self._src_centroid is None:
+            if self._src_interacting_atms:
+                self._src_centroid = centroid(atom_coordinates(self._src_interacting_atms))
+            else:
+                self._src_centroid = self._src_grp.centroid
+        return self._src_centroid
+
+    @src_centroid.setter
+    def src_centroid(self, centroid):
+        if centroid is None:
+            self._src_centroid = None
+        else:
+            self._src_centroid = np.array(centroid)
+
+    @property
+    def trgt_centroid(self):
+        if self._trgt_centroid is None:
+            if self._trgt_interacting_atms:
+                self._trgt_centroid = centroid(atom_coordinates(self._trgt_interacting_atms))
+            else:
+                self._trgt_centroid = self._trgt_grp.centroid
+        return self._trgt_centroid
+
+    @trgt_centroid.setter
+    def trgt_centroid(self, centroid):
+        if centroid is None:
+            self._trgt_centroid = None
+        else:
+            self._trgt_centroid = np.array(centroid)
 
     @property
     def type(self):
@@ -60,9 +112,8 @@ class InteractionType():
         return not self.is_intramol_interaction()
 
     def clear_refs(self):
-        if self._recursive:
-            self.src_grp.remove_interactions([self])
-            self.trgt_grp.remove_interactions([self])
+        self.src_grp.remove_interactions([self])
+        self.trgt_grp.remove_interactions([self])
 
     def _expand_dict(self):
         for key in self._params:
