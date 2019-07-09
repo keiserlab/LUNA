@@ -101,7 +101,7 @@ INTERACTION_IDS = {
     "Edge-to-slope pi-stacking": 35,
     "Displaced face-to-face pi-stacking": 36,
     "Displaced face-to-edge pi-stacking": 37,
-    "Displaced face-to-slope pi-stacking": 38
+    "Displaced face-to-slope pi-stacking": 38,
 }
 
 INTERACTION_SHORT_NAMES = {
@@ -143,7 +143,7 @@ INTERACTION_SHORT_NAMES = {
     "Edge-to-slope pi-stacking": "edge-to-slope_stack",
     "Displaced face-to-face pi-stacking": "disp_face-to-face_stack",
     "Displaced face-to-edge pi-stacking": "disp_face-to-edge_stack",
-    "Displaced face-to-slope pi-stacking": "disp_face-to-slope_stack"
+    "Displaced face-to-slope pi-stacking": "disp_face-to-slope_stack",
 }
 
 PYMOL_INTERACTION_COLOR = ColorPallete({
@@ -162,6 +162,7 @@ PYMOL_INTERACTION_COLOR = ColorPallete({
     "Chalcogen-pi": "lightorange",
     "Repulsive": "violetpurple",
     "Covalent bond": "black",
+    "Atom overlap": "gray40",
     "Van der Waals clash": "gray90",
     "Van der Waals": "gray50",
     "Orthogonal multipolar": "paleyellow",
@@ -184,5 +185,5 @@ PYMOL_INTERACTION_COLOR = ColorPallete({
     "Edge-to-slope pi-stacking": "tv_red",
     "Displaced face-to-face pi-stacking": "tv_red",
     "Displaced face-to-edge pi-stacking": "tv_red",
-    "Displaced face-to-slope pi-stacking": "tv_red"
+    "Displaced face-to-slope pi-stacking": "tv_red",
 }, "white")
