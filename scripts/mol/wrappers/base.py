@@ -1,4 +1,3 @@
-from util.exceptions import AtomObjectTypeError, MoleculeObjectTypeError
 from rdkit.Chem import Atom as RDAtom
 from rdkit.Chem import Mol as RDMol
 from rdkit.Chem import Bond as RDBond
@@ -6,6 +5,10 @@ from rdkit.Chem import MolToSmiles, GetPeriodicTable
 from openbabel import OBMol, OBAtom, OBBond, OBMolAtomIter, OBAtomAtomIter, OBAtomBondIter, OBMolBondIter
 from openbabel import etab
 from pybel import Molecule as PybelMol
+
+
+from util.exceptions import AtomObjectTypeError, MoleculeObjectTypeError
+
 
 import logging
 
@@ -241,6 +244,11 @@ class MolWrapper:
             raise MoleculeObjectTypeError("Objects of type '%s' are not currently accepted." % mol_obj.__class__)
 
         self._mol_obj = mol_obj
+
+    @classmethod
+    def from_mol_file(self, mol_file, mol_file_ext=None, mol_obj_type="rdkit"):
+        # TODO: implement it
+        pass
 
     @property
     def mol_obj(self):
