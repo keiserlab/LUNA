@@ -25,6 +25,9 @@ class InteractionType():
         self._params = params or {}
         self._hash_cache = None
 
+        self.src_grp.add_interactions([self])
+        self.trgt_grp.add_interactions([self])
+
         self._expand_dict()
 
     @property
