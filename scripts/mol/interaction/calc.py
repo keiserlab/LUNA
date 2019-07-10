@@ -43,6 +43,9 @@ class InteractionsManager:
     def remove_interactions(self, interactions):
         self._interactions = list(set(self.interactions) - set(interactions))
 
+        for inter in interactions:
+            inter.clear_refs()
+
     def find(self):
         # TODO: implement
         pass
