@@ -201,7 +201,7 @@ class PymolSessionManager:
                                                          inter.trgt_grp.atoms[1].electronegativity) else inter.trgt_grp.atoms[1]
                 obj2_name += "_%s" % hash(dipole_atm.name)
                 centroid_obj2 = dipole_atm.coord
-            # For unfavorable multipolar interactions, it may happen that the second atom group is an nucleophile as well.
+            # For unfavorable multipolar interactions, it may happen that the second atom group is a nucleophile as well.
             elif inter.type == "Unfavorable nucleophile-nucleophile" and len(inter.trgt_grp.atoms) == 2:
                 dipole_atm = inter.trgt_grp.atoms[0] if (inter.trgt_grp.atoms[0].electronegativity >
                                                          inter.trgt_grp.atoms[1].electronegativity) else inter.trgt_grp.atoms[1]
@@ -211,7 +211,6 @@ class PymolSessionManager:
             # Add pseudoatoms
             if not self.wrapper.obj_exists(obj1_name):
                 self.wrapper.add_pseudoatom(obj1_name, {"vdw": 1, "pos": list(centroid_obj1)})
-
             if not self.wrapper.obj_exists(obj2_name):
                 self.wrapper.add_pseudoatom(obj2_name, {"vdw": 1, "pos": list(centroid_obj2)})
 
@@ -263,8 +262,10 @@ class PymolSessionManager:
                                   "color": self.inter_color.get_color(inter.type)}
                     self.wrapper.arrow(arrow_name, obj1_name, obj2_name, arrow_opts)
 
-            # If a group object contains more than one atom, the centroid object will be displayed.
-            if len(inter.src_grp.atoms) > 1:
+            # If a group object contains more than one atom and the interaction is not Hydrophobic, the centroid object will be displayed.
+            # It ignores Hydrophobic interactions because it is usually rrepresented by the atom more proximal to its partner when the
+            # interaction involves surfaces. Otherwise, it will be an atom-atom interaction what matches the first 'If' test.
+            if inter.src_grp.size > 1 and inter.type != "Hydrophobic":
                 # Add the centroids to the group "grps" and append them to the main group
                 self.wrapper.group("%s.grps" % add_to_grp, [obj1_name])
                 self._set_centroid_style(obj1_name)
@@ -273,8 +274,10 @@ class PymolSessionManager:
             else:
                 self.wrapper.delete([obj1_name])
 
-            # If a group object contains more than one atom, the centroid object will be displayed.
-            if len(inter.trgt_grp.atoms) > 1:
+            # If a group object contains more than one atom and the interaction is not Hydrophobic, the centroid object will be displayed.
+            # It ignores Hydrophobic interactions because it is usually rrepresented by the atom more proximal to its partner when the
+            # interaction involves surfaces. Otherwise, it will be an atom-atom interaction, what already matches the first 'If' test.
+            if inter.trgt_grp.size > 1 and inter.type != "Hydrophobic":
                 # Add the centroids to the group "grps" and append them to the main group
                 self.wrapper.group("%s.grps" % add_to_grp, [obj2_name])
                 self._set_centroid_style(obj2_name)
@@ -290,8 +293,8 @@ class PymolSessionManager:
         self.wrapper.set("sphere_scale", 0.2, {"selection": centroid})
 
     def set_last_details_to_view(self):
-        self.wrapper.set("sphere_scale", "0.3", {"selection": "visible and resn hoh"})
-        self.wrapper.hide([("everything", "elem H")])
+        self.wrapper.set("sphere_scale", "0.3", {"selection": "visible and resn hoh+dod"})
+        self.wrapper.hide([("everything", "elem H+D")])
         self.wrapper.center("visible")
 
     def save_session(self, output_file):
