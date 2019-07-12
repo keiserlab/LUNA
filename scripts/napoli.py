@@ -26,7 +26,7 @@ from mol.clustering import cluster_fps_butina
 from mol.features import FeatureExtractor
 from mol.fingerprint import generate_fp_for_mols
 from mol.entry import DBEntry, MolEntry
-from mol.groups import CompoundGroupPerceiver
+from mol.groups import AtomGroupPerceiver
 from mol.interaction.contact import get_contacts_for_entity
 from mol.interaction.calc import InteractionCalculator
 from mol.interaction.conf import InteractionConf
@@ -368,24 +368,21 @@ class Project:
         return False
 
     def perceive_chemical_groups(self, entity, ligand, add_h=False):
-        perceiver = CompoundGroupPerceiver(self.feature_extractor, add_h=add_h, ph=self.ph, amend_mol=self.amend_mol,
-                                           mol_obj_type=self.mol_obj_type, default_properties=self.default_properties,
-                                           tmp_path="%s/tmp" % self.working_path)
+        perceiver = AtomGroupPerceiver(self.feature_extractor, add_h=add_h, ph=self.ph, amend_mol=self.amend_mol,
+                                       mol_obj_type=self.mol_obj_type, default_properties=self.default_properties,
+                                       tmp_path="%s/tmp" % self.working_path)
 
-        nb_compounds = get_contacts_for_entity(entity, ligand, level='R', radius=getattr(self.inter_conf, "boundary_cutoff", 7))
+        nb_compounds = get_contacts_for_entity(entity, ligand, level='R', radius=getattr(self.inter_conf, "boundary_cutoff", 6.2))
 
-        grps_by_compounds = {}
-        for comp in set([x[1] for x in nb_compounds]):
-            # TODO: verificar se estou usando o ICODE nos residuos
-            if comp.id == self.current_entry.get_biopython_key() and isinstance(self.current_entry, MolEntry):
-                groups = perceiver.perceive_compound_groups(comp, self.current_entry.mol_obj)
-            else:
-                groups = perceiver.perceive_compound_groups(comp)
-            grps_by_compounds[comp] = groups
+        mol_objs_dict = {}
+        if isinstance(self.current_entry, MolEntry):
+            mol_objs_dict[self.current_entry.get_biopython_key()] = self.current_entry.mol_obj
+
+        atm_grps_mngr = perceiver.perceive_atom_groups(set([x[1] for x in nb_compounds]), mol_objs_dict=mol_objs_dict)
 
         logger.info("Chemical group perception finished!!!")
 
-        return grps_by_compounds
+        return atm_grps_mngr
 
     def set_pharm_objects(self):
         feature_factory = ChemicalFeatures.BuildFeatureFactory(self.atom_prop_file)
@@ -1155,6 +1152,7 @@ class LocalProject(Project):
 
             # TODO: allow the person to pass a pdb_file into entries.
             pdb_file = self.get_pdb_file(target_entry.pdb_id)
+            target_entry.pdb_file = pdb_file
 
             # # TODO: resolver o problema dos hidrogenios.
             # #       Vou adicionar hidrogenio a pH 7?
@@ -1168,18 +1166,19 @@ class LocalProject(Project):
             ligand = get_entity_from_entry(structure, target_entry)
             ligand.set_as_target(is_target=True)
 
-            grps_by_compounds = self.perceive_chemical_groups(structure[0], ligand, add_hydrogen)
-            trgt_grps = [grps_by_compounds[x] for x in grps_by_compounds]
+            atm_grps_mngr = self.perceive_chemical_groups(structure[0], ligand, add_hydrogen)
 
-            neighborhood = [atm_grp for comp in grps_by_compounds.values() for atm_grp in comp.atm_grps]
-            self.neighborhoods.append((target_entry, neighborhood))
+            self.neighborhoods.append((target_entry, atm_grps_mngr))
 
             #
             # Calculate interactions
             #
-            interactions = self.inter_calc.calc_interactions(trgt_grps)
+            interactions_mngr = self.inter_calc.calc_interactions(atm_grps_mngr.atm_grps)
 
-            self.interactions.append((pdb_file, interactions))
+            # Create hydrophobic islands.
+            atm_grps_mngr.merge_hydrophobic_atoms(interactions_mngr)
+
+            self.interactions.append((target_entry, interactions_mngr))
             continue
 
             inter_file = "%s/results/%s.tsv" % (self.working_path, target_entry.to_string())
