@@ -222,6 +222,10 @@ class AtomGroup():
     def interactions(self):
         return self._interactions
 
+    @property
+    def size(self):
+        return len(self.atoms)
+
     def has_atom(self, atom):
         return atom in self.atoms
 
@@ -313,6 +317,10 @@ class AtomGroup():
     def __ne__(self, other):
         """Overrides the default implementation"""
         return not self.__eq__(other)
+
+    def __len__(self):
+        # Number of atoms.
+        return self.size
 
     def __hash__(self):
         """Overrides the default implementation"""
