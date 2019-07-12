@@ -57,6 +57,13 @@ from MyBio.PDB.StructureBuilder import StructureBuilder
 from MyBio.PDB.parse_pdb_header import _parse_pdb_header_list
 
 
+# MODBY: Alexandre Fassio
+# Possible labels for water molecules.
+# Ref: http://prody.csb.pitt.edu/manual/reference/atomic/flags.html.
+# DOD: deutered water.
+WATER_NAMES = ['HOH', 'DOD', 'WAT', 'H2O', 'OH2']
+
+
 # If PDB spec says "COLUMNS 18-20" this means line[17:20]
 
 class PDBParser(object):
@@ -263,24 +270,18 @@ class PDBParser(object):
                 icode = line[26]  # insertion code
 
                 # MODBY: Alexandre Fassio
-                # Possible labels for water molecules.
-                # Ref: http://prody.csb.pitt.edu/manual/reference/atomic/flags.html.
-                # DOD: deutered water.
-                waters = ['HOH', 'DOD', 'WAT', 'H2O', 'OH2']
-
-                # MODBY: Alexandre Fassio
                 # Correct flags that were incorrectly set by OpenBabel.
                 # Recognize other water labels.
-                if (self.FIX_OBABEL_FLAGS):
+                if self.FIX_OBABEL_FLAGS:
                     # Incorrect flags are set only for added hydrogen atoms
                     if (name == "H"):
                         child_dict = structure_builder.model[chainid].child_dict
                         # If this hydrogen belongs to water molecule or to a ligand
-                        if ((resname in waters) or (("H_%s" % resname, resseq, icode) in child_dict)):
+                        if resname in WATER_NAMES or ("H_%s" % resname, resseq, icode) in child_dict:
                             record_type = "HETATM"
 
                 if record_type == "HETATM":  # hetero atom flag
-                    if resname in waters:
+                    if resname in WATER_NAMES:
                         hetero_flag = "W"
                     else:
                         hetero_flag = "H"

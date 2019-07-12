@@ -1,5 +1,4 @@
 from collections import defaultdict
-from itertools import chain
 from rdkit.Chem import MolFromMolBlock, MolFromMolFile, SanitizeFlags, SanitizeMol
 from pybel import readfile
 from openbabel import etab

@@ -51,3 +51,7 @@ scripts/connect_to_server\.sh
 scripts/napoli\.log\.1
 
 scripts/mol/interaction/\.fuse_hidden0000450000000003
+
+scripts/mol/\.fuse_hidden0000465800000003
+
+scripts/mol/interaction/\.fuse_hidden0000585900000004
