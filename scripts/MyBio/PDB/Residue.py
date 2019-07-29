@@ -83,7 +83,7 @@ class Residue(Entity):
     # MODBY: Alexandre Fassio.
     # __lt__ method overwritten.
     def __lt__(self, r2):
-        return self.id < r2.id
+        return self.idx < r2.idx
 
     # Private methods
 
@@ -115,7 +115,7 @@ class Residue(Entity):
             return -1
         if index2:
             return 1
-        print(name1, name2)
+
         return cmp(name1, name2)
 
     # Public methods
