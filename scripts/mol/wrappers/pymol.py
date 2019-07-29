@@ -23,6 +23,9 @@ UNFAVORABLE_INTERS = ["Repulsive", "Unfavorable anion-nucleophile", "Unfavorable
 
 class PymolWrapper:
 
+    def get_cmd(self):
+        return cmd
+
     def load(self, input_file, obj_name=None):
         self.input_file = input_file
         if not obj_name:
@@ -155,7 +158,7 @@ class PymolSessionManager:
         self.wrapper.set("transparency_mode", 3)
         self.wrapper.set("group_auto_mode", 2)
         self.wrapper.run_cmds([("bg_color", {"color": self.bg_color})])
-        self.wrapper.set("internal_gui_width", 350)
+        self.wrapper.set("internal_gui_width", 370)
 
     def set_view(self, data):
         raise NotImplementedError("Use a class that implements this method.")
@@ -175,13 +178,14 @@ class PymolSessionManager:
         if self.show_cartoon:
             self.wrapper.show([("cartoon", pdb_obj)])
 
-    def set_interactions_view(self, interactions, add_to_grp, uid):
+    def set_interactions_view(self, interactions, add_to_grp):
 
         for i, inter in enumerate(interactions):
+
             if inter.type == "Proximal":
                 continue
 
-            obj1_name = "obj%d_grp%s" % (uid, hash(tuple(sorted(inter.src_interacting_atms))))
+            obj1_name = "%s.grps.grp%s" % (add_to_grp, hash(tuple(sorted(inter.src_interacting_atms))))
             centroid_obj1 = inter.src_centroid
             # Define the centroid in a nucleophile with two atoms as the position of its more electronegative atom.
             # Remember that the position in the interaction object matters. We have defined that the first group is always
@@ -198,7 +202,7 @@ class PymolSessionManager:
                 obj1_name += "_%s" % hash(dipole_atm.name)
                 centroid_obj1 = dipole_atm.coord
 
-            obj2_name = "obj%d_grp%s" % (uid, hash(tuple(sorted(inter.trgt_interacting_atms))))
+            obj2_name = "%s.grps.grp%s" % (add_to_grp, hash(tuple(sorted(inter.trgt_interacting_atms))))
             centroid_obj2 = inter.trgt_centroid
             # Define the centroid in an electrophile with two atoms as the position of its less electronegative atom.
             # Remember that the position in the interaction object matters. We have defined that the second group is always
@@ -232,7 +236,10 @@ class PymolSessionManager:
             # Check if the interaction involves the same compound: intramolecular interactions.
             inter_grp = "intra" if inter.is_intramol_interaction() else "inter"
 
-            inter_name = "%s.all_inters.%s.%s.obj%d_inter%d.line" % (add_to_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type], uid, i)
+            src_grp_name = "+".join(["%s-%s-%d%s" % (c.parent.id, c.resname, c.id[1], c.id[2].strip()) for c in sorted(inter.src_grp.compounds)])
+            trgt_grp_name = "+".join(["%s-%s-%d%s" % (c.parent.id, c.resname, c.id[1], c.id[2].strip()) for c in sorted(inter.trgt_grp.compounds)])
+            inter_name = "%s.all_inters.%s.%s.i%d_%s_and_%s.line" % (add_to_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type],
+                                                                       i, src_grp_name, trgt_grp_name)
             self.wrapper.distance(inter_name, obj1_name, obj2_name)
             self.wrapper.hide([("label", inter_name)])
 
@@ -241,12 +248,9 @@ class PymolSessionManager:
 
             if self.add_directional_arrows:
                 if inter.type in UNFAVORABLE_INTERS:
-                    arrow_name1 = "%s.all_inters.%s.%s.obj%d_inter%d.arrow1" % (add_to_grp, inter_grp,
-                                                                                INTERACTION_SHORT_NAMES[inter.type], uid, i)
-                    arrow_name2 = "%s.all_inters.%s.%s.obj%d_inter%d.arrow2" % (add_to_grp, inter_grp,
-                                                                                INTERACTION_SHORT_NAMES[inter.type], uid, i)
-                    square_name = "%s.all_inters.%s.%s.obj%d_inter%d.block" % (add_to_grp, inter_grp,
-                                                                               INTERACTION_SHORT_NAMES[inter.type], uid, i)
+                    arrow_name1 = "%s.all_inters.%s.%s.inter%d.arrow1" % (add_to_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type], i)
+                    arrow_name2 = "%s.all_inters.%s.%s.inter%d.arrow2" % (add_to_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type], i)
+                    square_name = "%s.all_inters.%s.%s.inter%d.block" % (add_to_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type], i)
 
                     arrow_opts = {"radius": 0.03, "gap": 0.9, "hlength": 0.5, "hradius": 0.2,
                                   "color": self.inter_color.get_color(inter.type)}
@@ -263,30 +267,23 @@ class PymolSessionManager:
                     self.wrapper.arrow(square_name, obj1_name, obj2_name, square_opts)
                 # Add arrows over the interaction lines to represent directional interactions
                 elif inter.is_directional():
-                    arrow_name = "%s.all_inters.%s.%s.obj%d_inter%d.arrow" % (add_to_grp, inter_grp,
-                                                                              INTERACTION_SHORT_NAMES[inter.type], uid, i)
+                    arrow_name = "%s.all_inters.%s.%s.inter%d.arrow" % (add_to_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type], i)
                     arrow_opts = {"radius": 0.03, "gap": 0.9, "hlength": 0.5, "hradius": 0.2,
                                   "color": self.inter_color.get_color(inter.type)}
                     self.wrapper.arrow(arrow_name, obj1_name, obj2_name, arrow_opts)
 
-            # If a group object contains more than one atom and the interaction is not Hydrophobic, the centroid object will be displayed.
-            # It ignores Hydrophobic interactions because it is usually rrepresented by the atom more proximal to its partner when the
-            # interaction involves surfaces. Otherwise, it will be an atom-atom interaction what matches the first 'If' test.
-            if inter.src_grp.size > 1 and inter.type != "Hydrophobic":
+            # If a group object contains more than one atom.
+            if inter.src_grp.size > 1:
                 # Add the centroids to the group "grps" and append them to the main group
-                self.wrapper.group("%s.grps" % add_to_grp, [obj1_name])
                 self._set_centroid_style(obj1_name)
             # Otherwise, just remove the centroid as it will not add any new information (the atom represented
             # by the centroid is already been displayed).
             else:
                 self.wrapper.delete([obj1_name])
 
-            # If a group object contains more than one atom and the interaction is not Hydrophobic, the centroid object will be displayed.
-            # It ignores Hydrophobic interactions because it is usually rrepresented by the atom more proximal to its partner when the
-            # interaction involves surfaces. Otherwise, it will be an atom-atom interaction, what already matches the first 'If' test.
-            if inter.trgt_grp.size > 1 and inter.type != "Hydrophobic":
+            # If a group object contains more than one atom.
+            if inter.trgt_grp.size > 1:
                 # Add the centroids to the group "grps" and append them to the main group
-                self.wrapper.group("%s.grps" % add_to_grp, [obj2_name])
                 self._set_centroid_style(obj2_name)
             # Otherwise, just remove the centroid as it will not add any new information (the atom represented
             # by the centroid is already been displayed).
