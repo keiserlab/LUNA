@@ -9,8 +9,8 @@ NAPOLI_PATH = path.abspath(path.join(path.realpath(__file__), '../../../', 'tmp/
 PDB_PATH = "%s/public/pdb" % NAPOLI_PATH
 TMP_FILES = "%s/public/tmp" % NAPOLI_PATH
 
-CONF_PATH = path.abspath(path.join(path.realpath(__file__), '../../../', 'data'))
-DB_CONF_FILE = "%s/.mysql.ini" % CONF_PATH
+CONF_PATH = path.abspath(path.join(path.realpath(__file__), '../../', 'data'))
+DB_CONF_FILE = "%s/mysql.ini" % CONF_PATH
 ATOM_PROP_FILE = "%s/Napoli.fdef" % CONF_PATH
 
 INTERACTION_CONF = DefaultInteractionConf()
