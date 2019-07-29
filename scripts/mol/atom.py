@@ -85,6 +85,10 @@ class ExtendedAtom:
         return etab.GetElectroNeg(etab.GetAtomicNum(self.element))
 
     @property
+    def full_id(self):
+        return self._atom.get_full_id()
+
+    @property
     def full_atom_name(self):
         full_atom_name = "%s/%s/%s" % self.get_full_id()[0:3]
         res_name = "%s-%d%s" % (self._atom.parent.resname, self._atom.parent.id[1], self._atom.parent.id[2].strip())
@@ -113,9 +117,14 @@ class ExtendedAtom:
     def is_neighbor(self, atom):
         return atom.serial_number in [i.serial_number for i in self._nb_info]
 
-    def get_shortest_path_size(self, trgt_atm):
+    def get_shortest_path_size(self, trgt_atm, merge_neighborhoods=False):
+        if merge_neighborhoods:
+            nb_graph = {**self.neighborhood, **trgt_atm.neighborhood}
+        else:
+            nb_graph = self.neighborhood
+
         # d stores the path size from the source to the target, and p stores the predecessors from each target.
-        d, p = bellman_ford(self.neighborhood, self.serial_number)
+        d, p = bellman_ford(nb_graph, self.serial_number)
         # Return infinite if the provided target is not in the distance object.
         return d.get(trgt_atm.serial_number, float("inf"))
 
@@ -140,8 +149,11 @@ class ExtendedAtom:
         return not self.__eq__(other)
 
     def __lt__(self, a2):
-        # It calls __lt__() from Biopython
-        return self._atom < a2._atom
+        # It substitutes the residue id for its index in order to keep the same order as in the PDB.
+        full_id1 = self.full_id[0:2] + (self.parent.idx, ) + self.full_id[4:]
+        full_id2 = a2.full_id[0:2] + (a2.parent.idx, ) + a2.full_id[4:]
+
+        return full_id1 < full_id2
 
     def __hash__(self):
         """Overrides the default implementation"""
