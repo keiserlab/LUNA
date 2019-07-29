@@ -25,7 +25,8 @@ class InteractionConf():
 
     def alter(self, key, val):
         if key in self._conf:
-            self.conf[key] = val
+            self._conf[key] = val
+            self.__dict__[key] = val
         else:
             logger.info("Key '%s' does not exist." % key)
 
@@ -58,7 +59,7 @@ class DefaultInteractionConf(InteractionConf):
         conf["max_ha_dist_hb_inter"] = 2.8
         conf["min_dha_ang_hb_inter"] = 90
         conf["min_har_ang_hb_inter"] = 90
-        conf["min_dar_ang_hb_inter"] = 90
+        conf["min_dar_ang_hb_inter"] = 80
 
         # Weak hydrogen bond
         # Ref: Panigrahi, S. K. & Desiraju, G. R. (2007).
@@ -114,12 +115,11 @@ class DefaultInteractionConf(InteractionConf):
         conf["max_dist_cation_pi_inter"] = 6
 
         # Halogen bond.
-        # Interaction model: C-X ---- A-R,
-        # Where C is a carbon, X a halogen, A an acceptor and
-        # R is an atom bonded to A.
-        # Distance X-A when A is a single atom.
+        # Interaction model: C-X ---- A-R, where C is a carbon, X a halogen, A an acceptor and R is an atom bonded to A.
         # Ref: Halogen bonds in biological molecules [Auffinger, 2004]
         # Ref: The Important Role of Halogen Bond in Substrate Selectivity of Enzymatic Catalysis [Jiang, 2016]
+        #
+        # Distance X-A when A is a single atom.
         conf["max_xa_dist_xbond_inter"] = 4
         # Distance X-A when A is an aromatic ring, so C stands for Centroid.
         conf["max_xc_dist_xbond_inter"] = 4.5
@@ -177,7 +177,7 @@ class DefaultInteractionConf(InteractionConf):
         conf["vdw_clash_tolerance"] = 0.6
 
         # From Chimera: https://www.cgl.ucsf.edu/chimerax/docs/user/commands/clashes.html
-        conf["min_bond_separation"] = 3
+        conf["min_bond_separation"] = 4
 
         conf["boundary_cutoff"] = 6.2
 
