@@ -106,30 +106,29 @@ class InteractionCalculator:
         computed_pairs = set()
         all_interactions = []
 
-        for trgt_atms_grp in trgt_atm_grps:
-
-            for nb_atms_grp in ss.search(trgt_atms_grp.centroid, self.inter_conf.boundary_cutoff):
+        for trgt_atm_grp in trgt_atm_grps:
+            for nb_atm_grp in ss.search(trgt_atm_grp.centroid, self.inter_conf.boundary_cutoff):
 
                 # It will always ignore interactions involving the same atom groups.
                 # Loops in the graph is not permitted and does not make any sense.
-                if trgt_atms_grp == nb_atms_grp:
+                if trgt_atm_grp == nb_atm_grp:
                     continue
 
                 # If the pair has already been calculated.
-                if (trgt_atms_grp, nb_atms_grp) in computed_pairs or (nb_atms_grp, trgt_atms_grp) in computed_pairs:
+                if (trgt_atm_grp, nb_atm_grp) in computed_pairs or (nb_atm_grp, trgt_atm_grp) in computed_pairs:
                     continue
 
                 # If no filter was informed, it will accept everything.
-                if self.inter_filter is not None and not self.inter_filter.is_valid_pair(trgt_atms_grp, nb_atms_grp):
+                if self.inter_filter is not None and not self.inter_filter.is_valid_pair(trgt_atm_grp, nb_atm_grp):
                     continue
 
-                computed_pairs.add((trgt_atms_grp, nb_atms_grp))
+                computed_pairs.add((trgt_atm_grp, nb_atm_grp))
 
-                feat_pairs = list(product(trgt_atms_grp.features, nb_atms_grp.features))
+                feat_pairs = list(product(trgt_atm_grp.features, nb_atm_grp.features))
                 feat_pairs = filter(lambda x: self.is_feature_pair_valid(*x), feat_pairs)
 
                 # If the groups belongs to the same molecule (intramolecule interaction).
-                is_intramol_inter = self.is_intramol_inter(trgt_atms_grp, nb_atms_grp)
+                is_intramol_inter = self.is_intramol_inter(trgt_atm_grp, nb_atm_grp)
                 shortest_path_size = None
 
                 for pair in feat_pairs:
@@ -142,12 +141,12 @@ class InteractionCalculator:
                         # Compute shortest path only once. The reason not to precompute it outside the For is to avoid computing
                         # the Bellman-Ford algorithm if the groups only have Atom features.
                         if shortest_path_size is None:
-                            shortest_path_size = trgt_atms_grp.get_shortest_path_size(nb_atms_grp)
+                            shortest_path_size = trgt_atm_grp.get_shortest_path_size(nb_atm_grp)
                         # Ignore groups according to the min bond separation threshold.
                         if shortest_path_size <= self.inter_conf.conf.get("min_bond_separation", 0):
                             continue
 
-                    calc_inter_params = (trgt_atms_grp, nb_atms_grp) + pair
+                    calc_inter_params = (trgt_atm_grp, nb_atm_grp) + pair
                     interactions = self.resolve_interactions(*calc_inter_params)
                     all_interactions.extend(interactions)
 
@@ -416,6 +415,7 @@ class InteractionCalculator:
 
                     # Favorable multipolar interactions.
                     ("Nucleophile", "Electrophile"): [self.calc_multipolar],
+
                     # Unfavorable multipolar interactions.
                     ("Nucleophile", "Nucleophile"): [self.calc_multipolar],
                     ("Electrophile", "Electrophile"): [self.calc_multipolar],
@@ -501,8 +501,8 @@ class InteractionCalculator:
             criteria = ["min_dihed_ang_slope_pi_pi_inter", "max_dihed_ang_slope_pi_pi_inter", "min_disp_ang_offset_pi_pi_inter",
                         "max_disp_ang_offset_pi_pi_inter"]
 
-            # If the angle criteria were not defined, a specific Pi-stacking definition is not possible as it depends on
-            # angle criteria. Therefore, a more general classification is used instead, i.e., all interactions will be Pi-stacking.
+            # If the angle criterion were not defined, a specific Pi-stacking definition is not possible as it depends on
+            # angle criterion. Therefore, a more general classification is used instead, i.e., all interactions will be Pi-stacking.
             if any([c not in self.inter_conf.conf for c in criteria]):
                 inter_type = "Pi-stacking"
             elif self.is_within_boundary(min_disp_angle, "min_disp_ang_offset_pi_pi_inter", le):
@@ -994,28 +994,16 @@ class InteractionCalculator:
             # R coordinates, in which R is a heavy atom.
             r_coords = [nbi.coord for nbi in acceptor_atm.neighbors_info if nbi.atomic_num != 1]
 
-            # Check if the interaction involves the same compound.
-            is_intramol_inter = self.is_intramol_inter(donor_grp, acceptor_grp)
-
             for c_coord in carbon_coords:
                 xc_vect = c_coord - donor_grp.centroid
                 cxa_angle = im.angle(xc_vect, xa_vect)
 
-                if (self.is_within_boundary(cxa_angle, "min_cxa_ang_xbond_inter", ge)):
+                if self.is_within_boundary(cxa_angle, "min_cxa_ang_xbond_inter", ge):
 
-                    # If no heavy atom is bonded to the acceptor, it means that only hydrogens may be bonded to it.
-                    # Then, we do not need to calculate the angles because hydrogens are too dynamic what means that
-                    # an acceptor could be ionized or not at a specific moment in time. That is the reason for why the
-                    # strict rule is only applied to donor atoms.
-                    #
-                    # Also, for intramolecular interactions, we loose the restriction involving the angles HAR and DAR.
-                    # I decided to do it, because in a same molecule the atoms are closer from each other due to covalent bonds
-                    # and torsional angles, what makes the angles HAR and DAR to be shortened. As a consequence, these angle
-                    # restrictions would ignorer many real interactions. That will not be a problem because in a molecule we already
-                    # have torsional and bond lengths that restrict the atom positions. Since this two rules are defined to avoid
-                    # atoms bonded to the donor to be placed around the interaction region, we do not need to worry about it as the
-                    # molecule conformation restrictions will already do this for us.
-                    if len(r_coords) == 0 or is_intramol_inter:
+                    # If no heavy atom is bonded to the acceptor, it means that only hydrogens may be bound to it. Then, we do not
+                    # calculate the angles because hydrogens are too dynamic, i.e., the acceptor could be ionized or not at a
+                    # specific moment in time and its hydrogens may be positioned in different ways.
+                    if len(r_coords) == 0:
                         params = {"xa_dist_xbond_inter": xa_dist,
                                   "cxa_ang_xbond_inter": cxa_angle,
                                   "xar_ang_xbond_inter": -1}
@@ -1101,9 +1089,6 @@ class InteractionCalculator:
             # N coordinates, in which N is a heavy atom.
             n_coords = [nbi.coord for nbi in acceptor_atm.neighbors_info if nbi.atomic_num != 1]
 
-            # Check if the interaction involves the same compound.
-            is_intramol_inter = self.is_intramol_inter(donor_grp, acceptor_grp)
-
             for r_atm in r_atms:
                 # Isothiazoles have only one sigma-hole located on the oposite site of the N.
                 # So, we must ignore the Carbon. Beno et al (2015). DOI: https://doi.org/10.1021/jm501853m.
@@ -1115,19 +1100,10 @@ class InteractionCalculator:
 
                 if (self.is_within_boundary(rya_angle, "min_rya_ang_ybond_inter", ge)):
 
-                    # If no heavy atom is bonded to the acceptor, it means that only hydrogens may be bonded to it.
-                    # Then, we do not need to calculate the angles because hydrogens are too dynamic what means that
-                    # an acceptor could be ionized or not at a specific moment in time. That is the reason for why the
-                    # strict rule is only applied to donor atoms.
-                    #
-                    # Also, for intramolecular interactions, we loose the restriction involving the angles HAR and DAR.
-                    # I decided to do it, because in a same molecule the atoms are closer from each other due to covalent bonds
-                    # and torsional angles, what makes the angles HAR and DAR to be shortened. As a consequence, these angle
-                    # restrictions would ignorer many real interactions. That will not be a problem because in a molecule we already
-                    # have torsional and bond lengths that restrict the atom positions. Since this two rules are defined to avoid
-                    # atoms bonded to the donor to be placed around the interaction region, we do not need to worry about it as the
-                    # molecule conformation restrictions will already do this for us.
-                    if len(n_coords) == 0 or is_intramol_inter:
+                    # If no heavy atom is bonded to the acceptor, it means that only hydrogens may be bound to it. Then, we do not
+                    # calculate the angles because hydrogens are too dynamic, i.e., the acceptor could be ionized or not at a
+                    # specific moment in time and its hydrogens may be positioned in different ways.
+                    if len(n_coords) == 0:
                         params = {"ya_dist_ybond_inter": ya_dist,
                                   "rya_ang_ybond_inter": rya_angle,
                                   "yan_ang_ybond_inter": -1}
@@ -1276,11 +1252,9 @@ class InteractionCalculator:
                 ha_dist = da_dist - 1
                 if self.is_within_boundary(ha_dist, "max_ha_dist_hb_inter", le):
 
-                    # If no heavy atom is bonded to the acceptor, it means that only hydrogens
-                    # may be bonded to it. Then, we do not need to calculate the angles because
-                    # hydrogens are too dynamic, what means that an acceptor could be ionized or not
-                    # at a specific moment in time and its hydrogens may be positioned in different ways.
-                    # That is the reason for why the strict rule is only applied to donor atoms.
+                    # If no heavy atom is bonded to the acceptor, it means that only hydrogens may be bound to it. Then, we do not
+                    # calculate the angles because hydrogens are too dynamic, i.e., the acceptor could be ionized or not at a
+                    # specific moment in time and its hydrogens may be positioned in different ways.
                     if len(r_coords) == 0:
                         params = {"da_dist_hb_inter": da_dist,
                                   "ha_dist_hb_inter": -1,
@@ -1318,9 +1292,6 @@ class InteractionCalculator:
                             inter = InteractionType(donor_grp, acceptor_grp, "Hydrogen bond", directional=True, params=params)
                             interactions.append(inter)
             else:
-                # Check if the interaction involves the same compound.
-                is_intramol_inter = self.is_intramol_inter(donor_grp, acceptor_grp)
-
                 # It may happen that D is covalently bound to more than one hydrogen atom.
                 # In this case, it is necessary to check the distances and angles for each atom.
                 # It will produce a hydrogen bond for each valid hydrogen.
@@ -1334,19 +1305,10 @@ class InteractionCalculator:
                     if (self.is_within_boundary(ha_dist, "max_ha_dist_hb_inter", le) and
                             self.is_within_boundary(dha_angle, "min_dha_ang_hb_inter", ge)):
 
-                        # If no heavy atom is bonded to the acceptor, it means that only hydrogens may be bonded to it.
-                        # Then, we do not need to calculate the angles because hydrogens are too dynamic what means that
-                        # an acceptor could be ionized or not at a specific moment in time. That is the reason for why the
-                        # strict rule is only applied to donor atoms.
-                        #
-                        # Also, for intramolecular interactions, we loose the restriction involving the angles HAR and DAR.
-                        # I decided to do it, because in a same molecule the atoms are closer from each other due to covalent bonds
-                        # and torsional angles, what makes the angles HAR and DAR to be shortened. As a consequence, these angle
-                        # restrictions would ignorer many real interactions. That will not be a problem because in a molecule we already
-                        # have torsional and bond lengths that restrict the atom positions. Since this two rules are defined to avoid
-                        # atoms bonded to the donor to be placed around the interaction region, we do not need to worry about it as the
-                        # molecule conformation restrictions will already do this for us.
-                        if len(r_coords) == 0 or is_intramol_inter:
+                        # If no heavy atom is bonded to the acceptor, it means that only hydrogens may be bound to it. Then, we do not
+                        # calculate the angles because hydrogens are too dynamic, i.e., the acceptor could be ionized or not at a
+                        # specific moment in time and its hydrogens may be positioned in different ways.
+                        if len(r_coords) == 0:
                             params = {"da_dist_hb_inter": da_dist,
                                       "ha_dist_hb_inter": ha_dist,
                                       "dha_ang_hb_inter": dha_angle,
@@ -1365,7 +1327,7 @@ class InteractionCalculator:
                             # Interaction model: D-H ---- A-R
                             # Check the angles formed at the acceptor. When A is covalently bonded to more than one R atom,
                             # it is necessary to evaluate all possible angles D-A-R and H-A-R. In this case, all angles should
-                            # satisfy the angle criteria. To do so, we could analyze only the lowest D-A-R and H-A-R angles.
+                            # satisfy the angle criterion. To do so, we could analyze only the lowest D-A-R and H-A-R angles.
                             # It guarantees that all angles will satisfy the criteria. OBS: it may happen that each one of the
                             # angles would belong to a different R atom.
                             lowest_har_angle = None
@@ -1456,11 +1418,9 @@ class InteractionCalculator:
                 ha_dist = da_dist - 1
                 if self.is_within_boundary(ha_dist, "max_ha_dist_whb_inter", le):
 
-                    # If no heavy atom is bonded to the acceptor, it means that only hydrogens
-                    # may be bonded to it. Then, we do not need to calculate the angles because
-                    # hydrogens are too dynamic, what means that an acceptor could be ionized or not
-                    # at a specific moment in time and its hydrogens may be positioned in different ways.
-                    # That is the reason for why the strict rule is only applied to donor atoms.
+                    # If no heavy atom is bonded to the acceptor, it means that only hydrogens may be bound to it. Then, we do not
+                    # calculate the angles because hydrogens are too dynamic, i.e., the acceptor could be ionized or not at a
+                    # specific moment in time and its hydrogens may be positioned in different ways.
                     if len(r_coords) == 0:
                         params = {"da_dist_whb_inter": da_dist,
                                   "ha_dist_whb_inter": -1,
@@ -1498,9 +1458,6 @@ class InteractionCalculator:
                             inter = InteractionType(donor_grp, acceptor_grp, "Weak hydrogen bond", directional=True, params=params)
                             interactions.append(inter)
             else:
-                # Check if the interaction involves the same compound.
-                is_intramol_inter = self.is_intramol_inter(donor_grp, acceptor_grp)
-
                 # It may happen that D is covalently bound to more than one hydrogen atom.
                 # In such cases, it's necessary to check the distances and angles for each atom.
                 for h_coord in hydrog_coords:
@@ -1513,19 +1470,10 @@ class InteractionCalculator:
                     if (self.is_within_boundary(ha_dist, "max_ha_dist_whb_inter", le) and
                             self.is_within_boundary(dha_angle, "min_dha_ang_whb_inter", ge)):
 
-                        # If no heavy atom is bonded to the acceptor, it means that only hydrogens may be bonded to it.
-                        # Then, we do not need to calculate the angles because hydrogens are too dynamic what means that
-                        # an acceptor could be ionized or not at a specific moment in time. That is the reason for why the
-                        # strict rule is only applied to donor atoms.
-                        #
-                        # Also, for intramolecular interactions, we loose the restriction involving the angles HAR and DAR.
-                        # I decided to do it, because in a same molecule the atoms are closer from each other due to covalent bonds
-                        # and torsional angles, what makes the angles HAR and DAR to be shortened. As a consequence, these angle
-                        # restrictions would ignorer many real interactions. That will not be a problem because in a molecule we already
-                        # have torsional and bond lengths that restrict the atom positions. Since this two rules are defined to avoid
-                        # atoms bonded to the donor to be placed around the interaction region, we do not need to worry about it as the
-                        # molecule conformation restrictions will already do this for us.
-                        if len(r_coords) == 0 or is_intramol_inter:
+                        # If no heavy atom is bonded to the acceptor, it means that only hydrogens may be bound to it. Then, we do not
+                        # calculate the angles because hydrogens are too dynamic, i.e., the acceptor could be ionized or not at a
+                        # specific moment in time and its hydrogens may be positioned in different ways.
+                        if len(r_coords) == 0:
                             params = {"da_dist_whb_inter": da_dist,
                                       "ha_dist_whb_inter": ha_dist,
                                       "dha_ang_whb_inter": dha_angle,
@@ -1545,7 +1493,7 @@ class InteractionCalculator:
                             # Check the angles formed at the acceptor.
                             # When A is covalently bonded to more than one R atom, it is necessary to
                             # evaluate all possible angles D-A-R and H-A-R. In this case, all angles should
-                            # satisfy the angle criteria. To do so, we could analyze only the lowest D-A-R and
+                            # satisfy the angle criterion. To do so, we could analyze only the lowest D-A-R and
                             # H-A-R angles. It guarantees that all angles will satisfy the criteria.
                             # OBS: it may happen that each one of the angles would belong to a different R atom.
                             lowest_har_angle = None
@@ -1580,6 +1528,7 @@ class InteractionCalculator:
 
                                 inter = InteractionType(donor_grp, acceptor_grp, "Weak hydrogen bond", directional=True, params=params)
                                 interactions.append(inter)
+
         return interactions
 
     @staticmethod
@@ -1760,11 +1709,14 @@ class InteractionCalculator:
                 rdw1 = etab.GetVdwRad(etab.GetAtomicNum(atm1.element))
                 rdw2 = etab.GetVdwRad(etab.GetAtomicNum(atm2.element))
 
-                # Ignore Van der Waals and clashes for atoms in the same molecule that are separated from each other by only N bonds.
+                # The graph of a molecule neighborhood contains only the information of its own atoms and their immediate neighbors.
+                # That is why it needs to merge two neighborhood graphs when an intermolecular interaction is to be calculated.
+                merge_neighborhods = self.is_intramol_inter(group1, group2) is False
+                # Ignore Van der Waals and clashes for atoms separated from each other by only N bonds.
                 # Covalent bonds keep atoms very tightly, producing distances lower than their sum of Van der Waals radius.
                 # As a consequence the algorithm will find a lot of false clashes and Van der Waals interactions.
-                if (self.is_intramol_inter(group1, group2) and
-                        group1.atoms[0].get_shortest_path_size(group2.atoms[0]) <= self.inter_conf.conf.get("min_bond_separation", 0)):
+                shortest_path_size = group1.atoms[0].get_shortest_path_size(group2.atoms[0], merge_neighborhods)
+                if shortest_path_size <= self.inter_conf.conf.get("min_bond_separation", 0):
                     return []
 
                 # r1 + r2 - d < 0 => no clash
