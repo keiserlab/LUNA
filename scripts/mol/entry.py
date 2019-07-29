@@ -193,7 +193,8 @@ class CompoundEntry(Entry):
 
 class MolEntry(Entry):
 
-    def __init__(self, pdb_id, mol_id, mol_obj=None, mol_file=None, mol_file_ext=None, mol_obj_type='rdkit', sep=ENTRY_SEPARATOR):
+    def __init__(self, pdb_id, mol_id, mol_obj=None, mol_file=None, mol_file_ext=None, mol_obj_type='rdkit',
+                 autoload=False, sep=ENTRY_SEPARATOR):
 
         if mol_obj is not None:
             if isinstance(mol_obj, MolWrapper):
@@ -370,28 +371,28 @@ class MolEntry(Entry):
         return '<MolEntry: %s%s%s>' % (self.pdb_id, self.sep, self.mol_id)
 
 
-def recover_entries_from_entity(entity, get_ligands=True, get_chains=True, sep=ENTRY_SEPARATOR):
+def recover_entries_from_entity(entity, get_small_molecules=True, get_chains=True, sep=ENTRY_SEPARATOR):
 
     if entity.level == "S":
-        if get_ligands:
+        if get_small_molecules:
             residues = entity[0].get_residues()
         if get_chains:
             chains = entity[0].get_chains()
 
     elif entity.level == "M":
-        if get_ligands:
+        if get_small_molecules:
             residues = entity.get_residues()
         if get_chains:
             chains = entity.get_chains()
     else:
-        if get_ligands:
+        if get_small_molecules:
             # If the entity is already a Chain, get_parent_by_level() returns the same object.
             # But, if the entity is a Residue or Atom, it will return its corresponding chain parent.
             residues = entity.get_parent_by_level("C").get_residues()
         if get_chains:
             chains = entity.get_parent_by_level("M").get_chains()
 
-    if get_ligands:
+    if get_small_molecules:
         pdb_id = entity.get_parent_by_level("S").id
         for res in residues:
             if res.is_hetatm():
