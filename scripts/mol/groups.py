@@ -1,4 +1,5 @@
 from collections import defaultdict
+from itertools import chain
 from rdkit.Chem import MolFromMolBlock, MolFromMolFile, SanitizeFlags, SanitizeMol
 from pybel import readfile
 from openbabel import etab
@@ -33,11 +34,18 @@ SS_BOND_FEATURES = ["Atom", "Acceptor", "ChalcogenDonor", "Hydrophobic"]
 class AtomGroupsManager():
 
     def __init__(self, atm_grps=None):
-        self._atm_grps = list(atm_grps) or []
+        self._atm_grps = []
+        self._child_dict = {}
+
+        self.add_atm_grps(atm_grps)
 
     @property
     def atm_grps(self):
         return self._atm_grps
+
+    @property
+    def child_dict(self):
+        return self._child_dict
 
     @property
     def size(self):
@@ -52,6 +60,12 @@ class AtomGroupsManager():
 
         return summary
 
+    def find_atm_grp(self, atoms):
+        return self.child_dict.get(tuple(sorted(atoms)), None)
+
+    def get_all_interactions(self):
+        return set(chain.from_iterable([atm_grp.interactions for atm_grp in self.atm_grps]))
+
     def filter_by_types(self, types):
         for atm_grp in self.atm_grps:
             if set(types).issubset(set(atm_grp.feature_names)):
@@ -60,14 +74,40 @@ class AtomGroupsManager():
     def add_atm_grps(self, atm_grps):
         self._atm_grps = list(set(self._atm_grps + list(atm_grps)))
 
+        for atm_grp in atm_grps:
+            self.child_dict[tuple(sorted(atm_grp.atoms))] = atm_grp
+
     def remove_atm_grps(self, atm_grps):
         self._atm_grps = list(set(self._atm_grps) - set(atm_grps))
 
-        # ExtendedAtom objects keep a list of all AtomGroup objects to which they belong to. So, if we don't clear the references directly,
-        # the AtomGroup objects will still exist in the ExtendedAtom list even when they were already removed from an instance of
-        # AtomGroupsManager().
         for atm_grp in atm_grps:
+            # ExtendedAtom objects keep a list of all AtomGroup objects to which they belong to. So, if we don't clear the references
+            # directly, the AtomGroup objects will still exist in the ExtendedAtom list even when they were already removed from an
+            # instance of AtomGroupsManager().
             atm_grp.clear_refs()
+
+            # Remove the atom group from the dict.
+            key = tuple(sorted(atm_grp.atoms))
+            if key in self.child_dict:
+                del self.child_dict[key]
+
+    def update_atm_grp(self, atoms, features=None, interactions=None):
+            key = tuple(sorted(atoms))
+            features = features or []
+            interactions = interactions or []
+
+            if key in self.child_dict:
+                atm_grp = self.child_dict[key]
+            else:
+                atm_grp = AtomGroup(atoms)
+
+            if features:
+                atm_grp.add_features(features)
+
+            if interactions:
+                atm_grp.add_interactions(interactions)
+
+            return atm_grp
 
     def merge_hydrophobic_atoms(self, interactions_mngr):
 
@@ -108,7 +148,9 @@ class AtomGroupsManager():
 
         # Create AtomGroup objects for the hydrophobe islands
         for island_id in hydrop_islands:
-            hydrophobe = AtomGroup(hydrop_islands[island_id], [ChemicalFeature("Hydrophobe")])
+            # It will update an existing atom group or create a new one with the informed parameters.
+            hydrophobe = self.update_atm_grp(hydrop_islands[island_id], [ChemicalFeature("Hydrophobe")])
+            # Update the island information
             hydrop_islands[island_id] = hydrophobe
 
         hydrop_interactions = list(interactions_mngr.filter_by_types(["Hydrophobic"]))
@@ -123,13 +165,8 @@ class AtomGroupsManager():
             island_island_inter[key].add(inter)
 
         interactions = set()
-        for k in sorted(island_island_inter):
-
+        for k in island_island_inter:
             island_atms = defaultdict(set)
-
-            centroids = {}
-            min_cc_dist = float("Inf")
-
             for inter in island_island_inter[k]:
                 src_atm = inter.src_grp.atoms[0]
                 trgt_atm = inter.trgt_grp.atoms[0]
@@ -137,16 +174,15 @@ class AtomGroupsManager():
                 island_atms[atm_mapping[src_atm.serial_number]].add(src_atm)
                 island_atms[atm_mapping[trgt_atm.serial_number]].add(trgt_atm)
 
-                if inter.dist_hydrop_inter < min_cc_dist:
-                    centroids[atm_mapping[src_atm.serial_number]] = src_atm.coord
-                    centroids[atm_mapping[trgt_atm.serial_number]] = trgt_atm.coord
-                    min_cc_dist = inter.dist_hydrop_inter
+            centroid1 = im.centroid(im.atom_coordinates(island_atms[k[0]]))
+            centroid2 = im.centroid(im.atom_coordinates(island_atms[k[1]]))
+            cc_dist = im.euclidean_distance(centroid1, centroid2)
 
-            params = {"dist_hydrop_inter": min_cc_dist}
+            params = {"dist_hydrop_inter": cc_dist}
 
             inter = InteractionType(hydrop_islands[k[0]], hydrop_islands[k[1]], "Hydrophobic",
                                     src_interacting_atms=island_atms[k[0]], trgt_interacting_atms=island_atms[k[1]],
-                                    src_centroid=centroids[k[0]], trgt_centroid=centroids[k[1]], directional=False, params=params)
+                                    directional=False, params=params)
             interactions.add(inter)
 
         # Update the list of interactions with the new island-island interactions.
@@ -160,13 +196,10 @@ class AtomGroupsManager():
         for atm_grp in hydrop_atm_grps:
             features = [f for f in atm_grp.features if f.name != "Hydrophobic"]
 
-            # If the atom group ended up having no feature after the remotion of the feature "Hydrophobic", we can remove this atom group.
+            # It may happen that a atom group ends up having no feature after the remotion of the feature "Hydrophobic".
             # This is unlikely to occur as all atoms (by default) will have at least the feature 'Atom'. But, depending one the
             # pharmacophore rules definition, it can occur.
-            if len(features) == 0:
-                self.remove_atm_grps([atm_grp])
-            else:
-                atm_grp.features = features
+            atm_grp.features = features
 
     def __len__(self):
         # Number of atom groups.
@@ -175,7 +208,7 @@ class AtomGroupsManager():
 
 class AtomGroup():
 
-    def __init__(self, atoms, features, interactions=None):
+    def __init__(self, atoms, features=None, interactions=None, recursive=True):
 
         self._atoms = list(atoms)
 
@@ -184,12 +217,15 @@ class AtomGroup():
         self._centroid = im.centroid(self.coords)
         self._normal = None
 
-        self.features = features
+        self._features = features or []
         self._interactions = interactions or []
         self._hash_cache = None
 
-        for atm in self.atoms:
-            atm.add_atm_grps([self])
+        self._recursive = recursive
+
+        if recursive:
+            for atm in self.atoms:
+                atm.add_atm_grps([self])
 
     @property
     def atoms(self):
@@ -214,12 +250,24 @@ class AtomGroup():
         return self._normal
 
     @property
+    def features(self):
+        return self._features
+
+    @features.setter
+    def features(self, features):
+        self._features = features
+
+    @property
     def feature_names(self):
         return [f.name for f in self.features]
 
     @property
     def interactions(self):
         return self._interactions
+
+    @interactions.setter
+    def interactions(self, interactions):
+        self._interactions = interactions
 
     @property
     def size(self):
@@ -243,16 +291,28 @@ class AtomGroup():
 
         return target_interactions
 
-    def get_shortest_path_size(self, trgt_grp):
+    def get_shortest_path_size(self, trgt_grp, merge_neighborhoods=False):
+
+        if merge_neighborhoods:
+            nb_graph = {**self.atoms[0].neighborhood, **trgt_grp.atoms[0].neighborhood}
+        else:
+            nb_graph = self.atoms[0].neighborhood
+
         shortest_path_size = float('inf')
         for src_atm in self.atoms:
             # d stores the path size from the source to the target, and p stores the predecessors from each target.
-            d, p = bellman_ford(src_atm.neighborhood, src_atm.serial_number)
+            d, p = bellman_ford(nb_graph, src_atm.serial_number)
             for trgt_atm in trgt_grp.atoms:
                 if trgt_atm.serial_number in d:
                     if d[trgt_atm.serial_number] < shortest_path_size:
                         shortest_path_size = d[trgt_atm.serial_number]
         return shortest_path_size
+
+    def add_features(self, features):
+        self._features = list(set(self.features + list(features)))
+
+    def remove_features(self, features):
+        self._features = list(set(self.features) - set(features))
 
     def add_interactions(self, interactions):
         self._interactions = list(set(self.interactions + list(interactions)))
@@ -301,8 +361,9 @@ class AtomGroup():
         return any([a.parent.is_target() for a in self.atoms])
 
     def clear_refs(self):
-        for atm in self.atoms:
-            atm.remove_atm_grps([self])
+        if self._recursive:
+            for atm in self.atoms:
+                atm.remove_atm_grps([self])
 
     def __repr__(self):
         return '<AtomGroup: [%s]>' % ', '.join([str(x) for x in self.atoms])
@@ -316,6 +377,12 @@ class AtomGroup():
     def __ne__(self, other):
         """Overrides the default implementation"""
         return not self.__eq__(other)
+
+    def __lt__(self, other):
+        atms1 = tuple(sorted(self.atoms))
+        atms2 = tuple(sorted(other.atoms))
+
+        return atms1 < atms2
 
     def __len__(self):
         # Number of atoms.
@@ -331,6 +398,17 @@ class AtomGroup():
 
             self._hash_cache = hash((atoms_tuple, feat_tuple))
         return self._hash_cache
+
+
+class PseudoAtomGroup(AtomGroup):
+
+    def __init__(self, parent_grp, atoms, features=None, interactions=None):
+        self.parent_grp = parent_grp
+
+        super().__init__(atoms, features, interactions, recursive=False)
+
+    def __repr__(self):
+        return '<PseudoAtomGroup: [%s]>' % ', '.join([str(x) for x in self.atoms])
 
 
 class AtomGroupPerceiver():
@@ -409,17 +487,21 @@ class AtomGroupPerceiver():
         #
         # This function only works if the user informed default properties to the target compound.
         if target_compound.resname in self.default_properties:
-
             atm_sel = AtomSelector(keep_altloc=False, keep_hydrog=False)
             atm_map = {atm.name: ExtendedAtom(atm) for atm in target_compound.get_atoms() if atm_sel.accept_atom(atm)}
 
             atms_in_ss_bonds = set()
 
+            # It stores compounds covalently bound to the informed compound.
+            neighbors = set()
+
+            # New atom groups set.
+            atm_grps = set()
+
             if target_compound.is_water() is False:
                 model = target_compound.get_parent_by_level('M')
                 cov_atoms = get_cov_contacts_for_entity(entity=model, source=target_compound)
 
-                neighbors = set()
                 for atm1, atm2 in cov_atoms:
                     # Validate the atoms using the AtomSelector created previously.
                     if atm_sel.accept_atom(atm1) and atm_sel.accept_atom(atm2):
@@ -442,9 +524,6 @@ class AtomGroupPerceiver():
                             atom_info = AtomData(etab.GetAtomicNum(atm1.element), atm1.coord, atm1.serial_number)
                             atm_map[atm2.name].add_nb_info([atom_info])
 
-            # New atom groups set.
-            atm_grps = set()
-
             for atms_str in self.default_properties[target_compound.resname]:
                 nb_atoms = []
                 missing_atoms = []
@@ -459,7 +538,7 @@ class AtomGroupPerceiver():
                     if len(missing_atoms) == 1 and missing_atoms[0] == "OXT":
                         # If there is no successor compound, it may be an indication that there is a missing atom, the OXT in this case.
                         # But, sometimes not having the successor compound may be caused by missing compounds instead of missing atoms.
-                        # As it is not so important, we will always print the alert.
+                        # As it is not so important, we will only print a warning.
                         if "next" not in neighbors:
                             logger.warning("The group composed by the atoms '%s' will be ignored because the OXT atom is missing in the "
                                            "compound %s. If the atom is not the C-terminal just ignore this message. "
@@ -514,10 +593,14 @@ class AtomGroupPerceiver():
 
             # Define a new graph as a dict object: each key is a serial number and the values are dictionaries with the serial
             # number of each neighbor of an atom. The algorithm of Bellman Ford requires weights, so we set all weights to 1.
-            nb_graph = {atm.serial_number: None for atm in atm_map.values()}
+            nb_graph = defaultdict(dict)
             for atm in atm_map.values():
+
                 # Add the neighbors of this atom. The number '1' defined below represents the edge weight. But, right now it's not used.
-                nb_graph[atm.serial_number] = {i.serial_number: 1 for i in atm.neighbors_info if i.serial_number in nb_graph}
+                for nb_info in atm.neighbors_info:
+                    nb_graph[atm.serial_number][nb_info.serial_number] = 1
+                    nb_graph[nb_info.serial_number][atm.serial_number] = 1
+
                 # Set the graph dictionary to each ExtendedAtom object. Since, dictionaries are passed as references, we can change
                 # the variable nb_graph and the changes will be updated in each ExtendedAtom object automatically.
                 atm.set_neighborhood(nb_graph)
@@ -663,7 +746,7 @@ class AtomGroupPerceiver():
 class AtomGroupNeighborhood:
 
     def __init__(self, atm_grps, bucket_size=10):
-        self.atm_grps = atm_grps
+        self.atm_grps = list(atm_grps)
 
         # get the coordinates
         coord_list = [ga.centroid for ga in self.atm_grps]
