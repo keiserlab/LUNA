@@ -95,13 +95,11 @@ class InteractionType():
         return interactions
 
     def get_partner(self, comp):
-        partner = None
         if comp == self.src_grp:
-            partner = self.trgt_grp
+            return self.trgt_grp
         elif comp == self.trgt_grp:
-            partner = self.src_grp
-
-        return partner
+            return self.src_grp
+        return None
 
     def is_directional(self):
         return self.directional
@@ -157,7 +155,7 @@ class InteractionType():
             # For example, Class(X,Y) would be considered different from Class(Y,X).
             # However, in both cases the interactions should be considered the same.
             # Then, the next line turns the order dependent arguments into an independent order data.
-            comp_values_as_tuple = tuple(sorted([self.src_grp, self.trgt_grp], key=hash))
+            comp_values_as_tuple = tuple(sorted([self.src_grp, self.trgt_grp]))
             self._hash_cache = hash(tuple([comp_values_as_tuple, self.type, params_as_tuple]))
 
         return self._hash_cache
