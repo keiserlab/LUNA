@@ -236,10 +236,15 @@ class PymolSessionManager:
             # Check if the interaction involves the same compound: intramolecular interactions.
             inter_grp = "intra" if inter.is_intramol_interaction() else "inter"
 
-            src_grp_name = "+".join(["%s-%s-%d%s" % (c.parent.id, c.resname, c.id[1], c.id[2].strip()) for c in sorted(inter.src_grp.compounds)])
-            trgt_grp_name = "+".join(["%s-%s-%d%s" % (c.parent.id, c.resname, c.id[1], c.id[2].strip()) for c in sorted(inter.trgt_grp.compounds)])
+            src_grp_name = "+".join(["%s-%s-%d%s" % (c.parent.id, c.resname, c.id[1], c.id[2].strip())
+                                    for c in sorted(inter.src_grp.compounds)])
+
+            trgt_grp_name = "+".join(["%s-%s-%d%s" % (c.parent.id, c.resname, c.id[1], c.id[2].strip())
+                                     for c in sorted(inter.trgt_grp.compounds)])
+
             inter_name = "%s.all_inters.%s.%s.i%d_%s_and_%s.line" % (add_to_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type],
-                                                                       i, src_grp_name, trgt_grp_name)
+                                                                     i, src_grp_name, trgt_grp_name)
+
             self.wrapper.distance(inter_name, obj1_name, obj2_name)
             self.wrapper.hide([("label", inter_name)])
 
