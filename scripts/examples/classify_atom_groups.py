@@ -15,14 +15,6 @@ atom_names = None
 with open(atom_names_map, "r") as IN:
     atom_names = json.load(IN)
 
-rdkit_fdef = '../data/BaseFeatures_DIP2_NoMicrospecies.fdef'
-rdkit_bff = ChemicalFeatures.BuildFeatureFactory(rdkit_fdef)
-rdkit_extractor = FeatureExtractor(rdkit_bff)
-
-napoli_fdef = '../data/Napoli.fdef'
-napoli_bff = ChemicalFeatures.BuildFeatureFactory(napoli_fdef)
-napoli_extractor = FeatureExtractor(napoli_bff)
-
 # Amino acids
 sdf_path = "../tmp/pharma_rules/amino"
 sdf_files = glob.glob('%s/ALA*.sdf' % sdf_path)
@@ -34,8 +26,6 @@ sdf_files = glob.glob('%s/%s*.sdf' % (sdf_path, lig))
 
 #mols = [Chem.MolFromMolFile(m) for m in sdf_files]
 
-feature_extractor = rdkit_extractor
-feature_extractor = napoli_extractor
 
 # Sulfinic (Thiourea dioxide)
 # RDKit original: DefineFeature AcidicGroup [C,S](=[O,S,P])-[O;H1,H0&-1]
@@ -677,18 +667,95 @@ smiles = '[O-][N+](=O)c1cc(ccc1NCc1ccco1)C(F)(F)F'
 
 # smiles = 'N[C@@H](CS)C(O)=O'
 
+
+
+# Hydrophobic analysis
+
+# TRP
+smiles = 'N[C@@H](Cc1c[nH]c2ccccc12)C(O)=O'
+# TYR
+smiles = 'N[C@@H](Cc1ccc(O)cc1)C(O)=O'
+# PHE
+smiles = 'N[C@@H](Cc1ccccc1)C(O)=O'
+
+# Fluorine
+# PDB: 1P2A, Lig: 5BN
+smiles = 'NCCNc1cc(-c2ccc[nH]2)c2C(=O)Nc3ccc(F)c1c23'
+
+# # Chlorine
+# # PDB: 7STD, Lig: CRP
+# smiles = 'CC[C@]1([C@@H](C)C1(Cl)Cl)C(=O)N[C@H](C)c1ccc(Cl)cc1'
+
+# # Bromine
+# # PDB: 4STD, Lig: BFS
+# smiles = 'C[C@@H](NC(=O)c1cc(F)ccc1O)c1ccc(Br)cc1'
+
+# # Iodine
+# # PDB: 1THA, Lig: T33
+# smiles = 'N[C@@H](Cc1ccc(Oc2ccc(O)c(I)c2)c(I)c1)C(O)=O'
+
+smiles = 'Nc1ncnc(n1)-c1cc(ccc1O)C#N'
+smiles = 'C1=CC2=CC5=CC=C(C=C4C=CC(C=C3C=CC(=CC1=N2)N3)=N4)N5'
+smiles = 'C1CCC2CCCCC2C1'
+smiles = 'N1NNN2NNNNN2N1'
+smiles = 'C1CCCNCC1'
+
+# 9-membered aromatic ring
+# smiles = 'C1=CC=CNC=CC=C1'
+# 8-membered aromatic ring
+smiles = '[CH-]1\\C=C/[CH-]\\C=C/C=C\\1'
+
+# 7-membered ring
+smiles = 'O1C=CC=CC=C1'
+smiles = 'C1CCCSCC1'
+# smiles = 'C1CCCOCC1'
+# smiles = 'C1=CC=COC=C1'
+# smiles = 'S1C=CC=CC=C1'
+# smiles = 'C1CCCNCC1'
+# smiles = 'C1=CC=CNC=C1'
+
+# smiles = 'c1cccccc1'
+
+# smiles = 'C1=CCCC1'
+# smiles = 'C1CSCCN1'
+# smiles = 'C1CCCCC1'
+
+# smiles = 'N=1\\C=C/C=C\\C=C/C=1'
+# smiles = 'c1ccccccc1'
+# smiles = 'c1cccnccc1'
+
+# Benzene
+# smiles = 'C1=CC=CC=C1'
+# Pyridine
+# smiles = 'C1=CC=NC=C1'
+
+# Pyrrole
+smiles = 'N1C=CC=C1'
+# Pyrazine
+smiles = 'C1=CN=CC=N1'
+
+
 print()
 print(smiles)
 print()
 
+napoli_fdef = '../data/Napoli.fdef'
+# napoli_fdef = '../data/BaseFeatures_DIP2_NoMicrospecies.fdef'
+
+napoli_bff = ChemicalFeatures.BuildFeatureFactory(napoli_fdef)
+napoli_extractor = FeatureExtractor(napoli_bff)
+feature_extractor = napoli_extractor
+
+
 mols = [Chem.MolFromSmiles(smiles)]
 
 CHEMICAL_FEATURE_IDS = {
-    # "Aromatic": 1,
+    "Aromatic": 1,
     # "Acceptor": 2,
     # "Donor": 3,
-    # "Hydrophobe": 4,
-    # "Hydrophobic": 5,
+    "Hydrophobe": 4,
+    "Hydrophobic": 5,
+    "LumpedHydrophobe": 13,
     # "Negative": 6,
     # "Positive": 7,
     # "Negatively ionizable": 8,
@@ -696,14 +763,13 @@ CHEMICAL_FEATURE_IDS = {
     # "Halogen donor": 10,
     # "Halogen acceptor": 11,
     # "Metal": 12,
-    # "Lumped hydrophobe": 13,
     # "Weak donor": 14,
     # "Weak acceptor": 15,
-    "Electrophile": 16,
-    "Nucleophile": 17,
+    # "Electrophile": 16,
+    # "Nucleophile": 17,
     # "Chalcogen donor": 19,
     # "Amide": 21,
-    # "Atom": 22
+    "Atom": 22
 }
 
 for rdmol in mols:

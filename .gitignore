@@ -20,19 +20,9 @@ www/data
 __pycache__
 scripts/output
 
-scripts/0V8JNH63KZ8WOXAIJMJSSCA4BKW2J0FH_level-6_Sphere-768508393\.pse
-
-scripts/3qqk\.pdb
-
 *.pdb
 
 *.output
-
-scripts/out2
-
-scripts/output1
-
-scripts/output2
 
 *.csv
 
@@ -40,18 +30,11 @@ scripts/compare_molecules\.py
 
 scripts/molecules_with_error\.py
 
-scripts/calc\.ods
-
 scripts/obsolete/
-
-Untitled 1\.ods
 
 scripts/connect_to_server\.sh
 
-scripts/napoli\.log\.1
+scripts/napoli\.log*
 
-scripts/mol/interaction/\.fuse_hidden0000450000000003
-
-scripts/mol/\.fuse_hidden0000465800000003
-
-scripts/mol/interaction/\.fuse_hidden0000585900000004
+*\.fuse_hidden*
+scripts/classify_atom_groups\.py
