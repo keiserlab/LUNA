@@ -59,7 +59,7 @@ class DefaultInteractionConf(InteractionConf):
         conf["max_ha_dist_hb_inter"] = 2.8
         conf["min_dha_ang_hb_inter"] = 90
         conf["min_har_ang_hb_inter"] = 90
-        conf["min_dar_ang_hb_inter"] = 80
+        conf["min_dar_ang_hb_inter"] = 90
 
         # Weak hydrogen bond
         # Ref: Panigrahi, S. K. & Desiraju, G. R. (2007).
@@ -177,7 +177,10 @@ class DefaultInteractionConf(InteractionConf):
         conf["vdw_clash_tolerance"] = 0.6
 
         # From Chimera: https://www.cgl.ucsf.edu/chimerax/docs/user/commands/clashes.html
-        conf["min_bond_separation"] = 4
+        # Controls all interactions, except clashes that has its own parameter.
+        conf["min_bond_separation"] = 3
+        # Controls only clashes.
+        conf["min_bond_separation_for_clash"] = 4
 
         conf["boundary_cutoff"] = 6.2
 
