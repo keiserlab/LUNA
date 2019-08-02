@@ -1716,16 +1716,22 @@ class InteractionCalculator:
                 # Covalent bonds keep atoms very tightly, producing distances lower than their sum of Van der Waals radius.
                 # As a consequence the algorithm will find a lot of false clashes and Van der Waals interactions.
                 shortest_path_size = group1.atoms[0].get_shortest_path_size(group2.atoms[0], merge_neighborhods)
-                if shortest_path_size <= self.inter_conf.conf.get("min_bond_separation", 0):
-                    return []
 
                 # r1 + r2 - d < 0 => no clash
                 # r1 + r2 - d = 0 => in the limit, i.e., spheres are touching.
                 # r1 + r2 - d > 0 => clash.
                 if (rdw1 + rdw2 - cc_dist) >= self.inter_conf.conf.get("vdw_clash_tolerance", 0):
+                    # Checks if the number of bonds matches the criterion for clashes.
+                    if shortest_path_size <= self.inter_conf.conf.get("min_bond_separation_for_clash", 0):
+                        return []
+
                     inter = InteractionType(group1, group2, "Van der Waals clash", params=params)
                     interactions.append(inter)
                 elif cc_dist <= rdw1 + rdw2 + self.inter_conf.conf.get("vdw_tolerance", 0):
+                    # Checks if the number of bonds matches the general criterion.
+                    if shortest_path_size <= self.inter_conf.conf.get("min_bond_separation", 0):
+                        return []
+
                     inter = InteractionType(group1, group2, "Van der Waals", params=params)
                     interactions.append(inter)
 
