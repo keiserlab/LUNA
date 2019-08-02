@@ -72,6 +72,8 @@ class AtomGroupsManager():
                 yield atm_grp
 
     def add_atm_grps(self, atm_grps):
+        atm_grps = atm_grps or []
+
         self._atm_grps = list(set(self._atm_grps + list(atm_grps)))
 
         for atm_grp in atm_grps:
@@ -91,7 +93,7 @@ class AtomGroupsManager():
             if key in self.child_dict:
                 del self.child_dict[key]
 
-    def update_atm_grp(self, atoms, features=None, interactions=None):
+    def new_atm_grp(self, atoms, features=None, interactions=None):
             key = tuple(sorted(atoms))
             features = features or []
             interactions = interactions or []
@@ -100,6 +102,7 @@ class AtomGroupsManager():
                 atm_grp = self.child_dict[key]
             else:
                 atm_grp = AtomGroup(atoms)
+                self.add_atm_grps([atm_grp])
 
             if features:
                 atm_grp.add_features(features)
@@ -149,7 +152,7 @@ class AtomGroupsManager():
         # Create AtomGroup objects for the hydrophobe islands
         for island_id in hydrop_islands:
             # It will update an existing atom group or create a new one with the informed parameters.
-            hydrophobe = self.update_atm_grp(hydrop_islands[island_id], [ChemicalFeature("Hydrophobe")])
+            hydrophobe = self.new_atm_grp(hydrop_islands[island_id], [ChemicalFeature("Hydrophobe")])
             # Update the island information
             hydrop_islands[island_id] = hydrophobe
 
@@ -190,9 +193,6 @@ class AtomGroupsManager():
         # Remove atom-atom hydrophobic interactions.
         interactions_mngr.remove_interactions(hydrop_interactions)
 
-        # Update the list of atom groups with the new atom groups (hydrophobic islands).
-        self.add_atm_grps(hydrop_islands.values())
-
         for atm_grp in hydrop_atm_grps:
             features = [f for f in atm_grp.features if f.name != "Hydrophobic"]
 
@@ -204,6 +204,11 @@ class AtomGroupsManager():
     def __len__(self):
         # Number of atom groups.
         return self.size
+
+    def __iter__(self):
+        """Iterate over children."""
+        for atm_grp in self.atm_grps:
+            yield atm_grp
 
 
 class AtomGroup():
@@ -256,6 +261,8 @@ class AtomGroup():
     @features.setter
     def features(self, features):
         self._features = features
+        # Reset hash.
+        self._hash_cache = None
 
     @property
     def feature_names(self):
@@ -292,7 +299,6 @@ class AtomGroup():
         return target_interactions
 
     def get_shortest_path_size(self, trgt_grp, merge_neighborhoods=False):
-
         if merge_neighborhoods:
             nb_graph = {**self.atoms[0].neighborhood, **trgt_grp.atoms[0].neighborhood}
         else:
@@ -310,9 +316,13 @@ class AtomGroup():
 
     def add_features(self, features):
         self._features = list(set(self.features + list(features)))
+        # Reset hash.
+        self._hash_cache = None
 
     def remove_features(self, features):
         self._features = list(set(self.features) - set(features))
+        # Reset hash.
+        self._hash_cache = None
 
     def add_interactions(self, interactions):
         self._interactions = list(set(self.interactions + list(interactions)))
@@ -381,7 +391,6 @@ class AtomGroup():
     def __lt__(self, other):
         atms1 = tuple(sorted(self.atoms))
         atms2 = tuple(sorted(other.atoms))
-
         return atms1 < atms2
 
     def __len__(self):
@@ -393,9 +402,8 @@ class AtomGroup():
         if self._hash_cache is None:
             # Transform atoms and features list into an imutable data structure.
             # The lists are sorted in order to avoid dependence on appending order.
-            atoms_tuple = tuple(sorted(self.atoms, key=hash))
-            feat_tuple = tuple(sorted(self.features, key=hash))
-
+            atoms_tuple = tuple(sorted(self.atoms))
+            feat_tuple = tuple(sorted(self.features))
             self._hash_cache = hash((atoms_tuple, feat_tuple))
         return self._hash_cache
 
@@ -437,14 +445,17 @@ class AtomGroupPerceiver():
 
         perceived_atm_grps = set()
 
-        for comp in compounds:
-            atm_grps = None
-            if self.default_properties is not None:
-                atm_grps = self._get_default_properties(comp)
+        self.atm_grps_mngr = AtomGroupsManager()
 
-            if atm_grps is None:
-                logger.info("It will try to perceive the features of the compound %s as no predefined properties was provided."
-                            % comp)
+        for comp in compounds:
+            props_set = False
+
+            if self.default_properties is not None:
+                props_set = self._set_default_properties(comp)
+
+            if props_set is False:
+                logger.info("It will try to perceive the features of the compound %s as no predefined properties "
+                            "was provided." % comp)
 
                 mol_obj = mol_objs_dict.get(comp.id, None)
 
@@ -461,12 +472,12 @@ class AtomGroupPerceiver():
                 # Recover all atoms from the previous selected compounds.
                 atoms = tuple([a for r in comp_list for a in r.get_unpacked_list() if comp_sel.accept_atom(a)])
 
-                atm_grps = self._get_calculated_properties(comp, atoms, comp_sel, mol_obj)
+                props_set = self._calculate_properties(comp, atoms, comp_sel, mol_obj)
 
-            if atm_grps:
-                perceived_atm_grps.update(atm_grps)
+            if not props_set:
+                logger.warning("Features for the compound '%s' were not correctly perceived." % comp)
 
-        return AtomGroupsManager(perceived_atm_grps)
+        return self.atm_grps_mngr
 
     def _get_proximal_compounds(self, target_compound):
         model = target_compound.get_parent_by_level('M')
@@ -475,7 +486,7 @@ class AtomGroupPerceiver():
         # Sorted by the compound order as in the PDB.
         return sorted(list(set([p[1] for p in proximal])), key=lambda r: r.idx)
 
-    def _get_default_properties(self, target_compound):
+    def _set_default_properties(self, target_compound):
         #
         # TODO: Limitations in this method, although not so impactful:
         #           - How to detect if the compound is the first one? In this case the N should be +.
@@ -487,189 +498,197 @@ class AtomGroupPerceiver():
         #
         # This function only works if the user informed default properties to the target compound.
         if target_compound.resname in self.default_properties:
-            atm_sel = AtomSelector(keep_altloc=False, keep_hydrog=False)
-            atm_map = {atm.name: ExtendedAtom(atm) for atm in target_compound.get_atoms() if atm_sel.accept_atom(atm)}
+            try:
+                atm_sel = AtomSelector(keep_altloc=False, keep_hydrog=False)
+                atm_map = {atm.name: ExtendedAtom(atm) for atm in target_compound.get_atoms() if atm_sel.accept_atom(atm)}
 
-            atms_in_ss_bonds = set()
+                atms_in_ss_bonds = set()
 
-            # It stores compounds covalently bound to the informed compound.
-            neighbors = set()
+                # It stores compounds covalently bound to the informed compound.
+                neighbors = set()
+
+                if target_compound.is_water() is False:
+                    model = target_compound.get_parent_by_level('M')
+                    cov_atoms = get_cov_contacts_for_entity(entity=model, source=target_compound)
+
+                    for atm1, atm2 in cov_atoms:
+                        # Validate the atoms using the AtomSelector created previously.
+                        if atm_sel.accept_atom(atm1) and atm_sel.accept_atom(atm2):
+                            # Add all compounds covalently bonded to the target compound into the neighbors list.
+                            if atm1.parent != target_compound:
+                                neighbors.add(atm1.parent)
+                            if atm2.parent != target_compound:
+                                neighbors.add(atm2.parent)
+
+                            if atm1.parent != atm2.parent and atm1.parent.resname == "CYS" and atm2.parent.resname == "CYS":
+                                atms_in_ss_bonds.add(atm_map[atm1.name])
+                                atms_in_ss_bonds.add(atm_map[atm2.name])
+
+                            # If the atom 1 belongs to the target and is not a hydrogen, add atom 2 to its neighbor list.
+                            if atm1.parent == target_compound and atm1.element != "H":
+                                atom_info = AtomData(etab.GetAtomicNum(atm2.element), atm2.coord, atm2.serial_number)
+                                atm_map[atm1.name].add_nb_info([atom_info])
+                            # If the atom 2 belongs to the target and is not a hydrogen, add atom 1 to its neighbor list.
+                            if atm2.parent == target_compound and atm2.element != "H":
+                                atom_info = AtomData(etab.GetAtomicNum(atm1.element), atm1.coord, atm1.serial_number)
+                                atm_map[atm2.name].add_nb_info([atom_info])
+
+                for atms_str in self.default_properties[target_compound.resname]:
+                    atoms = []
+                    missing_atoms = []
+                    for atm_name in atms_str.split(","):
+                        if atm_name in atm_map:
+                            atoms.append(atm_map[atm_name])
+                        else:
+                            missing_atoms.append(atm_name)
+
+                    if missing_atoms:
+                        # If the only missing atom is the OXT.
+                        if len(missing_atoms) == 1 and missing_atoms[0] == "OXT":
+                            # If there is no successor compound, it may be an indication that there is a missing atom, the OXT in this case.
+                            # But, sometimes not having the successor compound may be caused by missing compounds instead of missing atoms.
+                            # As it is not so important, we will only print a warning.
+                            if "next" not in neighbors:
+                                logger.warning("The group composed by the atoms '%s' will be ignored because the OXT atom is missing "
+                                               "in the compound %s. If the atom is not the C-terminal just ignore this message. "
+                                               % (atms_str.replace(",", ", "), target_compound))
+                        else:
+                            logger.warning("The group composed by the atoms '%s' will be ignored because some of them were not found in "
+                                           "the compound %s. The missing atoms are: %s." % (atms_str.replace(",", ", "), target_compound,
+                                                                                            ", ".join(missing_atoms)))
+                    else:
+                        # It checks if a cysteine atom is establishing a disulfide bond. If it does, it will read a predefined set of
+                        # properties (SS_BOND_FEATURES). In this case, the SG is hydrophobic and is not a donor anymore.
+                        if target_compound.is_aminoacid() and target_compound.resname == "CYS" and atoms[0] in atms_in_ss_bonds:
+                            features = [ChemicalFeature(f) for f in SS_BOND_FEATURES]
+                        else:
+                            features = [ChemicalFeature(f) for f in self.default_properties[target_compound.resname][atms_str].split(",")]
+
+                        # It considers all first compounds in the chain as the N-terminal and won't evaluate if there are missing compounds
+                        # in the N-terminal. Since not all PDBs will have a 'REMARK 465 MISSING RESIDUES' field and, also, given that this
+                        # field is not reliable enough, the best way to deal with the N-terminal would be by aligning the structure with
+                        # the protein sequence. However, it would force one to provide the sequence and it would also increase the
+                        # processing time only to identify if the compound is an N-terminal or not. In most of the cases, the first
+                        # compound will be the N-terminal. Moreover, in general (maybe always), the binding sites will not be at the ends
+                        # of the protein. Therefore, I opted to always attribute a 'PositivelyIonizable' property to the N atom from the
+                        # first compound in the chain.
+                        if atms_str == "N" and target_compound.idx == 0:
+                            features.append(ChemicalFeature("PositivelyIonizable"))
+
+                        self.atm_grps_mngr.new_atm_grp(atoms, list(set(features)))
+
+                # Check for amides only when the target is an amino acid.
+                if target_compound.is_aminoacid():
+                    for nb in neighbors:
+                        # Ignore compounds that are not amino acids.
+                        if not nb.is_aminoacid():
+                            continue
+                        # Recover valid atoms by applying an atom selection.
+                        nb_atms = {atm.name: atm for atm in nb.get_atoms() if atm_sel.accept_atom(atm)}
+                        if nb.idx < target_compound.idx:
+                            # If this compound is neighbor of the target compound N, then they form an amide (N-C=O).
+                            if "N" in atm_map and "O" in nb_atms and "C" in nb_atms and atm_map["N"].is_neighbor(nb_atms["C"]):
+                                # Define an amide group and add it to the compound groups.
+                                # In the atm_map, the atoms were already transformed into ExtendedAtoms().
+                                amide = [atm_map["N"], ExtendedAtom(nb_atms["C"]), ExtendedAtom(nb_atms["O"])]
+
+                                self.atm_grps_mngr.new_atm_grp(amide, [ChemicalFeature("Amide")])
+
+                        elif nb.idx > target_compound.idx:
+                            # If this compound is neighbor of the target compound C, then they form an amide (N-C=O).
+                            if "N" in nb_atms and "O" in atm_map and "C" in atm_map and atm_map["C"].is_neighbor(nb_atms["N"]):
+                                # Define an amide group and add it to the compound groups.
+                                # In the atm_map, the atoms were already transformed into ExtendedAtoms().
+                                amide = [ExtendedAtom(nb_atms["N"]), atm_map["C"], atm_map["O"]]
+
+                                self.atm_grps_mngr.new_atm_grp(amide, [ChemicalFeature("Amide")])
+
+                # Define a new graph as a dict object: each key is a serial number and the values are dictionaries with the serial
+                # number of each neighbor of an atom. The algorithm of Bellman Ford requires weights, so we set all weights to 1.
+                nb_graph = defaultdict(dict)
+                for atm in atm_map.values():
+                    # Add the neighbors of this atom. The number '1' defined below represents the edge weight. But, right now it's not used.
+                    for nb_info in atm.neighbors_info:
+                        nb_graph[atm.serial_number][nb_info.serial_number] = 1
+                        nb_graph[nb_info.serial_number][atm.serial_number] = 1
+
+                    # Set the graph dictionary to each ExtendedAtom object. Since, dictionaries are passed as references, we can change
+                    # the variable nb_graph and the changes will be updated in each ExtendedAtom object automatically.
+                    atm.set_neighborhood(nb_graph)
+                return True
+            except Exception as e:
+                logger.exception(e)
+                return False
+        return False
+
+    def _calculate_properties(self, target_compound, target_atoms, compound_selector, mol_obj=None):
+
+        try:
+            # If no OBMol was defined, create a new one through the compound list.
+            mol_obj = mol_obj or self._get_mol_from_entity(target_compound.get_parent_by_level('M'), compound_selector)
+            mol_obj = MolWrapper(mol_obj)
+
+            if mol_obj.get_num_heavy_atoms() != len(target_atoms):
+                raise MoleculeSizeError("The number of heavy atoms in the PDB selection and in the MOL file are different.")
+
+            # Ignore hydrogen atoms.
+            atm_obj_list = [atm for atm in mol_obj.get_atoms() if atm.get_atomic_num() != 1]
+
+            atm_map = {}
+            trgt_atms = {}
+            for i, atm_obj in enumerate(atm_obj_list):
+                atm_map[atm_obj.get_idx()] = target_atoms[i].serial_number
+                trgt_atms[target_atoms[i].serial_number] = ExtendedAtom(target_atoms[i])
+
+            # Set all neighbors, i.e., covalently bonded atoms.
+            for bond_obj in mol_obj.get_bonds():
+                bgn_atm_obj = bond_obj.get_begin_atom()
+                end_atm_obj = bond_obj.get_end_atom()
+
+                # At least one of the atoms must be a non-hydrogen atom.
+                if bgn_atm_obj.get_atomic_num() != 1 or end_atm_obj.get_atomic_num() != 1:
+                    # If the atom 1 is not a hydrogen, add atom 2 to its neighbor list.
+                    if bgn_atm_obj.get_atomic_num() != 1:
+                        serial_number = atm_map.get(end_atm_obj.get_idx())
+                        coord = mol_obj.get_atom_coord_by_id(end_atm_obj.get_id())
+                        atom_info = AtomData(end_atm_obj.get_atomic_num(), coord, serial_number)
+                        trgt_atms[atm_map[bgn_atm_obj.get_idx()]].add_nb_info([atom_info])
+                    # If the atom 2 is not a hydrogen, add atom 1 to its neighbor list.
+                    if end_atm_obj.get_atomic_num() != 1:
+                        serial_number = atm_map.get(bgn_atm_obj.get_idx())
+                        coord = mol_obj.get_atom_coord_by_id(bgn_atm_obj.get_id())
+                        atom_info = AtomData(bgn_atm_obj.get_atomic_num(), coord, serial_number)
+                        trgt_atms[atm_map[end_atm_obj.get_idx()]].add_nb_info([atom_info])
+
+            group_features = self.feature_extractor.get_features_by_groups(mol_obj, atm_map)
 
             # New atom groups set.
             atm_grps = set()
 
-            if target_compound.is_water() is False:
-                model = target_compound.get_parent_by_level('M')
-                cov_atoms = get_cov_contacts_for_entity(entity=model, source=target_compound)
+            for key in group_features:
+                grp_obj = group_features[key]
 
-                for atm1, atm2 in cov_atoms:
-                    # Validate the atoms using the AtomSelector created previously.
-                    if atm_sel.accept_atom(atm1) and atm_sel.accept_atom(atm2):
-                        # Add all compounds covalently bonded to the target compound into the neighbors list.
-                        if atm1.parent != target_compound:
-                            neighbors.add(atm1.parent)
-                        if atm2.parent != target_compound:
-                            neighbors.add(atm2.parent)
+                # It only accepts groups containing at least one atom from the target compound.
+                if any([trgt_atms[i].parent == target_compound for i in grp_obj["atm_ids"]]) is False:
+                    continue
 
-                        if atm1.parent != atm2.parent and atm1.parent.resname == "CYS" and atm2.parent.resname == "CYS":
-                            atms_in_ss_bonds.add(atm_map[atm1.name])
-                            atms_in_ss_bonds.add(atm_map[atm2.name])
+                atoms = [trgt_atms[i] for i in grp_obj["atm_ids"]]
 
-                        # If the atom 1 belongs to the target and is not a hydrogen, add atom 2 to its neighbor list.
-                        if atm1.parent == target_compound and atm1.element != "H":
-                            atom_info = AtomData(etab.GetAtomicNum(atm2.element), atm2.coord, atm2.serial_number)
-                            atm_map[atm1.name].add_nb_info([atom_info])
-                        # If the atom 2 belongs to the target and is not a hydrogen, add atom 1 to its neighbor list.
-                        if atm2.parent == target_compound and atm2.element != "H":
-                            atom_info = AtomData(etab.GetAtomicNum(atm1.element), atm1.coord, atm1.serial_number)
-                            atm_map[atm2.name].add_nb_info([atom_info])
-
-            for atms_str in self.default_properties[target_compound.resname]:
-                nb_atoms = []
-                missing_atoms = []
-                for atm_name in atms_str.split(","):
-                    if atm_name in atm_map:
-                        nb_atoms.append(atm_map[atm_name])
-                    else:
-                        missing_atoms.append(atm_name)
-
-                if missing_atoms:
-                    # If the only missing atom is the OXT.
-                    if len(missing_atoms) == 1 and missing_atoms[0] == "OXT":
-                        # If there is no successor compound, it may be an indication that there is a missing atom, the OXT in this case.
-                        # But, sometimes not having the successor compound may be caused by missing compounds instead of missing atoms.
-                        # As it is not so important, we will only print a warning.
-                        if "next" not in neighbors:
-                            logger.warning("The group composed by the atoms '%s' will be ignored because the OXT atom is missing in the "
-                                           "compound %s. If the atom is not the C-terminal just ignore this message. "
-                                           % (atms_str.replace(",", ", "), target_compound))
-                    else:
-                        logger.warning("The group composed by the atoms '%s' will be ignored because some of them were not found in "
-                                       "the compound %s. The missing atoms are: %s." % (atms_str.replace(",", ", "), target_compound,
-                                                                                        ", ".join(missing_atoms)))
-                else:
-                    # It checks if a cysteine atom is establishing a disulfide bond. If it does, it will read a predefined set of
-                    # properties (SS_BOND_FEATURES). In this case, the SG is hydrophobic and is not a donor anymore.
-                    if target_compound.is_aminoacid() and target_compound.resname == "CYS" and nb_atoms[0] in atms_in_ss_bonds:
-                        features = [ChemicalFeature(f) for f in SS_BOND_FEATURES]
-                    else:
-                        features = [ChemicalFeature(f) for f in self.default_properties[target_compound.resname][atms_str].split(",")]
-
-                    # It considers all first compounds in the chain as the N-terminal and won't evaluate if there are missing compounds
-                    # in the N-terminal. Since not all PDBs will have a 'REMARK 465 MISSING RESIDUES' field and, also, given that this
-                    # field is not reliable enough, the best way to deal with the N-terminal would be by aligning the structure with
-                    # the protein sequence. However, it would force one to provide the sequence and it would also increase the processing
-                    # time only to identify if the compound is an N-terminal or not. In most of the cases, the first compound will be the
-                    # N-terminal. Moreover, in general (maybe always), the binding sites will not be at the ends of the protein.
-                    # Therefore, I opted to always attribute a 'PositivelyIonizable' property to the N atom from the first
-                    # compound in the chain.
-                    if atms_str == "N" and target_compound.idx == 0:
-                        features.append(ChemicalFeature("PositivelyIonizable"))
-
-                    atm_grps.add(AtomGroup(nb_atoms, list(set(features))))
-
-            # Check for amides only when the target is an amino acid.
-            if target_compound.is_aminoacid():
-                for nb in neighbors:
-                    # Ignore compounds that are not amino acids.
-                    if not nb.is_aminoacid():
-                        continue
-                    # Recover valid atoms by applying an atom selection.
-                    nb_atms = {atm.name: atm for atm in nb.get_atoms() if atm_sel.accept_atom(atm)}
-                    if nb.idx < target_compound.idx:
-                        # If this compound is neighbor of the target compound N, then they form an amide (N-C=O).
-                        if "N" in atm_map and "O" in nb_atms and "C" in nb_atms and atm_map["N"].is_neighbor(nb_atms["C"]):
-                            # Define an amide group and add it to the compound groups.
-                            # In the atm_map, the atoms were already transformed into ExtendedAtoms().
-                            amide = [atm_map["N"], ExtendedAtom(nb_atms["C"]), ExtendedAtom(nb_atms["O"])]
-                            atm_grps.add(AtomGroup(amide, [ChemicalFeature("Amide")]))
-                    elif nb.idx > target_compound.idx:
-                        # If this compound is neighbor of the target compound C, then they form an amide (N-C=O).
-                        if "N" in nb_atms and "O" in atm_map and "C" in atm_map and atm_map["C"].is_neighbor(nb_atms["N"]):
-                            # Define an amide group and add it to the compound groups.
-                            # In the atm_map, the atoms were already transformed into ExtendedAtoms().
-                            amide = [ExtendedAtom(nb_atms["N"]), atm_map["C"], atm_map["O"]]
-                            atm_grps.add(AtomGroup(amide, [ChemicalFeature("Amide")]))
+                self.atm_grps_mngr.new_atm_grp(atoms, grp_obj["features"])
 
             # Define a new graph as a dict object: each key is a serial number and the values are dictionaries with the serial
             # number of each neighbor of an atom. The algorithm of Bellman Ford requires weights, so we set all weights to 1.
-            nb_graph = defaultdict(dict)
-            for atm in atm_map.values():
-
+            nb_graph = {atm.serial_number: None for atm in trgt_atms.values()}
+            for atm in trgt_atms.values():
                 # Add the neighbors of this atom. The number '1' defined below represents the edge weight. But, right now it's not used.
-                for nb_info in atm.neighbors_info:
-                    nb_graph[atm.serial_number][nb_info.serial_number] = 1
-                    nb_graph[nb_info.serial_number][atm.serial_number] = 1
-
+                nb_graph[atm.serial_number] = {i.serial_number: 1 for i in atm.neighbors_info if i.serial_number in nb_graph}
                 # Set the graph dictionary to each ExtendedAtom object. Since, dictionaries are passed as references, we can change
                 # the variable nb_graph and the changes will be updated in each ExtendedAtom object automatically.
                 atm.set_neighborhood(nb_graph)
-
-            return atm_grps
-
-    def _get_calculated_properties(self, target_compound, target_atoms, compound_selector, mol_obj=None):
-        # If no OBMol was defined, create a new one through the compound list.
-        mol_obj = mol_obj or self._get_mol_from_entity(target_compound.get_parent_by_level('M'), compound_selector)
-        mol_obj = MolWrapper(mol_obj)
-
-        if mol_obj.get_num_heavy_atoms() != len(target_atoms):
-            raise MoleculeSizeError("The number of heavy atoms in the PDB selection and in the MOL file are different.")
-
-        # Ignore hydrogen atoms.
-        atm_obj_list = [atm for atm in mol_obj.get_atoms() if atm.get_atomic_num() != 1]
-
-        atm_map = {}
-        trgt_atms = {}
-        for i, atm_obj in enumerate(atm_obj_list):
-            atm_map[atm_obj.get_idx()] = target_atoms[i].serial_number
-            trgt_atms[target_atoms[i].serial_number] = ExtendedAtom(target_atoms[i])
-
-        # Set all neighbors, i.e., covalently bonded atoms.
-        for bond_obj in mol_obj.get_bonds():
-            bgn_atm_obj = bond_obj.get_begin_atom()
-            end_atm_obj = bond_obj.get_end_atom()
-
-            # At least one of the atoms must be a non-hydrogen atom.
-            if bgn_atm_obj.get_atomic_num() != 1 or end_atm_obj.get_atomic_num() != 1:
-                # If the atom 1 is not a hydrogen, add atom 2 to its neighbor list.
-                if bgn_atm_obj.get_atomic_num() != 1:
-                    serial_number = atm_map.get(end_atm_obj.get_idx())
-                    coord = mol_obj.get_atom_coord_by_id(end_atm_obj.get_id())
-                    atom_info = AtomData(end_atm_obj.get_atomic_num(), coord, serial_number)
-                    trgt_atms[atm_map[bgn_atm_obj.get_idx()]].add_nb_info([atom_info])
-                # If the atom 2 is not a hydrogen, add atom 1 to its neighbor list.
-                if end_atm_obj.get_atomic_num() != 1:
-                    serial_number = atm_map.get(bgn_atm_obj.get_idx())
-                    coord = mol_obj.get_atom_coord_by_id(bgn_atm_obj.get_id())
-                    atom_info = AtomData(bgn_atm_obj.get_atomic_num(), coord, serial_number)
-                    trgt_atms[atm_map[end_atm_obj.get_idx()]].add_nb_info([atom_info])
-
-        group_features = self.feature_extractor.get_features_by_groups(mol_obj, atm_map)
-
-        # New atom groups set.
-        atm_grps = set()
-
-        for key in group_features:
-            grp_obj = group_features[key]
-
-            # It only accepts groups containing at least one atom from the target compound.
-            if any([trgt_atms[i].parent == target_compound for i in grp_obj["atm_ids"]]) is False:
-                continue
-
-            atoms = [trgt_atms[i] for i in grp_obj["atm_ids"]]
-            atm_grps.add(AtomGroup(atoms, grp_obj["features"]))
-
-        # Define a new graph as a dict object: each key is a serial number and the values are dictionaries with the serial
-        # number of each neighbor of an atom. The algorithm of Bellman Ford requires weights, so we set all weights to 1.
-        nb_graph = {atm.serial_number: None for atm in trgt_atms.values()}
-        for atm in trgt_atms.values():
-            # Add the neighbors of this atom. The number '1' defined below represents the edge weight. But, right now it's not used.
-            nb_graph[atm.serial_number] = {i.serial_number: 1 for i in atm.neighbors_info if i.serial_number in nb_graph}
-            # Set the graph dictionary to each ExtendedAtom object. Since, dictionaries are passed as references, we can change
-            # the variable nb_graph and the changes will be updated in each ExtendedAtom object automatically.
-            atm.set_neighborhood(nb_graph)
-
-        return atm_grps
+            return True
+        except Exception as e:
+            logger.exception(e)
+            return False
 
     def _get_mol_from_entity(self, entity, compound_selector):
         # First it saves the selection into a PDB file and then it converts the file to .mol.
