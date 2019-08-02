@@ -372,7 +372,8 @@ class Project:
                                        mol_obj_type=self.mol_obj_type, default_properties=self.default_properties,
                                        tmp_path="%s/tmp" % self.working_path)
 
-        nb_compounds = get_contacts_for_entity(entity, ligand, level='R', radius=getattr(self.inter_conf, "boundary_cutoff", 6.2))
+        radius = self.inter_conf.boundary_cutoff or BOUNDARY_CONF.boundary_cutoff
+        nb_compounds = get_contacts_for_entity(entity, ligand, level='R', radius=radius)
 
         mol_objs_dict = {}
         if isinstance(self.current_entry, MolEntry):
