@@ -12,12 +12,10 @@ def ob_atom_coordinates(ob_atoms):
     return np.array([(a.GetX(), a.GetY(), a.GetZ()) for a in ob_atoms])
 
 
-def axis_sum(arr):
+def axis_sum(arr, decimals=3):
     values = [0] * arr.shape[1]
-
     for i in range(0, arr.shape[1]):
-        values[i] = np.sum(arr[:, i])
-
+        values[i] = np.around(np.sum(arr[:, i]), decimals)
     return np.array(values)
 
 
@@ -31,18 +29,25 @@ def orthog_point(point, normal, t):
     return point + (normal * t)
 
 
-def centroid(arr):
-    return axis_sum(arr) / arr.shape[0]
+def centroid(arr, decimals=3):
+    return np.around(axis_sum(arr) / arr.shape[0], decimals)
 
 
-def euclidean_distance(p1, p2):
-    return distance.euclidean(p1, p2)
+def euclidean_distance(p1, p2, decimals=3):
+    return round(distance.euclidean(p1, p2), decimals)
 
 
-def angle(p1, p2):
-    cos_angle = np.dot(p1, p2) / (np.linalg.norm(p1) * np.linalg.norm(p2))
+def angle(p1, p2, decimals=3):
+    normal_prod = np.linalg.norm(p1) * np.linalg.norm(p2)
+
+    if normal_prod == 0:
+        return np.float32(0)
+
+    dot_prod = np.dot(p1, p2)
+    cos_angle = dot_prod / normal_prod
     arcos_angle = np.arccos(np.clip(cos_angle, -1, 1))
-    return np.degrees(arcos_angle)
+
+    return np.around(np.degrees(arcos_angle), 3)
 
 
 def norm_vector(p1, p2):
@@ -51,23 +56,23 @@ def norm_vector(p1, p2):
     return p2 - p1
 
 
-def to_quad1(angle):
+def to_quad1(angle, decimals=3):
     if (angle > 90 and angle <= 180):
-        return 180 - angle
+        return np.around((180 - angle), decimals)
     elif (angle > 180 and angle <= 270):
-        return angle - 180
+        return np.around((angle - 180), decimals)
     elif (angle > 270 and angle <= 360):
-        return 360 - angle
+        return np.around((360 - angle), decimals)
     else:
-        return angle
+        return np.around(angle, decimals)
 
 
 def plane(x, y, params):
     a = params[0]
     b = params[1]
     c = params[2]
-    z = a * x + b * y + c
-    return z
+
+    return a * x + b * y + c
 
 
 def error(params, points):
@@ -85,7 +90,7 @@ def cross(a, b):
             a[0] * b[1] - a[1] * b[0]]
 
 
-def calc_normal(points):
+def calc_normal(points, decimals=3):
     fun = functools.partial(error, points=points)
     params0 = [0, 0, 0]
 
@@ -104,6 +109,4 @@ def calc_normal(points):
 
     xs, ys, zs = zip(*points)
 
-    normal = np.array(cross([1, 0, a], [0, 1, b]))
-
-    return normal
+    return np.around(np.array(cross([1, 0, a], [0, 1, b])), decimals)
