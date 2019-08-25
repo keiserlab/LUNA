@@ -20,6 +20,8 @@ ELECTROPHILE_INTERS = ["Orthogonal multipolar", "Parallel multipolar", "Antipara
 UNFAVORABLE_INTERS = ["Repulsive", "Unfavorable anion-nucleophile", "Unfavorable cation-electrophile",
                       "Unfavorable nucleophile-nucleophile", "Unfavorable electrophile-electrophile"]
 
+WATER_NAMES = ['hoh', 'dod', 'wat', 'h2o', 'oh2']
+
 
 class PymolWrapper:
 
@@ -302,7 +304,7 @@ class PymolSessionManager:
         self.wrapper.set("sphere_scale", 0.2, {"selection": centroid})
 
     def set_last_details_to_view(self):
-        self.wrapper.set("sphere_scale", "0.3", {"selection": "visible and resn hoh+dod"})
+        self.wrapper.set("sphere_scale", "0.3", {"selection": "visible and resn %s" % "+".join(WATER_NAMES)})
         self.wrapper.hide([("everything", "elem H+D")])
         self.wrapper.center("visible")
 
