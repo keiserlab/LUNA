@@ -1,4 +1,5 @@
 from mol.entry import MolEntry
+from mol.interaction.calc import InteractionsManager
 from mol.wrappers.pymol import PymolWrapper, PymolSessionManager, mybio_to_pymol_selection
 from util.exceptions import PymolSessionNotInitialized
 
@@ -10,7 +11,7 @@ class InteractionViewer(PymolSessionManager):
         if not isinstance(self.wrapper, PymolWrapper):
             raise PymolSessionNotInitialized("No session was initialized.")
 
-        for (target_entry, interactions_mngr) in inter_tuples:
+        for target_entry, inter_data in inter_tuples:
             pdb_file = target_entry.pdb_file
             main_grp = target_entry.to_string(sep="-")
 
@@ -19,8 +20,13 @@ class InteractionViewer(PymolSessionManager):
             # Load PDB and extract hetatm.
             self.set_pdb_view(pdb_file, main_grp, mol_obj)
 
+            if isinstance(inter_data, InteractionsManager):
+                interactions = inter_data.interactions
+            else:
+                interactions = inter_data
+
             # Add interactions and styles.
-            self.set_interactions_view(interactions_mngr.interactions, main_grp)
+            self.set_interactions_view(interactions, main_grp)
 
         self.set_last_details_to_view()
 
