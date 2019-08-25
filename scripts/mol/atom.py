@@ -141,7 +141,7 @@ class ExtendedAtom:
     def __eq__(self, other):
         """Overrides the default implementation"""
         if isinstance(self, other.__class__):
-            return self._atom == other._atom
+            return self.full_atom_name == other.full_atom_name
         return False
 
     def __ne__(self, other):
@@ -157,4 +157,4 @@ class ExtendedAtom:
 
     def __hash__(self):
         """Overrides the default implementation"""
-        return hash(self._atom)
+        return hash(self.full_atom_name)
