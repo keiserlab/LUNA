@@ -176,7 +176,7 @@ def get_residue_neighbors(residue, select=Select()):
     # Get valid atoms according to the provided selection function.
     trgt_res_atms = {atm.name: atm for atm in residue.get_atoms() if select.accept_atom(atm)}
 
-    if residue.is_aminoacid():
+    if residue.is_residue():
         if "N" not in trgt_res_atms:
             logger.warning("There is a missing N in the residue %s. It may have been filtered out by the provided "
                            "selection function. So, the predecessor residue cannot be identified." % residue)
