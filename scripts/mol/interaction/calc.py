@@ -771,6 +771,11 @@ class InteractionCalculator:
                            "However, the informed groups have the features %s and %s." % (group1.feature_names, group2.feature_names))
             return []
 
+        # Ignore dipoles containing at least one common atom, which can happen to covalently bound dipoles.
+        # An example of it is the C-S-C substructure that contains two dipoles.
+        if any(atm in group2.atoms for atm in group1.atoms):
+            return []
+
         # Atom 1 => Dipole 1
         #
         # A nucleophile may have only 1 atom (water oxygen).
@@ -811,7 +816,6 @@ class InteractionCalculator:
 
             # No angle can be calculated if the electrophile (dipole 2) has only one atom.
             if len(dipole_grp2.atoms) == 1:
-
                 params = {"ne_dist_multipolar_inter": ne_dist,
                           "ney_ang_multipolar_inter": -1,
                           "disp_ang_multipolar_inter": -1,
@@ -867,17 +871,21 @@ class InteractionCalculator:
 
                                 if not dipole_type1 == dipole_type2:
                                     if self.is_within_boundary(an_ey_vect_angle, "max_an_ey_ang_para_multipolar_inter", le):
-                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Parallel multipolar", directional=True, params=params)
+                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Parallel multipolar",
+                                                                directional=True, params=params)
                                         interactions.append(inter)
                                     elif self.is_within_boundary(an_ey_vect_angle, "min_an_ey_ang_antipara_multipolar_inter", ge):
-                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Antiparallel multipolar", directional=True, params=params)
+                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Antiparallel multipolar",
+                                                                directional=True, params=params)
                                         interactions.append(inter)
                                     elif (self.is_within_boundary(an_ey_vect_angle, "min_an_ey_ang_ortho_multipolar_inter", ge) and
                                             self.is_within_boundary(an_ey_vect_angle, "max_an_ey_ang_ortho_multipolar_inter", le)):
-                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Orthogonal multipolar", directional=True, params=params)
+                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Orthogonal multipolar",
+                                                                directional=True, params=params)
                                         interactions.append(inter)
                                     else:
-                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Tilted multipolar", directional=True, params=params)
+                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Tilted multipolar",
+                                                                directional=True, params=params)
                                         interactions.append(inter)
                                 else:
                                     inter_type = "Unfavorable %s-%s" % (dipole_type1.lower(), dipole_type2.lower())
