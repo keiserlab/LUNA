@@ -1,5 +1,7 @@
+import re
 from pymol import cmd
 from pymol import util
+
 
 from mol.wrappers.cgo_arrow import cgo_arrow
 from mol.wrappers.base import MolWrapper
@@ -19,8 +21,6 @@ ELECTROPHILE_INTERS = ["Orthogonal multipolar", "Parallel multipolar", "Antipara
 
 UNFAVORABLE_INTERS = ["Repulsive", "Unfavorable anion-nucleophile", "Unfavorable cation-electrophile",
                       "Unfavorable nucleophile-nucleophile", "Unfavorable electrophile-electrophile"]
-
-WATER_NAMES = ['hoh', 'dod', 'wat', 'h2o', 'oh2']
 
 
 class PymolWrapper:
@@ -229,7 +229,17 @@ class PymolSessionManager:
 
             # Set the representation for each compound in the groups involved in the interaction.
             for compound in inter.src_grp.compounds.union(inter.trgt_grp.compounds):
-                comp_repr = "sphere" if compound.is_water() else "sticks"
+
+                if compound.is_water():
+                    comp_repr = "sphere"
+                elif compound.is_hetatm():
+                    if len(compound.child_list) == 1 or len([atm for atm in compound.child_list if atm.element != "H"]) == 1:
+                        comp_repr = "sphere"
+                    else:
+                        comp_repr = "sticks"
+                else:
+                    comp_repr = "sticks"
+
                 comp_sel = mybio_to_pymol_selection(compound)
                 self.wrapper.show([(comp_repr, comp_sel)])
                 carb_color = "green" if compound.is_target() else "gray"
@@ -284,7 +294,7 @@ class PymolSessionManager:
                 # Add the centroids to the group "grps" and append them to the main group
                 self._set_centroid_style(obj1_name)
             # Otherwise, just remove the centroid as it will not add any new information (the atom represented
-            # by the centroid is already been displayed).
+            # by the centroid is already the atom itself).
             else:
                 self.wrapper.delete([obj1_name])
 
@@ -304,7 +314,7 @@ class PymolSessionManager:
         self.wrapper.set("sphere_scale", 0.2, {"selection": centroid})
 
     def set_last_details_to_view(self):
-        self.wrapper.set("sphere_scale", "0.3", {"selection": "visible and resn %s" % "+".join(WATER_NAMES)})
+        self.wrapper.set("sphere_scale", "0.3", {"selection": "visible and not name PS*"})
         self.wrapper.hide([("everything", "elem H+D")])
         self.wrapper.center("visible")
 
@@ -342,5 +352,10 @@ def mybio_to_pymol_selection(entity):
                     params['resn'] = residue.resname
                     params['res'] = str(residue.id[1]) + residue.id[2].strip()
                     params['chain'] = residue.get_parent().id
+
+            if "resn" in params:
+                # Escape characters that can generate problems with Pymol
+                params['resn'] = params['resn'].replace("+", "\\+")
+                params['resn'] = params['resn'].replace("-", "\\-")
 
             return (' AND ').join(['%s %s' % (k, str(v)) for k, v in params.items()])
