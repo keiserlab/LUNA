@@ -15,14 +15,14 @@ def get_file_format(path, max_split=None):
 
 
 def get_filename(path, max_split=None):
-    return generic_splitext(path)[0]
+    return generic_splitext(path, max_split)[0]
 
 
 def generic_splitext(path, max_split=None):
     filename = basename(path)
 
     num_ext = filename.count('.') + 1
-    if (max_split is None or max_split < 1):
+    if max_split is None or max_split < 1:
         max_split = num_ext
     else:
         max_split = min(max_split, num_ext)
