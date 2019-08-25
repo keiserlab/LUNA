@@ -103,19 +103,19 @@ class InteractionFilter:
             return True
 
         # It ignores protein-protein interactions if it is required.
-        is_prot_prot = (src_grp.is_aminoacid() and trgt_grp.is_aminoacid())
+        is_prot_prot = (src_grp.is_residue() and trgt_grp.is_residue())
         if self.ignore_prot_prot and is_prot_prot:
             return False
 
         # It ignores protein-nucleic acid interactions if it is required.
-        is_prot_nucl = ((src_grp.is_aminoacid() and trgt_grp.is_nucleotide()) or
-                        (src_grp.is_nucleotide() and trgt_grp.is_aminoacid()))
+        is_prot_nucl = ((src_grp.is_residue() and trgt_grp.is_nucleotide()) or
+                        (src_grp.is_nucleotide() and trgt_grp.is_residue()))
         if self.ignore_prot_nucl and is_prot_nucl:
             return False
 
         # It ignores protein-ligand interactions if it is required.
-        is_prot_lig = ((src_grp.is_aminoacid() and trgt_grp.is_hetatm()) or
-                       (src_grp.is_hetatm() and trgt_grp.is_aminoacid()))
+        is_prot_lig = ((src_grp.is_residue() and trgt_grp.is_hetatm()) or
+                       (src_grp.is_hetatm() and trgt_grp.is_residue()))
         if self.ignore_prot_lig and is_prot_lig:
             return False
 
