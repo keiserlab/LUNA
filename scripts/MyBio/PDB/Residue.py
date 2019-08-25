@@ -150,14 +150,14 @@ class Residue(Entity):
         return self.get_id()[0] == "W"
 
     # MODBY: Alexandre Fassio
-    # Check if a residue is an hetero group.
+    # Check if a compound is a hetero group.
     def is_hetatm(self):
         """Return True if the residue is an hetero group."""
         return self.get_id()[0].startswith("H_")
 
     # MODBY: Alexandre Fassio
     # Check if a residue is an amino acid.
-    def is_aminoacid(self):
+    def is_residue(self):
         """Return True if the residue is an amino acid."""
         return self.get_id()[0] == " " and is_aa(self.resname)
 
@@ -165,7 +165,7 @@ class Residue(Entity):
     # Check if a residue is a nucleotide.
     def is_nucleotide(self):
         """Return True if the residue is a nucleic acid."""
-        return self.get_id()[0] == " " and not self.is_aminoacid()
+        return self.get_id()[0] == " " and not self.is_residue()
 
     # MODBY: Alexandre Fassio
     # Check if a residue is a target, i.e., if it will be used for any calculations.
@@ -179,8 +179,8 @@ class Residue(Entity):
             return "Water"
         if self.is_hetatm():
             return "Hetatm"
-        if self.is_aminoacid():
-            return "Amino acid"
+        if self.is_residue():
+            return "Residue"
         if self.is_nucleotide():
             return "Nucleotide"
 
