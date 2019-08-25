@@ -72,13 +72,13 @@ class ShellManager:
     def get_valid_shells(self):
         return [s for s in self.shells if s.is_valid()]
 
-    def get_shells_by_identifier(self, identifier, unique_shells=True):
+    def get_shells_by_identifier(self, identifier, unique_shells=False):
         if unique_shells:
             return [s for s in self.shells if s.identifier == identifier and s.is_valid()]
         else:
             return [s for s in self.shells if s.identifier == identifier]
 
-    def get_shells_by_level(self, level, unique_shells=True):
+    def get_shells_by_level(self, level, unique_shells=False):
         shells = []
 
         if level in self.levels:
@@ -91,7 +91,7 @@ class ShellManager:
 
         return shells
 
-    def get_shells_by_center(self, center, unique_shells=True):
+    def get_shells_by_center(self, center, unique_shells=False):
         shells = {}
 
         if center in self.centers:
@@ -104,7 +104,7 @@ class ShellManager:
 
         return shells
 
-    def get_shell_by_center_and_level(self, center, level, unique_shells=True):
+    def get_shell_by_center_and_level(self, center, level, unique_shells=False):
         shell = self.centers.get(center, {}).get(level)
 
         if shell is None and self.verbose:
@@ -117,7 +117,7 @@ class ShellManager:
 
         return shell
 
-    def get_previous_shell(self, center, curr_level, unique_shells=True):
+    def get_previous_shell(self, center, curr_level, unique_shells=False):
         shell = None
 
         while curr_level != 0 and shell is None:
@@ -131,7 +131,7 @@ class ShellManager:
 
         return shell
 
-    def get_last_shell(self, center, unique_shells=True):
+    def get_last_shell(self, center, unique_shells=False):
         shell = None
 
         shells = self.get_shells_by_center(center, unique_shells)
@@ -143,7 +143,7 @@ class ShellManager:
 
         return shell
 
-    def get_identifiers(self, level=None, unique_shells=True):
+    def get_identifiers(self, level=None, unique_shells=False):
         if level is not None:
             if unique_shells:
                 identifiers = [s.identifier for s in get_shells_by_level(level) if s.is_valid()]
@@ -157,7 +157,7 @@ class ShellManager:
 
         return sorted(identifiers)
 
-    def to_fingerprint(self, unique_shells=True, fold_to_size=None, count_fp=False):
+    def to_fingerprint(self, unique_shells=False, fold_to_size=None, count_fp=False):
         indices = self.get_identifiers(unique_shells=unique_shells)
         props = {"num_levels": self.num_levels,
                  "num_bits": self.num_bits,
@@ -420,7 +420,6 @@ class ShellGenerator:
                 shell = None
 
                 if radius > 0:
-
                     prev_shell = sm.get_previous_shell(atm_grp, level)
                     if not prev_shell:
                         logger.exception("No previous shell centered in %s was found." % atm_grp)
