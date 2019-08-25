@@ -1006,12 +1006,15 @@ class FingerprintProject(Project):
                     ligand = get_entity_from_entry(structure, target_entry)
                     ligand.set_as_target(is_target=True)
 
-                    grps_by_compounds = self.perceive_chemical_groups(structure[0], ligand, add_hydrogen)
-                    src_grps = [grps_by_compounds[x] for x in grps_by_compounds if x.get_id()[0] != " "]
-                    trgt_grps = [grps_by_compounds[x] for x in grps_by_compounds]
+                    atm_grps_mngr = self.perceive_chemical_groups(structure[0], ligand, add_hydrogen)
 
+                    #
                     # Calculate interactions
-                    interactions = self.inter_calc.calc_interactions(src_grps, trgt_grps)
+                    #
+                    interactions_mngr = self.inter_calc.calc_interactions(atm_grps_mngr.atm_grps)
+
+                    # Create hydrophobic islands.
+                    atm_grps_mngr.merge_hydrophobic_atoms(interactions_mngr)
 
                 result = {"id": (target_entry.to_string())}
                 if self.calc_mfp:
@@ -1024,10 +1027,9 @@ class FingerprintProject(Project):
                         pass
 
                 if self.calc_ifp:
-                    neighborhood = [ag for c in grps_by_compounds.values() for ag in c.atm_grps]
                     shells = ShellGenerator(self.ifp_num_levels, self.ifp_radius_step)
-                    sm = shells.create_shells(neighborhood)
-                    result["ifp"] = sm.to_fingerprint(fold_to_size=self.ifp_length)
+                    sm = shells.create_shells(atm_grps_mngr)
+                    result["ifp"] = sm.to_fingerprint(fold_to_size=self.ifp_length, unique_shells=True)
 
                 if isinstance(target_entry, MolEntry):
                     result["smiles"] = MolWrapper(target_entry.mol_obj).to_smiles()
