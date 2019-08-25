@@ -344,7 +344,7 @@ class MolEntry(Entry):
 
         lig = chain[(comp_name, comp_num, " ")]
 
-        # It only substitutes the ligand id if it is different from the id defined by the MolEntry object properties.
+        # It only substitutes the ligand id if it is different from the id defined by the MolEntry object property.
         # This update will never happen when the ligand file is a PDB file as the ids are guaranteed to be equal.
         if lig.id != ("H_%s" % self.comp_name, self.comp_num, " "):
             lig.id = ("H_%s" % self.comp_name, self.comp_num, " ")
@@ -359,6 +359,8 @@ class MolEntry(Entry):
                     structure[0].add(chain)
                 else:
                     lig = lig.copy()
+                    # Update the ligand index according to the number of compounds already present in the chain.
+                    lig.idx = len(structure[0][self.chain_id].child_list)
                     structure[0][self.chain_id].add(lig)
             else:
                 raise IllegalArgumentError("The informed entity is not a valid Biopython object.")
