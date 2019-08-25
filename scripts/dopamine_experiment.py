@@ -36,7 +36,8 @@ input_file = "%s/data/medium_diverse_stratified_INPUT" % output_path
 entries = []
 with open(input_file, "r") as IN:
     for l in IN.readlines():
-        entries.append(MolEntry("d4_receptor", l.strip(), mol_file))
+        entries.append(MolEntry("d4_receptor", l.strip(), mol_file=mol_file))
+
 
 #
 #
@@ -97,7 +98,10 @@ print("Starting new process...")
 print("Project: %s" % opt["working_path"])
 print("Parameters:")
 for (key, val) in opt.items():
-    print("\t-- %s:\t%s" % (key, str(val)))
+    if key == "entries":
+        print("\t-- #ENTRIES:\t%d" % len(val))
+    else:
+        print("\t-- %s:\t%s" % (key, str(val)))
 
 try:
     pli_obj = FingerprintProject(**opt)
