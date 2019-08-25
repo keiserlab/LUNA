@@ -15,9 +15,6 @@ import logging
 logger = logging.getLogger()
 
 
-LEVEL_TO_PRINT = 1000
-
-
 class ShellManager:
 
     def __init__(self, num_levels, radius_step, num_bits, shells=None, full_control=True, verbose=False):
@@ -44,76 +41,29 @@ class ShellManager:
 
     def find_similar_shell(self, shell):
 
-        if shell.level > LEVEL_TO_PRINT:
-            print("~~~~~~~~~~~~~~~~~~")
-            print("Searching for similar shells...")
-            print()
-            print("Current shell: ", sorted(shell.central_atm_grp.atoms))
-            print("   Level: ", shell.level)
-            print("   Id: ", shell.identifier)
-            print()
-
         for added_shell in self.shells:
             # For each group of similar shells, it will exist only one valid shell.
             if added_shell.is_valid():
-                if shell.is_similar(added_shell, "\t"):
-
-                    if shell.level > LEVEL_TO_PRINT:
-                        print("\t>>>>>>>>>> FOUND A SIMILAR SHELL <<<<<<<<<<")
-                        print()
-
+                if shell.is_similar(added_shell):
                     return added_shell
-
         return None
 
     def add_shell(self, shell):
         # Any new shell without interactions from level 1 onwards will be automatically considered invalid.
         if shell.level > 0 and len(shell.interactions) == 0:
             shell.valid = False
-
-            if shell.level > LEVEL_TO_PRINT:
-                print()
-                print("\t@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-                print("\t >>> INVALID SHELL - no interaction information...")
-                print()
         else:
             found_shell = self.find_similar_shell(shell)
-
-            if shell.level > LEVEL_TO_PRINT:
-                if shell.level > LEVEL_TO_PRINT:
-                    print()
-                    print("\t@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-                if found_shell:
-                    print("\tFound shell: ", sorted(found_shell.central_atm_grp.atoms))
-                    print("\t  Level: ", found_shell.level)
-                    print("\t  Id: ", found_shell.identifier)
-                else:
-                    print("\tNo shell was found...")
-                print()
 
             if found_shell:
                 if found_shell.level < shell.level:
                     shell.valid = False
 
-                    if shell.level > LEVEL_TO_PRINT:
-                        print("\t\t>> Found shell level is lower than the current one.")
-
                 elif found_shell.level == shell.level and found_shell.identifier <= shell.identifier:
                     shell.valid = False
 
-                    if shell.level > LEVEL_TO_PRINT:
-                        print("\t\t>> Levels are equal but the found shell id is lower or equal to the current one.")
                 else:
                     found_shell.valid = False
-
-                    if shell.level > LEVEL_TO_PRINT:
-                        print("\t\t>> Neither conditions accepted.")
-
-                if shell.level > LEVEL_TO_PRINT:
-                    print()
-                    print("\t\t     -> Current shell: ", shell.valid)
-                    print("\t\t     -> Found shell: ", found_shell.valid)
-                    print()
 
         self.shells.append(shell)
         self.levels[shell.level].append(shell)
@@ -122,13 +72,13 @@ class ShellManager:
     def get_valid_shells(self):
         return [s for s in self.shells if s.is_valid()]
 
-    def get_shells_by_identifier(self, identifier, unique_shells=False):
+    def get_shells_by_identifier(self, identifier, unique_shells=True):
         if unique_shells:
             return [s for s in self.shells if s.identifier == identifier and s.is_valid()]
         else:
             return [s for s in self.shells if s.identifier == identifier]
 
-    def get_shells_by_level(self, level, unique_shells=False):
+    def get_shells_by_level(self, level, unique_shells=True):
         shells = []
 
         if level in self.levels:
@@ -141,7 +91,7 @@ class ShellManager:
 
         return shells
 
-    def get_shells_by_center(self, center, unique_shells=False):
+    def get_shells_by_center(self, center, unique_shells=True):
         shells = {}
 
         if center in self.centers:
@@ -154,7 +104,7 @@ class ShellManager:
 
         return shells
 
-    def get_shell_by_center_and_level(self, center, level, unique_shells=False):
+    def get_shell_by_center_and_level(self, center, level, unique_shells=True):
         shell = self.centers.get(center, {}).get(level)
 
         if shell is None and self.verbose:
@@ -167,7 +117,7 @@ class ShellManager:
 
         return shell
 
-    def get_previous_shell(self, center, curr_level, unique_shells=False):
+    def get_previous_shell(self, center, curr_level, unique_shells=True):
         shell = None
 
         while curr_level != 0 and shell is None:
@@ -181,7 +131,7 @@ class ShellManager:
 
         return shell
 
-    def get_last_shell(self, center, unique_shells=False):
+    def get_last_shell(self, center, unique_shells=True):
         shell = None
 
         shells = self.get_shells_by_center(center, unique_shells)
@@ -193,7 +143,7 @@ class ShellManager:
 
         return shell
 
-    def get_identifiers(self, level=None, unique_shells=False):
+    def get_identifiers(self, level=None, unique_shells=True):
         if level is not None:
             if unique_shells:
                 identifiers = [s.identifier for s in get_shells_by_level(level) if s.is_valid()]
@@ -207,7 +157,7 @@ class ShellManager:
 
         return sorted(identifiers)
 
-    def to_fingerprint(self, unique_shells=False, fold_to_size=None, count_fp=False):
+    def to_fingerprint(self, unique_shells=True, fold_to_size=None, count_fp=False):
         indices = self.get_identifiers(unique_shells=unique_shells)
         props = {"num_levels": self.num_levels,
                  "num_bits": self.num_bits,
@@ -314,38 +264,16 @@ class Shell:
     def is_valid(self):
         return self.valid
 
-    def is_similar(self, shell, indentation):
-
-        if self.level > LEVEL_TO_PRINT and shell.level > LEVEL_TO_PRINT:
-            print(indentation, "> Potential shell: ", shell.level, shell.radius, sorted(shell.central_atm_grp.atoms))
-            print(indentation, "      Level: ", self.level, "VS", shell.level)
-            print(indentation, "      Id: ", self.identifier, "VS", shell.identifier)
-            print(indentation, "      Is valid? ", self.valid, "VS", shell.valid)
-            print()
+    def is_similar(self, shell):
 
         # The shells' identifiers will be equal when the shells encode the same information and were constructed in the same level.
         if self.level == shell.level:
             if self.identifier == shell.identifier:
-                if self.level > LEVEL_TO_PRINT:
-                    print(indentation, indentation, "    >> They have equal identifiers!!")
-                    print()
-
                 return True
-
-            if self.level > LEVEL_TO_PRINT:
-                print(indentation, indentation, "    >> They have different identifiers!!")
-                print()
-
             return False
 
         # If none of the shells have interactions, check if the shells have equal identifiers.
         if not self.interactions and not shell.interactions:
-            if self.level > LEVEL_TO_PRINT and shell.level > LEVEL_TO_PRINT:
-                print(indentation, indentation, "    >> None of them have interactions!!")
-                print(indentation, indentation, "          - Do they have the same identifiers?", shell.identifier == self.identifier)
-                print(indentation, indentation, "          - Do they have the same central atom?", shell.central_atm_grp == self.central_atm_grp)
-                print()
-
             # If the identifiers are different, but the shells' central group is the same, it means the shells encode the same
             # information even if their levels are different.
             #
@@ -356,89 +284,18 @@ class Shell:
             # were obtained in different levels.
             else:
                 if self.level > shell.level:
-                    if self.level > LEVEL_TO_PRINT and shell.level > LEVEL_TO_PRINT:
-                        print(indentation, indentation, "    ................. NEW SHELL HAS HIGHER LEVEL .................")
-                        print()
-                        print(indentation, indentation, "    >> It will look back to the past...")
-                        print(indentation, indentation, "           - ", self.previous_shell)
-                        print()
+                    return self.previous_shell.is_similar(shell)
+                return self.is_similar(shell.previous_shell)
 
-                    is_similar = self.previous_shell.is_similar(shell, "\t\t\t\t")
-
-                    if self.level > LEVEL_TO_PRINT and shell.level > LEVEL_TO_PRINT:
-                        print(indentation, indentation, "    >> Is similar??? ", is_similar)
-                        print()
-
-                    return is_similar
-                else:
-                    if self.level > LEVEL_TO_PRINT and shell.level > LEVEL_TO_PRINT:
-                        print(indentation, indentation, "    ................. OLD SHELL HAS HIGHER LEVEL .................")
-                        print()
-                        print(indentation, indentation, "    >> It will look back to the past...")
-                        print(indentation, indentation, "    >>     - ", shell.previous_shell)
-                        print()
-
-                    is_similar = self.is_similar(shell.previous_shell, "\t\t\t\t")
-
-                    if self.level > LEVEL_TO_PRINT:
-                        print(indentation, indentation, "    >> Is similar??? ", is_similar)
-                        print()
-                    return is_similar
         # If both shells have interactions, check if the interactions are equal.
         elif self.interactions and shell.interactions:
             if self.encoded_data == shell.encoded_data:
-                if self.level > LEVEL_TO_PRINT:
-                    print(indentation, "> Potential shell: ", shell)
-                    print(indentation, "      Level: ", self.level, "VS", shell.level)
-                    print(indentation, "      Id: ", self.identifier, "VS", shell.identifier)
-                    print(indentation, "      Is valid? ", self.valid, "VS", shell.valid)
-                    print()
-                    print()
-                    print(indentation, indentation, " >> ENCODED DATA - New shell: ", self.encoded_data)
-                    print()
-                    print(indentation, indentation, " >> ENCODED DATA - Old shell: ", shell.encoded_data)
-                    print(indentation, indentation, "       - Are they equal?? ", self.encoded_data == shell.encoded_data)
-                    print(indentation, indentation, "       - Are they equal?? ", self.interactions == shell.interactions)
-                    print(indentation, indentation, "-------------------------------- // ------------------------------------------")
-                    print()
                 return True
         return False
-
-    def _encode_interactions(self):
-        encoded_data = []
-        if self.interactions:
-            for inter in self.interactions:
-                # print()
-                # print(inter.src_grp)
-                # print(inter.trgt_grp)
-                # print(inter.type)
-                # print()
-
-                init_src_shell = self._manager.get_previous_shell(inter.src_grp, 1)
-                init_trgt_shell = self._manager.get_previous_shell(inter.trgt_grp, 1)
-                shell_ids = tuple(sorted([init_src_shell.identifier, init_trgt_shell.identifier]))
-                encoded_data.append((shell_ids, self.feature_mapper[inter.type]))
-
-            #     print(init_src_shell)
-            #     print("   - ID: ", init_src_shell.identifier)
-            #     print(init_trgt_shell)
-            #     print("   - ID: ", init_trgt_shell.identifier)
-            #     print()
-            #     print("   - DATA: ", (tuple(sorted([init_src_shell.identifier, init_trgt_shell.identifier])), self.feature_mapper[inter.type]))
-            #     print("--------")
-            #     print()
-            # exit()
-
-            # for d in encoded_data:
-            #     print(d)
-            # exit()
-        return sorted(encoded_data)
 
     def hash_shell(self):
         if self.level == 0:
             data = [self.feature_mapper[cf.format_name()] for cf in self.central_atm_grp.features]
-
-            tmp = [cf.name for cf in self.central_atm_grp.features]
 
             if len(self.central_atm_grp.atoms) == 1:
                 features = set()
@@ -451,24 +308,7 @@ class Shell:
                             features.update(atm_grp.features)
 
                 data += [self.feature_mapper[cf.format_name()] for cf in features]
-
-                tmp += [cf.name for cf in features]
             data.sort()
-
-            # if list(self.central_atm_grp.compounds)[0].id[1] == 145 and self.central_atm_grp.atoms[0].name == "N":
-            # if len(self.central_atm_grp.atoms) == 1 and self.central_atm_grp.atoms[0].name == "N":
-            #     print("--==---==--==---==--==---==--==--")
-            #     print(">>> Hashed information:")
-            #     print("        - Data: ", data)
-            #     print("        - Size: ", len(self.central_atm_grp.atoms))
-            #     print("        - Hash: ", hash(self.central_atm_grp.atoms[0]))
-            #     print("        - Id: ", id(self.central_atm_grp.atoms[0]))
-            #     print("        - Derived groups: ", [ag for atm in self.central_atm_grp.atoms for ag in atm.atm_grps])
-            #     print("---------------------------------")
-            #     print()
-
-            if self.level > LEVEL_TO_PRINT:
-                print(">>> HASHED INFORMATION: ", sorted(tmp))
         else:
             cent_prev_id = self.previous_shell.identifier
 
@@ -502,12 +342,16 @@ class Shell:
         # TODO: Let the user define a hash function
         hashed_shell = mmh3.hash(np_array, self.seed, signed=False)
 
-        # if self.level > LEVEL_TO_PRINT:
-        #     print(">>> HASHED INFORMATION: ", data)
-        #     print("        - ID: ", hashed_shell)
-        #     print()
-
         return hashed_shell
+
+    def _encode_interactions(self):
+        encoded_data = []
+        for inter in self.interactions:
+            init_src_shell = self._manager.get_previous_shell(inter.src_grp, 1)
+            init_trgt_shell = self._manager.get_previous_shell(inter.trgt_grp, 1)
+            shell_ids = tuple(sorted([init_src_shell.identifier, init_trgt_shell.identifier]))
+            encoded_data.append((shell_ids, self.feature_mapper[inter.type]))
+        return sorted(encoded_data)
 
     def __repr__(self):
         return ("<Shell: level=%d, radius=%d, center=%s, interactions=%d>"
@@ -551,8 +395,10 @@ class ShellGenerator:
             # Add a list of atoms
             pseudo_grps_mapping[atoms].add(pseudo_grp)
 
+        # It controls which atom groups already converged.
         skip_atm_grps = set()
 
+        # Sort the atom groups for avoiding order dependence.
         sorted_neighborhood = sorted(neighborhood)
 
         for level in range(self.num_levels):
@@ -575,19 +421,6 @@ class ShellGenerator:
 
                 if radius > 0:
 
-                    if level > LEVEL_TO_PRINT:
-                        print()
-                        print()
-                        print("##############################################################")
-                        print()
-                        print(">>>", sorted(atm_grp.atoms))
-                        print(">>>", sorted(atm_grp.features))
-                        print(">>>", atm_grp.centroid)
-                        print()
-                        print("Level: ", level)
-                        print("Radius: ", radius)
-                        print()
-
                     prev_shell = sm.get_previous_shell(atm_grp, level)
                     if not prev_shell:
                         logger.exception("No previous shell centered in %s was found." % atm_grp)
@@ -601,42 +434,12 @@ class ShellGenerator:
                     inter_tuples = set()
                     interactions_to_add = set()
 
-                    # if len(atm_grp.features) == 1 and atm_grp.features[0].name == "Amide":
-                    # if len(atm_grp.atoms) == 1 and atm_grp.atoms[0].name == "N":
-                    #     print("++++++++++++++++++++++++++++")
-                    #     print()
-                    #     print(prev_atm_grps)
-                    #     print()
-                    #     print(prev_interactions)
-                    #     print()
-                    #     print(prev_shell)
-                    #     print()
-                    #     print(nb_atm_grps)
-                    #     print()
-                    #     print()
-                    #     print("ATOMS: ")
-                    #     for atm in atm_grp.atoms:
-                    #         print(atm)
-                    #         print("        >>", atm.atm_grps)
-                    #     print()
-                    #     print("Evaluating inside the FOR...")
-
                     # For each atom group from the previous shell
                     for prev_atm_grp in sorted(prev_atm_grps):
-
-                        # if len(atm_grp.features) == 1 and atm_grp.features[0].name == "Amide":
-                        # if len(atm_grp.atoms) == 1 and atm_grp.atoms[0].name == "N":
-                        #     print(">> ", prev_atm_grp)
-                        #     print("\t     - Derived grps:")
-                        #     print("\t        ", self._get_derived_grps(prev_atm_grp, pseudo_grps_mapping))
-                        #     print("..................")
-                        #     print()
-
                         # Include the partner's derived groups to the set of all derived groups.
                         all_derived_atm_grps.update(self._get_derived_grps(prev_atm_grp, pseudo_grps_mapping))
 
                         for inter in prev_atm_grp.interactions:
-
                             # Only PseudoAtomGroup objects should deal with hydrophobic interactions.
                             if isinstance(prev_atm_grp, PseudoAtomGroup) is False and inter.type == "Hydrophobic":
                                 continue
@@ -657,13 +460,6 @@ class ShellGenerator:
                                     inter_tuples.add(new_tuple)
                                     interactions_to_add.add(inter)
 
-                    # if len(atm_grp.features) == 1 and atm_grp.features[0].name == "Amide":
-                    # if len(atm_grp.atoms) == 1 and atm_grp.atoms[0].name == "N":
-                    #     print("++++++++++++++++++++++++++++ // ++++++++++++++++++++++++++++++")
-                    #     print(">> All derived groups:")
-                    #     print("\t", all_derived_atm_grps)
-                    #     print()
-
                     # Get valid derived groups, which are those ones inside the current sphere.
                     valid_derived_atm_grps = set([ag for ag in all_derived_atm_grps if ag in nb_atm_grps])
 
@@ -671,94 +467,15 @@ class ShellGenerator:
 
                     unique_interactions = interactions_to_add - prev_interactions
 
-                    # if set([80, 81]) == set([c.id[1] for c in atm_grp.compounds]):
-                    # if len(atm_grp.features) == 1 and atm_grp.features[0].name == "Amide":
-                    # if len(atm_grp.atoms) == 1 and atm_grp.atoms[0].name == "N":
-                    #     print("--------------------------")
-                    #     print("Curr level: ", level)
-                    #     print("Prev level: ", prev_shell.level)
-                    #     print()
-                    #     print("# unique inters", len(unique_interactions))
-                    #     print("# unique grps", len(unique_derived_atm_grps))
-                    #     print(len(unique_interactions or unique_derived_atm_grps))
-                    #     print(len(unique_interactions or unique_derived_atm_grps) != 0)
-                    #     print()
-                    #     print()
-                    #     print(" -> All derived groups:")
-                    #     print("        - ", all_derived_atm_grps)
-                    #     print()
-                    #     print(" -> Valid derived groups:")
-                    #     print("        - ", valid_derived_atm_grps)
-                    #     print()
-                    #     print(" -> Previous groups:")
-                    #     print("        - ", prev_atm_grps)
-                    #     print()
-
-                    if level > LEVEL_TO_PRINT:
-                        print("# interactions: ", len(inter_tuples))
-                        print("# unique derived groups: ", len(unique_derived_atm_grps))
-                        print()
-
-                    # It adds a new shell when there are new interactions and derived atom group inside the shell.
+                    # It adds a new shell only if there are new interactions and derived atom groups inside the shell.
                     if len(unique_interactions or unique_derived_atm_grps) != 0:
                         shell_nb = set([x[1] for x in inter_tuples]) | valid_derived_atm_grps
                         shell_nb.add(atm_grp)
 
                         shell = Shell(atm_grp, level, radius, neighborhood=shell_nb, inter_tuples=inter_tuples,
                                       manager=sm, seed=self.seed, np_dtype=self.np_dtype)
-                    # else:
-
-                    #     if len(atm_grp.features) == 1 and atm_grp.features[0].name == "Amide":
-                    #         print(">>> GROUP DIDNT GENERATE A SHELL...")
-                    #         print()
-
-                    #         # shell_nb = set([x[1] for x in inter_tuples]) | valid_derived_atm_grps
-                    #         # shell_nb.add(atm_grp)
-
-                    #         # tmp_shell = Shell(atm_grp, level, radius, neighborhood=shell_nb, inter_tuples=inter_tuples,
-                    #         #                   manager=sm, seed=self.seed, np_dtype=self.np_dtype)
-                    #         # print("        - If it has generated a shell it would be: ")
-                    #         # print("                ", tmp_shell)
-                    #         # print("                ", tmp_shell.identifier)
-                    #         print("---------------------------------------------------------------------------------")
-                    #         print()
-
                 else:
-                    if level > LEVEL_TO_PRINT:
-                        print()
-                        print()
-                        print("##############################################################")
-                        print()
-                        print(">>>", sorted(atm_grp.atoms))
-                        print(">>>", sorted(atm_grp.features))
-                        print(">>>", atm_grp.centroid)
-                        print()
-                        print("Level: ", level)
-                        print("Radius: ", radius)
-                        print()
-
                     shell = Shell(atm_grp, level, radius, manager=sm, seed=self.seed, np_dtype=self.np_dtype)
-
-                if level > LEVEL_TO_PRINT:
-                    print("........................................")
-                    print("New shell...")
-                    print()
-
-                    if shell:
-                        print(sorted(shell.central_atm_grp.atoms))
-                        print("Level", shell.level)
-                        print("Id", shell.identifier)
-                        print()
-                        # print("..... ### .....")
-                        # print("Interactions:")
-                        # for i in shell.interactions:
-                        #     print(i)
-                        #     print("    ---> ", hash(i))
-                        #     print()
-                        # print("...............")
-                    else:
-                        print(shell)
-                    print()
 
                 if shell:
                     sm.add_shell(shell)
@@ -768,6 +485,7 @@ class ShellGenerator:
 
                 # Evaluate if the limit of possible substructures for the current centroid (atom group) was reached.
                 if last_shell:
+
                     # The limit will be reached when the last shell already contains all interactions
                     # established by the atom groups inside the shell. In this case, expanding the radius
                     # will not result in any new shell because a shell is only created when the atoms inside
@@ -791,46 +509,8 @@ class ShellGenerator:
                     # The global convergence occurs when all interactions in the binding site were already included in the sphere.
                     global_convergence = all_interactions == last_shell.interactions
 
-                    if level > LEVEL_TO_PRINT:
-                        print("Latest shell: ", last_shell.level, last_shell.radius, sorted(last_shell.central_atm_grp.atoms))
-                        print("    - ID: ", last_shell.identifier)
-                        print()
-                        print("   - Limit for interactions was reached?", interactions_converged)
-                        print("   - Limit for expansions was reached? Test 1: ", all_derived_atm_grps == last_shell.neighborhood)
-                        print("   - Limit for expansions was reached? Test 2 ", len(unique_derived_atm_grps) == 0)
-                        print()
-                        print("   - LOCAL limit was reached? ", interactions_converged and grp_expansions_converged)
-                        print("   - GLOBAL limit was reached?", global_convergence)
-                        print()
-                        print("# curr Interactions: ", len(last_shell.interactions))
-                        print("# valid Interactions: ", len(valid_interactions))
-                        print("# all possible Interactions in the NB: ", len(all_nb_interactions))
-                        print("# all interactions: ", len(all_interactions))
-                        print()
-                        print("# curr NB size: ", len(last_shell.neighborhood))
-                        print("# max NB size: ", len(all_derived_atm_grps))
-                        print()
-                        for ag in all_derived_atm_grps:
-                            print("-> ", ag, ag.features)
-                        print()
-
-                        if level > 0:
-                            print("^^^^^^^^^^^^^^^^^^^")
-                            for g in sorted(last_shell.neighborhood - prev_atm_grps, key=lambda x: (sorted(x.atoms), sorted(x.feature_names))):
-                                print(">>>", sorted(g.atoms), sorted(g.features))
-                                print()
-                            print()
-                            print(">> # NBs", len(last_shell.neighborhood))
-                            print()
-
                     # If the limit was reached for this centroid, in the next level it can be ignored.
                     if local_convergence or global_convergence:
-
-                        if level > LEVEL_TO_PRINT:
-                            print("!!!!!! ####### >>>>>>> LIMIT REACHED TO: ", sorted(atm_grp.atoms))
-                            print("!!!!!! ####### >>>>>>>     MAX LEVEL: ", level)
-                            print()
-
                         skip_atm_grps.add(atm_grp)
 
             # If all atom groups reached the limit of possible substructures, just leave the loop.
@@ -839,59 +519,11 @@ class ShellGenerator:
                                "of substructures were reached.")
                 break
 
-            # if level == 0:
-            #     # exit()
-            #     break
-
         logger.info("Shells creation finished.")
         logger.info("The last level executed was: %d." % level)
         logger.info("The number of levels defined was: %d." % self.num_levels)
         logger.info("Total number of shells created: %d" % sm.num_shells)
         logger.info("Total number of unique shells created: %d" % sm.num_unique_shells)
-
-        # import glob
-        # output_file = "tmp/errors/identifiers%s" % (len(glob.glob("tmp/errors/identifiers*")) + 1)
-        # print(output_file)
-        # with open(output_file, "w") as OUT:
-        #     ids = defaultdict(list)
-        #     for s in sm.shells:
-        #         ids[s.identifier].append(s)
-
-        #     for i in sorted(ids):
-        #         for s in ids[i]:
-        #             OUT.write("%d,%s" % (i, str((s))))
-        #             OUT.write("\n")
-
-        # print("---------------------- FINAL ----------------------")
-        # print()
-        # print(sm.num_shells)
-        # print()
-        # exit()
-
-        # clusters = defaultdict(list)
-
-        # for s1 in sorted(sm.shells, key=lambda x: x.identifier):
-        #     ref = s1
-
-        #     for s2 in sorted(clusters, key=lambda x: x.identifier):
-
-        #         if s1.is_similar(s2, "\t"):
-        #             if s2.level <= ref.level and s2.identifier <= ref.identifier:
-        #                 ref = s2
-        #                 break
-        #     clusters[ref].append(s1)
-
-        # # print("# clusters: ", len(clusters))
-        # # print()
-        # # exit()
-
-        # for k in sorted(clusters, key=lambda x: x.identifier):
-        #     print("Clusters: ", k.identifier)
-        #     print(sorted([s.identifier for s in clusters[k]]))
-        #     print()
-        #     print()
-
-        # exit()
 
         return sm
 
@@ -922,7 +554,6 @@ class ShellGenerator:
         return pseudo_grps.values()
 
     def _get_derived_grps(self, atm_grp, pseudo_grps_mapping):
-
         # Get derived groups for the informed atom group.
         derived_atm_grps = set([ag for a in atm_grp.atoms for ag in a.atm_grps])
 
@@ -932,7 +563,6 @@ class ShellGenerator:
         return derived_atm_grps
 
     def _recover_partner_grp(self, atm_grp, interaction, pseudo_grps_mapping):
-
         if isinstance(atm_grp, PseudoAtomGroup):
             atoms = sorted(atm_grp.atoms)
 
