@@ -30,7 +30,7 @@ PDB_PARSER = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=False
 
 REGEX_RESNUM_ICODE = re.compile(r'^(\d+)([a-zA-z]?)$')
 
-PCI_ENTRY_REGEX = re.compile(r'^%s:\w:\w{1,3}:\-?\d{1,4}[a-zA-z]?$' % FILENAME_REGEX)
+PCI_ENTRY_REGEX = re.compile(r'^%s:\w:\w[\w+\-]{1,2}?:\-?\d{1,4}[a-zA-z]?$' % FILENAME_REGEX)
 PPI_ENTRY_REGEX = re.compile(r'^%s:\w$' % FILENAME_REGEX)
 
 
