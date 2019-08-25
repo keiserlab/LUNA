@@ -36,7 +36,6 @@ class AtomGroupsManager():
     def __init__(self, atm_grps=None):
         self._atm_grps = []
         self._child_dict = {}
-
         self.add_atm_grps(atm_grps)
 
     @property
@@ -184,8 +183,7 @@ class AtomGroupsManager():
             params = {"dist_hydrop_inter": cc_dist}
 
             inter = InteractionType(hydrop_islands[k[0]], hydrop_islands[k[1]], "Hydrophobic",
-                                    src_interacting_atms=island_atms[k[0]], trgt_interacting_atms=island_atms[k[1]],
-                                    directional=False, params=params)
+                                    src_interacting_atms=island_atms[k[0]], trgt_interacting_atms=island_atms[k[1]], params=params)
             interactions.add(inter)
 
         # Update the list of interactions with the new island-island interactions.
@@ -214,15 +212,16 @@ class AtomGroupsManager():
 class AtomGroup():
 
     def __init__(self, atoms, features=None, interactions=None, recursive=True):
-
-        self._atoms = list(atoms)
+        self._atoms = sorted(atoms)
 
         # Atom properties
         self._coords = im.atom_coordinates(atoms)
         self._centroid = im.centroid(self.coords)
         self._normal = None
 
-        self._features = features or []
+        features = features or []
+        self._features = sorted(features)
+
         self._interactions = interactions or []
         self._hash_cache = None
 
@@ -260,7 +259,8 @@ class AtomGroup():
 
     @features.setter
     def features(self, features):
-        self._features = features
+        self._features = sorted(features)
+
         # Reset hash.
         self._hash_cache = None
 
@@ -315,12 +315,12 @@ class AtomGroup():
         return shortest_path_size
 
     def add_features(self, features):
-        self._features = list(set(self.features + list(features)))
+        self._features = sorted(set(self.features + list(features)))
         # Reset hash.
         self._hash_cache = None
 
     def remove_features(self, features):
-        self._features = list(set(self.features) - set(features))
+        self._features = sorted(set(self.features) - set(features))
         # Reset hash.
         self._hash_cache = None
 
@@ -338,9 +338,9 @@ class AtomGroup():
         """Return 1 if all compounds are hetero groups."""
         return all([a.parent.is_hetatm() for a in self.atoms])
 
-    def is_aminoacid(self):
+    def is_residue(self):
         """Return 1 if all compounds are amino acids."""
-        return all([a.parent.is_aminoacid() for a in self.atoms])
+        return all([a.parent.is_residue() for a in self.atoms])
 
     def is_nucleotide(self):
         """Return 1 if all compounds are nucleotides."""
@@ -360,7 +360,7 @@ class AtomGroup():
 
     def has_aminoacid(self):
         """Return 1 if at least one compound is an amino acids."""
-        return any([a.parent.is_aminoacid() for a in self.atoms])
+        return any([a.parent.is_residue() for a in self.atoms])
 
     def has_nucleotide(self):
         """Return 1 if at least one compound is a nucleotides."""
@@ -380,7 +380,7 @@ class AtomGroup():
 
     def __eq__(self, other):
         """Overrides the default implementation"""
-        if isinstance(self, other.__class__):
+        if type(self) == type(other):
             return self.atoms == other.atoms and self.features == other.features
         return False
 
@@ -402,9 +402,9 @@ class AtomGroup():
         if self._hash_cache is None:
             # Transform atoms and features list into an imutable data structure.
             # The lists are sorted in order to avoid dependence on appending order.
-            atoms_tuple = tuple(sorted(self.atoms))
-            feat_tuple = tuple(sorted(self.features))
-            self._hash_cache = hash((atoms_tuple, feat_tuple))
+            atoms_tuple = tuple(self.atoms)
+            feat_tuple = tuple(self.features)
+            self._hash_cache = hash((atoms_tuple, feat_tuple, self.__class__))
         return self._hash_cache
 
 
@@ -430,8 +430,12 @@ class AtomGroupPerceiver():
                                        "The available options are: %s." % (mol_obj_type, ", ".join(ACCEPTED_MOL_OBJ_TYPES)))
 
         self.feature_extractor = feature_extractor
+
         self.add_h = add_h
         self.ph = ph
+        # If the user decided not to add hydrogens it will try to use the existing ones.
+        self.keep_hydrog = not self.add_h
+
         self.amend_mol = amend_mol
         self.mol_obj_type = mol_obj_type
         self.charge_model = charge_model
@@ -446,6 +450,8 @@ class AtomGroupPerceiver():
         perceived_atm_grps = set()
 
         self.atm_grps_mngr = AtomGroupsManager()
+
+        self.atm_mapping = {}
 
         for comp in compounds:
             props_set = False
@@ -468,7 +474,7 @@ class AtomGroupPerceiver():
                     comp_list = [comp]
 
                 # Select compounds based on the compounds list defined previously.
-                comp_sel = ResidueSelector(comp_list, keep_altloc=False, keep_hydrog=False)
+                comp_sel = ResidueSelector(comp_list, keep_altloc=False, keep_hydrog=self.keep_hydrog)
                 # Recover all atoms from the previous selected compounds.
                 atoms = tuple([a for r in comp_list for a in r.get_unpacked_list() if comp_sel.accept_atom(a)])
 
@@ -499,9 +505,13 @@ class AtomGroupPerceiver():
         # This function only works if the user informed default properties to the target compound.
         if target_compound.resname in self.default_properties:
             try:
-                atm_sel = AtomSelector(keep_altloc=False, keep_hydrog=False)
-                atm_map = {atm.name: ExtendedAtom(atm) for atm in target_compound.get_atoms() if atm_sel.accept_atom(atm)}
+                atm_sel = AtomSelector(keep_altloc=False, keep_hydrog=self.keep_hydrog)
 
+                # If the add_h property is set to False, the code will not remove any existing hydrogens from the PDB structure.
+                # In these situations, the list of atoms may contain hydrogens. But, we do not need to attribute properties to hydrogens.
+                # We just need them to correctly set properties to heavy atoms. So let's just ignore them.
+                atm_map = {atm.name: self._new_extended_atom(atm) for atm in target_compound.get_atoms() if (atm_sel.accept_atom(atm) and
+                                                                                                             atm.element != "H")}
                 atms_in_ss_bonds = set()
 
                 # It stores compounds covalently bound to the informed compound.
@@ -524,11 +534,11 @@ class AtomGroupPerceiver():
                                 atms_in_ss_bonds.add(atm_map[atm1.name])
                                 atms_in_ss_bonds.add(atm_map[atm2.name])
 
-                            # If the atom 1 belongs to the target and is not a hydrogen, add atom 2 to its neighbor list.
+                            # If the atom 1 belongs to the target and is not a hydrogen, add atom 2 to its neighbor's list.
                             if atm1.parent == target_compound and atm1.element != "H":
                                 atom_info = AtomData(etab.GetAtomicNum(atm2.element), atm2.coord, atm2.serial_number)
                                 atm_map[atm1.name].add_nb_info([atom_info])
-                            # If the atom 2 belongs to the target and is not a hydrogen, add atom 1 to its neighbor list.
+                            # If the atom 2 belongs to the target and is not a hydrogen, add atom 1 to its neighbor's list.
                             if atm2.parent == target_compound and atm2.element != "H":
                                 atom_info = AtomData(etab.GetAtomicNum(atm1.element), atm1.coord, atm1.serial_number)
                                 atm_map[atm2.name].add_nb_info([atom_info])
@@ -559,7 +569,7 @@ class AtomGroupPerceiver():
                     else:
                         # It checks if a cysteine atom is establishing a disulfide bond. If it does, it will read a predefined set of
                         # properties (SS_BOND_FEATURES). In this case, the SG is hydrophobic and is not a donor anymore.
-                        if target_compound.is_aminoacid() and target_compound.resname == "CYS" and atoms[0] in atms_in_ss_bonds:
+                        if target_compound.is_residue() and target_compound.resname == "CYS" and atoms[0] in atms_in_ss_bonds:
                             features = [ChemicalFeature(f) for f in SS_BOND_FEATURES]
                         else:
                             features = [ChemicalFeature(f) for f in self.default_properties[target_compound.resname][atms_str].split(",")]
@@ -578,10 +588,10 @@ class AtomGroupPerceiver():
                         self.atm_grps_mngr.new_atm_grp(atoms, list(set(features)))
 
                 # Check for amides only when the target is an amino acid.
-                if target_compound.is_aminoacid():
+                if target_compound.is_residue():
                     for nb in neighbors:
                         # Ignore compounds that are not amino acids.
-                        if not nb.is_aminoacid():
+                        if not nb.is_residue():
                             continue
                         # Recover valid atoms by applying an atom selection.
                         nb_atms = {atm.name: atm for atm in nb.get_atoms() if atm_sel.accept_atom(atm)}
@@ -590,7 +600,7 @@ class AtomGroupPerceiver():
                             if "N" in atm_map and "O" in nb_atms and "C" in nb_atms and atm_map["N"].is_neighbor(nb_atms["C"]):
                                 # Define an amide group and add it to the compound groups.
                                 # In the atm_map, the atoms were already transformed into ExtendedAtoms().
-                                amide = [atm_map["N"], ExtendedAtom(nb_atms["C"]), ExtendedAtom(nb_atms["O"])]
+                                amide = [atm_map["N"], self._new_extended_atom(nb_atms["C"]), self._new_extended_atom(nb_atms["O"])]
 
                                 self.atm_grps_mngr.new_atm_grp(amide, [ChemicalFeature("Amide")])
 
@@ -599,7 +609,7 @@ class AtomGroupPerceiver():
                             if "N" in nb_atms and "O" in atm_map and "C" in atm_map and atm_map["C"].is_neighbor(nb_atms["N"]):
                                 # Define an amide group and add it to the compound groups.
                                 # In the atm_map, the atoms were already transformed into ExtendedAtoms().
-                                amide = [ExtendedAtom(nb_atms["N"]), atm_map["C"], atm_map["O"]]
+                                amide = [self._new_extended_atom(nb_atms["N"]), atm_map["C"], atm_map["O"]]
 
                                 self.atm_grps_mngr.new_atm_grp(amide, [ChemicalFeature("Amide")])
 
@@ -624,9 +634,14 @@ class AtomGroupPerceiver():
     def _calculate_properties(self, target_compound, target_atoms, compound_selector, mol_obj=None):
 
         try:
-            # If no OBMol was defined, create a new one through the compound list.
+            # If no OBMol was defined, create a new one with the compound list.
             mol_obj = mol_obj or self._get_mol_from_entity(target_compound.get_parent_by_level('M'), compound_selector)
             mol_obj = MolWrapper(mol_obj)
+
+            # If the add_h property is set to False, the code will not remove any existing hydrogens from the PDB structure.
+            # In these situations, the list of atoms may contain hydrogens. But, we do not need to attribute properties to hydrogens.
+            # We just need them to correctly set properties to heavy atoms. So let's just ignore them.
+            target_atoms = [atm for atm in target_atoms if atm.element != "H"]
 
             if mol_obj.get_num_heavy_atoms() != len(target_atoms):
                 raise MoleculeSizeError("The number of heavy atoms in the PDB selection and in the MOL file are different.")
@@ -638,7 +653,7 @@ class AtomGroupPerceiver():
             trgt_atms = {}
             for i, atm_obj in enumerate(atm_obj_list):
                 atm_map[atm_obj.get_idx()] = target_atoms[i].serial_number
-                trgt_atms[target_atoms[i].serial_number] = ExtendedAtom(target_atoms[i])
+                trgt_atms[target_atoms[i].serial_number] = self._new_extended_atom(target_atoms[i])
 
             # Set all neighbors, i.e., covalently bonded atoms.
             for bond_obj in mol_obj.get_bonds():
@@ -680,15 +695,21 @@ class AtomGroupPerceiver():
             # number of each neighbor of an atom. The algorithm of Bellman Ford requires weights, so we set all weights to 1.
             nb_graph = {atm.serial_number: None for atm in trgt_atms.values()}
             for atm in trgt_atms.values():
-                # Add the neighbors of this atom. The number '1' defined below represents the edge weight. But, right now it's not used.
+                # Add the neighbors of this atom. The number '1' defined below represents the edge weight.
                 nb_graph[atm.serial_number] = {i.serial_number: 1 for i in atm.neighbors_info if i.serial_number in nb_graph}
                 # Set the graph dictionary to each ExtendedAtom object. Since, dictionaries are passed as references, we can change
                 # the variable nb_graph and the changes will be updated in each ExtendedAtom object automatically.
                 atm.set_neighborhood(nb_graph)
+
             return True
         except Exception as e:
             logger.exception(e)
             return False
+
+    def _new_extended_atom(self, atm):
+        if atm not in self.atm_mapping:
+            self.atm_mapping[atm] = ExtendedAtom(atm)
+        return self.atm_mapping[atm]
 
     def _get_mol_from_entity(self, entity, compound_selector):
         # First it saves the selection into a PDB file and then it converts the file to .mol.
