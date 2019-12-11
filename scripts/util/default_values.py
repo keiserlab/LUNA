@@ -3,6 +3,7 @@ from util import ColorPallete
 
 from os import path
 
+
 ENTRY_SEPARATOR = ":"
 
 NAPOLI_PATH = path.abspath(path.join(path.realpath(__file__), '../../../', 'tmp/nAPOLI'))
@@ -20,7 +21,7 @@ NMR_METHODS = ["SOLID-STATE NMR", "SOLUTION NMR"]
 
 COV_SEARCH_RADIUS = 2.2
 
-IFP_LENGTH = 1024
+IFP_LENGTH = 4096
 
 ACCEPTED_MOL_OBJ_TYPES = ("rdkit", "openbabel")
 
