@@ -730,10 +730,15 @@ smiles = 'C1CCCSCC1'
 # smiles = 'C1=CC=NC=C1'
 
 # Pyrrole
-smiles = 'N1C=CC=C1'
+# smiles = 'N1C=CC=C1'
 # Pyrazine
-smiles = 'C1=CN=CC=N1'
+# smiles = 'C1=CN=CC=N1'
 
+
+smiles = 'N=C(n1cccn1)n1cccn1'
+smiles = 'NC(=N)n1cccn1'
+
+smiles = 'CCCCCCCCCCCCCC[C@@H](O)[C@@H](O)[C@H](CO[C@H]1O[C@H](CO)[C@H](O)[C@H](O)[C@H]1O)NC(=O)CCCCCCCCC\\C=C/C\\C=C/CCCCC'
 
 print()
 print(smiles)
@@ -751,24 +756,24 @@ mols = [Chem.MolFromSmiles(smiles)]
 
 CHEMICAL_FEATURE_IDS = {
     "Aromatic": 1,
-    # "Acceptor": 2,
-    # "Donor": 3,
+    "Acceptor": 2,
+    "Donor": 3,
     "Hydrophobe": 4,
     "Hydrophobic": 5,
     "LumpedHydrophobe": 13,
-    # "Negative": 6,
-    # "Positive": 7,
-    # "Negatively ionizable": 8,
-    # "Positively ionizable": 9,
-    # "Halogen donor": 10,
-    # "Halogen acceptor": 11,
-    # "Metal": 12,
-    # "Weak donor": 14,
-    # "Weak acceptor": 15,
-    # "Electrophile": 16,
-    # "Nucleophile": 17,
-    # "Chalcogen donor": 19,
-    # "Amide": 21,
+    "Negative": 6,
+    "Positive": 7,
+    "NegativelyIonizable": 8,
+    "PositivelyIonizable": 9,
+    "HalogenDonor": 10,
+    "HalogenAcceptor": 11,
+    "Metal": 12,
+    "WeakDonor": 14,
+    "WeakAcceptor": 15,
+    "Electrophile": 16,
+    "Nucleophile": 17,
+    "ChalcogenDonor": 19,
+    "Amide": 21,
     "Atom": 22
 }
 
