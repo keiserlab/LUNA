@@ -79,11 +79,13 @@ class DefaultInteractionConf(InteractionConf):
         conf["max_disp_ang_whb_inter"] = 40
 
         # Ionic interactions
+        # Ref: Barlow, D. J.; Thornton, J. M. Ion-Pairs in Proteins. Journal of Molecular Biology 1983.
         conf["max_dist_repuls_inter"] = 6
         conf["max_dist_attract_inter"] = 6
 
         # Aromatic stacking:
         # Ref: Bhattacharyya et al. 2003. Geometry of Interaction of the Histidine Ring with Other Planar and Basic Residues.
+        # Ref: Chakrabarti, P.; Bhattacharyya, R. 2007. Geometry of Nonbonded Interactions Involving Planar Groups in Proteins.
         conf["max_cc_dist_pi_pi_inter"] = 6
         # Define if a ring is tilted, same plane or in a T-format
         conf["min_dihed_ang_slope_pi_pi_inter"] = 30
@@ -97,7 +99,7 @@ class DefaultInteractionConf(InteractionConf):
         # [2] Efficient Stacking on Protein Amide Fragments [Harder, 2013].
         # [3] The environment of amide groups in protein–ligand complexes: H-bonds and beyond [Cotesta, 2006].
         # [4] Hydrogen bonds with π-acceptors in proteins: frequencies and role in stabilizing local 3D structures [Steiner, 2001]
-        # [5] Systematic Investigation of Halogen Bonding in Protein–Ligand Interactions [Hardegger, 2011]
+        # [5] Example of amide-pi: Systematic Investigation of Halogen Bonding in Protein–Ligand Interactions [Hardegger, 2011]
         #
         # Ref: [1], [2], [4], and [5].
         conf["max_cc_dist_amide_pi_inter"] = 4.5
@@ -112,6 +114,7 @@ class DefaultInteractionConf(InteractionConf):
         conf["min_inter_atom_in_surf"] = 1
 
         # Cation-pi interaction
+        # Ref: Gallivan, J. P.; Dougherty, D. A. Cation-π Interactions in Structural Biology. Proc Natl Acad Sci U S A 1999, 96 (17), 9459–9464.
         conf["max_dist_cation_pi_inter"] = 6
 
         # Halogen bond.
@@ -170,7 +173,7 @@ class DefaultInteractionConf(InteractionConf):
         conf["max_dist_proximal"] = 6
         conf["min_dist_proximal"] = 2
 
-        # Covalent interactions. From: Arpeggio.
+        # Van der Waals interactions. From: Arpeggio.
         conf["vdw_tolerance"] = 0.1
 
         # From Chimera: https://www.cgl.ucsf.edu/chimerax/docs/user/commands/clashes.html

@@ -55,6 +55,9 @@ class InteractionsManager:
             if inter.type in types:
                 yield inter
 
+    def save(self, output_file):
+        pass
+
     def __len__(self):
         # Number of interactions
         return self.size
@@ -791,7 +794,7 @@ class InteractionCalculator:
 
         # Atom 2 => Dipole 2
         #
-        # An electrophile may have only 1 atom. E.g.: NH3, although by default we consider it as an ion.
+        # An electrophile may have only 1 atom. E.g.: NH4, although by default we consider it as an ion.
         dipole_atm2 = dipole_grp2.atoms[0]
         # If it has 2 atoms, it will select the nucleophilic atom based on the electronegativity.
         if len(dipole_grp2.atoms) == 2 and dipole_type2 == "Nucleophile":
