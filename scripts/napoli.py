@@ -49,7 +49,7 @@ from MyBio.selector import ResidueSelector
 from MyBio.util import download_pdb, entity_to_string, get_entity_from_entry
 
 
-PDB_PARSER = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=False, FIX_OBABEL_FLAGS=False)
+PDB_PARSER = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=False)
 
 
 class StepControl:
@@ -172,9 +172,10 @@ class Project:
                  calc_mfp=True,
                  mfp_opts=None,
                  calc_ifp=True,
-                 ifp_num_levels=10,
+                 ifp_num_levels=7,
                  ifp_radius_step=1,
                  ifp_length=IFP_LENGTH,
+                 ifp_count=False,
                  similarity_func="BulkTanimotoSimilarity",
                  preload_mol_files=False,
                  default_properties=DEFAULT_AMINO_ATM_FEATURES,
@@ -219,6 +220,7 @@ class Project:
         self.ifp_num_levels = ifp_num_levels
         self.ifp_radius_step = ifp_radius_step
         self.ifp_length = ifp_length
+        self.ifp_count = ifp_count
 
         self.similarity_func = similarity_func
         self.butina_cutoff = butina_cutoff
@@ -1029,7 +1031,9 @@ class FingerprintProject(Project):
                 if self.calc_ifp:
                     shells = ShellGenerator(self.ifp_num_levels, self.ifp_radius_step)
                     sm = shells.create_shells(atm_grps_mngr)
-                    result["ifp"] = sm.to_fingerprint(fold_to_size=self.ifp_length, unique_shells=True)
+
+                    unique_shells = not self.ifp_count
+                    result["ifp"] = sm.to_fingerprint(fold_to_size=self.ifp_length, unique_shells=unique_shells, count_fp=self.ifp_count)
 
                 if isinstance(target_entry, MolEntry):
                     result["smiles"] = MolWrapper(target_entry.mol_obj).to_smiles()
@@ -1091,12 +1095,24 @@ class FingerprintProject(Project):
 
         if self.calc_ifp:
             self.ifp_output = self.ifp_output or "%s/results/ifp.csv" % self.working_path
+
             with open(self.ifp_output, "w") as OUT:
-                OUT.write("ligand_id,smiles,on_bits\n")
+
+                if self.ifp_count:
+                    OUT.write("ligand_id,smiles,on_bits,count\n")
+                else:
+                    OUT.write("ligand_id,smiles,on_bits\n")
+
                 for r in self.result:
                     if "ifp" in r:
-                        fp_str = "\t".join([str(x) for x in r["ifp"].get_on_bits()])
-                        OUT.write("%s,%s,%s\n" % (r["id"], r["smiles"], fp_str))
+
+                        if self.ifp_count:
+                            fp_bits_str = "\t".join([str(idx) for idx in r["ifp"].counts.keys()])
+                            fp_count_str = "\t".join([str(count) for count in r["ifp"].counts.values()])
+                            OUT.write("%s,%s,%s,%s\n" % (r["id"], r["smiles"], fp_bits_str, fp_count_str))
+                        else:
+                            fp_bits_str = "\t".join([str(x) for x in r["ifp"].get_on_bits()])
+                            OUT.write("%s,%s,%s\n" % (r["id"], r["smiles"], fp_bits_str))
 
         end = time.time()
         logger.info("Processing finished!!!")
