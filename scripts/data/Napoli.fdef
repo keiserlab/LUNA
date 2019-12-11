@@ -302,12 +302,16 @@ EndFeature
 
 # Capture: 4-aminopyridines
 #
+# Zuccotto, F. Pharmacophore Features Distributions in Different Classes of Compounds. J. Chem. Inf. Comput. Sci. 2003, 43 (5), 1542–1552. https://doi.org/10.1021/ci034068k.
+#
 DefineFeature Aminopyridine4 Nc1cc[nH0]cc1
   Family PositivelyIonizable
   Weights 1.0,1.0,1.0,1.0,1.0,1.0,1.0
 EndFeature
 
 # Capture: 2-aminopyridines
+#
+# Zuccotto, F. Pharmacophore Features Distributions in Different Classes of Compounds. J. Chem. Inf. Comput. Sci. 2003, 43 (5), 1542–1552. https://doi.org/10.1021/ci034068k.
 #
 DefineFeature Aminopyridine2 Nc1cccc[nH0]1
   Family PositivelyIonizable
@@ -457,8 +461,8 @@ EndFeature
 # Good AC, Oprea TI. Optimization of CAMD techniques 3. Virtual screening enrichment studies: a help or hindrance in tool selection? Journal of Computer-Aided Molecular Design. 2008;22:169–78.
 #
 # An acyl sulfonamide is a moiety that is very likely to be deprotonated.
-# Good AC, Oprea TI. Optimization of CAMD techniques 3. Virtual screening enrichment studies: a help or hindrance in tool selection? Journal of Computer-Aided Molecular Design. 2008;22:169–78.
-# Ballatore C, Huryn DM, Smith AB. Carboxylic Acid (Bio)Isosteres in Drug Design. ChemMedChem. 2013;8:385–95.
+#   Good AC, Oprea TI. Optimization of CAMD techniques 3. Virtual screening enrichment studies: a help or hindrance in tool selection? Journal of Computer-Aided Molecular Design. 2008;22:169–78.
+#   Ballatore C, Huryn DM, Smith AB. Carboxylic Acid (Bio)Isosteres in Drug Design. ChemMedChem. 2013;8:385–95.
 #
 DefineFeature AcylSulfonamide [NH,NH0-1](S(=O)(=O))(C(=O))
   Family NegativelyIonizable
