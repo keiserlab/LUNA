@@ -120,7 +120,7 @@ from util.config_parser import Config
 from database.loader import *
 
 from database.util import rows_2dict
-from database.napoli_model import *
+from database.luna_model import *
 from database.interactions import *
 
 from sqlalchemy import inspect

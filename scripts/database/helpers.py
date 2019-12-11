@@ -1,4 +1,4 @@
-from database.napoli_model import *
+from database.luna_model import *
 
 import logging
 logger = logging.getLogger()

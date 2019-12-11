@@ -6,13 +6,13 @@ from os import path
 
 ENTRY_SEPARATOR = ":"
 
-NAPOLI_PATH = path.abspath(path.join(path.realpath(__file__), '../../../', 'tmp/nAPOLI'))
-PDB_PATH = "%s/public/pdb" % NAPOLI_PATH
-TMP_FILES = "%s/public/tmp" % NAPOLI_PATH
+LUNA_PATH = path.abspath(path.join(path.realpath(__file__), '../../../', 'tmp/LUNA'))
+PDB_PATH = "%s/public/pdb" % LUNA_PATH
+TMP_FILES = "%s/public/tmp" % LUNA_PATH
 
 CONF_PATH = path.abspath(path.join(path.realpath(__file__), '../../', 'data'))
 DB_CONF_FILE = "%s/mysql.ini" % CONF_PATH
-ATOM_PROP_FILE = "%s/Napoli.fdef" % CONF_PATH
+ATOM_PROP_FILE = "%s/LUNA.fdef" % CONF_PATH
 
 INTERACTION_CONF = DefaultInteractionConf()
 BOUNDARY_CONF = InteractionConf({"boundary_cutoff": 6.2})

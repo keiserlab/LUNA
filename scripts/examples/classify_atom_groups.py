@@ -29,13 +29,13 @@ sdf_files = glob.glob('%s/%s*.sdf' % (sdf_path, lig))
 
 # Sulfinic (Thiourea dioxide)
 # RDKit original: DefineFeature AcidicGroup [C,S](=[O,S,P])-[O;H1,H0&-1]
-# nAPOLI: DefineFeature SulfinicGroup [S](=[O])-[O;H1,H0&-1]
+# LUNA: DefineFeature SulfinicGroup [S](=[O])-[O;H1,H0&-1]
 # smiles = 'C(=N)(N)S(=O)O'
 
 # Sulfonic acid (Taurine)
 # RDKit original: DefineFeature AcidicGroup [C,S](=[O,S,P])-[O;H1,H0&-1]
 #    -> Captura dois grupos de Sulfinic
-# nAPOLI: DefineFeature SulfonicGroup [S](=[O])(=O)[O;H1,H0&-1]
+# LUNA: DefineFeature SulfonicGroup [S](=[O])(=O)[O;H1,H0&-1]
 #    -> Captura apenas o grupo sulfonic acid
 # smiles = 'NCCS(=O)(=O)O'
 
@@ -744,12 +744,12 @@ print()
 print(smiles)
 print()
 
-napoli_fdef = '../data/Napoli.fdef'
-# napoli_fdef = '../data/BaseFeatures_DIP2_NoMicrospecies.fdef'
+luna_fdef = '../data/LUNA.fdef'
+# luna_fdef = '../data/BaseFeatures_DIP2_NoMicrospecies.fdef'
 
-napoli_bff = ChemicalFeatures.BuildFeatureFactory(napoli_fdef)
-napoli_extractor = FeatureExtractor(napoli_bff)
-feature_extractor = napoli_extractor
+luna_bff = ChemicalFeatures.BuildFeatureFactory(luna_fdef)
+luna_extractor = FeatureExtractor(luna_bff)
+feature_extractor = luna_extractor
 
 
 mols = [Chem.MolFromSmiles(smiles)]

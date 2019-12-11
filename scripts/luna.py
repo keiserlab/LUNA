@@ -17,7 +17,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from analysis.residues import InteractingResidues, get_interacting_residues
 from analysis.summary import *
 from database.loader import *
-from database.napoli_model import *
+from database.luna_model import *
 from database.helpers import *
 from database.util import (get_ligand_tbl_join_filter, default_interaction_filters, format_db_ligand_entries,
                            format_db_interactions, object_as_dict, get_default_mappers_list)
@@ -337,7 +337,7 @@ class Project:
 
     def validate_entry_format(self, target_entry):
         if not target_entry.is_valid():
-            raise InvalidEntry("Entry '%s' does not match the nAPOLI entry format." % target_entry.to_string())
+            raise InvalidEntry("Entry '%s' does not match a LUNA's entry format." % target_entry.to_string())
 
     def get_pdb_file(self, pdb_id):
         pdb_file = "%s/%s.pdb" % (self.pdb_path, pdb_id)
@@ -433,7 +433,7 @@ class Project:
             else:
                 logger.info("The entry '%s' exists in the database, but "
                             "there is no pre-computed interaction available. "
-                            "So, nAPOLI will calculate the interactions to "
+                            "So, LUNA will calculate the interactions to "
                             "this ligand." % entry_str)
         else:
             logger.info("The entry '%s' does not exist in the "
@@ -702,7 +702,7 @@ class RCSB_PLI_Population(Project):
         # raise an error.
         if db_ligand_entity is None:
             message = ("Entry '%s' does not exist in the table 'ligand'." % target_entry.to_string())
-            raise InvalidNapoliEntry(message)
+            raise InvalidEntry(message)
 
         # If there are already interactions to this entry,
         # raise an error.
@@ -719,7 +719,7 @@ class DB_PLI_Project(Project):
         self.job_code = job_code
 
         if not working_path:
-            working_path = "%s/projects/%s" % (NAPOLI_PATH, job_code)
+            working_path = "%s/projects/%s" % (LUNA_PATH, job_code)
 
         # If entries were not informed, get it from the database.
         self.get_entries_from_db = (entries is None)
@@ -767,13 +767,13 @@ class DB_PLI_Project(Project):
         inter_type_id_map = {r.type: r.id for r in db_inter_types}
 
         # The calculus of interactions depend on the pharmacophore definition (ATOM_PROP_FILE) and the pH (PH).
-        # Thus, if the user has kept such values unchanged and has not uploaded any PDB file, nAPOLI can try to
+        # Thus, if the user has kept such values unchanged and has not uploaded any PDB file, LUNA can try to
         # select the pre-computed interactions from a database.
         is_inter_params_default = (self.pdb_path is PDB_PATH and
                                    self.atom_prop_file == ATOM_PROP_FILE and
                                    self.ph == 7.4 and self.db_conf_file is not None)
         if is_inter_params_default:
-            logger.info("Default configuration was kept unchanged. nAPOLI will try to select pre-computed "
+            logger.info("Default configuration was kept unchanged. LUNA will try to select pre-computed "
                         "interactions from the defined database")
 
         fingerprints = []
@@ -949,7 +949,7 @@ class DB_PLI_Project(Project):
 
     def recover_target_entry(self, target_entry):
         if isinstance(target_entry, DBEntry) is False:
-            raise InvalidNapoliEntry("Entry '%s' is not a DBEntry object. So, nAPOLI cannot obtain "
+            raise InvalidEntry("Entry '%s' is not a DBEntry object. So, LUNA cannot obtain "
                                      "an id information for this ligand entry and no database update will be "
                                      "possible." % entry_str)
 

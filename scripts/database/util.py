@@ -3,14 +3,13 @@ from Bio.PDB.Polypeptide import is_aa
 from sqlalchemy import inspect
 from sqlalchemy.orm import relationship
 
-from database.napoli_model import *
+from database.luna_model import *
 from database.filters import FilterRules
 from database.helpers import MapperConfiguration
 
 from mol.entry import DBEntry
 from mol.interaction.type import InteractionType
 from mol.groups import AtomGroup
-from mol.atom import ExtendedAtom
 from mol.features import ChemicalFeature
 
 

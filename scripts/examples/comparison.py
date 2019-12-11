@@ -30,11 +30,11 @@ atom_names = None
 with open(atom_names_map, "r") as IN:
     atom_names = json.load(IN)
 
-napoli_fdef = '../data/Napoli.fdef'
-napoli_bff = ChemicalFeatures.BuildFeatureFactory(napoli_fdef)
-napoli_extractor = FeatureExtractor(napoli_bff)
+luna_fdef = '../data/LUNA.fdef'
+luna_bff = ChemicalFeatures.BuildFeatureFactory(luna_fdef)
+luna_extractor = FeatureExtractor(luna_bff)
 
-feature_extractor = napoli_extractor
+feature_extractor = luna_extractor
 
 working_path = "../tmp/pharma_rules"
 
