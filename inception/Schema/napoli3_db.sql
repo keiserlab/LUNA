@@ -1,1 +1,0 @@
-SELECT * FROM napoli2.inter_proj;
