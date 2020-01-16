@@ -1,3 +1,4 @@
+import numpy as np
 from rdkit.Chem import Atom as RDAtom
 from rdkit.Chem import Mol as RDMol
 from rdkit.Chem import Bond as RDBond
@@ -125,6 +126,19 @@ class AtomWrapper:
         if bonds and wrapped:
             return [BondWrapper(bond) for bond in bonds]
         return bonds
+
+    def get_atomic_invariants(self):
+        return [self.get_neighbors_number(only_heavy_atoms=True),       # Number of heavy atoms
+                (self.get_valence() - self.get_h_count()),              # Valence - Num. Hs
+                self.get_atomic_num(),                                  # Atomic number
+                self.get_isotope(),                                     # Isotope number
+                self.get_charge(),                                      # Formal charge
+                self.get_h_count(),                                     # Num. Hs
+                int(self.is_in_ring())]                                 # If the atom belongs to a ring or not
+
+    def is_in_ring(self):
+        # Both RDKit and Openbabel have the same function name.
+        return self._atm_obj.IsInRing()
 
     def set_charge(self, charge):
         # Both RDKit and Openbabel have the same function name.
