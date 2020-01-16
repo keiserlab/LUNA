@@ -289,6 +289,9 @@ class AtomGroup():
     def get_serial_numbers(self):
         return [a.get_serial_number() for a in self.atoms]
 
+    def get_chains(self):
+        return sorted(set([a.get_parent_by_level("C").id for a in self.atoms]))
+
     def get_interactions_with(self, atm_grp):
         target_interactions = []
 
@@ -653,7 +656,11 @@ class AtomGroupPerceiver():
             trgt_atms = {}
             for i, atm_obj in enumerate(atm_obj_list):
                 atm_map[atm_obj.get_idx()] = target_atoms[i].serial_number
-                trgt_atms[target_atoms[i].serial_number] = self._new_extended_atom(target_atoms[i])
+
+                # Get atomic invariants
+                invariants = atm_obj.get_atomic_invariants()
+
+                trgt_atms[target_atoms[i].serial_number] = self._new_extended_atom(target_atoms[i], invariants)
 
             # Set all neighbors, i.e., covalently bonded atoms.
             for bond_obj in mol_obj.get_bonds():
@@ -706,9 +713,10 @@ class AtomGroupPerceiver():
             logger.exception(e)
             return False
 
-    def _new_extended_atom(self, atm):
+    def _new_extended_atom(self, atm, invariants=None):
         if atm not in self.atm_mapping:
-            self.atm_mapping[atm] = ExtendedAtom(atm)
+            self.atm_mapping[atm] = ExtendedAtom(atm, invariants=invariants)
+
         return self.atm_mapping[atm]
 
     def _get_mol_from_entity(self, entity, compound_selector):
