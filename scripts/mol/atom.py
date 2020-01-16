@@ -58,11 +58,12 @@ class AtomData:
 
 class ExtendedAtom:
 
-    def __init__(self, mybio_atom, nb_info=None, atm_grps=None, neighborhood=None):
+    def __init__(self, mybio_atom, nb_info=None, atm_grps=None, neighborhood=None, invariants=None):
         self._atom = mybio_atom
         self._nb_info = nb_info or []
         self._atm_grps = atm_grps or []
         self._neighborhood = neighborhood or {}
+        self._invariants = invariants
 
     @property
     def atom(self):
@@ -79,6 +80,10 @@ class ExtendedAtom:
     @property
     def atm_grps(self):
         return self._atm_grps
+
+    @property
+    def invariants(self):
+        return self._invariants
 
     @property
     def electronegativity(self):
