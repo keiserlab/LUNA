@@ -55,12 +55,20 @@ class InteractionsManager:
             if inter.type in types:
                 yield inter
 
+    def filter_by_centroids(self, centroids, radius):
+        pass
+
     def save(self, output_file):
         pass
 
     def __len__(self):
         # Number of interactions
         return self.size
+
+    def __iter__(self):
+        """Iterate over children."""
+        for inter in self.interactions:
+            yield inter
 
 
 class InteractionCalculator:
