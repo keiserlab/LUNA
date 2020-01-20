@@ -478,6 +478,7 @@ class AtomGroupPerceiver():
 
                 # Select compounds based on the compounds list defined previously.
                 comp_sel = ResidueSelector(comp_list, keep_altloc=False, keep_hydrog=self.keep_hydrog)
+
                 # Recover all atoms from the previous selected compounds.
                 atoms = tuple([a for r in comp_list for a in r.get_unpacked_list() if comp_sel.accept_atom(a)])
 
@@ -493,7 +494,7 @@ class AtomGroupPerceiver():
         proximal = get_contacts_for_entity(entity=model, source=target_compound, radius=self.radius, level='R')
 
         # Sorted by the compound order as in the PDB.
-        return sorted(list(set([p[1] for p in proximal])), key=lambda r: r.idx)
+        return sorted(list(set([p[1] for p in proximal])), key=lambda r: (r.parent.parent.id, r.parent.id, r.idx))
 
     def _set_default_properties(self, target_compound):
         #
@@ -619,15 +620,19 @@ class AtomGroupPerceiver():
                 # Define a new graph as a dict object: each key is a serial number and the values are dictionaries with the serial
                 # number of each neighbor of an atom. The algorithm of Bellman Ford requires weights, so we set all weights to 1.
                 nb_graph = defaultdict(dict)
+
                 for atm in atm_map.values():
-                    # Add the neighbors of this atom. The number '1' defined below represents the edge weight. But, right now it's not used.
+                    # Add the neighbors of this atom. The number '1' defined below represents the edge weight (mandatory).
                     for nb_info in atm.neighbors_info:
-                        nb_graph[atm.serial_number][nb_info.serial_number] = 1
-                        nb_graph[nb_info.serial_number][atm.serial_number] = 1
+                        # Ignore hydrogens: we do not need to include them into the neighborhood graph.
+                        if nb_info.atomic_num != 1:
+                            nb_graph[atm.serial_number][nb_info.serial_number] = 1
+                            nb_graph[nb_info.serial_number][atm.serial_number] = 1
 
                     # Set the graph dictionary to each ExtendedAtom object. Since, dictionaries are passed as references, we can change
                     # the variable nb_graph and the changes will be updated in each ExtendedAtom object automatically.
                     atm.set_neighborhood(nb_graph)
+
                 return True
             except Exception as e:
                 logger.exception(e)
@@ -669,18 +674,28 @@ class AtomGroupPerceiver():
 
                 # At least one of the atoms must be a non-hydrogen atom.
                 if bgn_atm_obj.get_atomic_num() != 1 or end_atm_obj.get_atomic_num() != 1:
+
                     # If the atom 1 is not a hydrogen, add atom 2 to its neighbor list.
                     if bgn_atm_obj.get_atomic_num() != 1:
-                        serial_number = atm_map.get(end_atm_obj.get_idx())
-                        coord = mol_obj.get_atom_coord_by_id(end_atm_obj.get_id())
-                        atom_info = AtomData(end_atm_obj.get_atomic_num(), coord, serial_number)
-                        trgt_atms[atm_map[bgn_atm_obj.get_idx()]].add_nb_info([atom_info])
+
+                        # If the current bgn_atm_obj consists of an atom from the current target compound, we can update its information.
+                        # Other compounds are ignored for now as they will have their own time to update its information.
+                        if trgt_atms[atm_map[bgn_atm_obj.get_idx()]].parent == target_compound:
+                            serial_number = atm_map.get(end_atm_obj.get_idx())
+                            coord = mol_obj.get_atom_coord_by_id(end_atm_obj.get_id())
+                            atom_info = AtomData(end_atm_obj.get_atomic_num(), coord, serial_number)
+                            trgt_atms[atm_map[bgn_atm_obj.get_idx()]].add_nb_info([atom_info])
+
                     # If the atom 2 is not a hydrogen, add atom 1 to its neighbor list.
                     if end_atm_obj.get_atomic_num() != 1:
-                        serial_number = atm_map.get(bgn_atm_obj.get_idx())
-                        coord = mol_obj.get_atom_coord_by_id(bgn_atm_obj.get_id())
-                        atom_info = AtomData(bgn_atm_obj.get_atomic_num(), coord, serial_number)
-                        trgt_atms[atm_map[end_atm_obj.get_idx()]].add_nb_info([atom_info])
+
+                        # If the current end_atm_obj consists of an atom from the current target compound, we can update its information.
+                        # Other compounds are ignored for now as they will have their own time to update its information.
+                        if trgt_atms[atm_map[end_atm_obj.get_idx()]].parent == target_compound:
+                            serial_number = atm_map.get(bgn_atm_obj.get_idx())
+                            coord = mol_obj.get_atom_coord_by_id(bgn_atm_obj.get_id())
+                            atom_info = AtomData(bgn_atm_obj.get_atomic_num(), coord, serial_number)
+                            trgt_atms[atm_map[end_atm_obj.get_idx()]].add_nb_info([atom_info])
 
             group_features = self.feature_extractor.get_features_by_groups(mol_obj, atm_map)
 
