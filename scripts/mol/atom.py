@@ -8,7 +8,8 @@ class AtomData:
 
     def __init__(self, atomic_num, coord, serial_number=None):
         self.atomic_num = atomic_num
-        self._coord = np.array(coord)
+        # Standardize all coordinate data to the same Numpy data type for consistence.
+        self._coord = np.array(coord, "f")
         self.serial_number = serial_number
 
     @property
@@ -33,7 +34,8 @@ class AtomData:
 
     @coord.setter
     def coord(self, xyz):
-        self._coord = np.array(xyz)
+        # Standardize all coordinate data to the same Numpy data type for consistence.
+        self._coord = np.array(xyz, "f")
 
     def __repr__(self):
         return ("<ExtendedAtomData: atomic number=%d, coord=(%.3f, %.3f, %.3f), serial number=%s>"
