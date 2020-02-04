@@ -113,7 +113,7 @@ INTERACTION_SHORT_NAMES = {
     "Cation-pi": "cation-pi",
     "Hydrophobic": "hphobe",
     "Halogen bond": "xbond",
-    "Halogen bond": "x-pi",
+    "Halogen-pi": "x-pi",
     "Chalcogen bond": "ybond",
     "Chalcogen-pi": "y-pi",
     "Repulsive": "repuls",
