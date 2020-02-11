@@ -39,6 +39,11 @@ scripts/napoli\.log*
 *\.fuse_hidden*
 scripts/classify_atom_groups\.py
 
+# temporary files (e.g. Vim)
+*~
+*.swp
+*.swo
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
