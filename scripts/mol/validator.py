@@ -122,21 +122,25 @@ class MolValidator:
 
         # Atoms other than N are not currently evaluated because we did not find any similar errors with other atoms.
         if atm_obj.get_atomic_num() == 7:
+
             # It corrects quaternary ammonium Nitrogen errors.
-            # While reading from PDBs with no pH correction, it happens that quaternary ammonium N is perceived as
-            # having a valence equal to 5 (v5, hypervalent). Consequently, one additional (implicit) hydrogen is added to this N.
-            # if atm_obj.get_degree() == 4 and atm_obj.get_charge() == 0 and atm_obj.get_implicit_h_count() != 0:
-            if atm_obj.get_degree() == 5 and atm_obj.get_charge() == 0 and atm_obj.get_h_count() != 0:
-                logger.warning("Atom # %d has incorrect number of implicit hydrogens." % atm_obj.get_id())
+            #
+            #   While reading from PDBs containing quaternary ammonium N, it may happen to the N to be perceived as
+            #       having a valence equal to 5 (v5, hypervalent). It means Open Babel has added an invalid implicit hydrogen.
+            #
+            if atm_obj.get_valence() == 5 and atm_obj.get_charge() == 0:
+                logger.warning("Atom # %d has incorrect valence and charge." % atm_obj.get_id())
 
                 if self.fix_implicit_valence:
+                    correct_degree = len(atm_obj.get_bonds())
+
                     logger.warning("'Fix implicit valence' option is set on. It will update the implicit "
                                    "valence of atom # %d from %d to 4 and correct its charge." % (atm_obj.get_id(), atm_obj.get_valence()))
-                    atm_obj.set_implicit_valence(4)
+                    atm_obj.set_implicit_valence(correct_degree)
                     atm_obj.set_charge(1)
+
                     return True
-                else:
-                    return False
+                return False
         return True
 
     def is_charge_valid(self, atm_obj):
