@@ -3,7 +3,7 @@ from io import StringIO
 from os.path import exists
 from shutil import move as rename_pdb_file
 from itertools import product, combinations
-from openbabel import etab
+from openbabel import openbabel as ob
 
 
 from util.exceptions import IllegalArgumentError, MoleculeNotFoundError, ChainNotFoundError
@@ -149,8 +149,8 @@ def is_covalently_bound(mybio_atm1, mybio_atm2):
     # Distance atom-atom
     dist = mybio_atm1 - mybio_atm2
     # Covalent radius
-    cov1 = etab.GetCovalentRad(etab.GetAtomicNum(mybio_atm1.element))
-    cov2 = etab.GetCovalentRad(etab.GetAtomicNum(mybio_atm2.element))
+    cov1 = ob.GetCovalentRad(ob.GetAtomicNum(mybio_atm1.element))
+    cov2 = ob.GetCovalentRad(ob.GetAtomicNum(mybio_atm2.element))
 
     # OpenBabel thresholds.
     if 0.4 <= dist <= cov1 + cov2 + 0.45:
@@ -232,7 +232,6 @@ def get_residue_neighbors(residue, select=Select()):
                                "So, the predecessor residue cannot be identified." % (next_res, residue))
         # Otherwise, it could mean that the residue is the last one in the sequence or there are missing residues.
         else:
-
             logger.warning("The residue %s seems not to have any successor residue. "
                            "It may be the last in the chain sequence or there are missing residues." % residue)
         return neighbors

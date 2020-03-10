@@ -1,4 +1,4 @@
-from pybel import informats, outformats
+from openbabel.pybel import informats, outformats
 from subprocess import Popen, PIPE
 
 from util.exceptions import FileNotCreated, InvalidFileFormat

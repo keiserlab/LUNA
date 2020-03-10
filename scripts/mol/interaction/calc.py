@@ -1,4 +1,4 @@
-from openbabel import etab
+from openbabel import openbabel as ob
 from operator import le, ge
 from itertools import combinations, product
 from collections import defaultdict
@@ -1718,15 +1718,15 @@ class InteractionCalculator:
             inter = InteractionType(group1, group2, "Covalent bond", params=params)
             interactions.append(inter)
         else:
-            cov1 = etab.GetCovalentRad(etab.GetAtomicNum(atm1.element))
-            cov2 = etab.GetCovalentRad(etab.GetAtomicNum(atm2.element))
+            cov1 = ob.GetCovalentRad(ob.GetAtomicNum(atm1.element))
+            cov2 = ob.GetCovalentRad(ob.GetAtomicNum(atm2.element))
 
             if cc_dist <= cov1 + cov2:
                 inter = InteractionType(group1, group2, "Atom overlap", params=params)
                 interactions.append(inter)
             else:
-                rdw1 = etab.GetVdwRad(etab.GetAtomicNum(atm1.element))
-                rdw2 = etab.GetVdwRad(etab.GetAtomicNum(atm2.element))
+                rdw1 = ob.GetVdwRad(ob.GetAtomicNum(atm1.element))
+                rdw2 = ob.GetVdwRad(ob.GetAtomicNum(atm2.element))
 
                 # The graph of a molecule neighborhood contains only the information of its own atoms and their immediate neighbors.
                 # That is why it needs to merge two neighborhood graphs when an intermolecular interaction is to be calculated.

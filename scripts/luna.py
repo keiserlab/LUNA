@@ -6,11 +6,14 @@ import time
 import multiprocessing as mp
 import logging
 
-from pybel import readfile
-from pybel import informats as OB_FORMATS
+# Open Babel
+from openbabel.pybel import readfile
+from openbabel.pybel import informats as OB_FORMATS
+# RDKit
 from rdkit.Chem import ChemicalFeatures
 from rdkit.Chem.Pharm2D.SigFactory import SigFactory
 from rdkit.Chem import MolFromPDBBlock, MolFromSmiles
+# SQLAlchemy
 from sqlalchemy.orm.exc import NoResultFound
 
 # Local modules

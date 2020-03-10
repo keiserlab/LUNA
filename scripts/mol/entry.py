@@ -5,12 +5,11 @@ from os.path import exists
 
 
 from rdkit.Chem import MolToPDBBlock
-from pybel import readfile
-from pybel import informats as OB_FORMATS
-
 from rdkit.Chem import Mol as RDMol
 from openbabel import OBMol
-from pybel import Molecule as PybelMol
+from openbabel.pybel import readfile
+from openbabel.pybel import Molecule as PybelMol
+from openbabel.pybel import informats as OB_FORMATS
 
 from mol.wrappers.rdkit import RDKIT_FORMATS, read_multimol_file, read_mol_from_file
 from mol.wrappers.base import MolWrapper

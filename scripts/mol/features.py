@@ -2,9 +2,12 @@ import util.stringcase as case
 
 from util.exceptions import MoleculeObjectTypeError
 from mol.wrappers.base import MolWrapper
+
+# Open Babel
+from openbabel.openbabel import OBMol, OBSmartsPattern
+from openbabel.pybel import Molecule as PybelMol
+# RDKit
 from rdkit.Chem import Mol as RDMol
-from openbabel import OBMol, OBSmartsPattern
-from pybel import Molecule as PybelMol
 
 from collections import defaultdict
 
