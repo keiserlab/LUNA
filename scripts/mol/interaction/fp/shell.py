@@ -1,8 +1,8 @@
-from itertools import chain, product
+from itertools import chain
 from collections import defaultdict
+from enum import Enum, auto
 import numpy as np
 import mmh3
-
 
 from util.exceptions import ShellCenterNotFound
 from util.default_values import CHEMICAL_FEATURE_IDS, INTERACTION_IDS
@@ -15,12 +15,21 @@ import logging
 logger = logging.getLogger()
 
 
+class IFPType(Enum):
+    # auto() creates automatic identifiers for each type as this value is not important.
+    # Therefore, always remember to compare IFP types using their names and not their values.
+    EIFP = auto()
+    EIFP_WITH_PHARM_FOR_GROUPS = auto()
+    FIFP = auto()
+
+
 class ShellManager:
 
-    def __init__(self, num_levels, radius_step, num_bits, shells=None, full_control=True, verbose=False):
+    def __init__(self, num_levels, radius_step, num_bits, ifp_type, shells=None, full_control=True, verbose=False):
         self.num_levels = num_levels
         self.radius_steps = radius_step
         self.num_bits = num_bits
+        self.ifp_type = ifp_type
 
         self.shells = shells or []
         self.verbose = verbose
@@ -295,20 +304,10 @@ class Shell:
 
     def hash_shell(self):
         if self.level == 0:
-            data = [self.feature_mapper[cf.format_name()] for cf in self.central_atm_grp.features]
 
-            if len(self.central_atm_grp.atoms) == 1:
-                features = set()
-                # Given the previous If, this For will loop only through one atom and, therefore, it can be removed without
-                # losing information. However, if someday I decide to remove the If, then the code for capturing
-                # all atom derived features will be already working.
-                for atm in self.central_atm_grp.atoms:
-                    for atm_grp in atm.atm_grps:
-                        if atm_grp != self.central_atm_grp:
-                            features.update(atm_grp.features)
+            # Get the initial data for the first shell according to the IFP type the user has chosen.
+            data = self._initial_shell_data()
 
-                data += [self.feature_mapper[cf.format_name()] for cf in features]
-            data.sort()
         else:
             cent_prev_id = self.previous_shell.identifier
 
@@ -342,7 +341,49 @@ class Shell:
         # TODO: Let the user define a hash function
         hashed_shell = mmh3.hash(np_array, self.seed, signed=False)
 
+        if self.level == 0:
+            print(">>> ", self.central_atm_grp, "\t", data, "\t", hashed_shell)
+
         return hashed_shell
+
+    def _initial_shell_data(self):
+
+        data = []
+
+        # EIFP uses atomic invariants.
+        if self.manager.ifp_type == IFPType.EIFP:
+            print("++++++ ATOMS: ", self.central_atm_grp)
+            # Shells use atomic invariants as data. In case of atom groups, the data consists of a list of invariants.
+            data = sorted([atm.invariants for atm in self.central_atm_grp.atoms])
+
+        # EIFP_WITH_PHARM_FOR_GROUPS uses atomic invariants for atoms and pharmacophore information for atom groups.
+        elif self.manager.ifp_type == IFPType.EIFP_WITH_PHARM_FOR_GROUPS:
+
+            if len(self.central_atm_grp.atoms) == 1:
+                # Shells whose centroid are atoms use invariants as data.
+                data = sorted([atm.invariants for atm in self.central_atm_grp.atoms])
+            else:
+                # Shells whose centroid are atoms' group use pharmacophore as data.
+                data = [self.feature_mapper[cf.format_name()] for cf in self.central_atm_grp.features]
+
+        # FIFP uses pharmacophore properties for atoms and atoms' group.
+        elif self.manager.ifp_type == IFPType.FIFP:
+            data = [self.feature_mapper[cf.format_name()] for cf in self.central_atm_grp.features]
+
+            if len(self.central_atm_grp.atoms) == 1:
+                features = set()
+                # Given the previous If, this For will loop only through one atom and, therefore, it can be removed without
+                # losing information. However, if someday I decide to remove the If, then the code for capturing
+                # all atom derived features will be already working.
+                for atm in self.central_atm_grp.atoms:
+                    for atm_grp in atm.atm_grps:
+                        if atm_grp != self.central_atm_grp:
+                            features.update(atm_grp.features)
+
+                data += [self.feature_mapper[cf.format_name()] for cf in features]
+            data.sort()
+
+        return data
 
     def _encode_interactions(self):
         encoded_data = []
@@ -360,19 +401,20 @@ class Shell:
 
 class ShellGenerator:
 
-    def __init__(self, num_levels, radius_step, bucket_size=10, seed=0, np_dtype=np.int64,
-                 num_bits=DEFAULT_SHELL_NBITS):
+    def __init__(self, num_levels, radius_step, num_bits=DEFAULT_SHELL_NBITS, ifp_type=IFPType.EIFP,
+                 bucket_size=10, seed=0, np_dtype=np.int64):
 
         self.num_levels = num_levels
         self.radius_step = radius_step
+        self.num_bits = num_bits
+        self.ifp_type = ifp_type
 
         self.bucket_size = bucket_size
         self.seed = seed
         self.np_dtype = np_dtype
-        self.num_bits = num_bits
 
     def create_shells(self, atm_grps_mngr):
-        sm = ShellManager(self.num_levels, self.radius_step, self.num_bits)
+        sm = ShellManager(self.num_levels, self.radius_step, self.num_bits, self.ifp_type)
 
         all_interactions = atm_grps_mngr.get_all_interactions()
 
@@ -405,6 +447,7 @@ class ShellGenerator:
             radius = self.radius_step * level
 
             for atm_grp in sorted_neighborhood:
+
                 # Ignore centroids that already reached the limit of possible substructures.
                 if atm_grp in skip_atm_grps:
                     continue
@@ -511,6 +554,8 @@ class ShellGenerator:
                     # If the limit was reached for this centroid, in the next level it can be ignored.
                     if local_convergence or global_convergence:
                         skip_atm_grps.add(atm_grp)
+
+            exit()
 
             # If all atom groups reached the limit of possible substructures, just leave the loop.
             if len(skip_atm_grps) == len(neighborhood):
