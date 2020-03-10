@@ -111,40 +111,14 @@ class InteractionFilter:
         # Filters for residue-residue interactions if required.
         is_res_res = (src_grp.is_residue() and trgt_grp.is_residue())
         if is_res_res:
-
-            # if list(src_grp.compounds)[0].id[1] == 8 and list(trgt_grp.compounds)[0].id[1] == 29:
-            #     print()
-            #     print(src_grp, trgt_grp)
-            #     print("IGNORE INTRA CHAINS? ", self.ignore_intra_chain)
-            #     print("SAME CHAINS: ", is_same_chain)
-            #     print(src_grp.get_chains(), trgt_grp.get_chains())
-            #     print()
-
             # Ignore all residue-residue interactions.
             if self.ignore_res_res:
-
-                # # if list(src_grp.compounds)[0].id[1] == 140 and list(trgt_grp.compounds)[0].id[1] == 139:
-                # if list(src_grp.compounds)[0].id[1] == 8 and list(trgt_grp.compounds)[0].id[1] == 29:
-
-                #     print("IGNORE RES-RES")
-                #     exit()
-
                 return False
             # Ignore all intra-chain interactions involving two residues.
             elif self.ignore_intra_chain and is_same_chain:
-
-                # if list(src_grp.compounds)[0].id[1] == 140 and list(trgt_grp.compounds)[0].id[1] == 139:
-                #     print("IGNORE INTRA RES-RES")
-                #     exit()
-
                 return False
             elif self.ignore_inter_chain and not is_same_chain:
                 return False
-
-            # if list(src_grp.compounds)[0].id[1] == 8 and list(trgt_grp.compounds)[0].id[1] == 29:
-
-            #     print(">>> PASSOU")
-            #     print()
 
         # It ignores residue-nucleic acid interactions if required.
         is_res_nucl = ((src_grp.is_residue() and trgt_grp.is_nucleotide()) or
