@@ -1,6 +1,5 @@
 import numpy as np
-from openbabel import etab
-
+from openbabel import openbabel as ob
 from graph.bellman_ford import bellman_ford
 
 
@@ -87,9 +86,13 @@ class ExtendedAtom:
     def invariants(self):
         return self._invariants
 
+    @invariants.setter
+    def invariants(self, invariants):
+        self._invariants = invariants
+
     @property
     def electronegativity(self):
-        return etab.GetElectroNeg(etab.GetAtomicNum(self.element))
+        return ob.GetElectroNeg(ob.GetAtomicNum(self.element))
 
     @property
     def full_id(self):
