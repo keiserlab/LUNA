@@ -1,10 +1,15 @@
 from collections import defaultdict
 from itertools import chain
-from rdkit.Chem import MolFromMolBlock, MolFromMolFile, SanitizeFlags, SanitizeMol
-from pybel import readfile
-from openbabel import etab
+
 import numpy as np
 from Bio.KDTree import KDTree
+
+# Open Babel
+from openbabel import openbabel as ob
+from openbabel.pybel import readfile
+from openbabel.pybel import Molecule as PybelWrapper
+# RDKit
+from rdkit.Chem import MolFromMolBlock, MolFromMolFile, SanitizeFlags, SanitizeMol
 
 
 from MyBio.selector import ResidueSelector, AtomSelector
@@ -14,6 +19,7 @@ from mol.interaction.contact import get_contacts_for_entity, get_cov_contacts_fo
 from mol.atom import ExtendedAtom, AtomData
 from mol.charge_model import OpenEyeModel
 from mol.validator import MolValidator
+from mol.standardiser import ResiduesStandardiser
 from mol.wrappers.obabel import convert_molecule
 from mol.wrappers.base import MolWrapper
 from mol.features import ChemicalFeature
@@ -361,7 +367,7 @@ class AtomGroup():
         """Return 1 if at least one compound is an hetero groups."""
         return any([a.parent.is_hetatm() for a in self.atoms])
 
-    def has_aminoacid(self):
+    def has_residue(self):
         """Return 1 if at least one compound is an amino acids."""
         return any([a.parent.is_residue() for a in self.atoms])
 
@@ -450,13 +456,12 @@ class AtomGroupPerceiver():
     def perceive_atom_groups(self, compounds, mol_objs_dict=None):
         mol_objs_dict = mol_objs_dict or {}
 
-        perceived_atm_grps = set()
-
         self.atm_grps_mngr = AtomGroupsManager()
 
         self.atm_mapping = {}
 
         for comp in compounds:
+
             props_set = False
 
             if self.default_properties is not None:
@@ -540,11 +545,11 @@ class AtomGroupPerceiver():
 
                             # If the atom 1 belongs to the target and is not a hydrogen, add atom 2 to its neighbor's list.
                             if atm1.parent == target_compound and atm1.element != "H":
-                                atom_info = AtomData(etab.GetAtomicNum(atm2.element), atm2.coord, atm2.serial_number)
+                                atom_info = AtomData(ob.GetAtomicNum(atm2.element), atm2.coord, atm2.serial_number)
                                 atm_map[atm1.name].add_nb_info([atom_info])
                             # If the atom 2 belongs to the target and is not a hydrogen, add atom 1 to its neighbor's list.
                             if atm2.parent == target_compound and atm2.element != "H":
-                                atom_info = AtomData(etab.GetAtomicNum(atm1.element), atm1.coord, atm1.serial_number)
+                                atom_info = AtomData(ob.GetAtomicNum(atm1.element), atm1.coord, atm1.serial_number)
                                 atm_map[atm2.name].add_nb_info([atom_info])
 
                 for atms_str in self.default_properties[target_compound.resname]:
@@ -583,7 +588,7 @@ class AtomGroupPerceiver():
                         # field is not reliable enough, the best way to deal with the N-terminal would be by aligning the structure with
                         # the protein sequence. However, it would force one to provide the sequence and it would also increase the
                         # processing time only to identify if the compound is an N-terminal or not. In most of the cases, the first
-                        # compound will be the N-terminal. Moreover, in general (maybe always), the binding sites will not be at the ends
+                        # compound will be the N-terminal. Moreover, in general (maybe always), binding sites will not be at the ends
                         # of the protein. Therefore, I opted to always attribute a 'PositivelyIonizable' property to the N atom from the
                         # first compound in the chain.
                         if atms_str == "N" and target_compound.idx == 0:
@@ -632,7 +637,6 @@ class AtomGroupPerceiver():
                     # Set the graph dictionary to each ExtendedAtom object. Since, dictionaries are passed as references, we can change
                     # the variable nb_graph and the changes will be updated in each ExtendedAtom object automatically.
                     atm.set_neighborhood(nb_graph)
-
                 return True
             except Exception as e:
                 logger.exception(e)
@@ -643,13 +647,17 @@ class AtomGroupPerceiver():
 
         try:
             # If no OBMol was defined, create a new one with the compound list.
-            mol_obj = mol_obj or self._get_mol_from_entity(target_compound.get_parent_by_level('M'), compound_selector)
+            ignored_atoms = []
+            if mol_obj is None:
+                mol_obj, ignored_atoms = self._get_mol_from_entity(target_compound.get_parent_by_level('M'),
+                                                                   target_compound, target_atoms, compound_selector)
+            # Create a new MolWrapper object.
             mol_obj = MolWrapper(mol_obj)
 
             # If the add_h property is set to False, the code will not remove any existing hydrogens from the PDB structure.
             # In these situations, the list of atoms may contain hydrogens. But, we do not need to attribute properties to hydrogens.
             # We just need them to correctly set properties to heavy atoms. So let's just ignore them.
-            target_atoms = [atm for atm in target_atoms if atm.element != "H"]
+            target_atoms = [atm for atm in target_atoms if atm.element != "H" and atm not in ignored_atoms]
 
             if mol_obj.get_num_heavy_atoms() != len(target_atoms):
                 raise MoleculeSizeError("The number of heavy atoms in the PDB selection and in the MOL file are different.")
@@ -662,10 +670,30 @@ class AtomGroupPerceiver():
             for i, atm_obj in enumerate(atm_obj_list):
                 atm_map[atm_obj.get_idx()] = target_atoms[i].serial_number
 
-                # Get atomic invariants
-                invariants = atm_obj.get_atomic_invariants()
+                trgt_atms[target_atoms[i].serial_number] = self._new_extended_atom(target_atoms[i])
 
-                trgt_atms[target_atoms[i].serial_number] = self._new_extended_atom(target_atoms[i], invariants)
+                # Invariants are still None, so it means a new ExtendedAtom has just been created.
+                if trgt_atms[target_atoms[i].serial_number].invariants is None:
+                    # Update atomic invariants for new ExtendedAtoms created.
+                    trgt_atms[target_atoms[i].serial_number].invariants = atm_obj.get_atomic_invariants()
+
+                # The current atom already has its invariants updated, which means the atom was created previously
+                # for another target compound.
+                else:
+                    # In this case, if the current atom belongs to the target compound, we need to prioritize the current target compound
+                    # and overwrite the atom's invariants. By doing so, we always guarantee the most accurate information of an atom.
+                    #
+                    # It is done because some atoms are updated by centroids (target compound) not corresponding to its real compound.
+                    # When it happens, the information of covalently bonded atoms may be lost due to the short COV_SEARCH_RADIUS used when
+                    # selecting nearby compounds. As a consequence, these atoms will have their properties and topology incorrectly
+                    # perceived.
+                    #
+                    # However, we need to highlight that the main goal of selecting atoms using COV_SEARCH_RADIUS is to find atoms
+                    # covalently bonded to the current compound. Therefore, atoms in the border of nearby molecules are not important
+                    # right now and they will be updated in their own time.
+                    if trgt_atms[target_atoms[i].serial_number].parent == target_compound:
+                        # Update the atomic invariants for an ExtendedAtom.
+                        trgt_atms[target_atoms[i].serial_number].invariants = atm_obj.get_atomic_invariants()
 
             # Set all neighbors, i.e., covalently bonded atoms.
             for bond_obj in mol_obj.get_bonds():
@@ -674,10 +702,8 @@ class AtomGroupPerceiver():
 
                 # At least one of the atoms must be a non-hydrogen atom.
                 if bgn_atm_obj.get_atomic_num() != 1 or end_atm_obj.get_atomic_num() != 1:
-
                     # If the atom 1 is not a hydrogen, add atom 2 to its neighbor list.
                     if bgn_atm_obj.get_atomic_num() != 1:
-
                         # If the current bgn_atm_obj consists of an atom from the current target compound, we can update its information.
                         # Other compounds are ignored for now as they will have their own time to update its information.
                         if trgt_atms[atm_map[bgn_atm_obj.get_idx()]].parent == target_compound:
@@ -688,7 +714,6 @@ class AtomGroupPerceiver():
 
                     # If the atom 2 is not a hydrogen, add atom 1 to its neighbor list.
                     if end_atm_obj.get_atomic_num() != 1:
-
                         # If the current end_atm_obj consists of an atom from the current target compound, we can update its information.
                         # Other compounds are ignored for now as they will have their own time to update its information.
                         if trgt_atms[atm_map[end_atm_obj.get_idx()]].parent == target_compound:
@@ -698,10 +723,6 @@ class AtomGroupPerceiver():
                             trgt_atms[atm_map[end_atm_obj.get_idx()]].add_nb_info([atom_info])
 
             group_features = self.feature_extractor.get_features_by_groups(mol_obj, atm_map)
-
-            # New atom groups set.
-            atm_grps = set()
-
             for key in group_features:
                 grp_obj = group_features[key]
 
@@ -734,17 +755,17 @@ class AtomGroupPerceiver():
 
         return self.atm_mapping[atm]
 
-    def _get_mol_from_entity(self, entity, compound_selector):
+    def _get_mol_from_entity(self, entity, target_compound, target_atoms, compound_selector):
         # First it saves the selection into a PDB file and then it converts the file to .mol.
         # I had to do it because the OpenBabel 2.4.1 had a problem with some molecules containing aromatic rings.
         # In such cases, the aromatic ring was being wrongly perceived and some atoms received more double bonds than it
         # was expected. The version 2.3.2 works better. Therefore, I defined this version manually (openbabel property).
         filename = get_unique_filename(self.tmp_path)
-        pdb_file = '%s.pdb' % filename
+        pdb_file = '%s_pdb-file.pdb' % filename
         logger.info("Saving the PDB object as a PDB file named '%s'." % pdb_file)
         save_to_file(entity, pdb_file, compound_selector)
 
-        mol_file = '%s.mol' % filename
+        mol_file = '%s_mol-file.mol' % filename
         ob_opt = {"error-level": 5}
         logger.info("Converting the PDB file '%s' to a Mol file named '%s' using Open Babel." % (pdb_file, mol_file))
         if self.add_h:
@@ -754,6 +775,9 @@ class AtomGroupPerceiver():
             else:
                 ob_opt["h"] = ""
         convert_molecule(pdb_file, mol_file, opt=ob_opt, openbabel=OPENBABEL)
+
+        # Currently, ignored atoms are only metals.
+        ignored_atoms = []
 
         mol_obj = None
         if self.amend_mol:
@@ -766,9 +790,57 @@ class AtomGroupPerceiver():
                 raise MoleculeObjectError("An error occurred while parsing the file '%s' with Open Babel and the molecule "
                                           "object could not be created. Check the logs for more information." % mol_file)
 
+            if target_compound.is_residue():
+                # If the add_h property is set to False, the code will not remove any existing hydrogens from the PDB structure.
+                # In these situations, the list of atoms may contain hydrogens. But, we do not need to attribute properties to hydrogens.
+                # We just need them to correctly set properties to heavy atoms. So let's just ignore them.
+                target_atoms = [atm for atm in target_atoms if atm.element != "H"]
+
+                mol_obj = MolWrapper(mol_obj)
+                if mol_obj.get_num_heavy_atoms() != len(target_atoms):
+                    raise MoleculeSizeError("The number of heavy atoms in the PDB selection and in the MOL file are different.")
+
+                # Ignore hydrogen atoms.
+                atm_obj_list = [atm for atm in mol_obj.get_atoms() if atm.get_atomic_num() != 1]
+
+                atom_pairs = []
+                for i, atm_obj in enumerate(atm_obj_list):
+                    if target_atoms[i].parent.is_residue():
+                        atom_pairs.append((atm_obj, target_atoms[i]))
+
+                rs = ResiduesStandardiser(break_metal_bonds=False)
+                mol_obj.unwrap().DeleteHydrogens()
+                rs.standardise(atom_pairs)
+
+                for i, atm_obj in enumerate(atm_obj_list):
+                    if atm_obj.get_id() in rs.removed_atoms:
+                        ignored_atoms.append(target_atoms[i])
+
+                # After standardizing residues, we need to recreate the Mol file, otherwise implicit hydrogens will not be included in the
+                # MOL object and, therefore, their coordinates could not be accessed. If you try to generate coordinates directly from the
+                # object, hydrogens will be incorrectly placed.
+                mol_obj = PybelWrapper(mol_obj.unwrap())
+                new_mol_file = '%s_tmp-mol-file.mol' % filename
+                mol_obj.write("mol", new_mol_file, overwrite=True)
+                # Overwrite mol_file by converting the new molecular file using the user specified parameters.
+                # Note that right now it will add explicit hydrogens to the molecules according to the provided pH.
+                convert_molecule(new_mol_file, mol_file, opt=ob_opt, openbabel=OPENBABEL)
+
+                # Let's finally read the correct and standardized molecular file.
+                try:
+                    mol_obj = next(readfile("mol", mol_file))
+                except Exception as e:
+                    logger.exception(e)
+                    raise MoleculeObjectError("An error occurred while parsing the file '%s' with Open Babel and the molecule "
+                                              "object could not be created. Check the logs for more information." % mol_file)
+
+                # Remove temporary files.
+                remove_files([new_mol_file])
+
             mv = MolValidator()
             is_valid = mv.validate_mol(mol_obj)
             logger.info('Validation finished!!!')
+
             if not is_valid:
                 logger.warning("The molecular file '%s' contain invalid atoms. Check the logs for more information." % mol_file)
 
@@ -803,7 +875,7 @@ class AtomGroupPerceiver():
         # Remove temporary files.
         remove_files([pdb_file, mol_file])
 
-        return mol_obj
+        return mol_obj, ignored_atoms
 
 
 class AtomGroupNeighborhood:
