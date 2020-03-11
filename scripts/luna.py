@@ -22,7 +22,7 @@ from analysis.summary import *
 from database.loader import *
 from database.luna_model import *
 from database.helpers import *
-from database.util import (get_ligand_tbl_join_filter, default_interaction_filters, format_db_ligand_entries,
+from database.util import (get_ligand_tbl_join_filter, format_db_ligand_entries,
                            format_db_interactions, object_as_dict, get_default_mappers_list)
 from mol.depiction import ligand_pharm_figure
 from mol.clustering import cluster_fps_butina
@@ -33,18 +33,16 @@ from mol.groups import AtomGroupPerceiver
 from mol.interaction.contact import get_contacts_for_entity
 from mol.interaction.calc import InteractionCalculator
 from mol.interaction.conf import InteractionConf
-from mol.interaction.filter import InteractionFilter
 from mol.interaction.fp.shell import ShellGenerator
 from mol.wrappers.base import MolWrapper
-from mol.wrappers.obabel import convert_molecule
 from mol.wrappers.rdkit import RDKIT_FORMATS, read_multimol_file
 from mol.amino_features import DEFAULT_AMINO_ATM_FEATURES
 from util.default_values import *
 from util.exceptions import *
-from util.file import create_directory, is_file_valid, get_file_format, get_filename, get_unique_filename
+from util.file import create_directory, get_file_format, get_unique_filename
 from util.logging import new_logging_file, load_default_logging_conf
 from util.config_parser import Config
-from util import func_call_to_str, iter_to_chunks
+from util import iter_to_chunks
 from util.multiprocessing_logging import start_mp_handler
 
 from MyBio.PDB.PDBParser import PDBParser
