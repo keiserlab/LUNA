@@ -1,4 +1,4 @@
-# LUNA
+![LUNA Logo](luna.png)
 
 ### How to sync this fork with Alexandre's original repo directly from GitHub
 - go to **Alexandre's repo** pull request page: https://github.com/alexandrefassio/LUNA/pulls
