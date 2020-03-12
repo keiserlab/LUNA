@@ -2,14 +2,14 @@ from openbabel import etab
 from operator import le, ge
 from itertools import combinations, product
 from collections import defaultdict
-import pickle
+from util.file import pickle_data, unpickle_data
 
 import mol.interaction.math as im
 from mol.interaction.conf import DefaultInteractionConf, InteractionConf
 from mol.interaction.filter import InteractionFilter
 from mol.interaction.type import InteractionType
 from mol.features import ChemicalFeature
-from util.exceptions import IllegalArgumentError, FileNotCreated, PKLNotReadError
+from util.exceptions import IllegalArgumentError
 from mol.groups import AtomGroupNeighborhood
 
 
@@ -58,26 +58,12 @@ class InteractionsManager:
             if inter.type in types:
                 yield inter
 
-    def save(self, output_file):
-        try:
-            with open(output_file, "wb") as OUT:
-                pickle.dump(self, OUT, pickle.HIGHEST_PROTOCOL)
-        except OSError as e:
-            logger.exception(e)
-            raise FileNotCreated("File '%s' could not be created." % output_file)
-        except Exception as e:
-            logger.exception(e)
-            raise
+    def save(self, output_file, compressed=True):
+        pickle_data(self, output_file, compressed)
 
     @staticmethod
     def load(input_file):
-        try:
-            with open(input_file, "rb") as IN:
-                return pickle.load(IN)
-        except OSError as e:
-            logger.exception(e)
-            raise PKLNotReadError("File '%s' could not be loaded." % input_file)
-        return None
+        return unpickle_data(input_file)
 
     def __len__(self):
         # Number of interactions

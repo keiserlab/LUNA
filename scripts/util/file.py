@@ -1,10 +1,13 @@
 from os.path import basename, exists, isdir, isfile, splitext
 from os import makedirs, remove
 from shutil import rmtree
-
 import string
 import random
 import logging
+import pickle
+import gzip
+
+from util.exceptions import FileNotCreated, PKLNotReadError
 
 
 logger = logging.getLogger()
@@ -144,3 +147,41 @@ def try_validate_directory(path):
 
 def try_validate_file(path):
     validate_filesystem(path, "file")
+
+
+def pickle_data(data, output_file, compressed=True):
+    open_func = open
+    if compressed:
+        open_func = gzip.open
+
+        if output_file.endswith(".gz") is False:
+            output_file += ".gz"
+
+    try:
+        with open_func(output_file, "wb") as OUT:
+            pickle.dump(data, OUT, pickle.HIGHEST_PROTOCOL)
+    except OSError as e:
+        logger.exception(e)
+        raise FileNotCreated("File '%s' could not be created." % output_file)
+    except Exception as e:
+        logger.exception(e)
+        raise
+
+
+def unpickle_data(input_file):
+
+    # Try to decompress and unpickle the data first.
+    try:
+        with gzip.open(input_file, "rb") as IN:
+            return pickle.load(IN)
+    except Exception:
+        pass
+
+    # If the decompression failed, let's try to unpickle the file directly. Maybe it is not a compressed file.
+    try:
+        with open(input_file, "rb") as IN:
+            return pickle.load(IN)
+    except OSError as e:
+        logger.exception(e)
+        raise PKLNotReadError("File '%s' could not be loaded." % input_file)
+    return None

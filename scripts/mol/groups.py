@@ -4,7 +4,7 @@ from rdkit.Chem import MolFromMolBlock, MolFromMolFile, SanitizeFlags, SanitizeM
 from pybel import readfile
 from openbabel import etab
 import numpy as np
-import pickle
+from util.file import pickle_data, unpickle_data
 
 from Bio.KDTree import KDTree
 
@@ -19,8 +19,7 @@ from mol.wrappers.obabel import convert_molecule
 from mol.wrappers.base import MolWrapper
 from mol.features import ChemicalFeature
 from util.file import get_unique_filename, remove_files
-from util.exceptions import (MoleculeSizeError, IllegalArgumentError, MoleculeObjectError,
-                             FileNotCreated, PKLNotReadError)
+from util.exceptions import MoleculeSizeError, IllegalArgumentError, MoleculeObjectError
 from util.default_values import ACCEPTED_MOL_OBJ_TYPES, COV_SEARCH_RADIUS, OPENBABEL
 from mol.interaction.type import InteractionType
 import mol.interaction.math as im
@@ -201,26 +200,12 @@ class AtomGroupsManager():
             # pharmacophore rules definition, it can occur.
             atm_grp.features = features
 
-    def save(self, output_file):
-        try:
-            with open(output_file, "wb") as OUT:
-                pickle.dump(self, OUT, pickle.HIGHEST_PROTOCOL)
-        except OSError as e:
-            logger.exception(e)
-            raise FileNotCreated("File '%s' could not be created." % output_file)
-        except Exception as e:
-            logger.exception(e)
-            raise
+    def save(self, output_file, compressed=True):
+        pickle_data(self, output_file, compressed)
 
     @staticmethod
     def load(input_file):
-        try:
-            with open(input_file, "rb") as IN:
-                return pickle.load(IN)
-        except OSError as e:
-            logger.exception(e)
-            raise PKLNotReadError("File '%s' could not be loaded." % input_file)
-        return None
+        return unpickle_data(input_file)
 
     def __len__(self):
         # Number of atom groups.
