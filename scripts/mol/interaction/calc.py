@@ -2,7 +2,7 @@ from openbabel import etab
 from operator import le, ge
 from itertools import combinations, product
 from collections import defaultdict
-
+from util.file import pickle_data, unpickle_data
 
 import mol.interaction.math as im
 from mol.interaction.conf import DefaultInteractionConf, InteractionConf
@@ -11,6 +11,7 @@ from mol.interaction.type import InteractionType
 from mol.features import ChemicalFeature
 from util.exceptions import IllegalArgumentError
 from mol.groups import AtomGroupNeighborhood
+
 
 import logging
 logger = logging.getLogger()
@@ -23,7 +24,9 @@ ANIONS = ("NegativelyIonizable", "NegIonizable", "Negative")
 class InteractionsManager:
 
     def __init__(self, interactions=None):
-        self._interactions = list(interactions) or []
+        if interactions is None:
+            interactions = []
+        self._interactions = list(interactions)
 
     @property
     def interactions(self):
@@ -55,8 +58,12 @@ class InteractionsManager:
             if inter.type in types:
                 yield inter
 
-    def save(self, output_file):
-        pass
+    def save(self, output_file, compressed=True):
+        pickle_data(self, output_file, compressed)
+
+    @staticmethod
+    def load(input_file):
+        return unpickle_data(input_file)
 
     def __len__(self):
         # Number of interactions

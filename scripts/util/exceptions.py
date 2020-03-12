@@ -18,6 +18,10 @@ class PDBNotReadError(IOError):
     pass
 
 
+class PKLNotReadError(IOError):
+    pass
+
+
 class InvalidSuperpositionFileError(ValueError):
     pass
 

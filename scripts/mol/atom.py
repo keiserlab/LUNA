@@ -3,6 +3,9 @@ from openbabel import etab
 
 from graph.bellman_ford import bellman_ford
 
+import logging
+logger = logging.getLogger()
+
 
 class AtomData:
 
@@ -129,7 +132,16 @@ class ExtendedAtom:
         return d.get(trgt_atm.serial_number, float("inf"))
 
     def __getattr__(self, attr):
-        return getattr(self._atom, attr)
+        if hasattr(self._atom, attr):
+            return getattr(self._atom, attr)
+        else:
+            raise AttributeError("The attribute '%s' does not exist in the class %s." % (attr, self.__class__.__name__))
+
+    def __getstate__(self):
+        return self.__dict__
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
 
     def __repr__(self):
         return "<ExtendedAtom: %s>" % self.full_atom_name

@@ -4,8 +4,9 @@ from rdkit.Chem import MolFromMolBlock, MolFromMolFile, SanitizeFlags, SanitizeM
 from pybel import readfile
 from openbabel import etab
 import numpy as np
-from Bio.KDTree import KDTree
+from util.file import pickle_data, unpickle_data
 
+from Bio.KDTree import KDTree
 
 from MyBio.selector import ResidueSelector, AtomSelector
 from MyBio.util import save_to_file
@@ -199,6 +200,13 @@ class AtomGroupsManager():
             # pharmacophore rules definition, it can occur.
             atm_grp.features = features
 
+    def save(self, output_file, compressed=True):
+        pickle_data(self, output_file, compressed)
+
+    @staticmethod
+    def load(input_file):
+        return unpickle_data(input_file)
+
     def __len__(self):
         # Number of atom groups.
         return self.size
@@ -260,7 +268,6 @@ class AtomGroup():
     @features.setter
     def features(self, features):
         self._features = sorted(features)
-
         # Reset hash.
         self._hash_cache = None
 
@@ -704,6 +711,7 @@ class AtomGroupPerceiver():
             return True
         except Exception as e:
             logger.exception(e)
+            exit()
             return False
 
     def _new_extended_atom(self, atm):

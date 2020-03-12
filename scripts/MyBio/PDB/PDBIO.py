@@ -269,7 +269,7 @@ class PDBIO(object):
 
         # MODBY: Alexandre Fassio
         # Print CONECT records
-        if (write_conects):
+        if write_conects:
             conects = self.structure.conects
             for serial_number in sorted(conects):
                 if serial_number not in valid_serial_numbers:
