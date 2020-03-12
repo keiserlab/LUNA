@@ -2,15 +2,16 @@ from openbabel import etab
 from operator import le, ge
 from itertools import combinations, product
 from collections import defaultdict
-
+import pickle
 
 import mol.interaction.math as im
 from mol.interaction.conf import DefaultInteractionConf, InteractionConf
 from mol.interaction.filter import InteractionFilter
 from mol.interaction.type import InteractionType
 from mol.features import ChemicalFeature
-from util.exceptions import IllegalArgumentError
+from util.exceptions import IllegalArgumentError, FileNotCreated, PKLNotReadError
 from mol.groups import AtomGroupNeighborhood
+
 
 import logging
 logger = logging.getLogger()
@@ -23,7 +24,9 @@ ANIONS = ("NegativelyIonizable", "NegIonizable", "Negative")
 class InteractionsManager:
 
     def __init__(self, interactions=None):
-        self._interactions = list(interactions) or []
+        if interactions is None:
+            interactions = []
+        self._interactions = list(interactions)
 
     @property
     def interactions(self):
@@ -56,7 +59,25 @@ class InteractionsManager:
                 yield inter
 
     def save(self, output_file):
-        pass
+        try:
+            with open(output_file, "wb") as OUT:
+                pickle.dump(self, OUT, pickle.HIGHEST_PROTOCOL)
+        except OSError as e:
+            logger.exception(e)
+            raise FileNotCreated("File '%s' could not be created." % output_file)
+        except Exception as e:
+            logger.exception(e)
+            raise
+
+    @staticmethod
+    def load(input_file):
+        try:
+            with open(input_file, "rb") as IN:
+                return pickle.load(IN)
+        except OSError as e:
+            logger.exception(e)
+            raise PKLNotReadError("File '%s' could not be loaded." % input_file)
+        return None
 
     def __len__(self):
         # Number of interactions

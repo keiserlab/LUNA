@@ -41,7 +41,7 @@ def generate_json_file(json_data, output_file):
     try:
         import simplejson as json
         logger.info("Module 'simplejson' imported.")
-    except ImportError as e:
+    except ImportError:
         logger.info("Module 'simplejson' not available. Built-in module 'json' will be imported.")
         import json
 
@@ -57,7 +57,7 @@ def parse_json_file(json_file):
     try:
         import simplejson as json
         logger.info("Module 'simplejson' imported.")
-    except ImportError as e:
+    except ImportError:
         logger.info("Module 'simplejson' not available. Built-in module 'json' will be imported.")
         import json
 

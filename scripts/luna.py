@@ -5,6 +5,7 @@ from functools import wraps
 import time
 import multiprocessing as mp
 import logging
+import pickle
 
 from pybel import readfile
 from pybel import informats as OB_FORMATS
@@ -370,7 +371,10 @@ class Project:
         return False
 
     def perceive_chemical_groups(self, entity, ligand, add_h=False):
-        perceiver = AtomGroupPerceiver(self.feature_extractor, add_h=add_h, ph=self.ph, amend_mol=self.amend_mol,
+        feature_factory = ChemicalFeatures.BuildFeatureFactory(self.atom_prop_file)
+        feature_extractor = FeatureExtractor(feature_factory)
+
+        perceiver = AtomGroupPerceiver(feature_extractor, add_h=add_h, ph=self.ph, amend_mol=self.amend_mol,
                                        mol_obj_type=self.mol_obj_type, default_properties=self.default_properties,
                                        tmp_path="%s/tmp" % self.working_path)
 
@@ -387,20 +391,14 @@ class Project:
 
         return atm_grps_mngr
 
-    def set_pharm_objects(self):
-        feature_factory = ChemicalFeatures.BuildFeatureFactory(self.atom_prop_file)
+    def get_fingerprint(self, rdmol):
 
         # TODO: It should'be created unless pharm2d_fp is chosen.
         sig_factory = SigFactory(feature_factory, minPointCount=2, maxPointCount=3, trianglePruneBins=False)
         sig_factory.SetBins([(0, 2), (2, 5), (5, 8)])
         sig_factory.Init()
-        self.sig_factory = sig_factory
 
-        self.feature_extractor = FeatureExtractor(feature_factory)
-
-    def get_fingerprint(self, rdmol):
-
-        fp_opt = self.mfp_opts or {"fp_function": "pharm2d_fp", "sigFactory": self.sig_factory}
+        fp_opt = self.mfp_opts or {"fp_function": "pharm2d_fp", "sigFactory": sig_factory}
         fp_opt["critical"] = True
 
         return next(generate_fp_for_mols([rdmol], **fp_opt))
@@ -644,6 +642,27 @@ class Project:
         # TODO: Remover comentario
         # self.db.approve_session()
 
+    def save(self, output_file):
+        try:
+            with open(output_file, "wb") as OUT:
+                pickle.dump(self, OUT, pickle.HIGHEST_PROTOCOL)
+        except OSError as e:
+            logger.exception(e)
+            raise FileNotCreated("File '%s' could not be created." % output_file)
+        except Exception as e:
+            logger.exception(e)
+            raise
+
+    @staticmethod
+    def load(input_file):
+        try:
+            with open(input_file, "rb") as IN:
+                return pickle.load(IN)
+        except OSError as e:
+            logger.exception(e)
+            raise PKLNotReadError("File '%s' could not be loaded." % input_file)
+        return None
+
 
 # POPULATE RCSB.
 class RCSB_PLI_Population(Project):
@@ -658,8 +677,6 @@ class RCSB_PLI_Population(Project):
 
         self.prepare_project_path()
         self.init_common_tables()
-
-        self.set_pharm_objects()
 
         rcsb_inter_manager = RCSBInteractionManager(self.db)
 
@@ -755,8 +772,6 @@ class DB_PLI_Project(Project):
             self.entries = format_db_ligand_entries(db_lig_entries)
 
         self.prepare_project_path()
-
-        self.set_pharm_objects()
 
         rcsb_inter_manager = RCSBInteractionManager(self.db)
         proj_inter_manager = ProjectInteractionManager(self.db)
@@ -1019,6 +1034,8 @@ class FingerprintProject(Project):
                     atm_grps_mngr.merge_hydrophobic_atoms(interactions_mngr)
 
                 result = {"id": (target_entry.to_string())}
+
+                # TODO: It is not accepting Fingerprint types other than Morgan fp.
                 if self.calc_mfp:
                     if isinstance(target_entry, MolEntry):
                         rdmol_lig = MolFromSmiles(MolWrapper(target_entry.mol_obj).to_smiles())
@@ -1056,7 +1073,6 @@ class FingerprintProject(Project):
 
         self.prepare_project_path()
         self.init_logging_file("%s/logs/project.log" % self.working_path)
-        self.set_pharm_objects()
 
         fingerprints = []
         pli_fingerprints = []
@@ -1142,7 +1158,6 @@ class LocalProject(Project):
 
         self.prepare_project_path()
         self.init_logging_file("%s/logs/project.log" % self.working_path)
-        self.set_pharm_objects()
 
         self.mfps = []
         self.ifps = []
