@@ -41,6 +41,9 @@ from MyBio.util import download_pdb, entity_to_string, get_entity_from_entry
 PDB_PARSER = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=False)
 
 
+
+
+
 class StepControl:
 
     def __init__(self, step_id, num_subtasks, num_executed_subtasks, is_complete=False):
@@ -156,15 +159,19 @@ class Project:
                  ph=7.4,
                  amend_mol=True,
                  mol_obj_type='rdkit',
+
                  inter_conf=INTERACTION_CONF,
                  inter_calc=None,
-                 calc_mfp=True,
+
                  mfp_opts=None,
-                 calc_ifp=True,
+                 mfp_output=None,
+
                  ifp_num_levels=7,
                  ifp_radius_step=1,
                  ifp_length=IFP_LENGTH,
                  ifp_count=False,
+                 ifp_output=None,
+
                  similarity_func="BulkTanimotoSimilarity",
                  preload_mol_files=False,
                  default_properties=DEFAULT_AMINO_ATM_FEATURES,
@@ -204,13 +211,13 @@ class Project:
         self.inter_calc = inter_calc
 
         # Fingerprint parameters.
-        self.calc_mfp = calc_mfp
         self.mfp_opts = mfp_opts
-        self.calc_ifp = calc_ifp
         self.ifp_num_levels = ifp_num_levels
         self.ifp_radius_step = ifp_radius_step
         self.ifp_length = ifp_length
         self.ifp_count = ifp_count
+        self.mfp_output = mfp_output
+        self.ifp_output = ifp_output
 
         self.similarity_func = similarity_func
         self.butina_cutoff = butina_cutoff
@@ -454,148 +461,40 @@ class Project:
 
     @staticmethod
     def load(input_file):
-        return unpickle_data(input_file)
+        logger.warning("Reloading project saved in '%s'" % input_file)
+        proj_obj = unpickle_data(input_file)
+        proj_obj.init_logging_file("%s/logs/project.log" % proj_obj.working_path)
 
+        logger.warning("Reapplying interaction references to atom groups.")
 
-class FingerprintProject(Project):
+        result_pairs = []
+        for entry1, atm_grps_mngr in proj_obj.neighborhoods:
+            for entry2, inter_mngr in proj_obj.interactions:
+                if entry1.to_string() == entry2.to_string():
+                    # Updating references for entries.
+                    entry1 = entry2
+                    # Create a new pair of managers to update their atom group/interaction references.
+                    result_pairs.append((atm_grps_mngr, inter_mngr))
 
-    def __init__(self, entries, working_path, mfp_output=None, ifp_output=None, **kwargs):
-        self.mfp_output = mfp_output
-        self.ifp_output = ifp_output
+        for atm_grps_mngr, inter_mngr in result_pairs:
+            nb_mapping = {}
+            for atm_grp in atm_grps_mngr.atm_grps:
+                # First, reset the interactions list of an AtomGroup because the reference to
+                # their interaction objects will be updated in the next loop.
+                atm_grp.interactions = []
+                nb_mapping[atm_grp] = atm_grp
 
-        super().__init__(entries=entries, working_path=working_path, **kwargs)
-
-    def _process_entries(self, entries):
-
-        for target_entry in entries:
-            try:
-                logger.info("Starting processing entry %s." % target_entry)
-                self.current_entry = target_entry
-
-                # # Check if the entry is in the correct format.
-                # # It also accepts entries whose pdb_id is defined by the filename.
-                if isinstance(target_entry, MolEntry) is False:
-                    self.validate_entry_format(target_entry)
-
-                if self.calc_ifp:
-                    # # TODO: allow the person to pass a pdb_file into entries.
-                    pdb_file = self.get_pdb_file(target_entry.pdb_id)
-
-                    structure = PDB_PARSER.get_structure(target_entry.pdb_id, pdb_file)
-                    add_hydrogen = self.decide_hydrogen_addition(PDB_PARSER.get_header())
-
-                    if isinstance(target_entry, MolEntry):
-                        structure = target_entry.get_biopython_structure(structure, PDB_PARSER)
-
-                    ligand = get_entity_from_entry(structure, target_entry)
-                    ligand.set_as_target(is_target=True)
-
-                    atm_grps_mngr = self.perceive_chemical_groups(structure[0], ligand, add_hydrogen)
-
-                    #
-                    # Calculate interactions
-                    #
-                    interactions_mngr = self.inter_calc.calc_interactions(atm_grps_mngr.atm_grps)
-
-                    # Create hydrophobic islands.
-                    atm_grps_mngr.merge_hydrophobic_atoms(interactions_mngr)
-
-                result = {"id": (target_entry.to_string())}
-
-                # TODO: It is not accepting Fingerprint types other than Morgan fp.
-                if self.calc_mfp:
-                    if isinstance(target_entry, MolEntry):
-                        rdmol_lig = MolFromSmiles(MolWrapper(target_entry.mol_obj).to_smiles())
-                        rdmol_lig.SetProp("_Name", target_entry.mol_id)
-                        result["mfp"] = generate_fp_for_mols([rdmol_lig], "morgan_fp")[0]["fp"]
-                    else:
-                        # Read from PDB.
-                        pass
-
-                if self.calc_ifp:
-                    shells = ShellGenerator(self.ifp_num_levels, self.ifp_radius_step)
-                    sm = shells.create_shells(atm_grps_mngr)
-
-                    unique_shells = not self.ifp_count
-                    result["ifp"] = sm.to_fingerprint(fold_to_size=self.ifp_length, unique_shells=unique_shells, count_fp=self.ifp_count)
-
-                if isinstance(target_entry, MolEntry):
-                    result["smiles"] = MolWrapper(target_entry.mol_obj).to_smiles()
-                else:
-                    # TODO: Get Smiles from PDB
-                    result["smiles"] = ""
-                    pass
-                self.result.append(result)
-                logger.warning("Processing of entry %s finished successfully." % target_entry)
-            except Exception as e:
-                logger.exception(e)
-                logger.warning("Processing of entry %s failed. Check the logs for more information." % target_entry)
-
-    def __call__(self):
-        start = time.time()
-
-        if not self.calc_mfp and not self.calc_ifp:
-            logger.critical("Both molecular and interaction fingerprints were set off. So, there is nothing to be done...")
-            return
-
-        self.prepare_project_path()
-        self.init_logging_file("%s/logs/project.log" % self.working_path)
-
-        if self.preload_mol_files:
-            self.add_mol_obj_to_entries()
-
-        manager = mp.Manager()
-        self.mfps = []
-        self.ifps = []
-        self.interactions = manager.list()
-        self.neighborhoods = []
-
-        start = time.time()
-        chunk_size = ceil(len(self.entries) / (mp.cpu_count() - 1))
-        chunks = iter_to_chunks(self.entries, chunk_size)
-
-        processes = []
-        for (i, l) in enumerate(chunks):
-            p = mp.Process(name="Chunk %d" % i, target=self._process_entries, args=(l,))
-            processes.append(p)
-            p.start()
-
-        for p in processes:
-            p.join()
-
-        if self.calc_mfp:
-            self.mfp_output = self.mfp_output or "%s/results/mfp.csv" % self.working_path
-            with open(self.mfp_output, "w") as OUT:
-                OUT.write("ligand_id,smiles,on_bits\n")
-                for r in self.result:
-                    if "mfp" in r:
-                        fp_str = "\t".join([str(x) for x in r["mfp"].GetOnBits()])
-                        OUT.write("%s,%s,%s\n" % (r["id"], r["smiles"], fp_str))
-
-        if self.calc_ifp:
-            self.ifp_output = self.ifp_output or "%s/results/ifp.csv" % self.working_path
-
-            with open(self.ifp_output, "w") as OUT:
-                if self.ifp_count:
-                    OUT.write("ligand_id,smiles,on_bits,count\n")
-                else:
-                    OUT.write("ligand_id,smiles,on_bits\n")
-
-                for r in self.result:
-                    if "ifp" in r:
-
-                        if self.ifp_count:
-                            fp_bits_str = "\t".join([str(idx) for idx in r["ifp"].counts.keys()])
-                            fp_count_str = "\t".join([str(count) for count in r["ifp"].counts.values()])
-                            OUT.write("%s,%s,%s,%s\n" % (r["id"], r["smiles"], fp_bits_str, fp_count_str))
-                        else:
-                            fp_bits_str = "\t".join([str(x) for x in r["ifp"].get_on_bits()])
-                            OUT.write("%s,%s,%s\n" % (r["id"], r["smiles"], fp_bits_str))
-
-        end = time.time()
-        logger.info("Processing finished!!!")
-        logger.info("Check the results at '%s'." % self.working_path)
-        logger.info("Processing time: %.2fs." % (end - start))
+            for inter in inter_mngr.interactions:
+                # When the project is unpickled, it creates copies of AtomGroup objects and, therefore,
+                # their references in the interactions point out to different objects, i.e., objects whose information
+                # is equal but stored in different memory addresses. As a consequence, if an atom group is updated
+                # in interactions, its corresponding atom group in AtomGroupsManager is not updated.
+                #
+                # So, let's update the atom groups in interactions with the atom groups in the AtomGroupsManager.
+                # During this process, the reference to this interaction will be automatically updated in the new atom group.
+                inter.src_grp = nb_mapping[inter.src_grp]
+                inter.trgt_grp = nb_mapping[inter.trgt_grp]
+        return proj_obj
 
 
 class LocalProject(Project):
@@ -604,6 +503,7 @@ class LocalProject(Project):
         super().__init__(entries=entries, working_path=working_path, has_local_files=has_local_files, **kwargs)
 
     def __call__(self):
+        start = time.time()
 
         self.prepare_project_path()
         self.init_logging_file("%s/logs/project.log" % self.working_path)
@@ -617,8 +517,6 @@ class LocalProject(Project):
 
         self.mfps = []
         self.ifps = []
-
-        start = time.time()
 
         chunk_size = ceil(len(self.entries) / self.nproc)
         chunks = iter_to_chunks(self.entries, chunk_size)
@@ -634,6 +532,8 @@ class LocalProject(Project):
 
         self.interactions = list(self.interactions)
         self.neighborhoods = list(self.neighborhoods)
+
+        self._nb_mapping = {x[0].to_string(): x for x in self.neighborhoods}
 
         end = time.time()
         logger.info("Processing finished!!!")
@@ -669,8 +569,6 @@ class LocalProject(Project):
 
                 atm_grps_mngr = self.perceive_chemical_groups(structure[0], ligand, add_hydrogen)
 
-                self.neighborhoods.append((target_entry, atm_grps_mngr))
-
                 #
                 # Calculate interactions
                 #
@@ -679,6 +577,7 @@ class LocalProject(Project):
                 # Create hydrophobic islands.
                 atm_grps_mngr.merge_hydrophobic_atoms(interactions_mngr)
 
+                self.neighborhoods.append((target_entry, atm_grps_mngr))
                 self.interactions.append((target_entry, interactions_mngr))
 
                 logger.warning("Processing of entry %s finished successfully." % target_entry)
@@ -686,3 +585,84 @@ class LocalProject(Project):
             except Exception as e:
                 logger.exception(e)
                 logger.warning("Processing of entry %s failed. Check the logs for more information." % target_entry)
+
+    def generate_fps(self, calc_ifp=True, calc_mfp=False, save_files=False):
+
+        chunk_size = ceil(len(self.entries) / self.nproc)
+        chunks = iter_to_chunks(self.entries, chunk_size)
+
+        manager = mp.Manager()
+        self.ifps = manager.list()
+        self.mfps = manager.list()
+
+        processes = []
+        for (i, l) in enumerate(chunks):
+            p = mp.Process(name="Chunk %d" % i, target=self._process_fps, args=(l, calc_mfp, calc_ifp))
+            processes.append(p)
+            p.start()
+
+        for p in processes:
+            p.join()
+
+        self.ifps = list(self.ifps)
+        self.mfps = list(self.mfps)
+
+        # Save files.
+        if save_files:
+            if calc_mfp:
+                self.mfp_output = self.mfp_output or "%s/results/mfp.csv" % self.working_path
+                with open(self.mfp_output, "w") as OUT:
+                    OUT.write("ligand_id,smiles,on_bits\n")
+                    for target_entry, mfp in self.mfps:
+                        fp_str = "\t".join([str(x) for x in mfp.GetOnBits()])
+                        OUT.write("%s,%s,%s\n" % (target_entry.to_string(), "", fp_str))
+
+            if calc_ifp:
+                self.ifp_output = self.ifp_output or "%s/results/ifp.csv" % self.working_path
+                with open(self.ifp_output, "w") as OUT:
+                    if self.ifp_count:
+                        OUT.write("ligand_id,smiles,on_bits,count\n")
+                    else:
+                        OUT.write("ligand_id,smiles,on_bits\n")
+
+                    for target_entry, ifp in self.ifps:
+                        if self.ifp_count:
+                            fp_bits_str = "\t".join([str(idx) for idx in ifp.counts.keys()])
+                            fp_count_str = "\t".join([str(count) for count in ifp.counts.values()])
+                            OUT.write("%s,%s,%s,%s\n" % (target_entry.to_string(), "", fp_bits_str, fp_count_str))
+                        else:
+                            fp_bits_str = "\t".join([str(x) for x in ifp.get_on_bits()])
+                            OUT.write("%s,%s,%s\n" % (target_entry.to_string(), "", fp_bits_str))
+
+    def _process_fps(self, entries, calc_mfp, calc_ifp):
+
+        # Loop over each entry.
+        for target_entry in entries:
+            try:
+                logger.info("Generating fingerprints for entry: %s." % target_entry)
+
+                if calc_ifp:
+                    # Recover the neighborhood information for an entry.
+                    atm_grps_mngr = self._nb_mapping[target_entry.to_string()][1]
+
+                    shells = ShellGenerator(self.ifp_num_levels, self.ifp_radius_step)
+                    sm = shells.create_shells(atm_grps_mngr)
+
+                    unique_shells = not self.ifp_count
+                    ifp = sm.to_fingerprint(fold_to_size=self.ifp_length, unique_shells=unique_shells, count_fp=self.ifp_count)
+                    data = (target_entry, ifp)
+                    self.ifps.append(data)
+
+                if calc_mfp:
+                    if isinstance(target_entry, MolEntry):
+                        rdmol_lig = MolFromSmiles(MolWrapper(target_entry.mol_obj).to_smiles())
+                        rdmol_lig.SetProp("_Name", target_entry.mol_id)
+
+                        data = (target_entry, generate_fp_for_mols([rdmol_lig], "morgan_fp")[0]["fp"])
+                        self.mfps.append(data)
+                    else:
+                        logger.warning("Currently, it cannot generate molecular fingerprints for "
+                                       "instances of %s." % target_entry.__class__.__name__)
+            except Exception as e:
+                logger.exception(e)
+                logger.warning("Generation of fingerprints for entry %s failed. Check the logs for more information." % target_entry)
