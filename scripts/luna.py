@@ -165,6 +165,7 @@ class Project:
 
                  mfp_opts=None,
                  mfp_output=None,
+
                  ifp_num_levels=7,
                  ifp_radius_step=1,
                  ifp_length=IFP_LENGTH,
@@ -460,7 +461,40 @@ class Project:
 
     @staticmethod
     def load(input_file):
-        return unpickle_data(input_file)
+        logger.warning("Reloading project saved in '%s'" % input_file)
+        proj_obj = unpickle_data(input_file)
+        proj_obj.init_logging_file("%s/logs/project.log" % proj_obj.working_path)
+
+        logger.warning("Reapplying interaction references to atom groups.")
+
+        result_pairs = []
+        for entry1, atm_grps_mngr in proj_obj.neighborhoods:
+            for entry2, inter_mngr in proj_obj.interactions:
+                if entry1.to_string() == entry2.to_string():
+                    # Updating references for entries.
+                    entry1 = entry2
+                    # Create a new pair of managers to update their atom group/interaction references.
+                    result_pairs.append((atm_grps_mngr, inter_mngr))
+
+        for atm_grps_mngr, inter_mngr in result_pairs:
+            nb_mapping = {}
+            for atm_grp in atm_grps_mngr.atm_grps:
+                # First, reset the interactions list of an AtomGroup because the reference to
+                # their interaction objects will be updated in the next loop.
+                atm_grp.interactions = []
+                nb_mapping[atm_grp] = atm_grp
+
+            for inter in inter_mngr.interactions:
+                # When the project is unpickled, it creates copies of AtomGroup objects and, therefore,
+                # their references in the interactions point out to different objects, i.e., objects whose information
+                # is equal but stored in different memory addresses. As a consequence, if an atom group is updated
+                # in interactions, its corresponding atom group in AtomGroupsManager is not updated.
+                #
+                # So, let's update the atom groups in interactions with the atom groups in the AtomGroupsManager.
+                # During this process, the reference to this interaction will be automatically updated in the new atom group.
+                inter.src_grp = nb_mapping[inter.src_grp]
+                inter.trgt_grp = nb_mapping[inter.trgt_grp]
+        return proj_obj
 
 
 class LocalProject(Project):
@@ -535,8 +569,6 @@ class LocalProject(Project):
 
                 atm_grps_mngr = self.perceive_chemical_groups(structure[0], ligand, add_hydrogen)
 
-                self.neighborhoods.append((target_entry, atm_grps_mngr))
-
                 #
                 # Calculate interactions
                 #
@@ -545,6 +577,7 @@ class LocalProject(Project):
                 # Create hydrophobic islands.
                 atm_grps_mngr.merge_hydrophobic_atoms(interactions_mngr)
 
+                self.neighborhoods.append((target_entry, atm_grps_mngr))
                 self.interactions.append((target_entry, interactions_mngr))
 
                 logger.warning("Processing of entry %s finished successfully." % target_entry)
@@ -553,7 +586,7 @@ class LocalProject(Project):
                 logger.exception(e)
                 logger.warning("Processing of entry %s failed. Check the logs for more information." % target_entry)
 
-    def generate_fps(self, calc_mfp=True, calc_ifp=True, save_files=True):
+    def generate_fps(self, calc_ifp=True, calc_mfp=False, save_files=False):
 
         chunk_size = ceil(len(self.entries) / self.nproc)
         chunks = iter_to_chunks(self.entries, chunk_size)
@@ -576,28 +609,30 @@ class LocalProject(Project):
 
         # Save files.
         if save_files:
-            self.mfp_output = self.mfp_output or "%s/results/mfp.csv" % self.working_path
-            with open(self.mfp_output, "w") as OUT:
-                OUT.write("ligand_id,smiles,on_bits\n")
-                for target_entry, mfp in self.mfps:
-                    fp_str = "\t".join([str(x) for x in mfp.GetOnBits()])
-                    OUT.write("%s,%s,%s\n" % (target_entry.to_string(), "", fp_str))
-
-            self.ifp_output = self.ifp_output or "%s/results/ifp.csv" % self.working_path
-            with open(self.ifp_output, "w") as OUT:
-                if self.ifp_count:
-                    OUT.write("ligand_id,smiles,on_bits,count\n")
-                else:
+            if calc_mfp:
+                self.mfp_output = self.mfp_output or "%s/results/mfp.csv" % self.working_path
+                with open(self.mfp_output, "w") as OUT:
                     OUT.write("ligand_id,smiles,on_bits\n")
+                    for target_entry, mfp in self.mfps:
+                        fp_str = "\t".join([str(x) for x in mfp.GetOnBits()])
+                        OUT.write("%s,%s,%s\n" % (target_entry.to_string(), "", fp_str))
 
-                for target_entry, ifp in self.ifps:
+            if calc_ifp:
+                self.ifp_output = self.ifp_output or "%s/results/ifp.csv" % self.working_path
+                with open(self.ifp_output, "w") as OUT:
                     if self.ifp_count:
-                        fp_bits_str = "\t".join([str(idx) for idx in ifp.counts.keys()])
-                        fp_count_str = "\t".join([str(count) for count in ifp.counts.values()])
-                        OUT.write("%s,%s,%s,%s\n" % (target_entry.to_string(), "", fp_bits_str, fp_count_str))
+                        OUT.write("ligand_id,smiles,on_bits,count\n")
                     else:
-                        fp_bits_str = "\t".join([str(x) for x in ifp.get_on_bits()])
-                        OUT.write("%s,%s,%s\n" % (target_entry.to_string(), "", fp_bits_str))
+                        OUT.write("ligand_id,smiles,on_bits\n")
+
+                    for target_entry, ifp in self.ifps:
+                        if self.ifp_count:
+                            fp_bits_str = "\t".join([str(idx) for idx in ifp.counts.keys()])
+                            fp_count_str = "\t".join([str(count) for count in ifp.counts.values()])
+                            OUT.write("%s,%s,%s,%s\n" % (target_entry.to_string(), "", fp_bits_str, fp_count_str))
+                        else:
+                            fp_bits_str = "\t".join([str(x) for x in ifp.get_on_bits()])
+                            OUT.write("%s,%s,%s\n" % (target_entry.to_string(), "", fp_bits_str))
 
     def _process_fps(self, entries, calc_mfp, calc_ifp):
 
@@ -628,7 +663,6 @@ class LocalProject(Project):
                     else:
                         logger.warning("Currently, it cannot generate molecular fingerprints for "
                                        "instances of %s." % target_entry.__class__.__name__)
-
             except Exception as e:
                 logger.exception(e)
                 logger.warning("Generation of fingerprints for entry %s failed. Check the logs for more information." % target_entry)

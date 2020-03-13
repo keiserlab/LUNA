@@ -25,18 +25,32 @@ class InteractionType():
         self._params = params or {}
         self._hash_cache = None
 
-        self.src_grp.add_interactions([self])
-        self.trgt_grp.add_interactions([self])
-
+        self.apply_refs()
         self._expand_dict()
 
     @property
     def src_grp(self):
         return self._src_grp
 
+    @src_grp.setter
+    def src_grp(self, atm_grp):
+        self._src_grp = atm_grp
+
+        # Reset hash.
+        self._hash_cache = None
+        self.apply_refs()
+
     @property
     def trgt_grp(self):
         return self._trgt_grp
+
+    @trgt_grp.setter
+    def trgt_grp(self, atm_grp):
+        self._trgt_grp = atm_grp
+
+        # Reset hash.
+        self._hash_cache = None
+        self.apply_refs()
 
     @property
     def src_interacting_atms(self):
@@ -82,6 +96,13 @@ class InteractionType():
     def type(self):
         return self._type
 
+    @type.setter
+    def type(self, new_type):
+        self._type = new_type
+
+        # Reset hash.
+        self._hash_cache = None
+
     @property
     def params(self):
         return self._params
@@ -111,6 +132,10 @@ class InteractionType():
 
     def is_intermol_interaction(self):
         return not self.is_intramol_interaction()
+
+    def apply_refs(self):
+        self.src_grp.add_interactions([self])
+        self.trgt_grp.add_interactions([self])
 
     def clear_refs(self):
         self.src_grp.remove_interactions([self])
