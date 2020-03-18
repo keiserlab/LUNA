@@ -1,7 +1,6 @@
 from math import ceil
 from os.path import exists
 from collections import defaultdict
-from functools import wraps
 import time
 import multiprocessing as mp
 import logging
@@ -40,7 +39,6 @@ from luna.version import __version__
 logger = logging.getLogger()
 
 PDB_PARSER = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=False)
-
 
 
 class Project:
@@ -187,6 +185,19 @@ class Project:
         except Exception as e:
             logger.exception(e)
             raise FileNotCreated("Logging file could not be created.")
+
+    def remove_duplicate_entries(self):
+        entries = {}
+        for entry in self.entries:
+            if entry.to_string() not in entries:
+                entries[entry.to_string()] = entry
+            else:
+                logger.warning("An entry with id '%s' already exists in the list of entries, so the entry '%s' is a duplicate and will "
+                               "be removed." % (entry.to_string(), entry))
+
+        logger.warning("The remotion of duplicate entries was finished. %d entrie(s) were removed." % (len(self.entries) - len(entries)))
+
+        self.entries = list(entries.values())
 
     def validate_entry_format(self, target_entry):
         if not target_entry.is_valid():
@@ -419,6 +430,8 @@ class LocalProject(Project):
 
         self.prepare_project_path()
         self.init_logging_file("%s/logs/project.log" % self.working_path)
+
+        self.remove_duplicate_entries()
 
         if self.preload_mol_files:
             self.add_mol_obj_to_entries()
