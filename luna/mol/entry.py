@@ -371,6 +371,14 @@ class MolEntry(Entry):
     def __repr__(self):
         return '<MolEntry: %s%s%s>' % (self.pdb_id, self.sep, self.mol_id)
 
+    def __getstate__(self):
+        # SwigPyObject objects are not pickable.
+        self.mol_obj = None
+        return self.__dict__
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+
 
 def recover_entries_from_entity(entity, get_small_molecules=True, get_chains=True, sep=ENTRY_SEPARATOR):
 

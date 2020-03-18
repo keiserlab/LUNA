@@ -186,6 +186,19 @@ class Project:
             logger.exception(e)
             raise FileNotCreated("Logging file could not be created.")
 
+    def remove_duplicate_entries(self):
+        entries = {}
+        for entry in self.entries:
+            if entry.to_string() not in entries:
+                entries[entry.to_string()] = entry
+            else:
+                logger.warning("An entry with id '%s' already exists in the list of entries, so the entry '%s' is a duplicate and will "
+                               "be removed." % (entry.to_string(), entry))
+
+        logger.warning("The remotion of duplicate entries was finished. %d entrie(s) were removed." % (len(self.entries) - len(entries)))
+
+        self.entries = list(entries.values())
+
     def validate_entry_format(self, target_entry):
         if not target_entry.is_valid():
             raise InvalidEntry("Entry '%s' does not match a LUNA's entry format." % target_entry.to_string())
@@ -417,6 +430,8 @@ class LocalProject(Project):
 
         self.prepare_project_path()
         self.init_logging_file("%s/logs/project.log" % self.working_path)
+
+        self.remove_duplicate_entries()
 
         if self.preload_mol_files:
             self.add_mol_obj_to_entries()
