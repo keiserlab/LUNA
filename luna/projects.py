@@ -1,7 +1,6 @@
 from math import ceil
 from os.path import exists
 from collections import defaultdict
-from functools import wraps
 import time
 import multiprocessing as mp
 import logging
@@ -40,7 +39,6 @@ from luna.version import __version__
 logger = logging.getLogger()
 
 PDB_PARSER = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=False)
-
 
 
 class Project:
