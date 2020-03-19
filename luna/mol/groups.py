@@ -497,7 +497,7 @@ class AtomGroupPerceiver():
         proximal = get_contacts_for_entity(entity=model, source=target_compound, radius=self.radius, level='R')
 
         # Sorted by the compound order as in the PDB.
-        return sorted(list(set([p[1] for p in proximal])), key=lambda r: r.idx)
+        return sorted(list(set([p[1] for p in proximal])), key=lambda r: (r.parent.parent.id, r.parent.id, r.idx))
 
     def _set_default_properties(self, target_compound):
         #

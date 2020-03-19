@@ -335,7 +335,7 @@ class MolEntry(Entry):
                 comp_name = "H_UNL"
                 comp_num = 1
 
-        comp_structure = PDB_PARSER.get_structure_from_pdb_block(self.pdb_id, pdb_block)
+        comp_structure = parser.get_structure_from_pdb_block(self.pdb_id, pdb_block)
 
         chain = comp_structure[0][chain_id]
         if self.chain_id != chain.id:
