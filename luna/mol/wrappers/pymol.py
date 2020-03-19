@@ -118,7 +118,7 @@ class PymolWrapper:
             cmd.extract(name, selection)
 
     def load_mol_from_pdb_block(self, pdb_block, obj_name):
-        cmd.read_pdbstr(pdb_block, obj_name)
+        cmd.read_pdbstr(pdb_block, obj_name, state=1)
 
     def reinitialize(self):
         cmd.reinitialize('everything')
@@ -248,10 +248,10 @@ class PymolSessionManager:
             inter_grp = "intra" if inter.is_intramol_interaction() else "inter"
 
             src_grp_name = "+".join(["%s-%s-%d%s" % (c.parent.id, c.resname, c.id[1], c.id[2].strip())
-                                    for c in sorted(inter.src_grp.compounds)])
+                                     for c in sorted(inter.src_grp.compounds)])
 
             trgt_grp_name = "+".join(["%s-%s-%d%s" % (c.parent.id, c.resname, c.id[1], c.id[2].strip())
-                                     for c in sorted(inter.trgt_grp.compounds)])
+                                      for c in sorted(inter.trgt_grp.compounds)])
 
             inter_name = "%s.all_inters.%s.%s.i%d_%s_and_%s.line" % (add_to_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type],
                                                                      i, src_grp_name, trgt_grp_name)
