@@ -56,7 +56,7 @@ def new_mol_from_block(block, mol_format, sanitize=True, removeHs=True):
     return rdk_mol
 
 
-def read_multimol_file(mol_file, targets=None, mol_format=None, compressed=False, sanitize=True, removeHs=True):
+def read_multimol_file(mol_file, targets=None, mol_format=None, sanitize=True, removeHs=True):
 
     ext = mol_format or get_file_format(mol_file, ignore_compression=True)
 
