@@ -72,6 +72,11 @@ def read_multimol_file(mol_file, targets=None, mol_format=None, sanitize=True, r
         while True:
             try:
                 line = IN.readline()
+
+                # readline() returns empty strings when EOF is reached.
+                if not line:
+                    break
+
                 # Ignore new lines before a molecule block.
                 if len(mol) == 0 and line == "\n":
                     continue
