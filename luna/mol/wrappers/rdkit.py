@@ -15,7 +15,7 @@ def read_mol_from_file(mol_file, mol_format, sanitize=True, removeHs=True):
     if mol_format == "mol2":
         # First it creates the molecule without applying the sanitization function.
         rdk_mol = MolFromMol2File(mol_file, sanitize=False, removeHs=removeHs)
-    if mol_format == "pdb":
+    elif mol_format == "pdb":
         # First it creates the molecule without applying the sanitization function.
         rdk_mol = MolFromPDBFile(mol_file, sanitize=False, removeHs=removeHs)
     elif mol_format in RDKIT_FORMATS:
@@ -72,11 +72,9 @@ def read_multimol_file(mol_file, targets=None, mol_format=None, sanitize=True, r
         while True:
             try:
                 line = IN.readline()
-
                 # readline() returns empty strings when EOF is reached.
                 if not line:
                     break
-
                 # Ignore new lines before a molecule block.
                 if len(mol) == 0 and line == "\n":
                     continue
