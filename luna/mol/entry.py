@@ -193,7 +193,7 @@ class CompoundEntry(Entry):
 class MolEntry(Entry):
 
     def __init__(self, pdb_id, mol_id, mol_obj=None, mol_file=None, mol_file_ext=None, mol_obj_type='rdkit',
-                 autoload=False, sep=ENTRY_SEPARATOR):
+                 autoload=False, is_multimol_file=False, sep=ENTRY_SEPARATOR):
 
         if mol_obj is not None:
             if isinstance(mol_obj, MolWrapper):
@@ -218,6 +218,7 @@ class MolEntry(Entry):
         self.mol_file = mol_file
         self.mol_file_ext = mol_file_ext or get_file_format(self.mol_file)
         self.mol_obj_type = mol_obj_type
+        self.is_multimol_file = is_multimol_file
 
         super().__init__(pdb_id, "z", "LIG", 9999, is_hetatm=True, sep=sep)
 
@@ -262,15 +263,27 @@ class MolEntry(Entry):
 
         try:
             if self.mol_obj_type == "openbabel":
-                for ob_mol in readfile(self.mol_file_ext, self.mol_file):
-                    if self.mol_id == get_filename(ob_mol.OBMol.GetTitle()):
-                        self._mol_obj = ob_mol
-                        break
+                mols = readfile(self.mol_file_ext, self.mol_file)
+                # If it is a multimol file, then we need to loop over the molecules to find the target one.
+                # Note that in this case, the ids must match.
+                if self.is_multimol_file:
+                    for ob_mol in mols:
+                        if self.mol_id == get_filename(ob_mol.OBMol.GetTitle()):
+                            self._mol_obj = ob_mol
+                            break
+                else:
+                    self._mol_obj = mols.__next__()
             else:
                 if self.mol_file_ext == "pdb":
                     self._mol_obj = read_mol_from_file(self.mol_file, mol_format=self.mol_file_ext, removeHs=False)
                 else:
-                    for rdk_mol in read_multimol_file(self.mol_file, mol_format=self.mol_file_ext, targets=[self.mol_id], removeHs=False):
+                    # If 'targets' is None, then the entire Mol file will be read.
+                    targets = None
+                    # If it is a multimol file than loop through it until the informed molecule (by its mol_id) is found.
+                    if self.is_multimol_file:
+                        targets = [self.mol_id]
+
+                    for rdk_mol in read_multimol_file(self.mol_file, mol_format=self.mol_file_ext, targets=targets, removeHs=False):
                         # It returns None if the molecule parsing generated errors.
                         self._mol_obj = rdk_mol
                         break
