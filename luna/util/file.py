@@ -7,14 +7,32 @@ import logging
 import pickle
 import gzip
 
-
 from luna.util.exceptions import FileNotCreated, PKLNotReadError
 
 
 logger = logging.getLogger()
 
 
-def get_file_format(path, max_split=None):
+def detect_compression_format(filename):
+    """
+    Attempts to detect file format from the filename extension.
+    Returns None if no format could be detected.
+    """
+    if filename.endswith('.bz2'):
+        return "bz2"
+    elif filename.endswith('.xz'):
+        return "xz"
+    elif filename.endswith('.gz'):
+        return "gz"
+    else:
+        return None
+
+
+def get_file_format(path, max_split=None, ignore_compression=False):
+    if ignore_compression is True:
+        comp_format = detect_compression_format(path)
+        if comp_format:
+            path = path[:-(len(comp_format) + 1)]
     return generic_splitext(path, max_split)[1][1:]
 
 
@@ -154,7 +172,6 @@ def pickle_data(data, output_file, compressed=True):
     open_func = open
     if compressed:
         open_func = gzip.open
-
         if output_file.endswith(".gz") is False:
             output_file += ".gz"
 

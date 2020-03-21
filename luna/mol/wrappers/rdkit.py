@@ -1,4 +1,5 @@
-from rdkit.Chem import (MolFromMol2File, MolFromPDBFile, MolFromMolFile, MolFromMolBlock, MolFromMol2Block, SanitizeFlags, SanitizeMol)
+from rdkit.Chem import MolFromMol2File, MolFromPDBFile, MolFromMolFile, MolFromMolBlock, MolFromMol2Block, SanitizeFlags, SanitizeMol
+from xopen import xopen
 
 from luna.util.file import get_file_format
 from luna.util.exceptions import IllegalArgumentError
@@ -55,16 +56,15 @@ def new_mol_from_block(block, mol_format, sanitize=True, removeHs=True):
     return rdk_mol
 
 
-def read_multimol_file(mol_file, mol_format=None, targets=None, sanitize=True, removeHs=True):
+def read_multimol_file(mol_file, targets=None, mol_format=None, compressed=False, sanitize=True, removeHs=True):
 
-    ext = mol_format or get_file_format(mol_file)
+    ext = mol_format or get_file_format(mol_file, ignore_compression=True)
 
     if ext not in RDKIT_FORMATS:
         raise IllegalArgumentError("Format '%s' informed or assumed from the filename is invalid. The accepted formats are: %s."
                                    % (ext, ",".join(RDKIT_FORMATS)))
 
-    with open(mol_file, "r") as IN:
-
+    with xopen(mol_file, "r") as IN:
         if targets is not None:
             targets = set(targets)
 
@@ -87,7 +87,7 @@ def read_multimol_file(mol_file, mol_format=None, targets=None, sanitize=True, r
                             if targets is None:
                                 # Create a new RDKit object
                                 yield(new_mol_from_block("".join(mol), ext, sanitize, removeHs))
-                            # Otherwise, creat a new molecule only if it is in the list.
+                            # Otherwise, create a new molecule only if it is in the list.
                             elif mol[1].strip() in targets:
                                 targets.remove(mol[1].strip())
                                 # Create a new RDKit object
