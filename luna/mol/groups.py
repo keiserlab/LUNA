@@ -454,8 +454,6 @@ class AtomGroupPerceiver():
     def perceive_atom_groups(self, compounds, mol_objs_dict=None):
         mol_objs_dict = mol_objs_dict or {}
 
-        perceived_atm_grps = set()
-
         self.atm_grps_mngr = AtomGroupsManager()
 
         self.atm_mapping = {}

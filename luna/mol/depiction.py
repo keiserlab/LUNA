@@ -11,7 +11,7 @@ from luna.util.default_values import ATOM_TYPES_COLOR
 class PharmacophoreDepiction:
 
     def __init__(self, feature_extractor=None, colors=ATOM_TYPES_COLOR, add_legend=True, fig_ext="png",
-                 fig_size=(700, 700), font_size=0.5, circle_dist=0.2, circle_radius=0.3,
+                 fig_size=(800, 800), font_size=0.5, circle_dist=0.2, circle_radius=0.3,
                  use_bw_atom_palette=True, svg_opts=None):
 
         self.feature_extractor = feature_extractor
