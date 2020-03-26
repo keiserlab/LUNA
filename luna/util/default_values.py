@@ -28,16 +28,24 @@ ACCEPTED_MOL_OBJ_TYPES = ("rdkit", "openbabel")
 OPENBABEL = "/usr/bin/obabel"
 
 ATOM_TYPES_COLOR = ColorPallete({
-    "Acceptor": (252, 141, 89),
-    "Donor": (145, 191, 219),
-    "Aromatic": (224, 243, 248),
-    "Hydrophobic": (254, 224, 144),
+    "Aromatic": (255, 187, 204),
+    "Acceptor": (158, 154, 200),
+    "Donor": (17, 170, 119),
     "Hydrophobe": (254, 224, 144),
-    "LumpedHydrophobe": (254, 224, 144),
-    "PosIonizable": (69, 117, 180),
-    "NegIonizable": (215, 48, 3),
-    "HalogenAcceptor": (215, 48, 3),
-    "HalogenDonor": (215, 48, 3),
+    "Hydrophobic": (254, 224, 144),
+    "Negative": (251, 128, 114),
+    "Positive": (31, 120, 180),
+    "NegIonizable": (251, 128, 114),
+    "PosIonizable": (31, 120, 180),
+    "NegativelyIonizable": (251, 128, 114),
+    "PositivelyIonizable": (31, 120, 180),
+    "HalogenDonor": (196, 156, 148),
+    "Metal": (96, 125, 139),
+    "WeakDonor": (161, 217, 155),
+    "WeakAcceptor": (188, 194, 220),
+    "Electrophile": (251, 138, 124),
+    "Nucleophile": (158, 218, 229),
+    "ChalcogenDonor": (255, 193, 7),
 }, (255, 255, 255))
 
 CHEMICAL_FEATURE_IDS = {
@@ -51,7 +59,6 @@ CHEMICAL_FEATURE_IDS = {
     "Negatively ionizable": 8,
     "Positively ionizable": 9,
     "Halogen donor": 10,
-    "Halogen acceptor": 11,
     "Metal": 12,
     "Lumped hydrophobe": 13,
     "Weak donor": 14,

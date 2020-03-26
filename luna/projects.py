@@ -11,7 +11,7 @@ from rdkit.Chem import ChemicalFeatures
 from rdkit.Chem import MolFromPDBBlock, MolFromSmiles
 
 # Local modules
-from luna.mol.depiction import ligand_pharm_figure
+from luna.mol.depiction import PharmacophoreDepiction
 from luna.mol.clustering import cluster_fps_butina
 from luna.mol.features import FeatureExtractor
 from luna.mol.fingerprint import generate_fp_for_mols
@@ -351,9 +351,11 @@ class Project:
                 atm_id = atm_map[atm.serial_number]
                 atm_types[atm_id].update(set(grp.chemicalFeatures))
 
-        output = "%s/figures/%s.svg" % (self.working_path,
-                                        rdmol.GetProp("_Name"))
-        ligand_pharm_figure(rdmol, atm_types, output, ATOM_TYPES_COLOR)
+        output = "%s/figures/%s.svg" % (self.working_path, rdmol.GetProp("_Name"))
+
+        # TODO: Adapt it to use the PharmacophoreDepiction
+
+        # ligand_pharm_figure(rdmol, atm_types, output, ATOM_TYPES_COLOR)
 
     def clusterize_ligands(self, fingerprints):
         fps_only = [x["fp"] for x in fingerprints]
@@ -571,6 +573,7 @@ class LocalProject(Project):
             try:
                 logger.info("Generating fingerprints for entry: %s." % target_entry)
 
+                # TODO: It will fail if no interaction has been calculated!!!
                 if calc_ifp:
                     # Recover the neighborhood information for an entry.
                     atm_grps_mngr = self._nb_mapping[target_entry.to_string()][1]

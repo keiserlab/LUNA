@@ -1,10 +1,11 @@
 from rdkit.Chem import Atom as RDAtom
 from rdkit.Chem import Mol as RDMol
 from rdkit.Chem import Bond as RDBond
-from rdkit.Chem import MolToSmiles, MolToPDBBlock, GetPeriodicTable
+from rdkit.Chem import MolFromSmiles, MolToSmiles, MolToPDBBlock, GetPeriodicTable
 from openbabel import OBMol, OBAtom, OBBond, OBMolAtomIter, OBAtomAtomIter, OBAtomBondIter, OBMolBondIter
 from openbabel import etab
 from pybel import Molecule as PybelMol
+from pybel import readstring
 
 
 from luna.util.exceptions import AtomObjectTypeError, MoleculeObjectTypeError
@@ -40,7 +41,7 @@ class AtomWrapper:
             self._atm_obj = atm_obj
 
     def get_idx(self):
-        # Both RDKit and Openbabel have the same function name.
+        # Both RDKit and Open Babel have the same function name.
         return self._atm_obj.GetIdx()
 
     def get_id(self):
@@ -50,7 +51,7 @@ class AtomWrapper:
             return self._atm_obj.GetId()
 
     def get_atomic_num(self):
-        # Both RDKit and Openbabel have the same function name.
+        # Both RDKit and Open Babel have the same function name.
         return self._atm_obj.GetAtomicNum()
 
     def get_symbol(self):
@@ -60,7 +61,7 @@ class AtomWrapper:
             return etab.GetSymbol(self._atm_obj.GetAtomicNum())
 
     def get_charge(self):
-        # Both RDKit and Openbabel have the same function name.
+        # Both RDKit and Open Babel have the same function name.
         return self._atm_obj.GetFormalCharge()
 
     def get_isotope(self):
@@ -127,7 +128,7 @@ class AtomWrapper:
         return bonds
 
     def set_charge(self, charge):
-        # Both RDKit and Openbabel have the same function name.
+        # Both RDKit and Open Babel have the same function name.
         self._atm_obj.SetFormalCharge(charge)
 
     def set_implicit_valence(self, valence):
@@ -191,13 +192,13 @@ class BondWrapper:
         return partner
 
     def get_begin_atom(self, wrapped=True):
-        # Both RDKit and Openbabel have the same function name.
+        # Both RDKit and Open Babel have the same function name.
         if wrapped:
             return AtomWrapper(self._bond_obj.GetBeginAtom())
         return self._bond_obj.GetBeginAtom()
 
     def get_end_atom(self, wrapped=True):
-        # Both RDKit and Openbabel have the same function name.
+        # Both RDKit and Open Babel have the same function name.
         if wrapped:
             return AtomWrapper(self._bond_obj.GetEndAtom())
         return self._bond_obj.GetEndAtom()
@@ -250,6 +251,13 @@ class MolWrapper:
         # TODO: implement it
         pass
 
+    @classmethod
+    def from_smiles(self, smiles, mol_obj_type="rdkit"):
+        if mol_obj_type == "rdkit":
+            return MolWrapper(MolFromSmiles(smiles))
+        elif mol_obj_type == "openbabel":
+            return MolWrapper(readstring("smi", smiles))
+
     @property
     def mol_obj(self):
         return self._mol_obj
@@ -265,8 +273,31 @@ class MolWrapper:
 
         self._mol_obj = mol_obj
 
-    def get_atoms(self, wrapped=True):
+    def as_rdkit(self):
+        if self.is_rdkit_obj():
+            return self._mol_obj
+        elif self.is_openbabel_obj():
+            new_mol = MolWrapper.from_smiles(self.to_smiles(), mol_obj_type="rdkit")
+            new_mol.set_name(self.get_name())
+            return new_mol.unwrap()
 
+    def as_openbabel(self):
+        if self.is_openbabel_obj():
+            return self._mol_obj
+        elif self.is_rdkit_obj():
+            new_mol = MolWrapper.from_smiles(self.to_smiles(), mol_obj_type="openbabel")
+            new_mol.set_name(self.get_name())
+            return new_mol.unwrap()
+
+    def get_name(self):
+        if self.is_rdkit_obj():
+            if self._mol_obj.HasProp("_Name"):
+                return self._mol_obj.GetProp("_Name")
+            return ""
+        elif self.is_openbabel_obj():
+            return self._mol_obj.GetTitle()
+
+    def get_atoms(self, wrapped=True):
         atoms = []
         if self.is_rdkit_obj():
             atoms = self._mol_obj.GetAtoms()
@@ -278,7 +309,6 @@ class MolWrapper:
         return atoms
 
     def get_bonds(self, wrapped=True):
-
         bonds = []
         if self.is_rdkit_obj():
             bonds = self._mol_obj.GetBonds()
@@ -301,6 +331,17 @@ class MolWrapper:
         elif self.is_openbabel_obj():
             atm = self._mol_obj.GetAtomById(atm_id)
             return [atm.GetX(), atm.GetY(), atm.GetZ()]
+
+    def has_name(self):
+        if self.get_name():
+            return True
+        return False
+
+    def set_name(self, name):
+        if self.is_rdkit_obj():
+            self._mol_obj.SetProp("_Name", name)
+        elif self.is_openbabel_obj():
+            self._mol_obj.SetTitle(name)
 
     def to_smiles(self):
         if self.is_rdkit_obj():

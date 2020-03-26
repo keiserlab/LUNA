@@ -193,7 +193,7 @@ class CompoundEntry(Entry):
 class MolEntry(Entry):
 
     def __init__(self, pdb_id, mol_id, mol_obj=None, mol_file=None, mol_file_ext=None, mol_obj_type='rdkit',
-                 autoload=False, is_multimol_file=False, sep=ENTRY_SEPARATOR):
+                 autoload=False, overwrite_mol_name=False, is_multimol_file=False, sep=ENTRY_SEPARATOR):
 
         if mol_obj is not None:
             if isinstance(mol_obj, MolWrapper):
@@ -218,6 +218,7 @@ class MolEntry(Entry):
         self.mol_file = mol_file
         self.mol_file_ext = mol_file_ext or get_file_format(self.mol_file)
         self.mol_obj_type = mol_obj_type
+        self.overwrite_mol_name = overwrite_mol_name
         self.is_multimol_file = is_multimol_file
 
         super().__init__(pdb_id, "z", "LIG", 9999, is_hetatm=True, sep=sep)
@@ -295,6 +296,10 @@ class MolEntry(Entry):
         if self._mol_obj is None:
             raise MoleculeNotFoundError("Ligand '%s' not found in the input file or generated errors while parsing it with %s."
                                         % (self.mol_id, tool))
+        else:
+            mol = MolWrapper(self._mol_obj)
+            if not mol.has_name() or self.overwrite_mol_name:
+                mol.set_name(self.mol_id)
 
         logger.info("Molecule '%s' was successfully loaded." % self.mol_id)
 
