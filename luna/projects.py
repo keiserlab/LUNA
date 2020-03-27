@@ -309,7 +309,8 @@ class Project:
                             logger.info("All target ligands located in the file '%s' were successfully loaded." % mol_file)
                     else:
                         targets = list(mol_files[key].keys())
-                        for (i, rdk_mol) in enumerate(read_multimol_file(mol_file, ext, targets=targets, removeHs=False)):
+
+                        for (i, rdk_mol) in enumerate(read_multimol_file(mol_file, mol_format=ext, targets=targets, removeHs=False)):
                             mol_id = targets[i]
                             entry = mol_files[key][mol_id]
                             # It returns None if the molecule parsing generated errors.
