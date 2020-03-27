@@ -138,7 +138,8 @@ class PymolWrapper:
 class PymolSessionManager:
 
     def __init__(self, show_cartoon=False, bg_color="white", pharm_color=None,
-                 add_directional_arrows=True, inter_color=PYMOL_INTERACTION_COLOR, pse_export_version="1.8"):
+                 add_directional_arrows=True, show_hydrop_surface=True, inter_color=PYMOL_INTERACTION_COLOR,
+                 pse_export_version="1.8"):
 
         self.show_cartoon = show_cartoon
         self.bg_color = bg_color
@@ -146,6 +147,7 @@ class PymolSessionManager:
         self.inter_color = inter_color
         self.wrapper = None
         self.add_directional_arrows = add_directional_arrows
+        self.show_hydrop_surface = show_hydrop_surface
 
     def new_session(self, data, output_file):
         self.start_session()
@@ -164,14 +166,14 @@ class PymolSessionManager:
     def set_view(self, data):
         raise NotImplementedError("Use a class that implements this method.")
 
-    def set_pdb_view(self, pdb_file, pdb_obj, mol_obj=None):
+    def set_pdb_view(self, pdb_file, pdb_obj, mol_block=None):
         prot_obj = "%s.prot" % pdb_obj
 
         self.wrapper.load(pdb_file, prot_obj)
         self.wrapper.extract([("%s.hets" % pdb_obj, "hetatm and %s" % prot_obj)])
 
-        if mol_obj is not None:
-            self.wrapper.load_mol_from_pdb_block(MolWrapper(mol_obj).to_pdb_block(), "%s.hets" % pdb_obj)
+        if mol_block is not None:
+            self.wrapper.load_mol_from_pdb_block(mol_block, "%s.hets" % pdb_obj)
 
         self.wrapper.color_by_element([pdb_obj])
         self.wrapper.hide([("everything", pdb_obj)])
@@ -186,8 +188,12 @@ class PymolSessionManager:
             if inter.type == "Proximal":
                 continue
 
+            #
+            # Centroid 1
+            #
             obj1_name = "%s.grps.grp%s" % (add_to_grp, hash(tuple(sorted(inter.src_interacting_atms))))
             centroid_obj1 = inter.src_centroid
+            centroid_obj1_visible = True
             # Define the centroid in a nucleophile with two atoms as the position of its more electronegative atom.
             # Remember that the position in the interaction object matters. We have defined that the first group is always
             # the nucleophile for both dipole-dipole and ion-dipole interactions.
@@ -196,15 +202,21 @@ class PymolSessionManager:
                                                         inter.src_grp.atoms[1].electronegativity) else inter.src_grp.atoms[1]
                 obj1_name += "_%s" % hash(dipole_atm.name)
                 centroid_obj1 = dipole_atm.coord
+                centroid_obj1_visible = False
             # For unfavorable multipolar interactions, it may happen that the first atom group is an electrophile as well.
             elif inter.type == "Unfavorable electrophile-electrophile" and len(inter.src_grp.atoms) == 2:
                 dipole_atm = inter.src_grp.atoms[0] if (inter.src_grp.atoms[0].electronegativity <
                                                         inter.src_grp.atoms[1].electronegativity) else inter.src_grp.atoms[1]
                 obj1_name += "_%s" % hash(dipole_atm.name)
                 centroid_obj1 = dipole_atm.coord
+                centroid_obj1_visible = False
 
+            #
+            # Centroid 2
+            #
             obj2_name = "%s.grps.grp%s" % (add_to_grp, hash(tuple(sorted(inter.trgt_interacting_atms))))
             centroid_obj2 = inter.trgt_centroid
+            centroid_obj2_visible = True
             # Define the centroid in an electrophile with two atoms as the position of its less electronegative atom.
             # Remember that the position in the interaction object matters. We have defined that the second group is always
             # the electrophile for both dipole-dipole and ion-dipole interactions.
@@ -213,12 +225,14 @@ class PymolSessionManager:
                                                          inter.trgt_grp.atoms[1].electronegativity) else inter.trgt_grp.atoms[1]
                 obj2_name += "_%s" % hash(dipole_atm.name)
                 centroid_obj2 = dipole_atm.coord
+                centroid_obj2_visible = False
             # For unfavorable multipolar interactions, it may happen that the second atom group is a nucleophile as well.
             elif inter.type == "Unfavorable nucleophile-nucleophile" and len(inter.trgt_grp.atoms) == 2:
                 dipole_atm = inter.trgt_grp.atoms[0] if (inter.trgt_grp.atoms[0].electronegativity >
                                                          inter.trgt_grp.atoms[1].electronegativity) else inter.trgt_grp.atoms[1]
                 obj2_name += "_%s" % hash(dipole_atm.name)
                 centroid_obj2 = dipole_atm.coord
+                centroid_obj2_visible = False
 
             # Add pseudoatoms
             if not self.wrapper.obj_exists(obj1_name):
@@ -228,7 +242,6 @@ class PymolSessionManager:
 
             # Set the representation for each compound in the groups involved in the interaction.
             for compound in inter.src_grp.compounds.union(inter.trgt_grp.compounds):
-
                 if compound.is_water():
                     comp_repr = "sphere"
                 elif compound.is_hetatm():
@@ -289,7 +302,7 @@ class PymolSessionManager:
                     self.wrapper.arrow(arrow_name, obj1_name, obj2_name, arrow_opts)
 
             # If a group object contains more than one atom.
-            if inter.src_grp.size > 1:
+            if inter.src_grp.size > 1 and centroid_obj1_visible:
                 # Add the centroids to the group "grps" and append them to the main group
                 self._set_centroid_style(obj1_name)
             # Otherwise, just remove the centroid as it will not add any new information (the atom represented
@@ -298,7 +311,7 @@ class PymolSessionManager:
                 self.wrapper.delete([obj1_name])
 
             # If a group object contains more than one atom.
-            if inter.trgt_grp.size > 1:
+            if inter.trgt_grp.size > 1 and centroid_obj2_visible:
                 # Add the centroids to the group "grps" and append them to the main group
                 self._set_centroid_style(obj2_name)
             # Otherwise, just remove the centroid as it will not add any new information (the atom represented
