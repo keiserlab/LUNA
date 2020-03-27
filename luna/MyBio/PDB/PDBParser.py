@@ -63,6 +63,10 @@ from luna.MyBio.PDB.parse_pdb_header import _parse_pdb_header_list
 # DOD: deutered water.
 WATER_NAMES = ['HOH', 'DOD', 'WAT', 'H2O', 'OH2']
 
+# MODBY: Alexandre Fassio
+# Replace empty chains for a default value.
+DEFAULT_CHAIN_ID = "z"
+
 
 # If PDB spec says "COLUMNS 18-20" this means line[17:20]
 
@@ -262,6 +266,12 @@ class PDBParser(object):
                 # Applying a strip() on the residue name because some of them may have external whitespace characters.
                 resname = line[17:20].strip()
                 chainid = line[21]
+
+                # MODBY: Alexandre Fassio
+                # Replace empty chains for a default value.
+                if chainid.strip() == "":
+                    chainid = DEFAULT_CHAIN_ID
+
                 try:
                     serial_number = int(line[6:11])
                 except Exception:
