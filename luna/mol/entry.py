@@ -16,7 +16,7 @@ from luna.mol.wrappers.base import MolWrapper
 from luna.util.default_values import ACCEPTED_MOL_OBJ_TYPES, ENTRY_SEPARATOR
 from luna.util.file import get_file_format, get_filename
 from luna.util.exceptions import InvalidEntry, IllegalArgumentError, MoleculeObjectError, MoleculeObjectTypeError, MoleculeNotFoundError
-from luna.MyBio.PDB.PDBParser import PDBParser, WATER_NAMES
+from luna.MyBio.PDB.PDBParser import PDBParser, WATER_NAMES, DEFAULT_CHAIN_ID
 from luna.MyBio.PDB.Entity import Entity
 
 
@@ -221,7 +221,7 @@ class MolEntry(Entry):
         self.overwrite_mol_name = overwrite_mol_name
         self.is_multimol_file = is_multimol_file
 
-        super().__init__(pdb_id, "z", "LIG", 9999, is_hetatm=True, sep=sep)
+        super().__init__(pdb_id, DEFAULT_CHAIN_ID, "LIG", 9999, is_hetatm=True, sep=sep)
 
         if autoload:
             self.load_mol_from_file()
@@ -307,34 +307,33 @@ class MolEntry(Entry):
 
         if self.mol_obj_type == "openbabel":
             pdb_block = self.mol_obj.write('pdb')
+
+            atm = self.mol_obj.OBMol.GetFirstAtom()
+            residue_info = atm.GetResidue()
+
+            # When the PDBParser finds an empty chain, it automatically replace it by 'z'.
+            chain_id = residue_info.GetChain() if residue_info.GetChain().strip() != "" else self.chain_id
+            comp_num = residue_info.GetNum()
+
+            if residue_info.GetName() in WATER_NAMES:
+                comp_name = "W"
+            elif residue_info.IsHetAtom(atm):
+                comp_name = "H_%s" % residue_info.GetName()
+            else:
+                comp_name = " "
+
             if self.mol_file_ext == "pdb":
-                atm = self.mol_obj.OBMol.GetAtom(1)
-
-                residue_info = atm.GetResidue()
-                chain_id = residue_info.GetChain()
-                comp_num = residue_info.GetNum()
-
-                if residue_info.GetName() in WATER_NAMES:
-                    comp_name = "W"
-                elif residue_info.IsHetAtom(atm):
-                    comp_name = "H_%s" % residue_info.GetName()
-                else:
-                    comp_name = " "
-
                 self.chain_id = chain_id
                 self.comp_name = residue_info.GetName()
                 self.comp_num = comp_num
                 self.is_hetatm = residue_info.IsHetAtom(atm)
-            else:
-                chain_id = "A"
-                comp_name = " "
-                comp_num = 1
         else:
             pdb_block = MolToPDBBlock(self.mol_obj)
 
             if self.mol_file_ext == "pdb":
                 residue_info = self.mol_obj.GetAtoms()[0].GetPDBResidueInfo()
-                chain_id = residue_info.GetChainId()
+                # When the PDBParser finds an empty chain, it automatically replace it by 'z'.
+                chain_id = residue_info.GetChainId() if residue_info.GetChainId().strip() != "" else self.chain_id
                 comp_num = residue_info.GetResidueNumber()
 
                 if residue_info.GetResidueName() in WATER_NAMES:
@@ -349,7 +348,8 @@ class MolEntry(Entry):
                 self.comp_num = comp_num
                 self.is_hetatm = residue_info.GetIsHeteroAtom()
             else:
-                chain_id = " "
+                # When the PDBParser finds an empty chain, it automatically replace it by 'z'.
+                chain_id = self.chain_id
                 comp_name = "H_UNL"
                 comp_num = 1
 
