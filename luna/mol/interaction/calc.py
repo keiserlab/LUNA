@@ -69,6 +69,11 @@ class InteractionsManager:
         # Number of interactions
         return self.size
 
+    def __iter__(self):
+        """Iterate over children."""
+        for inter in self.interactions:
+            yield inter
+
 
 class InteractionCalculator:
 
