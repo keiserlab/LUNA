@@ -1,4 +1,5 @@
-from itertools import chain, product
+from itertools import chain
+from enum import Enum, auto
 from collections import defaultdict
 import numpy as np
 import mmh3
@@ -13,6 +14,14 @@ from luna.mol.features import ChemicalFeature
 import logging
 
 logger = logging.getLogger()
+
+
+class CompoundClassIds(Enum):
+    HETATM = 1
+    RESIDUE = 2
+    NUCLEOTIDE = 3
+    WATER = 4
+    UNKNOWN = 5
 
 
 class ShellManager:
@@ -146,9 +155,9 @@ class ShellManager:
     def get_identifiers(self, level=None, unique_shells=False):
         if level is not None:
             if unique_shells:
-                identifiers = [s.identifier for s in get_shells_by_level(level) if s.is_valid()]
+                identifiers = [s.identifier for s in self.get_shells_by_level(level) if s.is_valid()]
             else:
-                identifiers = [s.identifier for s in get_shells_by_level(level)]
+                identifiers = [s.identifier for s in self.get_shells_by_level(level)]
         else:
             if unique_shells:
                 identifiers = [s.identifier for s in self.shells if s.is_valid()]
@@ -188,12 +197,14 @@ class ShellManager:
 class Shell:
 
     def __init__(self, central_atm_grp, level, radius, neighborhood=None, inter_tuples=None,
-                 np_dtype=np.int64, seed=0, manager=None, valid=True, feature_mapper=None):
+                 diff_comp_classes=True, np_dtype=np.int64, seed=0, manager=None,
+                 valid=True, feature_mapper=None):
 
         self.central_atm_grp = central_atm_grp
         self.level = level
         self.radius = radius
         self.valid = valid
+        self.diff_comp_classes = diff_comp_classes
 
         if not neighborhood:
             # If inter_tuples was not defined initialize the neighborhood as an empty list.
@@ -295,11 +306,11 @@ class Shell:
 
     def hash_shell(self):
         if self.level == 0:
-            data = [self.feature_mapper[cf.format_name()] for cf in self.central_atm_grp.features]
+            atm_grp_data = [self.feature_mapper[cf.format_name()] for cf in self.central_atm_grp.features]
 
             if len(self.central_atm_grp.atoms) == 1:
                 features = set()
-                # Given the previous If, this For will loop only through one atom and, therefore, it can be removed without
+                # Given the previous If, it will loop only through one atom and, therefore, it can be removed without
                 # losing information. However, if someday I decide to remove the If, then the code for capturing
                 # all atom derived features will be already working.
                 for atm in self.central_atm_grp.atoms:
@@ -307,8 +318,17 @@ class Shell:
                         if atm_grp != self.central_atm_grp:
                             features.update(atm_grp.features)
 
-                data += [self.feature_mapper[cf.format_name()] for cf in features]
-            data.sort()
+                atm_grp_data += [self.feature_mapper[cf.format_name()] for cf in features]
+
+            data = sorted(atm_grp_data)
+
+            # Include differentiation between compound classes, i.e., groups belonging to Residues, Nucleotides, Ligands, Waters
+            # are treated as being different even when the group should be considered the same.
+            if self.diff_comp_classes:
+                # Classes is a list as multiple classes (so multiple residues) can exist in a group.
+                # That can happen, for instance, in amide groups from the backbone.
+                classes = sorted([CompoundClassIds[c.get_class().upper()].value for c in self.central_atm_grp.compounds])
+                data.extend(classes)
         else:
             cent_prev_id = self.previous_shell.identifier
 
@@ -360,11 +380,12 @@ class Shell:
 
 class ShellGenerator:
 
-    def __init__(self, num_levels, radius_step, bucket_size=10, seed=0, np_dtype=np.int64,
-                 num_bits=DEFAULT_SHELL_NBITS):
+    def __init__(self, num_levels, radius_step, diff_comp_classes=True,
+                 bucket_size=10, seed=0, np_dtype=np.int64, num_bits=DEFAULT_SHELL_NBITS):
 
         self.num_levels = num_levels
         self.radius_step = radius_step
+        self.diff_comp_classes = diff_comp_classes
 
         self.bucket_size = bucket_size
         self.seed = seed
@@ -472,9 +493,11 @@ class ShellGenerator:
                         shell_nb.add(atm_grp)
 
                         shell = Shell(atm_grp, level, radius, neighborhood=shell_nb, inter_tuples=inter_tuples,
-                                      manager=sm, seed=self.seed, np_dtype=self.np_dtype)
+                                      manager=sm, diff_comp_classes=self.diff_comp_classes,
+                                      seed=self.seed, np_dtype=self.np_dtype)
                 else:
-                    shell = Shell(atm_grp, level, radius, manager=sm, seed=self.seed, np_dtype=self.np_dtype)
+                    shell = Shell(atm_grp, level, radius, manager=sm, diff_comp_classes=self.diff_comp_classes,
+                                  seed=self.seed, np_dtype=self.np_dtype)
 
                 if shell:
                     sm.add_shell(shell)
@@ -484,7 +507,6 @@ class ShellGenerator:
 
                 # Evaluate if the limit of possible substructures for the current centroid (atom group) was reached.
                 if last_shell:
-
                     # The limit will be reached when the last shell already contains all interactions
                     # established by the atom groups inside the shell. In this case, expanding the radius
                     # will not result in any new shell because a shell is only created when the atoms inside

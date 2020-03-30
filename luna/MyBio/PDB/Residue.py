@@ -183,7 +183,6 @@ class Residue(Entity):
             return "Residue"
         if self.is_nucleotide():
             return "Nucleotide"
-
         return "Unknown"
 
     def get_resname(self):
