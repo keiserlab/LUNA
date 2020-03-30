@@ -36,6 +36,10 @@ from luna.MyBio.selector import ResidueSelector
 from luna.MyBio.util import download_pdb, entity_to_string, get_entity_from_entry
 from luna.version import __version__
 
+from sys import setrecursionlimit
+
+setrecursionlimit(5000)
+
 logger = logging.getLogger()
 
 PDB_PARSER = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=False)
@@ -472,6 +476,11 @@ class LocalProject(Project):
         logger.info("Processing finished!!!")
         logger.info("Check the results at '%s'." % self.working_path)
         logger.info("Processing time: %.2fs." % (end - start))
+
+        # TODO: check if logger has a Terminal handler with level higher than INFO.
+        print("Processing finished!!!")
+        print("Check the results at '%s'." % self.working_path)
+        print("Processing time: %.2fs." % (end - start))
 
     def _process_entries(self, entries):
 
