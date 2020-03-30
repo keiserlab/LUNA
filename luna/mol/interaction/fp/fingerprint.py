@@ -5,6 +5,7 @@ from collections import defaultdict
 
 
 from luna.util.exceptions import (BitsValueError, InvalidFingerprintType, IllegalArgumentError, FingerprintCountsError)
+from luna.version import __version__
 
 
 import logging
@@ -31,6 +32,8 @@ class Fingerprint:
         self._unfolded_fp = unfolded_fp
         self._unfolding_map = unfolding_map or {}
         self._props = props or {}
+
+        self.version = __version__
 
     @classmethod
     def from_indices(cls, indices, fp_length=DEFAULT_SHELL_NBITS, **kwargs):

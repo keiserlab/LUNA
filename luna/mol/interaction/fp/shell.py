@@ -1,10 +1,11 @@
 from itertools import chain
-from enum import Enum, auto
+from enum import Enum
 from collections import defaultdict
 import numpy as np
 import mmh3
 
 
+from luna.version import __version__
 from luna.util.exceptions import ShellCenterNotFound
 from luna.util.default_values import CHEMICAL_FEATURE_IDS, INTERACTION_IDS
 from luna.mol.interaction.fp.fingerprint import DEFAULT_SHELL_NBITS, Fingerprint, CountFingerprint
@@ -33,6 +34,8 @@ class ShellManager:
 
         self.shells = shells or []
         self.verbose = verbose
+
+        self.version = __version__
 
         self._init_controllers()
 
