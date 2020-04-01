@@ -3,7 +3,6 @@ from pymol import util
 
 
 from luna.mol.wrappers.cgo_arrow import cgo_arrow
-from luna.mol.wrappers.base import MolWrapper
 from luna.util.exceptions import PymolSessionNotInitialized
 from luna.util.default_values import PYMOL_INTERACTION_COLOR, INTERACTION_SHORT_NAMES
 from luna.util.file import get_filename, get_file_format
@@ -138,8 +137,8 @@ class PymolWrapper:
 class PymolSessionManager:
 
     def __init__(self, show_cartoon=False, bg_color="white", pharm_color=None,
-                 add_directional_arrows=True, show_hydrop_surface=True, inter_color=PYMOL_INTERACTION_COLOR,
-                 pse_export_version="1.8"):
+                 add_directional_arrows=True, show_hydrop_surface=True, show_comp_labels=True,
+                 inter_color=PYMOL_INTERACTION_COLOR, pse_export_version="1.8"):
 
         self.show_cartoon = show_cartoon
         self.bg_color = bg_color
@@ -148,6 +147,7 @@ class PymolSessionManager:
         self.wrapper = None
         self.add_directional_arrows = add_directional_arrows
         self.show_hydrop_surface = show_hydrop_surface
+        self.show_comp_labels = show_comp_labels
 
     def new_session(self, data, output_file):
         self.start_session()
