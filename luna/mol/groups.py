@@ -19,6 +19,7 @@ from luna.mol.interaction.contact import get_contacts_for_entity, get_cov_contac
 from luna.mol.atom import ExtendedAtom, AtomData
 from luna.mol.charge_model import OpenEyeModel
 from luna.mol.validator import MolValidator
+from luna.mol.standardiser import ResiduesStandardiser
 from luna.mol.wrappers.obabel import convert_molecule
 from luna.mol.wrappers.base import MolWrapper
 from luna.mol.features import ChemicalFeature
@@ -28,7 +29,6 @@ from luna.util.default_values import ACCEPTED_MOL_OBJ_TYPES, COV_SEARCH_RADIUS, 
 from luna.mol.interaction.type import InteractionType
 from luna.mol.interaction import math as im
 from luna.util.file import pickle_data, unpickle_data
-from luna.mol.standardiser import ResiduesStandardiser
 
 import logging
 logger = logging.getLogger()
@@ -466,7 +466,14 @@ class AtomGroupPerceiver():
 
         self.atm_mapping = {}
 
-        for comp in compounds:
+        compounds = set(compounds)
+        # Controls which compounds are allowed to expand when this option was set ON.
+        pruned_comps = set()
+        # Create a queue of compounds to be processed.
+        comp_queue = set(compounds)
+
+        while comp_queue:
+            comp = comp_queue.pop()
 
             props_set = False
 
@@ -479,10 +486,17 @@ class AtomGroupPerceiver():
 
                 mol_obj = mol_objs_dict.get(comp.id, None)
 
-                # If no OBMol object was defined and expand_selection was set ON, it will get all compounds around the
-                # target and create a new OBMol object with them.
+                # If no OBMol object was defined and expand_selection was set ON and it is not a border compound,
+                # it will get all compounds around the target and create a new OBMol object with them.
                 if mol_obj is None and self.expand_selection:
                     comp_list = self._get_proximal_compounds(comp)
+
+                    # Expands the queue of compounds with any new border compound.
+                    if comp not in pruned_comps:
+                        border_comps = set(comp_list) - compounds
+                        pruned_comps |= border_comps
+                        comp_queue |= border_comps
+
                 # Otherwise, the compound list will be composed only by the target compound.
                 else:
                     comp_list = [comp]
@@ -497,6 +511,13 @@ class AtomGroupPerceiver():
 
             if not props_set:
                 logger.warning("Features for the compound '%s' were not correctly perceived." % comp)
+
+        # Remove atom groups not comprising the provided compound list (parameter 'compounds').
+        remove_atm_grps = []
+        for atm_grp in self.atm_grps_mngr:
+            if any([c in compounds for c in atm_grp.compounds]) is False:
+                remove_atm_grps.append(atm_grp)
+        self.atm_grps_mngr.remove_atm_grps(remove_atm_grps)
 
         return self.atm_grps_mngr
 
@@ -684,7 +705,7 @@ class AtomGroupPerceiver():
                     trgt_atms[target_atoms[i].serial_number].invariants = atm_obj.get_atomic_invariants()
 
                 # The current atom already has its invariants updated, which means the atom was created previously
-                # for another target compound.
+                # by another target compound.
                 else:
                     # In this case, if the current atom belongs to the target compound, we need to prioritize the current target compound
                     # and overwrite the atom's invariants. By doing so, we always guarantee the most accurate information of an atom.
@@ -698,6 +719,7 @@ class AtomGroupPerceiver():
                     # covalently bonded to the current compound. Therefore, atoms in the border of nearby molecules are not important
                     # right now and they will be updated in their own time.
                     if trgt_atms[target_atoms[i].serial_number].parent == target_compound:
+
                         # Update the atomic invariants for an ExtendedAtom.
                         trgt_atms[target_atoms[i].serial_number].invariants = atm_obj.get_atomic_invariants()
 
@@ -753,7 +775,6 @@ class AtomGroupPerceiver():
             return True
         except Exception as e:
             logger.exception(e)
-            exit()
             return False
 
     def _new_extended_atom(self, atm, invariants=None):
