@@ -1,7 +1,6 @@
-from collections import defaultdict
 from enum import Enum, auto
 
-from mol.wrappers.base import BondType, MolWrapper
+from luna.mol.wrappers.base import BondType
 
 
 import logging

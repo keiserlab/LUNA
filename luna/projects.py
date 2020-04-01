@@ -5,8 +5,8 @@ import time
 import multiprocessing as mp
 import logging
 
-from pybel import readfile
-from pybel import informats as OB_FORMATS
+from openbabel.pybel import readfile
+from openbabel.pybel import informats as OB_FORMATS
 from rdkit.Chem import ChemicalFeatures
 from rdkit.Chem import MolFromPDBBlock, MolFromSmiles
 
@@ -38,7 +38,7 @@ from luna.version import __version__
 
 from sys import setrecursionlimit
 
-setrecursionlimit(5000)
+setrecursionlimit(50000)
 
 logger = logging.getLogger()
 

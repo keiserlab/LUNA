@@ -61,7 +61,7 @@ class MolValidator:
                 # Get the N atom.
                 atm_obj = [AtomWrapper(mol_obj.GetAtom(i)) for i in ids][0]
                 for bond in atm_obj.get_bonds():
-                    partner = bond.get_partner_atom(atm)
+                    partner = bond.get_partner_atom(atm_obj)
 
                     if partner.get_symbol() == "O" and bond.get_bond_type() == 2:
                         # Change double bond to single bond.
@@ -98,7 +98,7 @@ class MolValidator:
                 atm_obj = [AtomWrapper(mol_obj.GetAtom(i)) for i in ids][0]
 
                 for bond in atm_obj.get_bonds():
-                    partner = bond.get_partner_atom(atm)
+                    partner = bond.get_partner_atom(atm_obj)
 
                     if partner.get_symbol() == "C":
                         # Attributes a +1 charge to the N and corrects its degree to three, i.e., the N will become '=NH2+'.
@@ -166,7 +166,7 @@ class MolValidator:
         return True
 
     def get_expected_charge(self, atm_obj):
-        if not isinstance(atm, AtomWrapper):
+        if not isinstance(atm_obj, AtomWrapper):
             atm_obj = AtomWrapper(atm_obj)
 
         return self.charge_model.get_charge(atm_obj)
