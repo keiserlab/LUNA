@@ -16,6 +16,9 @@ import logging
 logger = logging.getLogger()
 
 
+PAD_DEFAULT = -9
+
+
 class IFPType(Enum):
     # auto() creates automatic identifiers for each type as this value is not important.
     # Therefore, always remember to compare IFP types using their names and not their values.
@@ -352,9 +355,6 @@ class Shell:
         # TODO: Let the user define a hash function
         hashed_shell = mmh3.hash(np_array, self.seed, signed=False)
 
-        if self.level == 0:
-            print(">>> ", self.central_atm_grp, "\t", data, "\t", hashed_shell)
-
         return hashed_shell
 
     def _initial_shell_data(self):
@@ -363,7 +363,6 @@ class Shell:
 
         # EIFP uses atomic invariants.
         if self.manager.ifp_type == IFPType.EIFP:
-            print("++++++ ATOMS: ", self.central_atm_grp)
             # Shells use atomic invariants as data. In case of atom groups, the data consists of a list of invariants.
             data = sorted([atm.invariants for atm in self.central_atm_grp.atoms])
 
@@ -375,11 +374,11 @@ class Shell:
                 data = sorted([atm.invariants for atm in self.central_atm_grp.atoms])
             else:
                 # Shells whose centroid are atoms' group use pharmacophore as data.
-                data = [self.feature_mapper[cf.format_name()] for cf in self.central_atm_grp.features]
+                data = [[self.feature_mapper[cf.format_name()] for cf in self.central_atm_grp.features]]
 
         # FIFP uses pharmacophore properties for atoms and atoms' group.
         elif self.manager.ifp_type == IFPType.FIFP:
-            
+
             atm_grp_data = [self.feature_mapper[cf.format_name()] for cf in self.central_atm_grp.features]
 
             if len(self.central_atm_grp.atoms) == 1:
@@ -394,15 +393,28 @@ class Shell:
 
                 atm_grp_data += [self.feature_mapper[cf.format_name()] for cf in features]
 
-            data = sorted(atm_grp_data)
+            data = [sorted(atm_grp_data)]
 
-            # Include differentiation between compound classes, i.e., groups belonging to Residues, Nucleotides, Ligands, Waters
-            # are treated as being different even when the group should be considered the same.
-            if self.diff_comp_classes:
-                # Classes is a list as multiple classes (so multiple residues) can exist in a group.
-                # That can happen, for instance, in amide groups from the backbone.
-                classes = sorted([CompoundClassIds[c.get_class().upper()].value for c in self.central_atm_grp.compounds])
-                data.extend(classes)
+        #
+        #
+        # Include differentiation between compound classes, i.e., groups belonging to Residues, Nucleotides, Ligands, or Waters
+        # are treated as being different even when the group would be considered the same.
+        if self.diff_comp_classes:
+            # Classes is a list as multiple classes (so multiple residues) can exist in a group.
+            # That can happen, for instance, in amide groups from the backbone.
+            classes = sorted([CompoundClassIds[c.get_class().upper()].value for c in self.central_atm_grp.compounds])
+
+            np_data = np.array(data, self.np_dtype)
+            np_classes = np.array(classes, self.np_dtype)
+
+            # Add padding to np_classes
+            if np_data.shape[1] > np_classes.shape[0]:
+                np_classes = np.pad(np_classes, (0, (np_data.shape[1] - np_classes.shape[0])), 'constant', constant_values=PAD_DEFAULT)
+            # Add padding to np_data.
+            elif np_data.shape[1] < np_classes.shape[0]:
+                np_data = np.pad(np_data, ((0, 0), (0, np_classes.shape[0] - np_data.shape[1])), 'constant', constant_values=PAD_DEFAULT)
+
+            data = np.vstack((np_data, np_classes))
 
         return data
 
@@ -422,7 +434,6 @@ class Shell:
 
 class ShellGenerator:
 
-    
     def __init__(self, num_levels, radius_step, diff_comp_classes=True, num_bits=DEFAULT_SHELL_NBITS, ifp_type=IFPType.EIFP,
                  bucket_size=10, seed=0, np_dtype=np.int64):
 
@@ -578,8 +589,6 @@ class ShellGenerator:
                     # If the limit was reached for this centroid, in the next level it can be ignored.
                     if local_convergence or global_convergence:
                         skip_atm_grps.add(atm_grp)
-
-            exit()
 
             # If all atom groups reached the limit of possible substructures, just leave the loop.
             if len(skip_atm_grps) == len(neighborhood):
