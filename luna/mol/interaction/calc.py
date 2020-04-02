@@ -79,7 +79,7 @@ class InteractionCalculator:
 
     def __init__(self, inter_conf=DefaultInteractionConf(), inter_filter=None, inter_funcs=None,
                  add_non_cov=True, add_proximal=False, add_atom_atom=True, add_dependent_inter=False,
-                 add_h2o_pairs_with_no_target=False, strict_donor_rules=False):
+                 add_h2o_pairs_with_no_target=False, strict_donor_rules=False, strict_weak_donor_rules=True):
 
         if inter_conf is not None and isinstance(inter_conf, InteractionConf) is False:
             raise IllegalArgumentError("The informed interaction configuration must be an instance of '%s'." % InteractionConf)
@@ -94,6 +94,7 @@ class InteractionCalculator:
         self.add_dependent_inter = add_dependent_inter
         self.add_h2o_pairs_with_no_target = add_h2o_pairs_with_no_target
         self.strict_donor_rules = strict_donor_rules
+        self.strict_weak_donor_rules = strict_weak_donor_rules
         self.inter_filter = inter_filter
         self._inter_funcs = inter_funcs or self._default_functions()
 
@@ -1433,7 +1434,7 @@ class InteractionCalculator:
             # and only hydrogens as neighbours (water, solvents, ammonia, SH2). In the latter case, the
             # hydrogens can be positioned in many different set of ways, and each run of a tool like
             # OpenBabel would vary the hydrogen bond list when one applies this algorithm.
-            if (self.strict_donor_rules is False and
+            if (self.strict_weak_donor_rules is False and
                     (len(hydrog_coords) == 0 or len(hydrog_coords) == len(donor_atm.neighbors_info))):
 
                 # When the position of the hydrogen cannot be defined, it assumes the hydrogen to be located 1A
@@ -1596,7 +1597,7 @@ class InteractionCalculator:
             # and only hydrogens as neighbours (water, solvents, ammonia, SH2). In the latter case, the
             # hydrogens can be positioned in many different set of ways, and each run of a tool like
             # OpenBabel would vary the hydrogen bond list when one applies this algorithm.
-            if (self.strict_donor_rules is False and
+            if (self.strict_weak_donor_rules is False and
                     (len(hydrog_coords) == 0 or len(hydrog_coords) == len(donor_atm.neighbors_info))):
 
                 # When the position of the hydrogen cannot be defined, it assumes the hydrogen to be located 1A
