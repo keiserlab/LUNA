@@ -737,7 +737,7 @@ class AtomGroupPerceiver():
                         if trgt_atms[atm_map[bgn_atm_obj.get_idx()]].parent == target_compound:
                             serial_number = atm_map.get(end_atm_obj.get_idx())
                             coord = mol_obj.get_atom_coord_by_id(end_atm_obj.get_id())
-                            atom_info = AtomData(end_atm_obj.get_atomic_num(), coord, serial_number)
+                            atom_info = AtomData(end_atm_obj.get_atomic_num(), coord, bond_obj.get_bond_type(), serial_number)
                             trgt_atms[atm_map[bgn_atm_obj.get_idx()]].add_nb_info([atom_info])
 
                     # If the atom 2 is not a hydrogen, add atom 1 to its neighbor list.
@@ -747,7 +747,7 @@ class AtomGroupPerceiver():
                         if trgt_atms[atm_map[end_atm_obj.get_idx()]].parent == target_compound:
                             serial_number = atm_map.get(bgn_atm_obj.get_idx())
                             coord = mol_obj.get_atom_coord_by_id(bgn_atm_obj.get_id())
-                            atom_info = AtomData(bgn_atm_obj.get_atomic_num(), coord, serial_number)
+                            atom_info = AtomData(bgn_atm_obj.get_atomic_num(), coord, bond_obj.get_bond_type(), serial_number)
                             trgt_atms[atm_map[end_atm_obj.get_idx()]].add_nb_info([atom_info])
 
             group_features = self.feature_extractor.get_features_by_groups(mol_obj, atm_map)
@@ -764,13 +764,38 @@ class AtomGroupPerceiver():
 
             # Define a new graph as a dict object: each key is a serial number and the values are dictionaries with the serial
             # number of each neighbor of an atom. The algorithm of Bellman Ford requires weights, so we set all weights to 1.
-            nb_graph = {atm.serial_number: None for atm in trgt_atms.values()}
+            nb_graph = {atm.serial_number: {} for atm in trgt_atms.values()}
+            for mybio_atm in target_compound.get_atoms():
+                if mybio_atm.serial_number in trgt_atms and mybio_atm.parent == target_compound:
+                    atm = trgt_atms[mybio_atm.serial_number]
+                    # Add the neighbors of this atom. The number '1' defined below represents the edge weight.
+                    nb_graph[atm.serial_number] = {i.serial_number: 1 for i in atm.neighbors_info if i.serial_number in trgt_atms}
+                    # Set the graph dictionary to each ExtendedAtom object. Since, dictionaries are passed as references, we can change
+                    # the variable nb_graph and the changes will be updated in each ExtendedAtom object automatically.
+                    atm.set_neighborhood(nb_graph)
+
+            updated_comps = set()
+            # Loop over each atom not belonging to the target compound as they were already updated.
             for atm in trgt_atms.values():
-                # Add the neighbors of this atom. The number '1' defined below represents the edge weight.
-                nb_graph[atm.serial_number] = {i.serial_number: 1 for i in atm.neighbors_info if i.serial_number in nb_graph}
-                # Set the graph dictionary to each ExtendedAtom object. Since, dictionaries are passed as references, we can change
-                # the variable nb_graph and the changes will be updated in each ExtendedAtom object automatically.
-                atm.set_neighborhood(nb_graph)
+                # The atoms from the target compound has already updated the graph.
+                if atm.parent != target_compound:
+                    # It enters the updating section once per compound.
+                    if atm.parent not in updated_comps:
+                        # Let's update an atom's neighborhood with the current target compound's neighborhood information.
+                        for serial_number in nb_graph:
+                            if ((serial_number in atm.neighborhood and target_compound == trgt_atms[serial_number].parent) or
+                                serial_number not in atm.neighborhood):
+
+                                atm.neighborhood[serial_number] = nb_graph[serial_number]
+
+                        # Let's update the current neighborhood with this atom's neighborhood information.
+                        for serial_number in atm.neighborhood:
+                            if serial_number in trgt_atms and atm.parent == trgt_atms[serial_number].parent:
+                                nb_graph[serial_number] = atm.neighborhood[serial_number]
+
+                        # Include the parent of this atom in the list of already updated compounds
+                        # to avoid re-updating the same graph multiple times.
+                        updated_comps.add(atm.parent)
 
             return True
         except Exception as e:
