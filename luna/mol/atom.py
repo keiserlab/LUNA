@@ -8,10 +8,11 @@ logger = logging.getLogger()
 
 class AtomData:
 
-    def __init__(self, atomic_num, coord, serial_number=None):
+    def __init__(self, atomic_num, coord, bond_type, serial_number=None):
         self.atomic_num = atomic_num
         # Standardize all coordinate data to the same Numpy data type for consistence.
         self._coord = np.array(coord, "f")
+        self.bond_type = bond_type
         self.serial_number = serial_number
 
     @property
@@ -126,6 +127,12 @@ class ExtendedAtom:
 
     def remove_atm_grps(self, atm_grps):
         self._atm_grps = list(set(self._atm_grps) - set(atm_grps))
+
+    def get_neighbor_info(self, atom):
+        for info in self._nb_info:
+            if atom.serial_number == info.serial_number:
+                return info
+        return None
 
     def is_neighbor(self, atom):
         return atom.serial_number in [i.serial_number for i in self._nb_info]
