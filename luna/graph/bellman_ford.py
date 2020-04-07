@@ -3,7 +3,7 @@
 #
 
 
-# Step 1: For each node prepare the destination and predecessor
+# For each node prepare the destination and predecessor
 def initialize(graph, source):
     # Stands for destination
     d = {}
@@ -34,12 +34,18 @@ def bellman_ford(graph, source):
         for u in graph:
             # For each neighbour of u
             for v in graph[u]:
-                # Lets relax it
-                relax(u, v, graph, d, p)
+                # Ignore ghost nodes, i.e., nodes that have been added into the edge list, but does not have
+                # a corresponding node.
+                if v in graph:
+                    # Let's relax it
+                    relax(u, v, graph, d, p)
 
-    # Step 3: check for negative-weight cycles
+    # Check for negative-weight cycles
     for u in graph:
         for v in graph[u]:
-            assert d[v] <= d[u] + graph[u][v]
+            # Ignore ghost nodes, i.e., nodes that have been added into the edge list, but does not have
+            # a corresponding node.
+            if v in graph:
+                assert d[v] <= d[u] + graph[u][v]
 
     return d, p
