@@ -110,6 +110,11 @@ INTERACTION_IDS = {
     "Displaced face-to-face pi-stacking": 36,
     "Displaced face-to-edge pi-stacking": 37,
     "Displaced face-to-slope pi-stacking": 38,
+    "Single bond": 39,
+    "Double bond": 40,
+    "Triple bond": 41,
+    "Aromatic bond": 42,
+    "Other bond": 43
 }
 
 INTERACTION_SHORT_NAMES = {
@@ -152,6 +157,11 @@ INTERACTION_SHORT_NAMES = {
     "Displaced face-to-face pi-stacking": "disp_face-to-face_stack",
     "Displaced face-to-edge pi-stacking": "disp_face-to-edge_stack",
     "Displaced face-to-slope pi-stacking": "disp_face-to-slope_stack",
+    "Single bond": "single-bond",
+    "Double bond": "double-bond",
+    "Triple bond": "triple-bond",
+    "Aromatic bond": "aromatic-bond",
+    "Other bond": "other-bond",
 }
 
 PYMOL_INTERACTION_COLOR = ColorPallete({
@@ -194,4 +204,9 @@ PYMOL_INTERACTION_COLOR = ColorPallete({
     "Displaced face-to-face pi-stacking": "tv_red",
     "Displaced face-to-edge pi-stacking": "tv_red",
     "Displaced face-to-slope pi-stacking": "tv_red",
+    "Single bond": "black",
+    "Double bond": "black",
+    "Triple bond": "black",
+    "Aromatic bond": "black",
+    "Other bond": "black",
 }, "white")
