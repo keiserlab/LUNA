@@ -8,6 +8,7 @@ from luna.mol.interaction.conf import DefaultInteractionConf, InteractionConf
 from luna.mol.interaction.filter import InteractionFilter
 from luna.mol.interaction.type import InteractionType
 from luna.mol.features import ChemicalFeature
+from luna.mol.wrappers.base import BondType
 from luna.util.exceptions import IllegalArgumentError
 from luna.mol.groups import AtomGroupNeighborhood
 from luna.util.file import pickle_data, unpickle_data
@@ -19,6 +20,13 @@ logger = logging.getLogger()
 
 CATIONS = ("PositivelyIonizable", "PosIonizable", "Positive")
 ANIONS = ("NegativelyIonizable", "NegIonizable", "Negative")
+
+COV_BONDS_MAPPING = {
+    BondType.SINGLE: "Single bond",
+    BondType.DOUBLE: "Double bond",
+    BondType.TRIPLE: "Triple bond",
+    BondType.AROMATIC: "Aromatic bond"
+}
 
 
 class InteractionsManager:
@@ -1722,7 +1730,16 @@ class InteractionCalculator:
         # states that two atoms are covalently bonded if:
         #       0.4 <= d(a1, a2) <= cov_rad(a1) + cov_rad(a2) + 0.45
         if atm1.is_neighbor(atm2):
-            inter = InteractionType(group1, group2, "Covalent bond", params=params)
+            bond_type = atm1.get_neighbor_info(atm2).bond_type
+
+            if bond_type in COV_BONDS_MAPPING:
+                bond_name = COV_BONDS_MAPPING[bond_type]
+            else:
+                bond_name = "Other bond"
+                logger.warning("An unexpected bond (%s) was found between the atoms %s and %s. "
+                               "Therefore, a general bond name (%s) will be used instead." % (bond_type, atm1, atm2, bond_name))
+
+            inter = InteractionType(group1, group2, bond_name, params=params)
             interactions.append(inter)
         else:
             cov1 = ob.GetCovalentRad(ob.GetAtomicNum(atm1.element))
@@ -1738,15 +1755,19 @@ class InteractionCalculator:
                 # The graph of a molecule neighborhood contains only the information of its own atoms and their immediate neighbors.
                 # That is why it needs to merge two neighborhood graphs when an intermolecular interaction is to be calculated.
                 merge_neighborhods = self.is_intramol_inter(group1, group2) is False
-                # Ignore Van der Waals and clashes for atoms separated from each other by only N bonds.
-                # Covalent bonds keep atoms very tightly, producing distances lower than their sum of Van der Waals radius.
-                # As a consequence the algorithm will find a lot of false clashes and Van der Waals interactions.
-                shortest_path_size = group1.atoms[0].get_shortest_path_size(group2.atoms[0], merge_neighborhods)
 
                 # r1 + r2 - d < 0 => no clash
                 # r1 + r2 - d = 0 => in the limit, i.e., spheres are touching.
                 # r1 + r2 - d > 0 => clash.
                 if (rdw1 + rdw2 - cc_dist) >= self.inter_conf.conf.get("vdw_clash_tolerance", 0):
+                    # Ignore Van der Waals and clashes for atoms separated from each other by only N bonds.
+                    # Covalent bonds keep atoms very tightly, producing distances lower than their sum of Van der Waals radius.
+                    # As a consequence the algorithm will find a lot of false clashes and Van der Waals interactions.
+                    #
+                    # It is better to keep this function inside the IFs to avoid the Bellman-Ford processing for pairs of atoms
+                    # that wouldn't enter inside the IF.
+                    shortest_path_size = group1.atoms[0].get_shortest_path_size(group2.atoms[0], merge_neighborhods)
+
                     # Checks if the number of bonds matches the criterion for clashes.
                     if shortest_path_size <= self.inter_conf.conf.get("min_bond_separation_for_clash", 0):
                         return []
@@ -1754,6 +1775,14 @@ class InteractionCalculator:
                     inter = InteractionType(group1, group2, "Van der Waals clash", params=params)
                     interactions.append(inter)
                 elif cc_dist <= rdw1 + rdw2 + self.inter_conf.conf.get("vdw_tolerance", 0):
+                    # Ignore Van der Waals and clashes for atoms separated from each other by only N bonds.
+                    # Covalent bonds keep atoms very tightly, producing distances lower than their sum of Van der Waals radius.
+                    # As a consequence the algorithm will find a lot of false clashes and Van der Waals interactions.
+                    #
+                    # It is better to keep this function inside the IFs to avoid the Bellman-Ford processing for pairs of atoms
+                    # that wouldn't enter inside the IF.
+                    shortest_path_size = group1.atoms[0].get_shortest_path_size(group2.atoms[0], merge_neighborhods)
+
                     # Checks if the number of bonds matches the general criterion.
                     if shortest_path_size <= self.inter_conf.conf.get("min_bond_separation", 0):
                         return []
