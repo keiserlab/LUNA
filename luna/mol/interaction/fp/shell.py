@@ -541,16 +541,13 @@ class ShellGenerator:
 
                     unique_derived_atm_grps = valid_derived_atm_grps - prev_atm_grps
 
-                    unique_interactions = interactions_to_add - prev_interactions
-
                     # It adds a new shell only if there are new interactions and derived atom groups inside the shell.
-                    if len(unique_interactions or unique_derived_atm_grps) != 0:
-                        shell_nb = set([x[1] for x in inter_tuples]) | valid_derived_atm_grps
-                        shell_nb.add(atm_grp)
+                    shell_nb = set([x[1] for x in inter_tuples]) | valid_derived_atm_grps
+                    shell_nb.add(atm_grp)
 
-                        shell = Shell(atm_grp, level, radius, neighborhood=shell_nb, inter_tuples=inter_tuples,
-                                      manager=sm, diff_comp_classes=self.diff_comp_classes,
-                                      seed=self.seed, np_dtype=self.np_dtype)
+                    shell = Shell(atm_grp, level, radius, neighborhood=shell_nb, inter_tuples=inter_tuples,
+                                  manager=sm, diff_comp_classes=self.diff_comp_classes,
+                                  seed=self.seed, np_dtype=self.np_dtype)
                 else:
                     shell = Shell(atm_grp, level, radius, manager=sm, diff_comp_classes=self.diff_comp_classes,
                                   seed=self.seed, np_dtype=self.np_dtype)

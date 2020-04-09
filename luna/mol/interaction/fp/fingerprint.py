@@ -451,7 +451,7 @@ class CountFingerprint(Fingerprint):
         new_fp = super().fold(new_fp_length)
 
         new_fp._counts = dict([(folded_idx, sum([self.get_count(x) for x in unfolded_set]))
-                              for folded_idx, unfolded_set in new_fp.unfolding_map.items()])
+                               for folded_idx, unfolded_set in new_fp.unfolding_map.items()])
 
         return new_fp
 
