@@ -89,8 +89,8 @@ class InteractionsManager:
 class InteractionCalculator:
 
     def __init__(self, inter_conf=DefaultInteractionConf(), inter_filter=None, inter_funcs=None,
-                 add_non_cov=True, add_proximal=False, add_atom_atom=True, add_dependent_inter=False,
-                 add_h2o_pairs_with_no_target=False, strict_donor_rules=False):
+                 add_non_cov=True, add_cov=True, add_proximal=False, add_atom_atom=True,
+                 add_dependent_inter=False, add_h2o_pairs_with_no_target=False, strict_donor_rules=False):
 
         if inter_conf is not None and isinstance(inter_conf, InteractionConf) is False:
             raise IllegalArgumentError("The informed interaction configuration must be an instance of '%s'." % InteractionConf)
@@ -100,6 +100,7 @@ class InteractionCalculator:
 
         self.inter_conf = inter_conf
         self.add_non_cov = add_non_cov
+        self.add_cov = add_cov
         self.add_proximal = add_proximal
         self.add_atom_atom = add_atom_atom
         self.add_dependent_inter = add_dependent_inter
@@ -1713,9 +1714,6 @@ class InteractionCalculator:
 
     @staticmethod
     def calc_atom_atom(self, params):
-        if not self.add_atom_atom:
-            return []
-
         group1, group2, feat1, feat2 = params
         interactions = []
 
@@ -1730,6 +1728,10 @@ class InteractionCalculator:
         # states that two atoms are covalently bonded if:
         #       0.4 <= d(a1, a2) <= cov_rad(a1) + cov_rad(a2) + 0.45
         if atm1.is_neighbor(atm2):
+            # Ignore covalent bonds.
+            if not self.add_cov:
+                return []
+
             bond_type = atm1.get_neighbor_info(atm2).bond_type
 
             if bond_type in COV_BONDS_MAPPING:
@@ -1742,6 +1744,9 @@ class InteractionCalculator:
             inter = InteractionType(group1, group2, bond_name, params=params)
             interactions.append(inter)
         else:
+            if not self.add_atom_atom:
+                return []
+
             cov1 = ob.GetCovalentRad(ob.GetAtomicNum(atm1.element))
             cov2 = ob.GetCovalentRad(ob.GetAtomicNum(atm2.element))
 
