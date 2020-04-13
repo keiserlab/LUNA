@@ -33,24 +33,35 @@ class InteractionFilter:
         self.ignore_mixed_class = ignore_mixed_class
 
     @classmethod
-    def new_pli_filter(cls, ignore_res_hetatm=False, ignore_any_h2o=False, ignore_self_inter=False, **kwargs):
-        return cls(ignore_res_hetatm=ignore_res_hetatm, ignore_any_h2o=ignore_any_h2o, ignore_self_inter=ignore_self_inter, **kwargs)
+    def new_pli_filter(cls, ignore_res_hetatm=False, ignore_hetatm_hetatm=False, ignore_any_h2o=False, ignore_self_inter=False, **kwargs):
+        return cls(ignore_res_hetatm=ignore_res_hetatm, ignore_hetatm_hetatm=ignore_hetatm_hetatm, ignore_any_h2o=ignore_any_h2o,
+                   ignore_self_inter=ignore_self_inter, **kwargs)
 
     @classmethod
-    def new_ppi_filter(cls, ignore_res_res=False, ignore_inter_chain=False, ignore_any_h2o=False, ignore_self_inter=False, **kwargs):
-        return cls(ignore_res_res=ignore_res_res, ignore_any_h2o=ignore_any_h2o, ignore_self_inter=ignore_self_inter, **kwargs)
+    def new_ppi_filter(cls, ignore_res_res=False, ignore_inter_chain=False, ignore_intra_chain=False, ignore_any_h2o=False,
+                       ignore_self_inter=False, **kwargs):
+
+        return cls(ignore_res_res=ignore_res_res, ignore_inter_chain=ignore_inter_chain, ignore_intra_chain=ignore_intra_chain,
+                   ignore_any_h2o=ignore_any_h2o, ignore_self_inter=ignore_self_inter, **kwargs)
 
     @classmethod
-    def new_pni_filter(cls, ignore_res_nucl=False, ignore_any_h2o=False, ignore_self_inter=False, **kwargs):
-        return cls(ignore_res_nucl=ignore_res_nucl, ignore_any_h2o=ignore_any_h2o, ignore_self_inter=ignore_self_inter, **kwargs)
+    def new_pni_filter(cls, ignore_res_nucl=False, ignore_inter_chain=False, ignore_intra_chain=False, ignore_any_h2o=False,
+                       ignore_self_inter=False, **kwargs):
+
+        return cls(ignore_res_nucl=ignore_res_nucl, ignore_inter_chain=ignore_inter_chain, ignore_intra_chain=ignore_intra_chain,
+                   ignore_any_h2o=ignore_any_h2o, ignore_self_inter=ignore_self_inter, **kwargs)
 
     @classmethod
-    def new_nni_filter(cls, ignore_nucl_nucl=False, ignore_any_h2o=False, ignore_self_inter=False, **kwargs):
-        return cls(ignore_nucl_nucl=ignore_nucl_nucl, ignore_any_h2o=ignore_any_h2o, ignore_self_inter=ignore_self_inter, **kwargs)
+    def new_nni_filter(cls, ignore_nucl_nucl=False, ignore_inter_chain=False, ignore_intra_chain=False,
+                       ignore_any_h2o=False, ignore_self_inter=False, **kwargs):
+
+        return cls(ignore_nucl_nucl=ignore_nucl_nucl, ignore_inter_chain=ignore_inter_chain, ignore_intra_chain=ignore_intra_chain,
+                   ignore_any_h2o=ignore_any_h2o, ignore_self_inter=ignore_self_inter, **kwargs)
 
     @classmethod
-    def new_nli_filter(cls, ignore_nucl_hetatm=False, ignore_any_h2o=False, ignore_self_inter=False, **kwargs):
-        return cls(ignore_nucl_hetatm=ignore_nucl_hetatm, ignore_any_h2o=ignore_any_h2o, ignore_self_inter=ignore_self_inter, **kwargs)
+    def new_nli_filter(cls, ignore_nucl_hetatm=False, ignore_hetatm_hetatm=False, ignore_any_h2o=False, ignore_self_inter=False, **kwargs):
+        return cls(ignore_nucl_hetatm=ignore_nucl_hetatm, ignore_hetatm_hetatm=ignore_hetatm_hetatm, ignore_any_h2o=ignore_any_h2o,
+                   ignore_self_inter=ignore_self_inter, **kwargs)
 
     @property
     def funcs(self):
