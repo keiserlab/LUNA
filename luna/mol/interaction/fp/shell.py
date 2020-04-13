@@ -491,7 +491,7 @@ class ShellGenerator:
                 # But, later it may also contain derived groups from interacting partner groups.
                 all_derived_atm_grps = self._get_derived_grps(atm_grp, pseudo_grps_mapping)
 
-                # In level 0, the number of unique derived groups is 0 as the shell initially only contain information of the centroid.
+                # In level 0, the number of unique derived groups is 0 as the shell initially only contains information of the centroid.
                 unique_derived_atm_grps = []
 
                 shell = None
