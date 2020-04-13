@@ -20,7 +20,7 @@ from luna.mol.groups import AtomGroupPerceiver
 from luna.mol.interaction.contact import get_contacts_for_entity
 from luna.mol.interaction.calc import InteractionCalculator
 from luna.mol.interaction.conf import InteractionConf
-from luna.mol.interaction.fp.shell import ShellGenerator
+from luna.mol.interaction.fp.shell import ShellGenerator, IFPType
 from luna.mol.wrappers.base import MolWrapper
 from luna.mol.wrappers.rdkit import RDKIT_FORMATS, read_multimol_file
 from luna.mol.amino_features import DEFAULT_AMINO_ATM_FEATURES
@@ -71,6 +71,8 @@ class Project:
                  ifp_radius_step=1,
                  ifp_length=IFP_LENGTH,
                  ifp_count=False,
+                 ifp_diff_comp_classes=True,
+                 ifp_type=IFPType.FIFP,
                  ifp_output=None,
 
                  similarity_func="BulkTanimotoSimilarity",
@@ -113,11 +115,14 @@ class Project:
 
         # Fingerprint parameters.
         self.mfp_opts = mfp_opts
+        self.mfp_output = mfp_output
+
         self.ifp_num_levels = ifp_num_levels
         self.ifp_radius_step = ifp_radius_step
         self.ifp_length = ifp_length
         self.ifp_count = ifp_count
-        self.mfp_output = mfp_output
+        self.ifp_diff_comp_classes = ifp_diff_comp_classes
+        self.ifp_type = ifp_type
         self.ifp_output = ifp_output
 
         self.similarity_func = similarity_func
@@ -588,8 +593,10 @@ class LocalProject(Project):
                     # Recover the neighborhood information for an entry.
                     atm_grps_mngr = self._nb_mapping[target_entry.to_string()][1]
 
-                    shells = ShellGenerator(self.ifp_num_levels, self.ifp_radius_step)
-                    sm = shells.create_shells(atm_grps_mngr)
+                    sg = ShellGenerator(self.ifp_num_levels, self.ifp_radius_step,
+                                        diff_comp_classes=self.ifp_diff_comp_classes,
+                                        ifp_type=self.ifp_type)
+                    sm = sg.create_shells(atm_grps_mngr)
 
                     unique_shells = not self.ifp_count
                     ifp = sm.to_fingerprint(fold_to_size=self.ifp_length, unique_shells=unique_shells, count_fp=self.ifp_count)

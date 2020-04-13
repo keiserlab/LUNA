@@ -7,7 +7,7 @@ import mmh3
 from luna.version import __version__
 from luna.util.exceptions import ShellCenterNotFound
 from luna.util.default_values import CHEMICAL_FEATURE_IDS, INTERACTION_IDS
-from luna.mol.interaction.fp.fingerprint import DEFAULT_SHELL_NBITS, Fingerprint, CountFingerprint
+from luna.mol.interaction.fp.fingerprint import DEFAULT_FP_LENGTH, Fingerprint, CountFingerprint
 from luna.mol.groups import PseudoAtomGroup, AtomGroupNeighborhood
 from luna.mol.features import ChemicalFeature
 
@@ -434,7 +434,7 @@ class Shell:
 
 class ShellGenerator:
 
-    def __init__(self, num_levels, radius_step, diff_comp_classes=True, num_bits=DEFAULT_SHELL_NBITS, ifp_type=IFPType.EIFP,
+    def __init__(self, num_levels, radius_step, diff_comp_classes=True, num_bits=DEFAULT_FP_LENGTH, ifp_type=IFPType.FIFP,
                  bucket_size=10, seed=0, np_dtype=np.int64):
 
         self.num_levels = num_levels

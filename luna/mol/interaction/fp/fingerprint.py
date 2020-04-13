@@ -12,14 +12,14 @@ import logging
 
 logger = logging.getLogger()
 
-DEFAULT_SHELL_NBITS = 2**32
-DEFAULT_FP_LENGTH = 1024
+DEFAULT_FP_LENGTH = 2**32
+DEFAULT_FOLDED_FP_LENGTH = 4096
 DEFAULT_FP_DTYPE = np.int32
 
 
 class Fingerprint:
 
-    def __init__(self, indices, fp_length=DEFAULT_SHELL_NBITS, unfolded_fp=None, unfolding_map=None, props=None):
+    def __init__(self, indices, fp_length=DEFAULT_FP_LENGTH, unfolded_fp=None, unfolding_map=None, props=None):
 
         indices = np.asarray(indices, dtype=np.long)
 
@@ -36,7 +36,7 @@ class Fingerprint:
         self.version = __version__
 
     @classmethod
-    def from_indices(cls, indices, fp_length=DEFAULT_SHELL_NBITS, **kwargs):
+    def from_indices(cls, indices, fp_length=DEFAULT_FP_LENGTH, **kwargs):
         return cls(indices, fp_length, **kwargs)
 
     @classmethod
@@ -256,7 +256,7 @@ class Fingerprint:
         rdkit_fp.SetBitsFromList(indices.tolist())
         return rdkit_fp
 
-    def fold(self, new_fp_length=DEFAULT_FP_LENGTH):
+    def fold(self, new_fp_length=DEFAULT_FOLDED_FP_LENGTH):
 
         if new_fp_length > self.fp_length:
             error_msg = ("Fold operation requires the new fingerprint length (%d) "
@@ -354,7 +354,7 @@ class Fingerprint:
 
 class CountFingerprint(Fingerprint):
 
-    def __init__(self, indices=None, counts=None, fp_length=DEFAULT_SHELL_NBITS,
+    def __init__(self, indices=None, counts=None, fp_length=DEFAULT_FP_LENGTH,
                  unfolded_fp=None, unfolding_map=None, props=None):
 
         if indices is None and counts is None:
@@ -390,11 +390,11 @@ class CountFingerprint(Fingerprint):
         super().__init__(indices, fp_length, unfolded_fp, unfolding_map, props)
 
     @classmethod
-    def from_indices(cls, indices, counts=None, fp_length=DEFAULT_SHELL_NBITS, **kwargs):
+    def from_indices(cls, indices, counts=None, fp_length=DEFAULT_FP_LENGTH, **kwargs):
         return cls(indices=indices, counts=counts, fp_length=fp_length, **kwargs)
 
     @classmethod
-    def from_counts(cls, counts, fp_length=DEFAULT_SHELL_NBITS, **kwargs):
+    def from_counts(cls, counts, fp_length=DEFAULT_FP_LENGTH, **kwargs):
         return cls(counts=counts, fp_length=fp_length, **kwargs)
 
     @classmethod
@@ -446,7 +446,7 @@ class CountFingerprint(Fingerprint):
     def get_count(self, index):
         return self.counts.get(index, 0)
 
-    def fold(self, new_fp_length=DEFAULT_FP_LENGTH):
+    def fold(self, new_fp_length=DEFAULT_FOLDED_FP_LENGTH):
 
         new_fp = super().fold(new_fp_length)
 
