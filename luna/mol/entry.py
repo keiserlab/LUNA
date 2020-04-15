@@ -290,10 +290,11 @@ class MolEntry(Entry):
         except Exception as e:
             logger.exception(e)
             raise MoleculeObjectError("An error occurred while parsing the molecular file with %s and the molecule "
-                                      "object could not be created. Check the logs for more information." % tool)
+                                      "object for the entry '%s' could not be created. Check the logs for more information."
+                                      % (tool, self.to_string()))
 
         if self._mol_obj is None:
-            raise MoleculeNotFoundError("Ligand '%s' not found in the input file or generated errors while parsing it with %s."
+            raise MoleculeNotFoundError("The ligand '%s' was not found in the input file or generated errors while parsing it with %s."
                                         % (self.mol_id, tool))
         else:
             mol = MolWrapper(self._mol_obj)

@@ -3,7 +3,7 @@ from os.path import exists
 from collections import defaultdict
 import time
 import multiprocessing as mp
-from enum import Enum, auto
+from enum import Enum
 import logging
 
 from openbabel.pybel import readfile
@@ -340,7 +340,7 @@ class Project:
                     else:
                         targets = list(mol_files[key].keys())
 
-                        for (i, rdk_mol) in enumerate(read_multimol_file(mol_file, mol_format=ext, targets=targets, removeHs=False)):
+                        for i, rdk_mol in enumerate(read_multimol_file(mol_file, mol_format=ext, targets=targets, removeHs=False)):
                             mol_id = targets[i]
                             entry = mol_files[key][mol_id]
                             # It returns None if the molecule parsing generated errors.
