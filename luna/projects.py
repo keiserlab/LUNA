@@ -654,7 +654,7 @@ class LocalProject(Project):
                 # TODO: It will fail if no interaction has been calculated!!!
                 if calc_ifp:
                     # Recover the neighborhood information for an entry.
-                    atm_grps_mngr = self._nb_mapping[target_entry.to_string()][1]
+                    atm_grps_mngr = self._nb_mapping[target_entry.to_string()]
 
                     sg = ShellGenerator(self.ifp_num_levels, self.ifp_radius_step,
                                         diff_comp_classes=self.ifp_diff_comp_classes,
