@@ -12,7 +12,7 @@ from luna.mol.wrappers.base import BondType
 from luna.util.exceptions import IllegalArgumentError
 from luna.mol.groups import AtomGroupNeighborhood
 from luna.util.file import pickle_data, unpickle_data
-
+from luna.version import __version__
 
 import logging
 logger = logging.getLogger()
@@ -31,10 +31,14 @@ COV_BONDS_MAPPING = {
 
 class InteractionsManager:
 
-    def __init__(self, interactions=None):
+    def __init__(self, interactions=None, entry=None):
         if interactions is None:
             interactions = []
+
+        self.entry = entry
         self._interactions = list(interactions)
+
+        self.version = __version__
 
     @property
     def interactions(self):

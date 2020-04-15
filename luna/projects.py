@@ -3,6 +3,7 @@ from os.path import exists
 from collections import defaultdict
 import time
 import multiprocessing as mp
+from enum import Enum, auto
 import logging
 
 from openbabel.pybel import readfile
@@ -45,6 +46,12 @@ logger = logging.getLogger()
 PDB_PARSER = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=False)
 
 
+class MemoryMode(Enum):
+    NONE = 0
+    SAVE_CHUNKS = 1
+    SAVE_ENTRIES = 2
+
+
 class Project:
 
     def __init__(self,
@@ -81,6 +88,9 @@ class Project:
                  butina_cutoff=0.2,
                  run_from_step=None,
                  run_until_step=None,
+
+                 memory_mode=MemoryMode.NONE,
+
                  nproc=None):
 
         if mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES:
@@ -133,6 +143,13 @@ class Project:
         self.preload_mol_files = preload_mol_files
         self.step_controls = {}
 
+        if not isinstance(memory_mode, MemoryMode):
+            logger.exception("The provided memory mode '%s' does not exist. "
+                             "Choose one from the valid MemoryMode options." % memory_mode)
+            raise IllegalArgumentError("The provided memory mode '%s' does not exist. "
+                                       "Choose one from the valid MemoryMode options." % memory_mode)
+        self.memory_mode = memory_mode
+
         if nproc is None:
             nproc = mp.cpu_count() - 1
         elif nproc < 1:
@@ -174,6 +191,10 @@ class Project:
         create_directory("%s/results" % self.working_path)
         create_directory("%s/logs" % self.working_path)
         create_directory("%s/tmp" % self.working_path)
+
+        if self.memory_mode != MemoryMode.NONE:
+            create_directory("%s/chunks/neighborhoods" % self.working_path)
+            create_directory("%s/chunks/interactions" % self.working_path)
 
         logger.warning("Path '%s' created successfully!!!" % self.working_path)
 
@@ -387,8 +408,10 @@ class Project:
 
     def update_references(self):
         result_pairs = []
-        for entry1, atm_grps_mngr in self.neighborhoods:
-            for entry2, inter_mngr in self.interactions:
+        for atm_grps_mngr in self.neighborhoods:
+            entry1 = atm_grps_mngr.entry
+            for inter_mngr in self.interactions:
+                entry2 = inter_mngr.entry
                 if entry1.to_string() == entry2.to_string():
                     # Updating references for entries.
                     entry1 = entry2
@@ -460,7 +483,7 @@ class LocalProject(Project):
 
         processes = []
         for (i, l) in enumerate(chunks):
-            p = mp.Process(name="Chunk %d" % i, target=self._process_entries, args=(l,))
+            p = mp.Process(name="Chunk %d" % i, target=self._process_entries, args=(l, i))
             processes.append(p)
             p.start()
 
@@ -475,7 +498,7 @@ class LocalProject(Project):
         # and by doing so circular references are lost and must be updated.
         self.update_references()
 
-        self._nb_mapping = {x[0].to_string(): x for x in self.neighborhoods}
+        self._nb_mapping = {x.entry.to_string(): x for x in self.neighborhoods}
 
         end = time.time()
         logger.info("Processing finished!!!")
@@ -487,7 +510,11 @@ class LocalProject(Project):
         print("Check the results at '%s'." % self.working_path)
         print("Processing time: %.2fs." % (end - start))
 
-    def _process_entries(self, entries):
+    def _process_entries(self, entries, chunk_id):
+
+        if self.memory_mode == MemoryMode.SAVE_CHUNKS:
+            neighborhoods = []
+            interactions = []
 
         # Loop over each entry.
         for target_entry in entries:
@@ -514,24 +541,60 @@ class LocalProject(Project):
                 ligand = get_entity_from_entry(structure, target_entry)
                 ligand.set_as_target(is_target=True)
 
+                #
+                # Perceive pharmacophoric properties
+                #
                 atm_grps_mngr = self.perceive_chemical_groups(structure[0], ligand, add_hydrogen)
+                atm_grps_mngr.entry = target_entry
 
                 #
                 # Calculate interactions
                 #
                 interactions_mngr = self.inter_calc.calc_interactions(atm_grps_mngr.atm_grps)
+                interactions_mngr.entry = target_entry
 
                 # Create hydrophobic islands.
                 atm_grps_mngr.merge_hydrophobic_atoms(interactions_mngr)
 
-                self.neighborhoods.append((target_entry, atm_grps_mngr))
-                self.interactions.append((target_entry, interactions_mngr))
+                if self.memory_mode == MemoryMode.SAVE_ENTRIES:
+                    nb_file = "%s/chunks/neighborhoods/%s.nbs.pkl.gz" % (self.working_path, target_entry.to_string())
+                    atm_grps_mngr.save(nb_file)
+
+                    inter_file = "%s/chunks/interactions/%s.interactions.pkl.gz" % (self.working_path, target_entry.to_string())
+                    interactions_mngr.save(inter_file)
+
+                    # Delete molecular objects.
+                    if isinstance(target_entry, MolEntry):
+                        target_entry.mol_obj = None
+
+                elif self.memory_mode == MemoryMode.SAVE_CHUNKS:
+                    neighborhoods.append(atm_grps_mngr)
+                    interactions.append(interactions_mngr)
+
+                else:
+                    self.neighborhoods.append(atm_grps_mngr)
+                    self.interactions.append(interactions_mngr)
 
                 logger.warning("Processing of entry %s finished successfully." % target_entry)
 
             except Exception as e:
                 logger.exception(e)
                 logger.warning("Processing of entry %s failed. Check the logs for more information." % target_entry)
+
+        try:
+            if self.memory_mode == MemoryMode.SAVE_CHUNKS:
+                logger.error("Saving chunk %d, containing %d AtomGroupsManager object(s)." % (chunk_id, len(neighborhoods)))
+                nb_file = "%s/chunks/neighborhoods/chunk-id_%d___entries-%d.nbs.pkl.gz" % (self.working_path, chunk_id, len(neighborhoods))
+                pickle_data(neighborhoods, nb_file)
+
+                logger.error("Saving chunk %d, containing %d InteractionsManager object(s)." % (chunk_id, len(neighborhoods)))
+                inter_file = "%s/chunks/interactions/chunk-id_%d___entries-%d.interactions.pkl.gz" % (self.working_path, chunk_id,
+                                                                                                      len(interactions))
+                pickle_data(interactions, inter_file)
+
+        except Exception as e:
+            logger.exception(e)
+            raise
 
     def generate_fps(self, calc_ifp=True, calc_mfp=False, save_files=False):
 

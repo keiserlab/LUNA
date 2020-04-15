@@ -29,6 +29,7 @@ from luna.util.default_values import ACCEPTED_MOL_OBJ_TYPES, COV_SEARCH_RADIUS, 
 from luna.mol.interaction.type import InteractionType
 from luna.mol.interaction import math as im
 from luna.util.file import pickle_data, unpickle_data
+from luna.version import __version__
 
 import logging
 logger = logging.getLogger()
@@ -39,9 +40,13 @@ SS_BOND_FEATURES = ["Atom", "Acceptor", "ChalcogenDonor", "Hydrophobic"]
 
 class AtomGroupsManager():
 
-    def __init__(self, atm_grps=None):
+    def __init__(self, atm_grps=None, entry=None):
         self._atm_grps = []
+        self.entry = entry
         self._child_dict = {}
+
+        self.version = __version__
+
         self.add_atm_grps(atm_grps)
 
     @property
