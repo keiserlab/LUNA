@@ -215,7 +215,10 @@ class MolEntry(Entry):
         self.mol_id = mol_id
         self._mol_obj = mol_obj
         self.mol_file = mol_file
-        self.mol_file_ext = mol_file_ext or get_file_format(self.mol_file)
+
+        # TODO: Find a way to assume the Mol file type when not provided
+        self.mol_file_ext = mol_file_ext
+
         self.mol_obj_type = mol_obj_type
         self.overwrite_mol_name = overwrite_mol_name
         self.is_multimol_file = is_multimol_file
@@ -249,21 +252,23 @@ class MolEntry(Entry):
     def load_mol_from_file(self):
         logger.info("It will try to load the molecule '%s'." % self.mol_id)
 
+        mol_file_ext = self.mol_file_ext or get_file_format(self.mol_file)
+
         if self.mol_file is None:
             raise IllegalArgumentError("It cannot load the molecule as no molecular file was provided.")
 
         available_formats = OB_FORMATS if self.mol_obj_type == "openbabel" else RDKIT_FORMATS
         tool = "Open Babel" if self.mol_obj_type == "openbabel" else "RDKit"
-        if self.mol_file_ext not in available_formats:
+        if mol_file_ext not in available_formats:
             raise IllegalArgumentError("Extension '%s' informed or assumed from the filename is not a format "
-                                       "recognized by %s." % (self.mol_file_ext, tool))
+                                       "recognized by %s." % (mol_file_ext, tool))
 
         if not exists(self.mol_file):
             raise FileNotFoundError("The file '%s' was not found." % self.mol_file)
 
         try:
             if self.mol_obj_type == "openbabel":
-                mols = readfile(self.mol_file_ext, self.mol_file)
+                mols = readfile(mol_file_ext, self.mol_file)
                 # If it is a multimol file, then we need to loop over the molecules to find the target one.
                 # Note that in this case, the ids must match.
                 if self.is_multimol_file:
@@ -274,8 +279,8 @@ class MolEntry(Entry):
                 else:
                     self._mol_obj = mols.__next__()
             else:
-                if self.mol_file_ext == "pdb":
-                    self._mol_obj = read_mol_from_file(self.mol_file, mol_format=self.mol_file_ext, removeHs=False)
+                if mol_file_ext == "pdb":
+                    self._mol_obj = read_mol_from_file(self.mol_file, mol_format=mol_file_ext, removeHs=False)
                 else:
                     # If 'targets' is None, then the entire Mol file will be read.
                     targets = None
@@ -283,7 +288,7 @@ class MolEntry(Entry):
                     if self.is_multimol_file:
                         targets = [self.mol_id]
 
-                    for rdk_mol in read_multimol_file(self.mol_file, mol_format=self.mol_file_ext, targets=targets, removeHs=False):
+                    for rdk_mol, mol_id in read_multimol_file(self.mol_file, mol_format=mol_file_ext, targets=targets, removeHs=False):
                         # It returns None if the molecule parsing generated errors.
                         self._mol_obj = rdk_mol
                         break
@@ -305,6 +310,10 @@ class MolEntry(Entry):
 
     def get_biopython_structure(self, entity=None, parser=PDB_PARSER):
 
+        mol_file_ext = self.mol_file_ext
+        if mol_file_ext is None and self.mol_file is not None:
+            mol_file_ext = get_file_format(self.mol_file)
+
         if self.mol_obj_type == "openbabel":
             pdb_block = self.mol_obj.write('pdb')
 
@@ -322,7 +331,7 @@ class MolEntry(Entry):
             else:
                 comp_name = " "
 
-            if self.mol_file_ext == "pdb":
+            if mol_file_ext == "pdb":
                 self.chain_id = chain_id
                 self.comp_name = residue_info.GetName()
                 self.comp_num = comp_num
@@ -330,7 +339,7 @@ class MolEntry(Entry):
         else:
             pdb_block = MolToPDBBlock(self.mol_obj)
 
-            if self.mol_file_ext == "pdb":
+            if mol_file_ext == "pdb":
                 residue_info = self.mol_obj.GetAtoms()[0].GetPDBResidueInfo()
                 # When the PDBParser finds an empty chain, it automatically replace it by 'z'.
                 chain_id = residue_info.GetChainId() if residue_info.GetChainId().strip() != "" else self.chain_id

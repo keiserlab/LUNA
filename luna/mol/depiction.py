@@ -93,7 +93,8 @@ class PharmacophoreDepiction:
         else:
             opts.useDefaultAtomPalette()
 
-        legend = legend or rdmol.GetProp("_Name")
+        if legend is None:
+            legend = ""
 
         drawer.SetFontSize(self.font_size)
         drawer.DrawMolecule(rwm, highlightAtoms=atoms, highlightAtomColors=highlight,
