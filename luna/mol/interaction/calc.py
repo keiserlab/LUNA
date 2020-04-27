@@ -74,7 +74,6 @@ class InteractionsManager:
         pass
 
     def to_csv(self, output_file):
-
         interactions_set = set()
         for inter in self.interactions:
             grp1 = ";".join(sorted(["/".join(a.full_atom_name.split("/")) for a in inter.src_grp.atoms]))

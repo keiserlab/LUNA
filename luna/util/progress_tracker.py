@@ -58,19 +58,12 @@ class ProgressTracker:
             msg = '%s%% [%s] %d/%d [Avg: %.2fs/task]%s' % (int(perc), ("\u25A0" * int(perc / 2)).ljust(50, ' '),
                                                            p, self.ntasks, self.avg_running_time, task_name)
 
-            # CONSOLE_FORMAT = '[%(asctime)s]    %(log_color)s%(levelname)-10s %(reset)s%(filename)16s:%(lineno)-10d %(message)s'
-
             format_str = '\r[%s]    %s%s %s%s  %s'
-            progress_str = format_str % (time.strftime('%Y-%m-%d %H:%M:%S'), parse_colors("red"),
+            progress_str = format_str % (time.strftime('%Y-%m-%d %H:%M:%S'), parse_colors("purple"),
                                          "PROGRESS".ljust(10, " "), escape_codes["reset"], "".rjust(26, " "), msg)
 
             sys.stdout.write(progress_str)
             sys.stdout.flush()
-
-            # print the current progress value in bar and percent form
-            # sys.stdout.write('\r%s%% [%s] %d/%d [Avg: %.2fs/task]%s' % (int(perc), ("\u25A0" * int(perc / 2)).ljust(50, ' '), p,
-            #                                                             self.ntasks, self.avg_running_time, task_name))
-            # sys.stdout.flush()
 
     @property
     def progress(self):
@@ -105,4 +98,4 @@ class ProgressTracker:
 
         self._end_time = round(time.time(), 2)
 
-        sys.stdout.write('\n\n')
+        sys.stdout.write('\n')

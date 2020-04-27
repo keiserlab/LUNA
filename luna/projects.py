@@ -647,7 +647,7 @@ class LocalProject(Project):
 
         logger.info("Entries processing will start. Number of entries to be processed is: %d." % len(self.entries))
 
-        entry_processing = ProgressTracker(len(self.entries), "Entries processing")
+        entry_processing = ProgressTracker(len(self.entries), "Entries processing.")
         entry_processing.start()
 
         for i in range(self.nproc):
@@ -688,7 +688,7 @@ class LocalProject(Project):
 
         job_queue = Queue(maxsize=self.nproc)
 
-        entry_processing = ProgressTracker(len(self.entries), "IFPs generation")
+        entry_processing = ProgressTracker(len(self.entries), "IFPs generation.")
         entry_processing.start()
 
         for i in range(self.nproc):
