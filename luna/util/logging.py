@@ -12,17 +12,18 @@ def new_logging_file(filename, logging_level=logging.INFO, logger_name=None, pro
     # Set the LOG file at the working path
     fh = logging.handlers.RotatingFileHandler(filename, mode, 5 * 1024 * 1024, 100)
     file_format = log_format or FILE_FORMAT
-    file_formatter = logging.Formatter(file_format)
+    file_formatter = logging.Formatter(file_format, '%Y-%m-%d %H:%M:%S')
     fh.setFormatter(file_formatter)
     fh.setLevel(logging_level)
 
     ch = logging.StreamHandler()
     console_format = log_format or CONSOLE_FORMAT
-    console_formatter = colorlog.ColoredFormatter(console_format, log_colors={'DEBUG': 'cyan',
-                                                                              'INFO': 'green',
-                                                                              'WARNING': 'yellow',
-                                                                              'ERROR': 'red',
-                                                                              'CRITICAL': 'red,bg_white'})
+    console_formatter = colorlog.ColoredFormatter(console_format, '%Y-%m-%d %H:%M:%S',
+                                                  log_colors={'DEBUG': 'cyan',
+                                                              'INFO': 'green',
+                                                              'WARNING': 'yellow',
+                                                              'ERROR': 'red',
+                                                              'CRITICAL': 'red,bg_white'})
     ch.setFormatter(console_formatter)
     ch.setLevel(logging_level)
 
