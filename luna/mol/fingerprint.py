@@ -64,11 +64,11 @@ class FingerprintGenerator():
             @type int
         """
         try:
-            if (type == 1):
+            if type == 1:
                 return AllChem.GetMorganFingerprintAsBitVect(self.molecule, radius=radius, nBits=nBits, useFeatures=features)
-            elif (type == 2):
+            elif type == 2:
                 return AllChem.GetHashedMorganFingerprint(self.molecule, radius=radius, nBits=nBits, useFeatures=features)
-            elif (type == 3):
+            elif type == 3:
                 return AllChem.GetMorganFingerprint(self.molecule, radius=radius, useFeatures=features)
             else:
                 raise IllegalArgumentError("Informed type '%s' is invalid. Available options are 1, 2, or 3." % str(type))
@@ -78,7 +78,7 @@ class FingerprintGenerator():
 
     def pharm2d_fp(self, sigFactory=None):
         try:
-            if (sigFactory is None):
+            if sigFactory is None:
                 raise IllegalArgumentError("SigFactory object is obligatory.")
 
             return Generate.Gen2DFingerprint(self.molecule, sigFactory)
@@ -95,13 +95,13 @@ def available_fp_functions():
 
 def prepare_morgan_fp(fp_opt):
     params = {}
-    if ("radius" in fp_opt):
+    if "radius" in fp_opt:
         params["radius"] = fp_opt["radius"]
-    if ("nBits" in fp_opt):
+    if "nBits" in fp_opt:
         params["nBits"] = fp_opt["nBits"]
-    if ("features" in fp_opt):
+    if "features" in fp_opt:
         params["features"] = fp_opt["features"]
-    if ("type" in fp_opt):
+    if "type" in fp_opt:
         params["type"] = fp_opt["type"]
 
     return params
@@ -109,7 +109,7 @@ def prepare_morgan_fp(fp_opt):
 
 def prepare_pharm2d_fp(fp_opt):
     params = {}
-    if ("sigFactory" in fp_opt):
+    if "sigFactory" in fp_opt:
         sigFactory = fp_opt["sigFactory"]
     else:
         fdefName = 'data/MinimalFeatures.fdef'
@@ -123,9 +123,9 @@ def prepare_pharm2d_fp(fp_opt):
 
 
 def prepare_fp_params(fp_function, fp_opt):
-    if (fp_function == "pharm2d_fp" and type(fp_opt) is dict):
+    if fp_function == "pharm2d_fp" and type(fp_opt) is dict:
         return prepare_pharm2d_fp(fp_opt)
-    elif (fp_function == "morgan_fp" and type(fp_opt) is dict):
+    elif fp_function == "morgan_fp" and type(fp_opt) is dict:
         return prepare_morgan_fp(fp_opt)
     else:
         return {}
@@ -138,10 +138,9 @@ def generate_fp_for_mols(mols, fp_function=None, fp_opt=None, critical=False):
 
     if fp_function is None:
         fp_function = "pharm2d_fp"
-        logger.info("No fingerprint function was defined.")
-        logger.info("The default fingerprint type will be used: 2D Pharmacophore fingerprint.")
+        logger.info("No fingerprint function was defined. So, the default fingerprint type will be used: 2D Pharmacophore fingerprint.")
 
-    logger.info("Trying to generate fingerprints for %d molecules." % len(mols))
+    logger.info("Generating molecular fingerprints for %d molecules." % len(mols))
 
     params = prepare_fp_params(fp_function, fp_opt)
     fpg = FingerprintGenerator()
@@ -153,12 +152,12 @@ def generate_fp_for_mols(mols, fp_function=None, fp_opt=None, critical=False):
             fp = getattr(fpg, fp_function)(**params)
             fp_mols.append({"fp": fp, "mol": mol.GetProp("_Name")})
         except Exception as e:
-            logger.info("Molecule at position %d failed. Name: %s" % (idx, mol.GetProp("_Name")))
+            logger.debug("Molecule at position %d failed. Name: %s" % (idx, mol.GetProp("_Name")))
             logger.exception(e)
 
             if critical:
                 raise
 
-    logger.info("%d fingerprint(s) created." % len(fp_mols))
+    logger.info("%d molecular sfingerprint(s) created." % len(fp_mols))
 
     return fp_mols

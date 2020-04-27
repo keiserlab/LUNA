@@ -486,8 +486,8 @@ class AtomGroupPerceiver():
                 props_set = self._set_default_properties(comp)
 
             if props_set is False:
-                logger.info("It will try to perceive the features of the compound %s as no predefined properties "
-                            "was provided." % comp)
+                logger.debug("It will try to perceive the features of the compound %s as no predefined properties "
+                             "was provided." % comp)
 
                 mol_obj = mol_objs_dict.get(comp.id, None)
 
@@ -515,7 +515,7 @@ class AtomGroupPerceiver():
                 props_set = self._calculate_properties(comp, atoms, comp_sel, mol_obj)
 
             if not props_set:
-                logger.warning("Features for the compound '%s' were not correctly perceived." % comp)
+                logger.debug("Features for the compound '%s' were not correctly perceived." % comp)
 
         # Remove atom groups not comprising the provided compound list (parameter 'compounds').
         remove_atm_grps = []
@@ -600,12 +600,12 @@ class AtomGroupPerceiver():
                             # But, sometimes not having the successor compound may be caused by missing compounds instead of missing atoms.
                             # As it is not so important, we will only print a warning.
                             if "next" not in neighbors:
-                                logger.warning("The group composed by the atoms '%s' will be ignored because the OXT atom is missing "
-                                               "in the compound %s. If the atom is not the C-terminal just ignore this message. "
-                                               % (atms_str.replace(",", ", "), target_compound))
+                                logger.debug("The group composed by the atoms '%s' will be ignored because the OXT atom is missing "
+                                             "in the compound %s. If the atom is not the C-terminal just ignore this message. "
+                                             % (atms_str.replace(",", ", "), target_compound))
                         else:
-                            logger.warning("The group composed by the atoms '%s' will be ignored because some of them were not found in "
-                                           "the compound %s. The missing atoms are: %s." % (atms_str.replace(",", ", "), target_compound,
+                            logger.debug("The group composed by the atoms '%s' will be ignored because some of them were not found in "
+                                         "the compound %s. The missing atoms are: %s." % (atms_str.replace(",", ", "), target_compound,
                                                                                             ", ".join(missing_atoms)))
                     else:
                         # It checks if a cysteine atom is establishing a disulfide bond. If it does, it will read a predefined set of
@@ -820,14 +820,14 @@ class AtomGroupPerceiver():
         # was expected. The version 2.3.2 works better. Therefore, I defined this version manually (openbabel property).
         filename = get_unique_filename(self.tmp_path)
         pdb_file = '%s_pdb-file.pdb' % filename
-        logger.info("Saving the PDB object as a PDB file named '%s'." % pdb_file)
+        logger.debug("Saving the PDB object as a PDB file named '%s'." % pdb_file)
         save_to_file(entity, pdb_file, compound_selector)
 
         mol_file = '%s_mol-file.mol' % filename
         ob_opt = {"error-level": 5}
-        logger.info("Converting the PDB file '%s' to a Mol file named '%s' using Open Babel." % (pdb_file, mol_file))
+        logger.debug("Converting the PDB file '%s' to a Mol file named '%s' using Open Babel." % (pdb_file, mol_file))
         if self.add_h:
-            logger.info("Hydrogens will be added to the molecule.")
+            logger.debug("Hydrogens will be added to the molecule.")
             if self.ph is not None:
                 ob_opt["p"] = self.ph
             else:
@@ -839,7 +839,7 @@ class AtomGroupPerceiver():
 
         mol_obj = None
         if self.amend_mol:
-            logger.info("A validation will be performed and it will try to fix some errors.")
+            logger.debug("A validation will be performed and it will try to fix some errors.")
 
             try:
                 mol_obj = next(readfile("mol", mol_file))
@@ -897,7 +897,7 @@ class AtomGroupPerceiver():
 
             mv = MolValidator()
             is_valid = mv.validate_mol(mol_obj)
-            logger.info('Validation finished!!!')
+            logger.debug('Validation finished!!!')
 
             if not is_valid:
                 logger.warning("The molecular file '%s' contain invalid atoms. Check the logs for more information." % mol_file)

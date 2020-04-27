@@ -1,21 +1,30 @@
 import logging
 import logging.config
 import os.path
+import colorlog
 
 
-DEFAULT_FORMAT = '%(asctime)s - %(processName)s - %(name)s - %(levelname)s - %(filename)s - %(funcName)s - line %(lineno)d => %(message)s'
+FILE_FORMAT = '[%(asctime)s]    %(levelname)-8s %(filename)16s:%(lineno)-10d %(threadName)-16s %(message)s'
+CONSOLE_FORMAT = '[%(asctime)s]    %(log_color)s%(levelname)-10s %(reset)s%(filename)16s:%(lineno)-10d %(message)s'
 
 
-def new_logging_file(filename, logger_name=None, propagate=True, log_format=DEFAULT_FORMAT, mode='a'):
+def new_logging_file(filename, logging_level=logging.INFO, logger_name=None, propagate=True, log_format=None, mode='a'):
     # Set the LOG file at the working path
     fh = logging.handlers.RotatingFileHandler(filename, mode, 5 * 1024 * 1024, 100)
-    formatter = logging.Formatter(log_format)
-    fh.setFormatter(formatter)
-    fh.setLevel(logging.INFO)
+    file_format = log_format or FILE_FORMAT
+    file_formatter = logging.Formatter(file_format)
+    fh.setFormatter(file_formatter)
+    fh.setLevel(logging_level)
 
     ch = logging.StreamHandler()
-    ch.setFormatter(formatter)
-    ch.setLevel(logging.ERROR)
+    console_format = log_format or CONSOLE_FORMAT
+    console_formatter = colorlog.ColoredFormatter(console_format, log_colors={'DEBUG': 'cyan',
+                                                                              'INFO': 'green',
+                                                                              'WARNING': 'yellow',
+                                                                              'ERROR': 'red',
+                                                                              'CRITICAL': 'red,bg_white'})
+    ch.setFormatter(console_formatter)
+    ch.setLevel(logging_level)
 
     logger = logging.getLogger(logger_name)
 

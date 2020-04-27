@@ -24,7 +24,7 @@ TMALIGN = "/bin/tmalign"
 
 def run_tmalign(file1, file2, output_path, tmalign):
 
-    logger.info("Trying to execute the command: '%s %s %s'." % (tmalign, file1, file2))
+    logger.debug("It will try to execute the command: '%s %s %s'." % (tmalign, file1, file2))
 
     for fname in (file1, file2):
         if not os.path.isfile(fname):
@@ -34,8 +34,8 @@ def run_tmalign(file1, file2, output_path, tmalign):
     try:
         if (output_path is not None and output_path.strip() != ""):
             if (is_directory_valid(output_path)):
-                logger.info("The superposition files will be saved "
-                            "at the directory '%s'" % output_path)
+                logger.debug("The superposition files will be saved "
+                             "at the directory '%s'" % output_path)
 
                 filename = os.path.split(os.path.basename(file1))[1]
                 output_file = "%s/%s.sup" % (output_path, filename)
@@ -55,7 +55,7 @@ def run_tmalign(file1, file2, output_path, tmalign):
 def get_seq_records(tm_output, ref_id, eqv_id):
     """Create a pair of SeqRecords from TMalign output."""
 
-    logger.info("Parsing the TMalign output.")
+    logger.debug("Parsing the TMalign output.")
 
     lines = tm_output.splitlines()
 
@@ -125,13 +125,13 @@ def extract_chain_from_sup(sup_file, extract_chain, new_chain_id, output_file, Q
     if QUIET:
         try:
             warnings.filterwarnings("ignore")
-            logger.info("Quiet mode activated. From now on, no warning will be printed.")
+            logger.debug("Quiet mode activated. From now on, no warning will be printed.")
         except Exception:
             logger.warning("Quiet mode could not be activated.")
 
     try:
         if (is_file_valid(sup_file)):
-            logger.info("Trying to parse the file '%s'." % sup_file)
+            logger.debug("Trying to parse the file '%s'." % sup_file)
 
             structure = try_parse_from_pdb("SUP", sup_file)
 
@@ -144,13 +144,13 @@ def extract_chain_from_sup(sup_file, extract_chain, new_chain_id, output_file, Q
             model.detach_child(chainToRemove)
             if (extract_chain != new_chain_id):
                 model[extract_chain].id = new_chain_id
-            logger.info("Modifications completed.")
+            logger.debug("Modifications completed.")
 
-            logger.info("Now, it will try to parse the file '%s'." % sup_file)
+            logger.debug("Now, it will try to parse the file '%s'." % sup_file)
 
             try_save_2pdb(structure, output_file)
 
-            logger.info("File '%s' created successfully." % output_file)
+            logger.debug("File '%s' created successfully." % output_file)
     except Exception as e:
         logger.exception(e)
         raise
