@@ -399,11 +399,11 @@ class MolWrapper:
         pass
 
     @classmethod
-    def from_smiles(self, smiles, mol_obj_type="rdkit"):
+    def from_smiles(cls, smiles, mol_obj_type="rdkit"):
         if mol_obj_type == "rdkit":
-            return MolWrapper(MolFromSmiles(smiles))
+            return cls(MolFromSmiles(smiles))
         elif mol_obj_type == "openbabel":
-            return MolWrapper(readstring("smi", smiles))
+            return cls(readstring("smi", smiles))
 
     @property
     def mol_obj(self):
