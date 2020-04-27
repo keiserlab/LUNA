@@ -1,7 +1,7 @@
 from rdkit.Chem import SanitizeFlags, SanitizeMol
 from openbabel.openbabel import OBSmartsPattern
 
-from luna.mol.wrappers.base import AtomWrapper, MolWrapper
+from luna.mol.wrappers.base import BondType, AtomWrapper, MolWrapper
 from luna.mol.charge_model import OpenEyeModel
 
 import logging
