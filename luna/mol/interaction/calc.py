@@ -73,6 +73,21 @@ class InteractionsManager:
     def filter_by_centroids(self, centroids, radius):
         pass
 
+    def to_csv(self, output_file):
+
+        interactions_set = set()
+        for inter in self.interactions:
+            grp1 = ";".join(sorted(["/".join(a.full_atom_name.split("/")) for a in inter.src_grp.atoms]))
+            grp2 = ";".join(sorted(["/".join(a.full_atom_name.split("/")) for a in inter.trgt_grp.atoms]))
+
+            grp1, grp2 = sorted([grp1, grp2])
+            interactions_set.add((grp1, grp2, inter.type))
+
+        with open(output_file, "w") as OUT:
+            OUT.write("atom_group1,atom_group2,interaction\n")
+            # Sort lines before writing to always keep the same order.
+            OUT.write("\n".join([",".join(k) for k in sorted(interactions_set)]))
+
     def save(self, output_file, compressed=True):
         pickle_data(self, output_file, compressed)
 
@@ -196,7 +211,7 @@ class InteractionCalculator:
         if not self.add_h2o_pairs_with_no_target:
             self.remove_h2o_pairs_with_no_target(all_interactions)
 
-        logger.info("Number of potential interactions found: %d" % len(all_interactions))
+        logger.debug("Number of potential interactions found: %d" % len(all_interactions))
 
         return InteractionsManager(all_interactions)
 
