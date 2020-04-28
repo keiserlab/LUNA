@@ -31,6 +31,21 @@ class ProgressTracker:
         self._start_time = None
         self._end_time = None
 
+    def _show_progress_bar(self, p, perc):
+        task_name = ""
+        if self.task_name:
+            task_name = " - %s" % self.task_name
+
+        msg = '%s%% [%s] %d/%d [Avg: %.2fs/task]%s' % (int(perc), ("\u25A0" * int(perc / 2)).ljust(50, ' '),
+                                                       p, self.ntasks, self.avg_running_time, task_name)
+
+        format_str = '\r[%s]    %s%s %s%s  %s'
+        progress_str = format_str % (time.strftime('%Y-%m-%d %H:%M:%S'), parse_colors("purple"),
+                                     "PROGRESS".ljust(10, " "), escape_codes["reset"], "".rjust(26, " "), msg)
+
+        sys.stdout.write(progress_str)
+        sys.stdout.flush()
+
     def print_progress(self, e, q):
         """Updates a progress bar on stdout anytime progress is made"""
 
@@ -51,19 +66,7 @@ class ProgressTracker:
             p = q.get()
             perc = round((p / self.ntasks), 2) * 100
 
-            task_name = ""
-            if self.task_name:
-                task_name = " - %s" % self.task_name
-
-            msg = '%s%% [%s] %d/%d [Avg: %.2fs/task]%s' % (int(perc), ("\u25A0" * int(perc / 2)).ljust(50, ' '),
-                                                           p, self.ntasks, self.avg_running_time, task_name)
-
-            format_str = '\r[%s]    %s%s %s%s  %s'
-            progress_str = format_str % (time.strftime('%Y-%m-%d %H:%M:%S'), parse_colors("purple"),
-                                         "PROGRESS".ljust(10, " "), escape_codes["reset"], "".rjust(26, " "), msg)
-
-            sys.stdout.write(progress_str)
-            sys.stdout.flush()
+            self._show_progress_bar(p, perc)
 
     @property
     def progress(self):
@@ -86,11 +89,15 @@ class ProgressTracker:
 
     @property
     def avg_running_time(self):
-        return round(sum(self.running_times) / len(self.running_times), 2)
+        if self.running_times:
+            return round(sum(self.running_times) / len(self.running_times), 2)
+        else:
+            return 0
 
     def start(self):
         self._start_time = round(time.time(), 2)
         self.progress_bar.start()
+        self._show_progress_bar(0, 0)
 
     def end(self):
         self.event.set()
