@@ -69,15 +69,15 @@ class ResiduesStandardiser:
                 # Non-N-terminal N where the carbonyl O is involved in a covalent bond with an atom not comprised
                 # by the metal rules. So, it's better not to update anything here.
                 if atm_obj.matches_smarts(f"N-,=[C;X4,X3]([#6])[OX2;$(O([C;X4,X3])[!#1]);!$(O{METAL_ATOM})]"):
-                    logger.warning("While checking for inconsistencies in the atom N of the residue %s, it was found an unexpected "
-                                   "atom covalently bound to the neighboring atom O. So, N will not be amended." % pdb_atm.parent)
+                    logger.debug("While checking for inconsistencies in the atom N of the residue %s, it was found an unexpected "
+                                 "atom covalently bound to the neighboring atom O. So, N will not be amended." % pdb_atm.parent)
                     continue
                 # Non-N-terminal N where the carbonyl O is involved in a covalent bond with a metal.
                 # However, 'break_metal_bonds' was set to False and there isn't anything to be done so.
                 elif atm_obj.matches_smarts(f"N-,=[C;X4,X3]([#6])[OX2]{METAL_ATOM}") and self.break_metal_bonds is False:
-                    logger.warning("While checking for inconsistencies in the atom N of the residue %s, it was found a metal "
-                                   "covalently bound to its atom O. However, nothing will be done because 'break_metal_bonds' "
-                                   "was set to False." % pdb_atm.parent)
+                    logger.debug("While checking for inconsistencies in the atom N of the residue %s, it was found a metal "
+                                 "covalently bound to its atom O. However, nothing will be done because 'break_metal_bonds' "
+                                 "was set to False." % pdb_atm.parent)
                     continue
 
                 # Any non-N-terminal N not from PRO.
@@ -136,9 +136,9 @@ class ResiduesStandardiser:
                         if self.break_metal_bonds:
                             fix_atom = True
                         else:
-                            logger.warning("While checking for inconsistencies in the atom C of the residue %s, it was found a metal "
-                                           "covalently bound to its atom O. However, nothing will be done because 'break_metal_bonds' "
-                                           "was set to False." % pdb_atm.parent)
+                            logger.debug("While checking for inconsistencies in the atom C of the residue %s, it was found a metal "
+                                         "covalently bound to its atom O. However, nothing will be done because 'break_metal_bonds' "
+                                         "was set to False." % pdb_atm.parent)
 
                     # If the neighboring oxygen is bound to something else not comprised in the previous rule, it is better not to
                     # update anything. Otherwise, fix the C.
@@ -149,8 +149,8 @@ class ResiduesStandardiser:
 
                     # Alert for unexpected atoms bound to the oxygen O.
                     elif atm_obj.matches_smarts(f"[C;X4,X3]([OX2;$(O([C;X4,X3])[!#1]);!$(O{METAL_ATOM})])([#6])(-,=[N,O])"):
-                        logger.warning("While checking for inconsistencies in the atom C of the residue %s, it was found an unexpected "
-                                       "atom covalently bound to its atom O. So, C will not be amended." % pdb_atm.parent)
+                        logger.debug("While checking for inconsistencies in the atom C of the residue %s, it was found an unexpected "
+                                     "atom covalently bound to its atom O. So, C will not be amended." % pdb_atm.parent)
 
                     if fix_atom:
                         bond_types = []
@@ -166,8 +166,8 @@ class ResiduesStandardiser:
                 # If it is bonded only to 2 heavy atoms, then it is a C-terminal with a missing OXT or there are missing residues.
                 elif atm_obj.get_neighbors_number(True) == 2:
 
-                    logger.warning("The residue %s seems not to have any successor residue. "
-                                   "It may be the last in the chain sequence or there are missing residues." % pdb_atm.parent)
+                    logger.debug("The residue %s seems not to have any successor residue. "
+                                 "It may be the last in the chain sequence or there are missing residues." % pdb_atm.parent)
 
                     # Main chain carbonyl O involved in a metallic coordination.
                     #
@@ -185,9 +185,9 @@ class ResiduesStandardiser:
                         if self.break_metal_bonds:
                             fix_atom = True
                         else:
-                            logger.warning("While checking for inconsistencies in the atom C of the residue %s, it was found a metal "
-                                           "covalently bound to its atom O. However, nothing will be done because 'break_metal_bonds' "
-                                           "was set to False." % pdb_atm.parent)
+                            logger.debug("While checking for inconsistencies in the atom C of the residue %s, it was found a metal "
+                                         "covalently bound to its atom O. However, nothing will be done because 'break_metal_bonds' "
+                                         "was set to False." % pdb_atm.parent)
 
                     # If the neighboring oxygen is bound to something else not comprised in the previous rule, it is better not to
                     # update anything. Otherwise, fix the C.
@@ -197,8 +197,8 @@ class ResiduesStandardiser:
 
                     # Alert for unexpected atoms bound to the oxygen O.
                     elif atm_obj.matches_smarts(f"[CX4]([OX2;$(O([CX4])[!#1]);!$(O{METAL_ATOM})])([#6])"):
-                        logger.warning("While checking for inconsistencies in the atom C of the residue %s, it was found an unexpected "
-                                       "atom covalently bound to its atom O. So, C will not be amended." % pdb_atm.parent)
+                        logger.debug("While checking for inconsistencies in the atom C of the residue %s, it was found an unexpected "
+                                     "atom covalently bound to its atom O. So, C will not be amended." % pdb_atm.parent)
 
                     if fix_atom:
                         bond_types = []
@@ -307,9 +307,9 @@ class ResiduesStandardiser:
                         if self.break_metal_bonds:
                             fix_atom = True
                         else:
-                            logger.warning("While checking for inconsistencies in the atom CG of the residue %s, it was found a metal "
-                                           "covalently bound to its atom OD1. However, nothing will be done because 'break_metal_bonds' "
-                                           "was set to False." % pdb_atm.parent)
+                            logger.debug("While checking for inconsistencies in the atom CG of the residue %s, it was found a metal "
+                                         "covalently bound to its atom OD1. However, nothing will be done because 'break_metal_bonds' "
+                                         "was set to False." % pdb_atm.parent)
 
                     # If the neighboring oxygen is bound to something else not comprised in the previous rule, it is better not to
                     # update anything. Otherwise, fix the CG.
@@ -319,9 +319,9 @@ class ResiduesStandardiser:
 
                     # Alert for unexpected atoms bound to the neighboring nitrogen/oxygen.
                     elif atm_obj.matches_smarts("[C;X4,X3](-,=[N,O])([#6])[OX2][!#1]"):
-                        logger.warning("While checking for inconsistencies in the atom CG of the residue %s, it was found an unexpected "
-                                       "atom covalently bound to a neighboring nitrogen/oxygen. So, CG will not be amended."
-                                       % pdb_atm.parent)
+                        logger.debug("While checking for inconsistencies in the atom CG of the residue %s, it was found an unexpected "
+                                     "atom covalently bound to a neighboring nitrogen/oxygen. So, CG will not be amended."
+                                     % pdb_atm.parent)
 
                     if fix_atom:
                         bond_types = []
@@ -450,9 +450,9 @@ class ResiduesStandardiser:
                         if self.break_metal_bonds:
                             fix_atom = True
                         else:
-                            logger.warning("While checking for inconsistencies in the atom CD of the residue %s, it was found a metal "
-                                           "covalently bound to its atom OE1. However, nothing will be done because 'break_metal_bonds' "
-                                           "was set to False." % pdb_atm.parent)
+                            logger.debug("While checking for inconsistencies in the atom CD of the residue %s, it was found a metal "
+                                         "covalently bound to its atom OE1. However, nothing will be done because 'break_metal_bonds' "
+                                         "was set to False." % pdb_atm.parent)
 
                     # If the neighboring oxygen is bound to something else not comprised in the previous rule, it is better not to
                     # update anything. Otherwise, fix the CD.
@@ -462,9 +462,9 @@ class ResiduesStandardiser:
 
                     # Alert for unexpected atoms bound to the neighboring nitrogen/oxygen.
                     elif atm_obj.matches_smarts("[C;X4,X3](-,=[N,O])([#6])[OX2][!#1]"):
-                        logger.warning("While checking for inconsistencies in the atom CD of the residue %s, it was found an unexpected "
-                                       "atom covalently bound to a neighboring nitrogen/oxygen. So, CD will not be amended."
-                                       % pdb_atm.parent)
+                        logger.debug("While checking for inconsistencies in the atom CD of the residue %s, it was found an unexpected "
+                                     "atom covalently bound to a neighboring nitrogen/oxygen. So, CD will not be amended."
+                                     % pdb_atm.parent)
 
                     if fix_atom:
                         bond_types = []
@@ -761,9 +761,9 @@ class ResiduesStandardiser:
                         self._remove_metallic_bond(atm_obj)
                         fix_atom = True
                     else:
-                        logger.warning("While checking for inconsistencies in the atom ND1 of the residue %s, it was found a metal "
-                                       "covalently bound to it. However, nothing will be done because 'break_metal_bonds' "
-                                       "was set to False." % pdb_atm.parent)
+                        logger.debug("While checking for inconsistencies in the atom ND1 of the residue %s, it was found a metal "
+                                     "covalently bound to it. However, nothing will be done because 'break_metal_bonds' "
+                                     "was set to False." % pdb_atm.parent)
 
                 # If the nitrogen is bound to something else not comprised in the previous rule, it is better not to
                 # update anything. Otherwise, fix ND1.
@@ -775,8 +775,8 @@ class ResiduesStandardiser:
 
                 # Alert for unexpected atoms bound to the nitrogen ND1.
                 elif atm_obj.matches_smarts("[#7;R]([#6])([#6])[!#1]"):
-                    logger.warning("While checking for inconsistencies in the atom ND1 of the residue %s, it was found an unexpected "
-                                   "atom covalently bound to it. So, ND1 will not be amended." % pdb_atm.parent)
+                    logger.debug("While checking for inconsistencies in the atom ND1 of the residue %s, it was found an unexpected "
+                                 "atom covalently bound to it. So, ND1 will not be amended." % pdb_atm.parent)
 
                 if fix_atom:
                     bond_types = []
@@ -831,9 +831,9 @@ class ResiduesStandardiser:
                     if self.break_metal_bonds:
                         self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=2)
                     else:
-                        logger.warning("While checking for inconsistencies in the atom ND2 of the residue %s, it was found a metal "
-                                       "covalently bound to the atom OD1. However, nothing will be done because 'break_metal_bonds' "
-                                       "was set to False." % pdb_atm.parent)
+                        logger.debug("While checking for inconsistencies in the atom ND2 of the residue %s, it was found a metal "
+                                     "covalently bound to the atom OD1. However, nothing will be done because 'break_metal_bonds' "
+                                     "was set to False." % pdb_atm.parent)
 
                 # If the oxygen is bound to something else not comprised in the previous rules, it is better not to update anything.
                 # Otherwise, fix the ND2.
@@ -843,8 +843,8 @@ class ResiduesStandardiser:
 
                 # Alert for unexpected atoms bound to the oxygen OD1.
                 elif atm_obj.matches_smarts("N[CX4]([#6])[OX2][!#1]"):
-                    logger.warning("While checking for inconsistencies in the atom ND2 of the residue %s, it was found an unexpected "
-                                   "atom covalently bound to the oxygen OD1. So, ND2 will not be amended." % pdb_atm.parent)
+                    logger.debug("While checking for inconsistencies in the atom ND2 of the residue %s, it was found an unexpected "
+                                 "atom covalently bound to the oxygen OD1. So, ND2 will not be amended." % pdb_atm.parent)
 
             # Atom: NE
             # Sanity check for ARG:NE with invalid bond types.
@@ -884,9 +884,9 @@ class ResiduesStandardiser:
                             bond_types = [(bond_obj, BondType.SINGLE, True) for bond_obj in atm_obj.get_bonds()]
                             self._fix_atom(atm_obj, bond_types=bond_types, charge=0, implicit_h_count=1, is_aromatic=True)
                         else:
-                            logger.warning("While checking for inconsistencies in the atom NE2 of the residue %s, it was found a metal "
-                                           "covalently bound to it. However, nothing will be done because 'break_metal_bonds' "
-                                           "was set to False." % pdb_atm.parent)
+                            logger.debug("While checking for inconsistencies in the atom NE2 of the residue %s, it was found a metal "
+                                         "covalently bound to it. However, nothing will be done because 'break_metal_bonds' "
+                                         "was set to False." % pdb_atm.parent)
 
                     # If the nitrogen is bound to something else not comprised in the previous rule, it is better not to
                     # update anything. Otherwise, fix NE2.
@@ -900,8 +900,8 @@ class ResiduesStandardiser:
 
                     # Alert for unexpected atoms bound to the nitrogen NE2.
                     elif atm_obj.matches_smarts("[#7;R]([#6])([#6])[!#1]"):
-                        logger.warning("While checking for inconsistencies in the atom NE2 of the residue %s, it was found an unexpected "
-                                       "atom covalently bound to it. So, NE2 will not be amended." % pdb_atm.parent)
+                        logger.debug("While checking for inconsistencies in the atom NE2 of the residue %s, it was found an unexpected "
+                                     "atom covalently bound to it. So, NE2 will not be amended." % pdb_atm.parent)
 
                 elif (pdb_atm.parent.resname == "GLN" and atm_obj.get_neighbors_number(True) == 1 and
                         (atm_obj.get_valence() != 3 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
@@ -921,9 +921,9 @@ class ResiduesStandardiser:
                         if self.break_metal_bonds:
                             self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=2)
                         else:
-                            logger.warning("While checking for inconsistencies in the atom NE2 of the residue %s, it was found a metal "
-                                           "covalently bound to the atom OE1. However, nothing will be done because 'break_metal_bonds' "
-                                           "was set to False." % pdb_atm.parent)
+                            logger.debug("While checking for inconsistencies in the atom NE2 of the residue %s, it was found a metal "
+                                         "covalently bound to the atom OE1. However, nothing will be done because 'break_metal_bonds' "
+                                         "was set to False." % pdb_atm.parent)
 
                     # If the oxygen is bound to something else not comprised in the previous rules, it is better not to update anything.
                     # Otherwise, fix the NE2.
@@ -932,8 +932,8 @@ class ResiduesStandardiser:
 
                     # Alert for unexpected atoms bound to the oxygen OE1.
                     elif atm_obj.matches_smarts("N[CX4]([#6])[OX2][!#1]"):
-                        logger.warning("While checking for inconsistencies in the atom NE2 of the residue %s, it was found an unexpected "
-                                       "atom covalently bound to the oxygen OE1. So, NE2 will not be amended." % pdb_atm.parent)
+                        logger.debug("While checking for inconsistencies in the atom NE2 of the residue %s, it was found an unexpected "
+                                     "atom covalently bound to the oxygen OE1. So, NE2 will not be amended." % pdb_atm.parent)
 
             # Atom: NZ
             # Sanity check for LYS:NZ with invalid bond types.
@@ -982,9 +982,9 @@ class ResiduesStandardiser:
                         self._remove_metallic_bond(atm_obj)
                         self._fix_atom(atm_obj, bond_types=[BondType.DOUBLE], charge=0, implicit_h_count=0)
                     else:
-                        logger.warning("While checking for inconsistencies in the atom %s of the residue %s, it was found a metal "
-                                       "covalently bound to it. However, nothing will be done because 'break_metal_bonds' "
-                                       "was set to False." % (pdb_atm.name, pdb_atm.parent))
+                        logger.debug("While checking for inconsistencies in the atom %s of the residue %s, it was found a metal "
+                                     "covalently bound to it. However, nothing will be done because 'break_metal_bonds' "
+                                     "was set to False." % (pdb_atm.name, pdb_atm.parent))
 
                 # If the oxygen is bound to something else not comprised in the previous rules, it is better not to update anything.
                 # Otherwise, fix the oxygen.
@@ -1003,8 +1003,8 @@ class ResiduesStandardiser:
 
                 # Alert for unexpected atoms bound to the oxygens.
                 elif atm_obj.matches_smarts(f"[OX2;$(O([C;X4,X3])[!#1]);!$(O{METAL_ATOM})]-,=[C;X4,X3]"):
-                    logger.warning("While checking for inconsistencies in the atom %s of the residue %s, it was found an unexpected "
-                                   "atom covalently bound to it. So, %s will not be amended." % (pdb_atm.name, pdb_atm.parent,
+                    logger.debug("While checking for inconsistencies in the atom %s of the residue %s, it was found an unexpected "
+                                 "atom covalently bound to it. So, %s will not be amended." % (pdb_atm.name, pdb_atm.parent,
                                                                                                  pdb_atm.name))
 
             # Atom: OXT, OD2, and OE2
@@ -1028,9 +1028,9 @@ class ResiduesStandardiser:
                         self._remove_metallic_bond(atm_obj)
                         self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=-1, implicit_h_count=0)
                     else:
-                        logger.warning("While checking for inconsistencies in the atom %s of the residue %s, it was found a metal "
-                                       "covalently bound to it. However, nothing will be done because 'break_metal_bonds' "
-                                       "was set to False." % (pdb_atm.name, pdb_atm.parent))
+                        logger.debug("While checking for inconsistencies in the atom %s of the residue %s, it was found a metal "
+                                     "covalently bound to it. However, nothing will be done because 'break_metal_bonds' "
+                                     "was set to False." % (pdb_atm.name, pdb_atm.parent))
 
                 # If the second oxygen (OD1/OE1) is bound to something else not comprised in the previous rules,
                 # then it won't be fixed and, therefore, we should update OD2/OE2 as follows: remove the bond with
@@ -1045,9 +1045,9 @@ class ResiduesStandardiser:
                         self._remove_metallic_bond(atm_obj)
                         self._fix_atom(atm_obj, bond_types=[BondType.DOUBLE], charge=0, implicit_h_count=0)
                     else:
-                        logger.warning("While checking for inconsistencies in the atom %s of the residue %s, it was found a metal "
-                                       "covalently bound to it. However, nothing will be done because 'break_metal_bonds' "
-                                       "was set to False." % (pdb_atm.name, pdb_atm.parent))
+                        logger.debug("While checking for inconsistencies in the atom %s of the residue %s, it was found a metal "
+                                     "covalently bound to it. However, nothing will be done because 'break_metal_bonds' "
+                                     "was set to False." % (pdb_atm.name, pdb_atm.parent))
 
                 # Capture cases where the second oxygen is bound to a metal atom, but not OXT/OD2/OE2.
                 elif atm_obj.matches_smarts(f"[OX1]=[CX3]([#6])[OX2;$(O{METAL_ATOM})]"):
@@ -1055,9 +1055,9 @@ class ResiduesStandardiser:
                     if self.break_metal_bonds:
                         self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=-1, implicit_h_count=0)
                     else:
-                        logger.warning("While checking for inconsistencies in the atom %s of the residue %s, it was found a metal "
-                                       "covalently bound to the other carboxyl oxygen. However, nothing will be done because "
-                                       "'break_metal_bonds' was set to False." % (pdb_atm.name, pdb_atm.parent))
+                        logger.debug("While checking for inconsistencies in the atom %s of the residue %s, it was found a metal "
+                                     "covalently bound to the other carboxyl oxygen. However, nothing will be done because "
+                                     "'break_metal_bonds' was set to False." % (pdb_atm.name, pdb_atm.parent))
 
                 # It fixes invalid oxygens, excluing cases where OD2/OE2 is bound to an atom not comprised in the
                 # previous rules and cases where OD2/OE2 has a double bond with CG/CD and the second oxygen (OD1/OE1)
@@ -1071,15 +1071,15 @@ class ResiduesStandardiser:
 
                 # Alert for unexpected atoms bound to the oxygens.
                 elif atm_obj.matches_smarts("[OX2]([!#1])[C;X4,X3]"):
-                    logger.warning("While checking for inconsistencies in the atom %s of the residue %s, it was found an unexpected "
-                                   "atom covalently bound to it. So, %s will not be amended." % (pdb_atm.name, pdb_atm.parent,
+                    logger.debug("While checking for inconsistencies in the atom %s of the residue %s, it was found an unexpected "
+                                 "atom covalently bound to it. So, %s will not be amended." % (pdb_atm.name, pdb_atm.parent,
                                                                                                  pdb_atm.name))
 
                 # Alert for unexpected atoms bound to the oxygens.
                 elif atm_obj.matches_smarts(f"[OX1]=[CX3]([#6])[OX2;$(O([CX3])[!#1]);!$(O{METAL_ATOM})]"):
-                    logger.warning("While checking for inconsistencies in the atom %s of the residue %s, it was found an unexpected "
-                                   "atom covalently bound to the other carboxyl oxygen. So, %s was treated as a carbonyl oxygen." %
-                                   (pdb_atm.name, pdb_atm.parent, pdb_atm.name))
+                    logger.debug("While checking for inconsistencies in the atom %s of the residue %s, it was found an unexpected "
+                                 "atom covalently bound to the other carboxyl oxygen. So, %s was treated as a carbonyl oxygen." %
+                                 (pdb_atm.name, pdb_atm.parent, pdb_atm.name))
 
             # Atom: OG, OG1, and OH
             # Sanity check for OG/OG1/OH oxygens with invalid bond types.
@@ -1097,9 +1097,9 @@ class ResiduesStandardiser:
                         self._remove_metallic_bond(atm_obj)
                         self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=1)
                     else:
-                        logger.warning("While checking for inconsistencies in the atom %s of the residue %s, it was found a metal "
-                                       "covalently bound to it. However, nothing will be done because 'break_metal_bonds' "
-                                       "was set to False." % (pdb_atm.name, pdb_atm.parent))
+                        logger.debug("While checking for inconsistencies in the atom %s of the residue %s, it was found a metal "
+                                     "covalently bound to it. However, nothing will be done because 'break_metal_bonds' "
+                                     "was set to False." % (pdb_atm.name, pdb_atm.parent))
 
                 # If the oxygen is bound to something else not comprised in the previous rule, it is better not to
                 # update anything. Otherwise, fix OG/OG1/OH.
@@ -1112,8 +1112,8 @@ class ResiduesStandardiser:
 
                 # Alert for unexpected atoms bound to the hydroxyl oxygens.
                 elif atm_obj.matches_smarts(f"[OX2;$(O([#6])[!#1]);!$(O{METAL_ATOM})]"):
-                    logger.warning("While checking for inconsistencies in the atom %s of the residue %s, it was found an unexpected "
-                                   "atom covalently bound to it. So, %s will not be amended." % (pdb_atm.name, pdb_atm.parent,
+                    logger.debug("While checking for inconsistencies in the atom %s of the residue %s, it was found an unexpected "
+                                 "atom covalently bound to it. So, %s will not be amended." % (pdb_atm.name, pdb_atm.parent,
                                                                                                  pdb_atm.name))
 
             # Atom: SD
@@ -1145,9 +1145,9 @@ class ResiduesStandardiser:
                         self._remove_metallic_bond(atm_obj)
                         self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=-1, implicit_h_count=0)
                     else:
-                        logger.warning("While checking for inconsistencies in the atom SG of the residue %s, it was found a metal "
-                                       "covalently bound to it. However, nothing will be done because 'break_metal_bonds' "
-                                       "was set to False." % pdb_atm.parent)
+                        logger.debug("While checking for inconsistencies in the atom SG of the residue %s, it was found a metal "
+                                     "covalently bound to it. However, nothing will be done because 'break_metal_bonds' "
+                                     "was set to False." % pdb_atm.parent)
 
                 # If the sulfur is bound to something else not comprised in the previous rule, it is better not to
                 # update anything. Otherwise, fix SG.
@@ -1164,8 +1164,8 @@ class ResiduesStandardiser:
 
                 # Alert for unexpected atoms bound to the hydroxyl oxygens.
                 elif atm_obj.matches_smarts("[SX2](C)[!#1]"):
-                    logger.warning("While checking for inconsistencies in the atom SG of the residue %s, it was found an unexpected "
-                                   "atom covalently bound to it. So, SG will not be amended." % pdb_atm.parent)
+                    logger.debug("While checking for inconsistencies in the atom SG of the residue %s, it was found an unexpected "
+                                 "atom covalently bound to it. So, SG will not be amended." % pdb_atm.parent)
 
         # Only remove metals with no bond to any residue.
         for metal_obj in self.found_metals.values():

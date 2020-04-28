@@ -26,7 +26,6 @@ from luna.mol.interaction.conf import InteractionConf
 from luna.mol.interaction.fp.shell import ShellGenerator, IFPType
 from luna.mol.wrappers.base import MolWrapper
 from luna.mol.wrappers.rdkit import RDKIT_FORMATS, read_multimol_file
-from luna.mol.amino_features import DEFAULT_AMINO_ATM_FEATURES
 from luna.util.default_values import *
 from luna.util.exceptions import *
 from luna.util.file import pickle_data, unpickle_data, create_directory, get_file_format, get_unique_filename
@@ -102,7 +101,6 @@ class Project:
 
                  similarity_func="BulkTanimotoSimilarity",
                  preload_mol_files=False,
-                 default_properties=DEFAULT_AMINO_ATM_FEATURES,
                  butina_cutoff=0.2,
                  run_from_step=None,
                  run_until_step=None,
@@ -173,7 +171,6 @@ class Project:
 
         self.similarity_func = similarity_func
         self.butina_cutoff = butina_cutoff
-        self.default_properties = default_properties
         self.run_from_step = run_from_step
         self.run_until_step = run_until_step
         self.preload_mol_files = preload_mol_files
@@ -298,8 +295,7 @@ class Project:
         feature_extractor = FeatureExtractor(feature_factory)
 
         perceiver = AtomGroupPerceiver(feature_extractor, add_h=add_h, ph=self.ph, amend_mol=self.amend_mol,
-                                       mol_obj_type=self.mol_obj_type, default_properties=self.default_properties,
-                                       tmp_path="%s/tmp" % self.working_path)
+                                       mol_obj_type=self.mol_obj_type, tmp_path="%s/tmp" % self.working_path)
 
         radius = self.inter_conf.boundary_cutoff or BOUNDARY_CONF.boundary_cutoff
         nb_compounds = get_contacts_for_entity(entity, ligand, level='R', radius=radius)
