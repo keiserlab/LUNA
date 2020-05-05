@@ -63,7 +63,7 @@ class MolValidator:
                 for bond in atm_obj.get_bonds():
                     partner = bond.get_partner_atom(atm_obj)
 
-                    if partner.get_symbol() == "O" and bond.get_bond_type() == 2:
+                    if partner.get_symbol() == "O" and bond.get_bond_type() == BondType.DOUBLE:
                         # Change double bond to single bond.
                         bond.set_bond_type(BondType.SINGLE)
                         # Attributes a +1 charge to the N.
