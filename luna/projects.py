@@ -28,7 +28,7 @@ from luna.mol.wrappers.base import MolWrapper
 from luna.mol.wrappers.rdkit import RDKIT_FORMATS, read_multimol_file
 from luna.util.default_values import *
 from luna.util.exceptions import *
-from luna.util.file import pickle_data, unpickle_data, create_directory, get_file_format, get_unique_filename
+from luna.util.file import pickle_data, unpickle_data, create_directory, clear_directory, get_file_format, get_unique_filename
 from luna.util.logging import new_logging_file, load_default_logging_conf
 import luna.util.logging_ini
 
@@ -36,6 +36,11 @@ from luna.MyBio.PDB.PDBParser import PDBParser
 from luna.MyBio.selector import ResidueSelector
 from luna.MyBio.util import download_pdb, entity_to_string, get_entity_from_entry
 from luna.version import __version__
+
+from sys import setrecursionlimit
+
+# Set a recursion limit to avoid RecursionError with the library pickle.
+setrecursionlimit(RECURSION_LIMIT)
 
 
 logger = logging.getLogger()
@@ -194,6 +199,8 @@ class Project:
 
         self.version = __version__
 
+        self._paths = ["chunks", "figures", "logs", "pdbs", "results/interactions", "results/fingerprints", "results", "tmp"]
+
         load_default_logging_conf()
 
         self.log_preferences()
@@ -216,16 +223,17 @@ class Project:
     def prepare_project_path(self):
         logger.info("Initializing project directory '%s'." % self.working_path)
 
+        # Create main project directory.
         create_directory(self.working_path, self.overwrite_path)
-        create_directory("%s/pdbs" % self.working_path)
-        create_directory("%s/figures" % self.working_path)
-        create_directory("%s/results/interactions" % self.working_path)
-        create_directory("%s/results/fingerprints" % self.working_path)
-        create_directory("%s/logs" % self.working_path)
-        create_directory("%s/tmp" % self.working_path)
-        create_directory("%s/chunks/" % self.working_path)
+        # Create subdirectories.
+        for path in self._paths:
+            create_directory("%s/%s" % (self.working_path, path))
 
         logger.info("Project directory '%s' created successfully." % self.working_path)
+
+    def remove_empty_paths(self):
+        for path in self._paths:
+            clear_directory("%s/%s" % (self.working_path, path), only_empty_paths=True)
 
     def init_logging_file(self, logging_filename=None, use_mp_handler=True):
         if not logging_filename:
@@ -658,16 +666,32 @@ class LocalProject(Project):
         job_queue.join()
         entry_processing.end()
 
-        logger.info("Entries processing finished successfully.")
+        if entry_processing.errors:
+            self.entries = set(self.entries) - set(entry_processing.errors)
 
-        # Generate IFP/MFP files
-        if self.calc_ifp:
-            self.create_ifp_file()
-        if self.calc_mfp:
-            self.create_mfp_file()
+        # If all molecules failed, it won't try to create fingerprints.
+        if len(self.entries) == 0:
+            logger.critical("Entries processing failed.")
+        else:
+            logger.info("Entries processing finished successfully.")
+
+            # Warn the users for any errors found during the entries processing.
+            if entry_processing.errors:
+                logger.warning("Number of entries with errors: %d. Check the log file for the complete list of entries that failed."
+                               % len(entry_processing.errors))
+                logger.debug("Entries that failed: %s." % ", ".join([e.to_string() for e in entry_processing.errors]))
+
+            # Generate IFP/MFP files
+            if self.calc_ifp:
+                self.create_ifp_file()
+            if self.calc_mfp:
+                self.create_mfp_file()
 
         # Save the whole project information.
         self.save(self.project_file)
+
+        # Remove unnecessary paths.
+        self.remove_empty_paths()
 
         end = time.time()
         logger.info("Project creation completed!!!")

@@ -27,6 +27,8 @@ ACCEPTED_MOL_OBJ_TYPES = ("rdkit", "openbabel")
 
 OPENBABEL = "/usr/bin/obabel"
 
+RECURSION_LIMIT = 600000
+
 ATOM_TYPES_COLOR = ColorPallete({
     "Aromatic": (255, 187, 204),
     "Acceptor": (158, 154, 200),

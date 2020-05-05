@@ -1,5 +1,5 @@
 from os.path import basename, exists, isdir, isfile, splitext
-from os import makedirs, remove
+from os import makedirs, remove, listdir
 from shutil import rmtree
 import string
 import random
@@ -110,11 +110,15 @@ def remove_files(files):
         if exists(f):
             remove(f)
         else:
-            logger.info("File %s does not exist." % f)
+            logger.info("File '%s' does not exist." % f)
 
 
-def clear_directory(path):
+def clear_directory(path, only_empty_paths=False):
     if isdir(path):
+        # Do nothing if the directory is not empty and if only empty paths must be removed.
+        if only_empty_paths and len(listdir(path)) != 0:
+            return
+
         try:
             rmtree(path, ignore_errors=True)
         except OSError as e:

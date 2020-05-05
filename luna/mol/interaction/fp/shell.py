@@ -590,7 +590,7 @@ class ShellGenerator:
             # If all atom groups reached the limit of possible substructures, just leave the loop.
             if len(skip_atm_grps) == len(neighborhood):
                 logger.debug("The list of shells cannot be expanded anymore. The maximum number "
-                               "of substructures were reached.")
+                             "of substructures were reached.")
                 break
 
         logger.debug("Shells creation finished.")

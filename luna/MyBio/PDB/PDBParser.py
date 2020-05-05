@@ -284,7 +284,7 @@ class PDBParser(object):
                 # Recognize other water labels.
                 if self.FIX_OBABEL_FLAGS:
                     # Incorrect flags are set only for added hydrogen atoms
-                    if (name == "H"):
+                    if name == "H":
                         child_dict = structure_builder.model[chainid].child_dict
                         # If this hydrogen belongs to water molecule or to a ligand
                         if resname in WATER_NAMES or ("H_%s" % resname, resseq, icode) in child_dict:
