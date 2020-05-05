@@ -14,7 +14,7 @@ def new_logging_file(filename, logging_level=logging.INFO, logger_name=None, pro
     file_format = log_format or FILE_FORMAT
     file_formatter = logging.Formatter(file_format, '%Y-%m-%d %H:%M:%S')
     fh.setFormatter(file_formatter)
-    fh.setLevel(logging_level)
+    fh.setLevel(logging.DEBUG)
 
     ch = logging.StreamHandler()
     console_format = log_format or CONSOLE_FORMAT
@@ -23,7 +23,7 @@ def new_logging_file(filename, logging_level=logging.INFO, logger_name=None, pro
                                                               'INFO': 'green',
                                                               'WARNING': 'yellow',
                                                               'ERROR': 'red',
-                                                              'CRITICAL': 'red,bg_white'})
+                                                              'CRITICAL': 'bold_red'})
     ch.setFormatter(console_formatter)
     ch.setLevel(logging_level)
 
