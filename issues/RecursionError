@@ -1,0 +1,5 @@
+When running LUNA for a whole chain analysis or depending on the ligand (e.g., 3HIO:A:C2X:268), the code may break when it tries to pickle the results object. This issue has been caused by the maximum recursion limit reached by the circular references I have added in the data structures. For example, an atom group points to atoms, while atoms have references to all of their atom groups they belong to. Also, interactions point out to atom groups, while atom groups have references to their list of interactions. As one can see, there are a lot of circular references.
+
+To partially solve this problem, one can set the recursion limit through the use of setrecursionlimit(). Currently, I set the default limit to 600,000, but I don't think it is the best solution.
+
+Since this is a recurrent problem, maybe the best approach would be to remove the circular references. However, that will be done in the later future as I don't have much time to worry about this technical thing right now.
