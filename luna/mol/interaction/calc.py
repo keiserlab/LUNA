@@ -182,7 +182,7 @@ class InteractionCalculator:
 
                 # If the groups belongs to the same molecule (intramolecule interaction).
                 is_intramol_inter = self.is_intramol_inter(trgt_atm_grp, nb_atm_grp)
-                shortest_path_size = None
+                shortest_path_length = None
 
                 for pair in feat_pairs:
                     # It will ignore interactions for atoms in the same molecule that are separated from each other by only N bonds.
@@ -191,12 +191,18 @@ class InteractionCalculator:
                     #
                     # But, it will never skip pairs of Atom features because they are used to calculate covalent interactions.
                     if pair[0].name != "Atom" and pair[1].name != "Atom" and is_intramol_inter:
-                        # Compute shortest path only once. The reason not to precompute it outside the For is to avoid computing
-                        # the Bellman-Ford algorithm if the groups only have Atom features.
-                        if shortest_path_size is None:
-                            shortest_path_size = trgt_atm_grp.get_shortest_path_size(nb_atm_grp)
-                        # Ignore groups according to the min bond separation threshold.
-                        if shortest_path_size <= self.inter_conf.conf.get("min_bond_separation", 0):
+                        # Compute the shortest path only once. The reason not to precompute it outside the For is to avoid computing
+                        # the algorithm for groups containing only Atom features.
+                        if shortest_path_length is None:
+                            # By providing a cutoff, it will force the algorithm to return paths only for groups connected by
+                            # less than or equal N paths. So, if two groups return INF, it means they are a valid combination as they
+                            # match the minimum bond separation.
+                            cutoff = self.inter_conf.conf.get("min_bond_separation", 0)
+                            shortest_path_length = trgt_atm_grp.get_shortest_path_length(nb_atm_grp, cutoff)
+
+                        # If get_shortest_path_length() returns any value that is not infinite (INF), it means these two groups
+                        # contain a path with at less than or equal to the cutoff 'min_bond_separation'. Therefore, ignore them.
+                        if shortest_path_length != float('inf'):
                             continue
 
                     calc_inter_params = (trgt_atm_grp, nb_atm_grp) + pair
@@ -1795,10 +1801,6 @@ class InteractionCalculator:
                 rdw1 = ob.GetVdwRad(ob.GetAtomicNum(atm1.element))
                 rdw2 = ob.GetVdwRad(ob.GetAtomicNum(atm2.element))
 
-                # The graph of a molecule neighborhood contains only the information of its own atoms and their immediate neighbors.
-                # That is why it needs to merge two neighborhood graphs when an intermolecular interaction is to be calculated.
-                merge_neighborhods = self.is_intramol_inter(group1, group2) is False
-
                 # r1 + r2 - d < 0 => no clash
                 # r1 + r2 - d = 0 => in the limit, i.e., spheres are touching.
                 # r1 + r2 - d > 0 => clash.
@@ -1807,27 +1809,30 @@ class InteractionCalculator:
                     # Covalent bonds keep atoms very tightly, producing distances lower than their sum of Van der Waals radius.
                     # As a consequence the algorithm will find a lot of false clashes and Van der Waals interactions.
                     #
-                    # It is better to keep this function inside the IFs to avoid the Bellman-Ford processing for pairs of atoms
+                    # It is better to keep this function inside the IFs to avoid the Dijkstra processing for pairs of atoms
                     # that wouldn't enter inside the IF.
-                    shortest_path_size = group1.atoms[0].get_shortest_path_size(group2.atoms[0], merge_neighborhods)
+                    shortest_path_length = group1.get_shortest_path_length(group2, self.inter_conf.conf.get("min_bond_separation", 0))
 
-                    # Checks if the number of bonds matches the criterion for clashes.
-                    if shortest_path_size <= self.inter_conf.conf.get("min_bond_separation_for_clash", 0):
+                    # If get_shortest_path_length() returns any value that is not infinite (INF), it means these two groups
+                    # contain a path with at less than or equal to the cutoff 'min_bond_separation'. Therefore, ignore them.
+                    if shortest_path_length != float('inf'):
                         return []
 
                     inter = InteractionType(group1, group2, "Van der Waals clash", params=params)
                     interactions.append(inter)
+
                 elif cc_dist <= rdw1 + rdw2 + self.inter_conf.conf.get("vdw_tolerance", 0):
                     # Ignore Van der Waals and clashes for atoms separated from each other by only N bonds.
                     # Covalent bonds keep atoms very tightly, producing distances lower than their sum of Van der Waals radius.
                     # As a consequence the algorithm will find a lot of false clashes and Van der Waals interactions.
                     #
-                    # It is better to keep this function inside the IFs to avoid the Bellman-Ford processing for pairs of atoms
+                    # It is better to keep this function inside the IFs to avoid the Dijkstra processing for pairs of atoms
                     # that wouldn't enter inside the IF.
-                    shortest_path_size = group1.atoms[0].get_shortest_path_size(group2.atoms[0], merge_neighborhods)
+                    shortest_path_length = group1.get_shortest_path_length(group2, self.inter_conf.conf.get("min_bond_separation", 0))
 
-                    # Checks if the number of bonds matches the general criterion.
-                    if shortest_path_size <= self.inter_conf.conf.get("min_bond_separation", 0):
+                    # If get_shortest_path_length() returns any value that is not infinite (INF), it means these two groups
+                    # contain a path with at less than or equal to the cutoff 'min_bond_separation'. Therefore, ignore them.
+                    if shortest_path_length != float('inf'):
                         return []
 
                     inter = InteractionType(group1, group2, "Van der Waals", params=params)

@@ -1,5 +1,4 @@
 import numpy as np
-from luna.graph.bellman_ford import bellman_ford
 from openbabel import openbabel as ob
 
 import logging
@@ -63,11 +62,10 @@ class AtomData:
 
 class ExtendedAtom:
 
-    def __init__(self, mybio_atom, nb_info=None, atm_grps=None, neighborhood=None, invariants=None):
+    def __init__(self, mybio_atom, nb_info=None, atm_grps=None, invariants=None):
         self._atom = mybio_atom
         self._nb_info = nb_info or []
         self._atm_grps = atm_grps or []
-        self._neighborhood = neighborhood or {}
         self._invariants = invariants
 
     @property
@@ -77,10 +75,6 @@ class ExtendedAtom:
     @property
     def neighbors_info(self):
         return self._nb_info
-
-    @property
-    def neighborhood(self):
-        return self._neighborhood
 
     @property
     def atm_grps(self):
@@ -113,9 +107,6 @@ class ExtendedAtom:
 
         return full_atom_name
 
-    def set_neighborhood(self, nb_graph):
-        self._neighborhood = nb_graph
-
     def add_nb_info(self, nb_info):
         self._nb_info = list(set(self._nb_info + list(nb_info)))
 
@@ -136,17 +127,6 @@ class ExtendedAtom:
 
     def is_neighbor(self, atom):
         return atom.serial_number in [i.serial_number for i in self._nb_info]
-
-    def get_shortest_path_size(self, trgt_atm, merge_neighborhoods=False):
-        if merge_neighborhoods:
-            nb_graph = {**self.neighborhood, **trgt_atm.neighborhood}
-        else:
-            nb_graph = self.neighborhood
-
-        # d stores the path size from the source to the target, and p stores the predecessors from each target.
-        d, p = bellman_ford(nb_graph, self.serial_number)
-        # Return infinite if the provided target is not in the distance object.
-        return d.get(trgt_atm.serial_number, float("inf"))
 
     def __getattr__(self, attr):
         if hasattr(self._atom, attr):
