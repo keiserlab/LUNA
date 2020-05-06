@@ -287,14 +287,15 @@ class PDBIO(object):
         # Print CONECT records
         if write_conects:
             conects = self.structure.conects
-            for serial_number in sorted(conects):
 
+            for serial_number in sorted(conects):
                 # Substitutes the old serial number by the new serial number
                 new_serial_number = serial_number_mapping.get(serial_number, None)
 
                 if new_serial_number not in valid_serial_numbers:
                     continue
 
+                # It may return a list of lists as some atoms may have more than one CONECT line.
                 bonded_atoms = conects[serial_number]
                 max_num_fields = 4
                 bonded_atoms_sets = [bonded_atoms[i:i + max_num_fields]
@@ -302,14 +303,13 @@ class PDBIO(object):
                                                     max_num_fields)]
 
                 for bonded_atoms in bonded_atoms_sets:
-                    valid_bonded_atoms = set()
+                    valid_bonded_atoms = []
                     for tmp_serial_number in bonded_atoms:
-
                         # Substitutes the old serial number by the new serial number
                         tmp_serial_number = serial_number_mapping.get(tmp_serial_number, None)
 
                         if tmp_serial_number in valid_serial_numbers:
-                            valid_bonded_atoms.add(tmp_serial_number)
+                            valid_bonded_atoms.append(tmp_serial_number)
 
                     if len(valid_bonded_atoms) == 0:
                         continue

@@ -445,7 +445,7 @@ class PDBParser(object):
 
                 try:
                     orig_serial_number = int(serial_numbers[0].strip())
-                except Exception as e:
+                except Exception:
                     warnings.warn("Serial number '%s' in CONECT record "
                                   "is invalid. Line %d."
                                   % (orig_serial_number, global_line_counter),
@@ -458,7 +458,7 @@ class PDBParser(object):
                                   PDBConstructionWarning)
                     continue
 
-                bonded_atoms = set()
+                bonded_atoms = []
                 for serial_number in serial_numbers[1:]:
                     serial_number = serial_number.strip()
 
@@ -467,7 +467,7 @@ class PDBParser(object):
 
                     try:
                         serial_number = int(serial_number)
-                    except Exception as e:
+                    except Exception:
                         warnings.warn("Serial number '%s' in CONECT record "
                                       "is invalid. Line %d."
                                       % (serial_number, global_line_counter),
@@ -481,7 +481,7 @@ class PDBParser(object):
                                       PDBConstructionWarning)
                         continue
 
-                    bonded_atoms.add(serial_number)
+                    bonded_atoms.append(serial_number)
 
                 if (len(bonded_atoms) == 0):
                     warnings.warn("No bonded atom were found in CONECT record."
@@ -493,7 +493,7 @@ class PDBParser(object):
                                          if orig_serial_number in conects
                                          else [])
 
-                    orig_bonded_atoms += list(bonded_atoms)
+                    orig_bonded_atoms += bonded_atoms
                     conects[orig_serial_number] = orig_bonded_atoms
 
             local_line_counter += 1
