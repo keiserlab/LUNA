@@ -1,5 +1,5 @@
 from openbabel.pybel import informats, outformats
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, TimeoutExpired
 
 from luna.util.exceptions import FileNotCreated, InvalidFileFormat
 from luna.util.default_values import OPENBABEL
@@ -108,7 +108,11 @@ def convert_molecule(infile, output, infile_format=None,
         args = [openbabel, "-i", infile_format, infile, "-o", output_format, "-O", output] + opt_list
 
         p = Popen(args, stdout=PIPE, stderr=PIPE)
-        stdout, stderr = p.communicate()
+        try:
+            stdout, stderr = p.communicate(timeout=15)
+        except TimeoutExpired:
+            p.kill()
+            raise
 
         output_lines = stderr.decode().strip().split("\n")
         is_mol_converted = output_lines[-1] != "0 molecule converted"
@@ -116,6 +120,5 @@ def convert_molecule(infile, output, infile_format=None,
             raise FileNotCreated("File '%s' not converted to '%s'." % (infile, output))
         else:
             logger.debug("File '%s' converted to '%s'." % (infile, output))
-    except Exception as e:
-        logger.exception(e)
+    except Exception:
         raise
