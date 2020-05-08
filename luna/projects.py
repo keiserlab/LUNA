@@ -81,14 +81,13 @@ class Project:
                  pdb_path=PDB_PATH,
                  has_local_files=False,
                  overwrite_path=False,
-                 db_conf_file=None,
-                 pdb_template=None,
-                 atom_prop_file=ATOM_PROP_FILE,
+
                  try_h_addition=True,
                  ph=7.4,
                  amend_mol=True,
                  mol_obj_type='rdkit',
-
+                 preload_mol_files=False,
+                 atom_prop_file=ATOM_PROP_FILE,
                  inter_conf=INTERACTION_CONF,
                  inter_calc=None,
 
@@ -106,10 +105,7 @@ class Project:
                  ifp_output=None,
 
                  similarity_func="BulkTanimotoSimilarity",
-                 preload_mol_files=False,
                  butina_cutoff=0.2,
-                 run_from_step=None,
-                 run_until_step=None,
 
                  verbosity=3,
                  nproc=None):
@@ -146,8 +142,6 @@ class Project:
         self.pdb_path = pdb_path
         self.has_local_files = has_local_files
         self.overwrite_path = overwrite_path
-        self.db_conf_file = db_conf_file
-        self.pdb_template = pdb_template
         self.atom_prop_file = atom_prop_file
         self.ph = ph
         self.amend_mol = amend_mol
@@ -177,8 +171,6 @@ class Project:
 
         self.similarity_func = similarity_func
         self.butina_cutoff = butina_cutoff
-        self.run_from_step = run_from_step
-        self.run_until_step = run_until_step
         self.preload_mol_files = preload_mol_files
         self.step_controls = {}
         self.verbosity = VERBOSITY_LEVEL[verbosity]
