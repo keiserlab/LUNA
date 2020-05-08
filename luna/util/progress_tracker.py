@@ -14,19 +14,19 @@ logger = logging.getLogger()
 
 class ProgressTracker:
 
-    def __init__(self, ntasks, task_name=None):
+    def __init__(self, ntasks, queue, task_name=None):
         self.ntasks = ntasks
         self.task_name = task_name
 
         self._progress = 0
 
-        self.queue = Queue(1)   # used to communicate progress to the thread
+        self.queue = queue   # used to communicate progress to the thread
         self.event = Event()    # used to tell the thread when to finish
         self.progress_bar = Thread(target=self.print_progress, args=(self.event, self.queue))
         self.progress_bar.daemon = True
 
         # Save any errors found during the task processing.
-        self.errors = []
+        self.errors = set()
         self.running_times = []
         self._start_time = None
         self._end_time = None
@@ -36,8 +36,9 @@ class ProgressTracker:
         if self.task_name:
             task_name = " - %s" % self.task_name
 
-        msg = '%s%% [%s] %d/%d [Avg: %.2fs/task]%s' % (int(perc), ("\u25A0" * int(perc / 2)).ljust(50, ' '),
-                                                       p, self.ntasks, self.avg_running_time, task_name)
+        msg = '%s%% [%s] %d/%d [Avg: %.2fs/task; Errors: %d]%s' % (int(perc), ("\u25A0" * int(perc / 2)).ljust(50, ' '),
+                                                                   p, self.ntasks, self.avg_running_time, len(self.errors),
+                                                                   task_name)
 
         format_str = '\r[%s]    %s%s %s%s  %s'
         progress_str = format_str % (time.strftime('%Y-%m-%d %H:%M:%S'), parse_colors("purple"),
@@ -62,11 +63,20 @@ class ProgressTracker:
             if e.is_set() and q.full() is False:
                 break
 
-            # get the current progress value
-            p = q.get()
-            perc = round((p / self.ntasks), 2) * 100
+            # get the current progress data.
+            progress_data = q.get()
 
-            self._show_progress_bar(p, perc)
+            if progress_data is not None:
+                entry, proc_time, failed = progress_data
+
+                self.running_times.append(proc_time)
+                if failed:
+                    self.errors.add(entry)
+
+                self.progress += 1
+
+            perc = round((self.progress / self.ntasks), 2) * 100
+            self._show_progress_bar(self.progress, perc)
 
     @property
     def progress(self):
@@ -77,9 +87,6 @@ class ProgressTracker:
     def progress(self, value):
         """Sets the current progress value, passing updates to the thread"""
         self._progress = value
-
-        # this is the key to this solution
-        self.queue.put(self._progress)
 
     @property
     def running_time(self):
@@ -97,7 +104,6 @@ class ProgressTracker:
     def start(self):
         self._start_time = round(time.time(), 2)
         self.progress_bar.start()
-        self._show_progress_bar(0, 0)
 
     def end(self):
         self.event.set()

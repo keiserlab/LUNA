@@ -62,9 +62,9 @@ def generic_splitext(path, max_split=None):
 def generate_json_file(json_data, output_file):
     try:
         import simplejson as json
-        logger.info("Module 'simplejson' imported.")
+        logger.warning("Module 'simplejson' imported.")
     except ImportError:
-        logger.info("Module 'simplejson' not available. Built-in module 'json' will be imported.")
+        logger.warning("Module 'simplejson' not available. Built-in module 'json' will be imported.")
         import json
 
     try:
@@ -78,9 +78,9 @@ def generate_json_file(json_data, output_file):
 def parse_json_file(json_file):
     try:
         import simplejson as json
-        logger.info("Module 'simplejson' imported.")
+        logger.warning("Module 'simplejson' imported.")
     except ImportError:
-        logger.info("Module 'simplejson' not available. Built-in module 'json' will be imported.")
+        logger.warning("Module 'simplejson' not available. Built-in module 'json' will be imported.")
         import json
 
     try:
@@ -121,8 +121,7 @@ def clear_directory(path, only_empty_paths=False):
 
         try:
             rmtree(path, ignore_errors=True)
-        except OSError as e:
-            logger.exception(e)
+        except OSError:
             raise
 
 
@@ -183,10 +182,8 @@ def pickle_data(data, output_file, compressed=True):
         with open_func(output_file, "wb") as OUT:
             pickle.dump(data, OUT, pickle.HIGHEST_PROTOCOL)
     except OSError as e:
-        logger.exception(e)
-        raise FileNotCreated("File '%s' could not be created." % output_file)
-    except Exception as e:
-        logger.exception(e)
+        raise FileNotCreated("File '%s' could not be created." % output_file) from e
+    except Exception:
         raise
 
 
@@ -204,6 +201,4 @@ def unpickle_data(input_file):
         with open(input_file, "rb") as IN:
             return pickle.load(IN)
     except OSError as e:
-        logger.exception(e)
-        raise PKLNotReadError("File '%s' could not be loaded." % input_file)
-    return None
+        raise PKLNotReadError("File '%s' could not be loaded." % input_file) from e
