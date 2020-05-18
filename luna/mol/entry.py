@@ -196,7 +196,6 @@ class MolEntry(Entry):
         #
         # Initialize empty properties.
         #
-
         self._mol_obj = None
         self.mol_file = None
         # TODO: Find a way to assume the Mol file type when not provided
@@ -265,14 +264,14 @@ class MolEntry(Entry):
         return self._mol_obj
 
     @mol_obj.setter
-    def mol_obj(self, obj):
-        self._mol_obj = obj
+    def mol_obj(self, mol_obj):
+        self._mol_obj = MolWrapper(mol_obj)
 
     def is_valid(self):
         return True
 
     def is_mol_obj_loaded(self):
-        return self._mol_obj is not None
+        return self.mol_obj is not None
 
     def _load_mol_from_file(self):
         logger.debug("It will try to load the molecule '%s'." % self.mol_id)
@@ -297,13 +296,13 @@ class MolEntry(Entry):
                 if self.is_multimol_file:
                     for ob_mol in mols:
                         if self.mol_id == get_filename(ob_mol.OBMol.GetTitle()):
-                            self._mol_obj = ob_mol
+                            self.mol_obj = ob_mol
                             break
                 else:
-                    self._mol_obj = mols.__next__()
+                    self.mol_obj = mols.__next__()
             else:
                 if self.mol_file_ext == "pdb":
-                    self._mol_obj = read_mol_from_file(self.mol_file, mol_format=self.mol_file_ext, removeHs=False)
+                    self.mol_obj = read_mol_from_file(self.mol_file, mol_format=self.mol_file_ext, removeHs=False)
                 else:
                     # If 'targets' is None, then the entire Mol file will be read.
                     targets = None
@@ -313,7 +312,7 @@ class MolEntry(Entry):
 
                     for rdk_mol, mol_id in read_multimol_file(self.mol_file, mol_format=self.mol_file_ext, targets=targets, removeHs=False):
                         # It returns None if the molecule parsing generated errors.
-                        self._mol_obj = rdk_mol
+                        self.mol_obj = rdk_mol
                         break
         except Exception as e:
             logger.exception(e)
@@ -321,13 +320,12 @@ class MolEntry(Entry):
                                       "object for the entry '%s' could not be created. Check the logs for more information."
                                       % (tool, self.to_string()))
 
-        if self._mol_obj is None:
+        if self.mol_obj is None:
             raise MoleculeNotFoundError("The ligand '%s' was not found in the input file or generated errors while parsing it with %s."
                                         % (self.mol_id, tool))
         else:
-            mol = MolWrapper(self._mol_obj)
-            if not mol.has_name() or self.overwrite_mol_name:
-                mol.set_name(self.mol_id)
+            if not self.mol_obj.has_name() or self.overwrite_mol_name:
+                self.mol_obj.set_name(self.mol_id)
 
         logger.debug("Molecule '%s' was successfully loaded." % self.mol_id)
 
@@ -341,9 +339,9 @@ class MolEntry(Entry):
             mol_file_ext = get_file_format(self.mol_file)
 
         if self.mol_obj_type == "openbabel":
-            pdb_block = self.mol_obj.write('pdb')
+            pdb_block = self.mol_obj.to_pdb_block()
 
-            atm = self.mol_obj.OBMol.GetFirstAtom()
+            atm = self.mol_obj.unwrap().GetFirstAtom()
             residue_info = atm.GetResidue()
 
             # When the PDBParser finds an empty chain, it automatically replace it by 'z'.
@@ -363,10 +361,10 @@ class MolEntry(Entry):
                 self.comp_num = comp_num
                 self.is_hetatm = residue_info.IsHetAtom(atm)
         else:
-            pdb_block = MolToPDBBlock(self.mol_obj)
+            pdb_block = self.mol_obj.to_pdb_block()
 
             if mol_file_ext == "pdb":
-                residue_info = self.mol_obj.GetAtoms()[0].GetPDBResidueInfo()
+                residue_info = self.mol_obj.unwrap().GetAtoms()[0].GetPDBResidueInfo()
                 # When the PDBParser finds an empty chain, it automatically replace it by 'z'.
                 chain_id = residue_info.GetChainId() if residue_info.GetChainId().strip() != "" else self.chain_id
                 comp_num = residue_info.GetResidueNumber()
@@ -425,8 +423,8 @@ class MolEntry(Entry):
         return '<MolEntry: %s%s%s>' % (self.pdb_id, self.sep, self.mol_id)
 
     def __getstate__(self):
-        # SwigPyObject objects are not pickable.
-        self.mol_obj = None
+        if self.mol_obj is not None:
+            self.mol_obj = MolWrapper(self.mol_obj)
         return self.__dict__
 
     def __setstate__(self, state):

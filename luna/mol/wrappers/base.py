@@ -3,12 +3,15 @@ from rdkit.Chem import Atom as RDAtom
 from rdkit.Chem import Mol as RDMol
 from rdkit.Chem import Bond as RDBond
 from rdkit.Chem import BondType as RDBondType
-from rdkit.Chem import MolFromSmiles, MolToSmiles, MolToPDBBlock, GetPeriodicTable
+from rdkit.Chem import MolFromSmiles, MolToSmiles, MolToPDBBlock, MolToMolBlock, GetPeriodicTable
 from openbabel import openbabel as ob
 from openbabel.pybel import Molecule as PybelMol
-from openbabel.pybel import readstring
+from openbabel.pybel import readstring, readfile, readstring
 
-from luna.util.exceptions import AtomObjectTypeError, MoleculeObjectTypeError, IllegalArgumentError
+from luna.util.file import get_file_format, get_filename
+from luna.mol.wrappers.rdkit import read_multimol_file, read_mol_from_file, new_mol_from_block
+from luna.util.exceptions import (AtomObjectTypeError, MoleculeObjectTypeError, IllegalArgumentError, MoleculeObjectError,
+                                  MoleculeNotFoundError)
 
 import logging
 
@@ -394,9 +397,62 @@ class MolWrapper:
         self._mol_obj = mol_obj
 
     @classmethod
-    def from_mol_file(self, mol_file, mol_file_ext=None, mol_obj_type="rdkit"):
-        # TODO: implement it
+    def from_mol_file(cls, mol_file, mol_id=None, mol_file_ext=None, mol_obj_type="rdkit"):
         pass
+
+        # TODO: Test below code:
+
+        """
+            mol_file_ext = mol_file_ext or get_file_format(mol_file)
+
+            tool = "Open Babel" if mol_obj_type == "openbabel" else "RDKit"
+
+            try:
+                if mol_obj_type == "openbabel":
+                    mols = readfile(mol_file_ext, mol_file)
+                    # If it is a multimol file, then we need to loop over the molecules to find the target one.
+                    # Note that in this case, the ids must match.
+                    if mol_id is not None:
+                        for ob_mol in mols:
+                            if mol_id == get_filename(ob_mol.OBMol.GetTitle()):
+                                mol_obj = ob_mol
+                                break
+                    else:
+                        mol_obj = mols.__next__()
+                else:
+                    if mol_file_ext == "pdb":
+                        mol_obj = read_mol_from_file(mol_file, mol_format=mol_file_ext, removeHs=False)
+                    else:
+                        # If 'targets' is None, then the entire Mol file will be read.
+                        targets = None
+                        # If it is a multimol file than loop through it until the informed molecule (by its mol_id) is found.
+                        if mol_id:
+                            targets = [mol_id]
+
+                        for rdk_mol, mol_id in read_multimol_file(mol_file, mol_format=mol_file_ext, targets=targets, removeHs=False):
+                            # It returns None if the molecule parsing generated errors.
+                            mol_obj = rdk_mol
+                            break
+            except Exception as e:
+                logger.exception(e)
+                raise MoleculeObjectError("An error occurred while parsing the molecular file '%s' with %s." % (mol_file, tool))
+
+            if mol_obj is None:
+                if mol_id:
+                    raise MoleculeNotFoundError("The ligand '%s' was not found in the molecular file '%s' or some errors "
+                                                "were found while parsing it with %s." % (mol_id, mol_file, tool))
+                else:
+                    raise MoleculeNotFoundError("Some errors were found while parsing the molecular file '%s' with %s." % (mol_file, tool))
+
+            return cls(mol_obj)
+        """
+
+    @classmethod
+    def from_mol_block(cls, block, mol_format, mol_obj_type="rdkit"):
+        if mol_obj_type == "rdkit":
+            return cls(new_mol_from_block(block, mol_format))
+        elif mol_obj_type == "openbabel":
+            return cls(readstring(mol_format, block))
 
     @classmethod
     def from_smiles(cls, smiles, mol_obj_type="rdkit"):
@@ -479,6 +535,12 @@ class MolWrapper:
             atm = self._mol_obj.GetAtomById(atm_id)
             return [atm.GetX(), atm.GetY(), atm.GetZ()]
 
+    def get_obj_type(self):
+        if self.is_rdkit_obj():
+            return "rdkit"
+        elif self.is_openbabel_obj():
+            return "openbabel"
+
     def has_name(self):
         if self.get_name():
             return True
@@ -502,6 +564,12 @@ class MolWrapper:
         elif self.is_openbabel_obj():
             return PybelMol(self._mol_obj).write("pdb")
 
+    def to_mol_block(self):
+        if self.is_rdkit_obj():
+            return MolToMolBlock(self._mol_obj)
+        elif self.is_openbabel_obj():
+            return PybelMol(self._mol_obj).write("mol")
+
     def unwrap(self):
         return self._mol_obj
 
@@ -523,4 +591,23 @@ class MolWrapper:
         return False
 
     def __getattr__(self, attr):
+        if self.mol_obj is None:
+            return None
         return getattr(self._mol_obj, attr)
+
+    def __getstate__(self):
+        # Creates a copy of the class' dictionary in case we need to modify the molecular object to pickle it.
+        my_dict = self.__dict__.copy()
+        if self.is_openbabel_obj():
+            my_dict["_mol_block"] = self.to_mol_block()
+            my_dict["_mol_obj_type"] = self.get_obj_type()
+            my_dict["_mol_obj"] = None
+        return my_dict
+
+    def __setstate__(self, state):
+        if "_mol_obj_type" in state and "_mol_block" in state:
+            state["_mol_obj"] = self.from_mol_block(state["_mol_block"], "mol", "openbabel").unwrap()
+            del state["_mol_obj_type"]
+            del state["_mol_block"]
+
+        self.__dict__.update(state)
