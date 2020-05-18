@@ -14,7 +14,7 @@ class InteractionViewer(PymolSessionManager):
 
         for target_entry, inter_data in inter_tuples:
             pdb_file = target_entry.pdb_file
-            main_grp = target_entry.to_string(sep="-")
+            main_grp = target_entry.to_string(sep="-").replace("'", "-")
 
             mol_block = (entity_to_string(target_entry.get_biopython_structure())
                          if isinstance(target_entry, MolEntry) else None)

@@ -75,7 +75,7 @@ class ProgressTracker:
 
                 self.progress += 1
 
-            perc = round((self.progress / self.ntasks), 2) * 100
+            perc = round((self.progress / self.ntasks), 2) * 100 if self.ntasks > 0 else 0
             self._show_progress_bar(self.progress, perc)
 
     @property

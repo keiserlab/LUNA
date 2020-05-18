@@ -110,30 +110,31 @@ class Project:
                  verbosity=3,
                  nproc=None):
 
+        if len(entries) == 0:
+            logger.warning("Nothing to be done as no entry was informed.")
+            return
+
         if verbosity not in VERBOSITY_LEVEL:
-            logger.error("The informed logging level '%s' is not valid. The valid levels are: %s."
-                         % (repr(verbosity), ", ".join(["%d (%s)" % (k, logging.getLevelName(v))
-                                                        for k, v in sorted(VERBOSITY_LEVEL.items())])))
-            sys.exit()
+            raise IllegalArgumentError("The informed logging level '%s' is not valid. The valid levels are: %s."
+                                       % (repr(verbosity), ", ".join(["%d (%s)" % (k, logging.getLevelName(v))
+                                                                      for k, v in sorted(VERBOSITY_LEVEL.items())])))
         else:
             logger.info("Verbosity set to: %d (%s)." % (verbosity, logging.getLevelName(verbosity)))
 
         if mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES:
-            logger.error("Invalid value for 'mol_obj_type'. Objects of type '%s' are not currently accepted. "
-                         "The available options are: %s." % (mol_obj_type, ", ".join(["'%s'" % m for m in ACCEPTED_MOL_OBJ_TYPES])))
-            sys.exit()
+            raise IllegalArgumentError("Invalid value for 'mol_obj_type'. Objects of type '%s' are not currently accepted. "
+                                       "The available options are: %s." % (mol_obj_type,
+                                                                           ", ".join(["'%s'" % m for m in ACCEPTED_MOL_OBJ_TYPES])))
 
         if inter_conf is None:
             logger.info("No interaction configuration was set and the default will be used instead")
         elif inter_conf is not None and isinstance(inter_conf, InteractionConf) is False:
-            logger.error("The informed interaction configuration must be an instance of %s."
-                         % ".".join([InteractionConf.__module__, InteractionConf.__name__]))
-            sys.exit()
+            raise IllegalArgumentError("The informed interaction configuration must be an instance of %s."
+                                       % ".".join([InteractionConf.__module__, InteractionConf.__name__]))
 
         if inter_calc is not None and isinstance(inter_calc, InteractionCalculator) is False:
-            logger.error("The informed interaction configuration must be an instance of %s."
-                         % ".".join([InteractionCalculator.__module__, InteractionCalculator.__name__]))
-            sys.exit()
+            raise IllegalArgumentError("The informed interaction configuration must be an instance of %s."
+                                       % ".".join([InteractionCalculator.__module__, InteractionCalculator.__name__]))
         else:
             logger.info("No interaction calculator object was defined and the default will be used instead.")
 
@@ -204,6 +205,48 @@ class Project:
     @property
     def project_file(self):
         return "%s/project_v%s.pkl.gz" % (self.working_path, __version__)
+
+    @property
+    def results(self):
+        for entry in self.entries:
+            results = self.get_entry_results(entry)
+            if results:
+                yield results
+
+    @property
+    def interactions_mngrs(self):
+        for entry in self.entries:
+            results = self.get_entry_results(entry)
+            if results:
+                yield results.interactions_mngr
+
+    @property
+    def atm_grps_mngrs(self):
+        for entry in self.entries:
+            results = self.get_entry_results(entry)
+            if results:
+                yield results.atm_grps_mngr
+
+    @property
+    def ifps(self):
+        for entry in self.entries:
+            results = self.get_entry_results(entry)
+            if results:
+                yield entry, results.ifp
+
+    @property
+    def mfps(self):
+        for entry in self.entries:
+            results = self.get_entry_results(entry)
+            if results:
+                yield entry, results.mfp
+
+    def get_entry_results(self, entry):
+        pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
+        try:
+            return EntryResults.load(pkl_file)
+        except Exception as e:
+            logger.exception(e)
 
     def run(self):
         self()
@@ -501,6 +544,7 @@ class Project:
         if has_version_compatibility(proj_obj.version):
             proj_obj.init_logging_file("%s/logs/project.log" % proj_obj.working_path)
 
+            logger.info("Project reloaded successfully.")
             return proj_obj
         else:
             raise CompatibilityError("The project loaded from '%s' has a version (%s) not compatible with the "
@@ -536,48 +580,6 @@ class LocalProject(Project):
 
     def __init__(self, entries, working_path, has_local_files=False, **kwargs):
         super().__init__(entries=entries, working_path=working_path, has_local_files=has_local_files, **kwargs)
-
-    @property
-    def results(self):
-        for entry in self.entries:
-            results = self.get_entry_results(entry)
-            if results:
-                yield results
-
-    @property
-    def interaction_mngrs(self):
-        for entry in self.entries:
-            results = self.get_entry_results(entry)
-            if results:
-                yield results.interactions_mngr
-
-    @property
-    def atm_grps_mngrs(self):
-        for entry in self.entries:
-            results = self.get_entry_results(entry)
-            if results:
-                yield results.atm_grps_mngr
-
-    @property
-    def ifps(self):
-        for entry in self.entries:
-            results = self.get_entry_results(entry)
-            if results:
-                yield entry, results.ifp
-
-    @property
-    def mfps(self):
-        for entry in self.entries:
-            results = self.get_entry_results(entry)
-            if results:
-                yield entry, results.mfp
-
-    def get_entry_results(self, entry):
-        pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
-        try:
-            return EntryResults.load(pkl_file)
-        except Exception as e:
-            logger.exception(e)
 
     def _process_entry(self, entry):
         logger.debug("Starting entry processing: %s." % entry.to_string())
@@ -635,10 +637,6 @@ class LocalProject(Project):
         # Saving interactions to CSV file.
         csv_file = "%s/results/interactions/%s.csv" % (self.working_path, entry.to_string())
         interactions_mngr.to_csv(csv_file)
-
-        # Delete molecular objects to save memory.
-        if isinstance(entry, MolEntry):
-            entry.mol_obj = None
 
         logger.debug("Processing of entry '%s' finished successfully." % entry.to_string())
 
