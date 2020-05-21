@@ -107,6 +107,7 @@ class Project:
                  similarity_func="BulkTanimotoSimilarity",
                  butina_cutoff=0.2,
 
+                 append_mode=False,
                  verbosity=3,
                  nproc=None):
 
@@ -137,6 +138,9 @@ class Project:
                                        % ".".join([InteractionCalculator.__module__, InteractionCalculator.__name__]))
         else:
             logger.info("No interaction calculator object was defined and the default will be used instead.")
+
+        if append_mode:
+            logger.warning("Append mode set ON, entries with already existing results will skip the entries processing.")
 
         self.entries = entries
         self.working_path = working_path
@@ -173,7 +177,9 @@ class Project:
         self.similarity_func = similarity_func
         self.butina_cutoff = butina_cutoff
         self.preload_mol_files = preload_mol_files
+
         self.step_controls = {}
+        self.append_mode = append_mode
         self.verbosity = VERBOSITY_LEVEL[verbosity]
 
         if nproc is None:
@@ -589,6 +595,12 @@ class LocalProject(Project):
         if isinstance(entry, MolEntry) is False:
             self.validate_entry_format(entry)
 
+        # Entry results will be saved here.
+        pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
+
+        if self.append_mode and exists(pkl_file):
+            return
+
         # TODO: allow the user to pass a pdb_file through entries.
         pdb_file = self.get_pdb_file(entry.pdb_id)
         entry.pdb_file = pdb_file
@@ -628,10 +640,8 @@ class LocalProject(Project):
         if self.calc_mfp:
             mfp = self.create_mfp()
 
-        entry_results = EntryResults(entry, atm_grps_mngr, interactions_mngr, ifp, mfp)
-
         # Saving entry results.
-        pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
+        entry_results = EntryResults(entry, atm_grps_mngr, interactions_mngr, ifp, mfp)
         entry_results.save(pkl_file)
 
         # Saving interactions to CSV file.
