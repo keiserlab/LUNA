@@ -1,7 +1,5 @@
 import numpy as np
-from openbabel import etab
-
-from luna.graph.bellman_ford import bellman_ford
+from openbabel import openbabel as ob
 
 import logging
 logger = logging.getLogger()
@@ -9,9 +7,11 @@ logger = logging.getLogger()
 
 class AtomData:
 
-    def __init__(self, atomic_num, coord, serial_number=None):
+    def __init__(self, atomic_num, coord, bond_type, serial_number=None):
         self.atomic_num = atomic_num
-        self._coord = np.array(coord)
+        # Standardize all coordinate data to the same Numpy data type for consistence.
+        self._coord = np.array(coord, "f")
+        self.bond_type = bond_type
         self.serial_number = serial_number
 
     @property
@@ -36,7 +36,8 @@ class AtomData:
 
     @coord.setter
     def coord(self, xyz):
-        self._coord = np.array(xyz)
+        # Standardize all coordinate data to the same Numpy data type for consistence.
+        self._coord = np.array(xyz, "f")
 
     def __repr__(self):
         return ("<ExtendedAtomData: atomic number=%d, coord=(%.3f, %.3f, %.3f), serial number=%s>"
@@ -61,11 +62,11 @@ class AtomData:
 
 class ExtendedAtom:
 
-    def __init__(self, mybio_atom, nb_info=None, atm_grps=None, neighborhood=None):
+    def __init__(self, mybio_atom, nb_info=None, atm_grps=None, invariants=None):
         self._atom = mybio_atom
         self._nb_info = nb_info or []
         self._atm_grps = atm_grps or []
-        self._neighborhood = neighborhood or {}
+        self._invariants = invariants
 
     @property
     def atom(self):
@@ -76,16 +77,20 @@ class ExtendedAtom:
         return self._nb_info
 
     @property
-    def neighborhood(self):
-        return self._neighborhood
-
-    @property
     def atm_grps(self):
         return self._atm_grps
 
     @property
+    def invariants(self):
+        return self._invariants
+
+    @invariants.setter
+    def invariants(self, invariants):
+        self._invariants = invariants
+
+    @property
     def electronegativity(self):
-        return etab.GetElectroNeg(etab.GetAtomicNum(self.element))
+        return ob.GetElectroNeg(ob.GetAtomicNum(self.element))
 
     @property
     def full_id(self):
@@ -102,9 +107,6 @@ class ExtendedAtom:
 
         return full_atom_name
 
-    def set_neighborhood(self, nb_graph):
-        self._neighborhood = nb_graph
-
     def add_nb_info(self, nb_info):
         self._nb_info = list(set(self._nb_info + list(nb_info)))
 
@@ -117,19 +119,14 @@ class ExtendedAtom:
     def remove_atm_grps(self, atm_grps):
         self._atm_grps = list(set(self._atm_grps) - set(atm_grps))
 
+    def get_neighbor_info(self, atom):
+        for info in self._nb_info:
+            if atom.serial_number == info.serial_number:
+                return info
+        return None
+
     def is_neighbor(self, atom):
         return atom.serial_number in [i.serial_number for i in self._nb_info]
-
-    def get_shortest_path_size(self, trgt_atm, merge_neighborhoods=False):
-        if merge_neighborhoods:
-            nb_graph = {**self.neighborhood, **trgt_atm.neighborhood}
-        else:
-            nb_graph = self.neighborhood
-
-        # d stores the path size from the source to the target, and p stores the predecessors from each target.
-        d, p = bellman_ford(nb_graph, self.serial_number)
-        # Return infinite if the provided target is not in the distance object.
-        return d.get(trgt_atm.serial_number, float("inf"))
 
     def __getattr__(self, attr):
         if hasattr(self._atom, attr):

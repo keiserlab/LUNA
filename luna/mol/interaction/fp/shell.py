@@ -1,12 +1,13 @@
-from itertools import chain, product
+from itertools import chain
 from collections import defaultdict
+from enum import Enum, auto
 import numpy as np
 import mmh3
 
-
+from luna.version import __version__
 from luna.util.exceptions import ShellCenterNotFound
 from luna.util.default_values import CHEMICAL_FEATURE_IDS, INTERACTION_IDS
-from luna.mol.interaction.fp.fingerprint import DEFAULT_SHELL_NBITS, Fingerprint, CountFingerprint
+from luna.mol.interaction.fp.fingerprint import DEFAULT_FP_LENGTH, Fingerprint, CountFingerprint
 from luna.mol.groups import PseudoAtomGroup, AtomGroupNeighborhood
 from luna.mol.features import ChemicalFeature
 
@@ -15,15 +16,37 @@ import logging
 logger = logging.getLogger()
 
 
+PAD_DEFAULT = -9
+
+
+class IFPType(Enum):
+    # auto() creates automatic identifiers for each type as this value is not important.
+    # Therefore, always remember to compare IFP types using their names and not their values.
+    EIFP = auto()
+    EIFP_WITH_PHARM_FOR_GROUPS = auto()
+    FIFP = auto()
+
+
+class CompoundClassIds(Enum):
+    HETATM = 1
+    RESIDUE = 2
+    NUCLEOTIDE = 3
+    WATER = 4
+    UNKNOWN = 5
+
+
 class ShellManager:
 
-    def __init__(self, num_levels, radius_step, num_bits, shells=None, full_control=True, verbose=False):
+    def __init__(self, num_levels, radius_step, num_bits, ifp_type, shells=None, full_control=True, verbose=False):
         self.num_levels = num_levels
         self.radius_steps = radius_step
         self.num_bits = num_bits
+        self.ifp_type = ifp_type
 
         self.shells = shells or []
         self.verbose = verbose
+
+        self.version = __version__
 
         self._init_controllers()
 
@@ -146,9 +169,9 @@ class ShellManager:
     def get_identifiers(self, level=None, unique_shells=False):
         if level is not None:
             if unique_shells:
-                identifiers = [s.identifier for s in get_shells_by_level(level) if s.is_valid()]
+                identifiers = [s.identifier for s in self.get_shells_by_level(level) if s.is_valid()]
             else:
-                identifiers = [s.identifier for s in get_shells_by_level(level)]
+                identifiers = [s.identifier for s in self.get_shells_by_level(level)]
         else:
             if unique_shells:
                 identifiers = [s.identifier for s in self.shells if s.is_valid()]
@@ -188,12 +211,14 @@ class ShellManager:
 class Shell:
 
     def __init__(self, central_atm_grp, level, radius, neighborhood=None, inter_tuples=None,
-                 np_dtype=np.int64, seed=0, manager=None, valid=True, feature_mapper=None):
+                 diff_comp_classes=True, np_dtype=np.int64, seed=0, manager=None,
+                 valid=True, feature_mapper=None):
 
         self.central_atm_grp = central_atm_grp
         self.level = level
         self.radius = radius
         self.valid = valid
+        self.diff_comp_classes = diff_comp_classes
 
         if not neighborhood:
             # If inter_tuples was not defined initialize the neighborhood as an empty list.
@@ -295,20 +320,8 @@ class Shell:
 
     def hash_shell(self):
         if self.level == 0:
-            data = [self.feature_mapper[cf.format_name()] for cf in self.central_atm_grp.features]
-
-            if len(self.central_atm_grp.atoms) == 1:
-                features = set()
-                # Given the previous If, this For will loop only through one atom and, therefore, it can be removed without
-                # losing information. However, if someday I decide to remove the If, then the code for capturing
-                # all atom derived features will be already working.
-                for atm in self.central_atm_grp.atoms:
-                    for atm_grp in atm.atm_grps:
-                        if atm_grp != self.central_atm_grp:
-                            features.update(atm_grp.features)
-
-                data += [self.feature_mapper[cf.format_name()] for cf in features]
-            data.sort()
+            # Get the initial data for the first shell according to the IFP type the user has chosen.
+            data = self._initial_shell_data()
         else:
             cent_prev_id = self.previous_shell.identifier
 
@@ -344,6 +357,67 @@ class Shell:
 
         return hashed_shell
 
+    def _initial_shell_data(self):
+
+        data = []
+
+        # EIFP uses atomic invariants.
+        if self.manager.ifp_type == IFPType.EIFP:
+            # Shells use atomic invariants as data. In case of atom groups, the data consists of a list of invariants.
+            data = sorted([atm.invariants for atm in self.central_atm_grp.atoms])
+
+        # EIFP_WITH_PHARM_FOR_GROUPS uses atomic invariants for atoms and pharmacophore information for atom groups.
+        elif self.manager.ifp_type == IFPType.EIFP_WITH_PHARM_FOR_GROUPS:
+
+            if len(self.central_atm_grp.atoms) == 1:
+                # Shells whose centroid are atoms use invariants as data.
+                data = sorted([atm.invariants for atm in self.central_atm_grp.atoms])
+            else:
+                # Shells whose centroid are atoms' group use pharmacophore as data.
+                data = [[self.feature_mapper[cf.format_name()] for cf in self.central_atm_grp.features]]
+
+        # FIFP uses pharmacophore properties for atoms and atoms' group.
+        elif self.manager.ifp_type == IFPType.FIFP:
+
+            atm_grp_data = [self.feature_mapper[cf.format_name()] for cf in self.central_atm_grp.features]
+
+            if len(self.central_atm_grp.atoms) == 1:
+                features = set()
+                # It will loop only through one atom and, therefore, it can be removed without
+                # losing information. However, if someday I decide to remove the If, then the code for capturing
+                # all atom derived features will be already working.
+                for atm in self.central_atm_grp.atoms:
+                    for atm_grp in atm.atm_grps:
+                        if atm_grp != self.central_atm_grp:
+                            features.update(atm_grp.features)
+
+                atm_grp_data += [self.feature_mapper[cf.format_name()] for cf in features]
+
+            data = [sorted(atm_grp_data)]
+
+        #
+        #
+        # Include differentiation between compound classes, i.e., groups belonging to Residues, Nucleotides, Ligands, or Waters
+        # are treated as being different even when the group would be considered the same.
+        if self.diff_comp_classes:
+            # Classes is a list as multiple classes (so multiple residues) can exist in a group.
+            # That can happen, for instance, in amide groups from the backbone.
+            classes = sorted([CompoundClassIds[c.get_class().upper()].value for c in self.central_atm_grp.compounds])
+
+            np_data = np.array(data, self.np_dtype)
+            np_classes = np.array(classes, self.np_dtype)
+
+            # Add padding to np_classes
+            if np_data.shape[1] > np_classes.shape[0]:
+                np_classes = np.pad(np_classes, (0, (np_data.shape[1] - np_classes.shape[0])), 'constant', constant_values=PAD_DEFAULT)
+            # Add padding to np_data.
+            elif np_data.shape[1] < np_classes.shape[0]:
+                np_data = np.pad(np_data, ((0, 0), (0, np_classes.shape[0] - np_data.shape[1])), 'constant', constant_values=PAD_DEFAULT)
+
+            data = np.vstack((np_data, np_classes))
+
+        return data
+
     def _encode_interactions(self):
         encoded_data = []
         for inter in self.interactions:
@@ -360,19 +434,21 @@ class Shell:
 
 class ShellGenerator:
 
-    def __init__(self, num_levels, radius_step, bucket_size=10, seed=0, np_dtype=np.int64,
-                 num_bits=DEFAULT_SHELL_NBITS):
+    def __init__(self, num_levels, radius_step, diff_comp_classes=True, num_bits=DEFAULT_FP_LENGTH, ifp_type=IFPType.FIFP,
+                 bucket_size=10, seed=0, np_dtype=np.int64):
 
         self.num_levels = num_levels
         self.radius_step = radius_step
+        self.diff_comp_classes = diff_comp_classes
+        self.num_bits = num_bits
+        self.ifp_type = ifp_type
 
         self.bucket_size = bucket_size
         self.seed = seed
         self.np_dtype = np_dtype
-        self.num_bits = num_bits
 
     def create_shells(self, atm_grps_mngr):
-        sm = ShellManager(self.num_levels, self.radius_step, self.num_bits)
+        sm = ShellManager(self.num_levels, self.radius_step, self.num_bits, self.ifp_type)
 
         all_interactions = atm_grps_mngr.get_all_interactions()
 
@@ -405,6 +481,7 @@ class ShellGenerator:
             radius = self.radius_step * level
 
             for atm_grp in sorted_neighborhood:
+
                 # Ignore centroids that already reached the limit of possible substructures.
                 if atm_grp in skip_atm_grps:
                     continue
@@ -414,7 +491,7 @@ class ShellGenerator:
                 # But, later it may also contain derived groups from interacting partner groups.
                 all_derived_atm_grps = self._get_derived_grps(atm_grp, pseudo_grps_mapping)
 
-                # In level 0, the number of unique derived groups is 0 as the shell initially only contain information of the centroid.
+                # In level 0, the number of unique derived groups is 0 as the shell initially only contains information of the centroid.
                 unique_derived_atm_grps = []
 
                 shell = None
@@ -464,17 +541,16 @@ class ShellGenerator:
 
                     unique_derived_atm_grps = valid_derived_atm_grps - prev_atm_grps
 
-                    unique_interactions = interactions_to_add - prev_interactions
-
                     # It adds a new shell only if there are new interactions and derived atom groups inside the shell.
-                    if len(unique_interactions or unique_derived_atm_grps) != 0:
-                        shell_nb = set([x[1] for x in inter_tuples]) | valid_derived_atm_grps
-                        shell_nb.add(atm_grp)
+                    shell_nb = set([x[1] for x in inter_tuples]) | valid_derived_atm_grps
+                    shell_nb.add(atm_grp)
 
-                        shell = Shell(atm_grp, level, radius, neighborhood=shell_nb, inter_tuples=inter_tuples,
-                                      manager=sm, seed=self.seed, np_dtype=self.np_dtype)
+                    shell = Shell(atm_grp, level, radius, neighborhood=shell_nb, inter_tuples=inter_tuples,
+                                  manager=sm, diff_comp_classes=self.diff_comp_classes,
+                                  seed=self.seed, np_dtype=self.np_dtype)
                 else:
-                    shell = Shell(atm_grp, level, radius, manager=sm, seed=self.seed, np_dtype=self.np_dtype)
+                    shell = Shell(atm_grp, level, radius, manager=sm, diff_comp_classes=self.diff_comp_classes,
+                                  seed=self.seed, np_dtype=self.np_dtype)
 
                 if shell:
                     sm.add_shell(shell)
@@ -484,7 +560,6 @@ class ShellGenerator:
 
                 # Evaluate if the limit of possible substructures for the current centroid (atom group) was reached.
                 if last_shell:
-
                     # The limit will be reached when the last shell already contains all interactions
                     # established by the atom groups inside the shell. In this case, expanding the radius
                     # will not result in any new shell because a shell is only created when the atoms inside
@@ -514,15 +589,15 @@ class ShellGenerator:
 
             # If all atom groups reached the limit of possible substructures, just leave the loop.
             if len(skip_atm_grps) == len(neighborhood):
-                logger.warning("The list of shells cannot be expanded anymore. The maximum number "
-                               "of substructures were reached.")
+                logger.debug("The list of shells cannot be expanded anymore. The maximum number "
+                             "of substructures were reached.")
                 break
 
-        logger.info("Shells creation finished.")
-        logger.info("The last level executed was: %d." % level)
-        logger.info("The number of levels defined was: %d." % self.num_levels)
-        logger.info("Total number of shells created: %d" % sm.num_shells)
-        logger.info("Total number of unique shells created: %d" % sm.num_unique_shells)
+        logger.debug("Shells creation finished.")
+        logger.debug("The last level executed was: %d." % level)
+        logger.debug("The number of levels defined was: %d." % self.num_levels)
+        logger.debug("Total number of shells created: %d" % sm.num_shells)
+        logger.debug("Total number of unique shells created: %d" % sm.num_unique_shells)
 
         return sm
 

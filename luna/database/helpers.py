@@ -76,8 +76,8 @@ class InteractionManager(Manager):
                 # If any required interaction is invalid,
                 # it does not add the current interaction
                 if invalid_dependencies:
-                    logger.info("The interaction '%s' depends on some invalid interactions: %s."
-                                % (interaction, str(interaction.required_interactions)))
+                    logger.debug("The interaction '%s' depends on some invalid interactions: %s."
+                                 % (interaction, str(interaction.required_interactions)))
 
                 # If all required interactions has already
                 # been added to the DB.
@@ -88,21 +88,21 @@ class InteractionManager(Manager):
                     if dbInter:
                         dbInter.dependencies = dbReqInters
                     else:
-                        logger.info("The interaction '%s' does not have a valid type." % interaction)
+                        logger.debug("The interaction '%s' does not have a valid type." % interaction)
                 else:
                     # If the interaction is in the 'retries' list
                     # it means that it is the second try to the
                     # same interaction. So, ignore it.
                     if interaction in retries:
-                        logger.info("The interaction '%s' depend on not existing interactions: %s."
-                                    % (interaction, str(interaction.required_interactions)))
+                        logger.debug("The interaction '%s' depend on not existing interactions: %s."
+                                     % (interaction, str(interaction.required_interactions)))
                     else:
                         retries.add(interaction)
                         aux_list.append(interaction)
             else:
                 dbInter = self.new_interaction(interaction, ligand_entity)
                 if dbInter is None:
-                    logger.info("The interaction '%s' does not have a valid type." % interaction)
+                    logger.debug("The interaction '%s' does not have a valid type." % interaction)
 
                 inter_in_db[interaction] = dbInter
 

@@ -4,19 +4,18 @@ from operator import xor
 from os.path import exists
 
 from rdkit.Chem import MolToPDBBlock
-from pybel import readfile
-from pybel import informats as OB_FORMATS
-
 from rdkit.Chem import Mol as RDMol
 from openbabel import OBMol
-from pybel import Molecule as PybelMol
+from openbabel.pybel import readfile
+from openbabel.pybel import Molecule as PybelMol
+from openbabel.pybel import informats as OB_FORMATS
 
 from luna.mol.wrappers.rdkit import RDKIT_FORMATS, read_multimol_file, read_mol_from_file
 from luna.mol.wrappers.base import MolWrapper
 from luna.util.default_values import ACCEPTED_MOL_OBJ_TYPES, ENTRY_SEPARATOR
 from luna.util.file import get_file_format, get_filename
 from luna.util.exceptions import InvalidEntry, IllegalArgumentError, MoleculeObjectError, MoleculeObjectTypeError, MoleculeNotFoundError
-from luna.MyBio.PDB.PDBParser import PDBParser, WATER_NAMES
+from luna.MyBio.PDB.PDBParser import PDBParser, WATER_NAMES, DEFAULT_CHAIN_ID
 from luna.MyBio.PDB.Entity import Entity
 
 
@@ -24,8 +23,6 @@ logger = logging.getLogger()
 
 # Source: https://richjenks.com/filename-regex/
 FILENAME_REGEX = r"(?!.{256,})(?!(aux|clock\$|con|nul|prn|com[1-9]|lpt[1-9])(?:$|\.))[^ ][ \.\w\-$()+=[\];#@~,&']+[^\. ]"
-
-PDB_PARSER = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=False)
 
 REGEX_RESNUM_ICODE = re.compile(r'^(\d+)([a-zA-z]?)$')
 
@@ -192,8 +189,25 @@ class CompoundEntry(Entry):
 
 class MolEntry(Entry):
 
-    def __init__(self, pdb_id, mol_id, mol_obj=None, mol_file=None, mol_file_ext=None, mol_obj_type='rdkit',
-                 autoload=False, sep=ENTRY_SEPARATOR):
+    def __init__(self, pdb_id, mol_id, sep=ENTRY_SEPARATOR):
+
+        self.mol_id = mol_id
+
+        #
+        # Initialize empty properties.
+        #
+        self._mol_obj = None
+        self.mol_file = None
+        # TODO: Find a way to assume the Mol file type when not provided
+        self.mol_file_ext = None
+        self.mol_obj_type = None
+        self.overwrite_mol_name = None
+        self.is_multimol_file = None
+
+        super().__init__(pdb_id, DEFAULT_CHAIN_ID, "LIG", 9999, is_hetatm=True, sep=sep)
+
+    @classmethod
+    def from_mol_obj(cls, pdb_id, mol_id, mol_obj, sep=ENTRY_SEPARATOR):
 
         if mol_obj is not None:
             if isinstance(mol_obj, MolWrapper):
@@ -213,16 +227,31 @@ class MolEntry(Entry):
                 raise IllegalArgumentError("Objects of type '%s' are not currently accepted. "
                                            "The available options are: %s." % (mol_obj_type, ", ".join(ACCEPTED_MOL_OBJ_TYPES)))
 
-        self.mol_id = mol_id
-        self._mol_obj = mol_obj
-        self.mol_file = mol_file
-        self.mol_file_ext = mol_file_ext or get_file_format(self.mol_file)
-        self.mol_obj_type = mol_obj_type
+        entry = cls(pdb_id, mol_id, sep)
+        entry.mol_obj = mol_obj
+        entry.mol_obj_type = mol_obj_type
 
-        super().__init__(pdb_id, "z", "LIG", 9999, is_hetatm=True, sep=sep)
+        # TODO: Find a way to assume the Mol file type when not provided
+        # mol_file_ext
+
+        return entry
+
+    @classmethod
+    def from_mol_file(cls, pdb_id, mol_id, mol_file, is_multimol_file, mol_file_ext=None, mol_obj_type='rdkit',
+                      autoload=False, overwrite_mol_name=False, sep=ENTRY_SEPARATOR):
+
+        entry = cls(pdb_id, mol_id, sep)
+
+        entry.mol_file = mol_file
+        entry.is_multimol_file = is_multimol_file
+        entry.mol_file_ext = mol_file_ext or get_file_format(mol_file)
+        entry.mol_obj_type = mol_obj_type
+        entry.overwrite_mol_name = overwrite_mol_name
 
         if autoload:
-            self.load_mol_from_file()
+            entry._load_mol_from_file()
+
+        return entry
 
     @property
     def full_id(self):
@@ -230,23 +259,22 @@ class MolEntry(Entry):
 
     @property
     def mol_obj(self):
-        if self._mol_obj is None:
-            self.load_mol_from_file()
-
+        if self._mol_obj is None and self.mol_file is not None:
+            self._load_mol_from_file()
         return self._mol_obj
 
     @mol_obj.setter
-    def mol_obj(self, obj):
-        self._mol_obj = obj
+    def mol_obj(self, mol_obj):
+        self._mol_obj = MolWrapper(mol_obj)
 
     def is_valid(self):
         return True
 
     def is_mol_obj_loaded(self):
-        return self._mol_obj is not None
+        return self.mol_obj is not None
 
-    def load_mol_from_file(self):
-        logger.info("It will try to load the molecule '%s'." % self.mol_id)
+    def _load_mol_from_file(self):
+        logger.debug("It will try to load the molecule '%s'." % self.mol_id)
 
         if self.mol_file is None:
             raise IllegalArgumentError("It cannot load the molecule as no molecular file was provided.")
@@ -262,61 +290,83 @@ class MolEntry(Entry):
 
         try:
             if self.mol_obj_type == "openbabel":
-                for ob_mol in readfile(self.mol_file_ext, self.mol_file):
-                    if self.mol_id == get_filename(ob_mol.OBMol.GetTitle()):
-                        self._mol_obj = ob_mol
-                        break
+                mols = readfile(self.mol_file_ext, self.mol_file)
+                # If it is a multimol file, then we need to loop over the molecules to find the target one.
+                # Note that in this case, the ids must match.
+                if self.is_multimol_file:
+                    for ob_mol in mols:
+                        if self.mol_id == get_filename(ob_mol.OBMol.GetTitle()):
+                            self.mol_obj = ob_mol
+                            break
+                else:
+                    self.mol_obj = mols.__next__()
             else:
                 if self.mol_file_ext == "pdb":
-                    self._mol_obj = read_mol_from_file(self.mol_file, mol_format=self.mol_file_ext, removeHs=False)
+                    self.mol_obj = read_mol_from_file(self.mol_file, mol_format=self.mol_file_ext, removeHs=False)
                 else:
-                    for rdk_mol in read_multimol_file(self.mol_file, mol_format=self.mol_file_ext, targets=[self.mol_id], removeHs=False):
+                    # If 'targets' is None, then the entire Mol file will be read.
+                    targets = None
+                    # If it is a multimol file than loop through it until the informed molecule (by its mol_id) is found.
+                    if self.is_multimol_file:
+                        targets = [self.mol_id]
+
+                    for rdk_mol, mol_id in read_multimol_file(self.mol_file, mol_format=self.mol_file_ext, targets=targets, removeHs=False):
                         # It returns None if the molecule parsing generated errors.
-                        self._mol_obj = rdk_mol
+                        self.mol_obj = rdk_mol
                         break
         except Exception as e:
             logger.exception(e)
             raise MoleculeObjectError("An error occurred while parsing the molecular file with %s and the molecule "
-                                      "object could not be created. Check the logs for more information." % tool)
+                                      "object for the entry '%s' could not be created. Check the logs for more information."
+                                      % (tool, self.to_string()))
 
-        if self._mol_obj is None:
-            raise MoleculeNotFoundError("Ligand '%s' not found in the input file or generated errors while parsing it with %s."
+        if self.mol_obj is None:
+            raise MoleculeNotFoundError("The ligand '%s' was not found in the input file or generated errors while parsing it with %s."
                                         % (self.mol_id, tool))
+        else:
+            if not self.mol_obj.has_name() or self.overwrite_mol_name:
+                self.mol_obj.set_name(self.mol_id)
 
-        logger.info("Molecule '%s' was successfully loaded." % self.mol_id)
+        logger.debug("Molecule '%s' was successfully loaded." % self.mol_id)
 
-    def get_biopython_structure(self, entity=None, parser=PDB_PARSER):
+    def get_biopython_structure(self, entity=None, parser=None):
+
+        if parser is None:
+            parser = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=False)
+
+        mol_file_ext = self.mol_file_ext
+        if mol_file_ext is None and self.mol_file is not None:
+            mol_file_ext = get_file_format(self.mol_file)
 
         if self.mol_obj_type == "openbabel":
-            pdb_block = self.mol_obj.write('pdb')
-            if self.mol_file_ext == "pdb":
-                atm = self.mol_obj.OBMol.GetAtom(1)
+            pdb_block = self.mol_obj.to_pdb_block()
 
-                residue_info = atm.GetResidue()
-                chain_id = residue_info.GetChain()
-                comp_num = residue_info.GetNum()
+            atm = self.mol_obj.unwrap().GetFirstAtom()
+            residue_info = atm.GetResidue()
 
-                if residue_info.GetName() in WATER_NAMES:
-                    comp_name = "W"
-                elif residue_info.IsHetAtom(atm):
-                    comp_name = "H_%s" % residue_info.GetName()
-                else:
-                    comp_name = " "
+            # When the PDBParser finds an empty chain, it automatically replace it by 'z'.
+            chain_id = residue_info.GetChain() if residue_info.GetChain().strip() != "" else self.chain_id
+            comp_num = residue_info.GetNum()
 
+            if residue_info.GetName() in WATER_NAMES:
+                comp_name = "W"
+            elif residue_info.IsHetAtom(atm):
+                comp_name = "H_%s" % residue_info.GetName()
+            else:
+                comp_name = " "
+
+            if mol_file_ext == "pdb":
                 self.chain_id = chain_id
                 self.comp_name = residue_info.GetName()
                 self.comp_num = comp_num
                 self.is_hetatm = residue_info.IsHetAtom(atm)
-            else:
-                chain_id = "A"
-                comp_name = " "
-                comp_num = 1
         else:
-            pdb_block = MolToPDBBlock(self.mol_obj)
+            pdb_block = self.mol_obj.to_pdb_block()
 
-            if self.mol_file_ext == "pdb":
-                residue_info = self.mol_obj.GetAtoms()[0].GetPDBResidueInfo()
-                chain_id = residue_info.GetChainId()
+            if mol_file_ext == "pdb":
+                residue_info = self.mol_obj.unwrap().GetAtoms()[0].GetPDBResidueInfo()
+                # When the PDBParser finds an empty chain, it automatically replace it by 'z'.
+                chain_id = residue_info.GetChainId() if residue_info.GetChainId().strip() != "" else self.chain_id
                 comp_num = residue_info.GetResidueNumber()
 
                 if residue_info.GetResidueName() in WATER_NAMES:
@@ -331,7 +381,8 @@ class MolEntry(Entry):
                 self.comp_num = comp_num
                 self.is_hetatm = residue_info.GetIsHeteroAtom()
             else:
-                chain_id = " "
+                # When the PDBParser finds an empty chain, it automatically replace it by 'z'.
+                chain_id = self.chain_id
                 comp_name = "H_UNL"
                 comp_num = 1
 
@@ -372,8 +423,8 @@ class MolEntry(Entry):
         return '<MolEntry: %s%s%s>' % (self.pdb_id, self.sep, self.mol_id)
 
     def __getstate__(self):
-        # SwigPyObject objects are not pickable.
-        self.mol_obj = None
+        if self.mol_obj is not None:
+            self.mol_obj = MolWrapper(self.mol_obj)
         return self.__dict__
 
     def __setstate__(self, state):

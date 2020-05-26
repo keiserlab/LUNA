@@ -11,9 +11,7 @@ logger = logging.getLogger()
 
 def available_similarity_functions():
     regex = re.compile("Bulk([a-zA-Z]+)Similarity", flags=0)
-    funcs = list(filter(regex.match, dir(DataStructs)))
-
-    return funcs
+    return list(filter(regex.match, dir(DataStructs)))
 
 
 def calc_distance_matrix(fps, similarity_func="BulkTanimotoSimilarity"):

@@ -63,6 +63,10 @@ from luna.MyBio.PDB.parse_pdb_header import _parse_pdb_header_list
 # DOD: deutered water.
 WATER_NAMES = ['HOH', 'DOD', 'WAT', 'H2O', 'OH2']
 
+# MODBY: Alexandre Fassio
+# Replace empty chains for a default value.
+DEFAULT_CHAIN_ID = "z"
+
 
 # If PDB spec says "COLUMNS 18-20" this means line[17:20]
 
@@ -262,6 +266,12 @@ class PDBParser(object):
                 # Applying a strip() on the residue name because some of them may have external whitespace characters.
                 resname = line[17:20].strip()
                 chainid = line[21]
+
+                # MODBY: Alexandre Fassio
+                # Replace empty chains for a default value.
+                if chainid.strip() == "":
+                    chainid = DEFAULT_CHAIN_ID
+
                 try:
                     serial_number = int(line[6:11])
                 except Exception:
@@ -274,7 +284,7 @@ class PDBParser(object):
                 # Recognize other water labels.
                 if self.FIX_OBABEL_FLAGS:
                     # Incorrect flags are set only for added hydrogen atoms
-                    if (name == "H"):
+                    if name == "H":
                         child_dict = structure_builder.model[chainid].child_dict
                         # If this hydrogen belongs to water molecule or to a ligand
                         if resname in WATER_NAMES or ("H_%s" % resname, resseq, icode) in child_dict:
@@ -435,7 +445,7 @@ class PDBParser(object):
 
                 try:
                     orig_serial_number = int(serial_numbers[0].strip())
-                except Exception as e:
+                except Exception:
                     warnings.warn("Serial number '%s' in CONECT record "
                                   "is invalid. Line %d."
                                   % (orig_serial_number, global_line_counter),
@@ -448,7 +458,7 @@ class PDBParser(object):
                                   PDBConstructionWarning)
                     continue
 
-                bonded_atoms = set()
+                bonded_atoms = []
                 for serial_number in serial_numbers[1:]:
                     serial_number = serial_number.strip()
 
@@ -457,7 +467,7 @@ class PDBParser(object):
 
                     try:
                         serial_number = int(serial_number)
-                    except Exception as e:
+                    except Exception:
                         warnings.warn("Serial number '%s' in CONECT record "
                                       "is invalid. Line %d."
                                       % (serial_number, global_line_counter),
@@ -471,7 +481,7 @@ class PDBParser(object):
                                       PDBConstructionWarning)
                         continue
 
-                    bonded_atoms.add(serial_number)
+                    bonded_atoms.append(serial_number)
 
                 if (len(bonded_atoms) == 0):
                     warnings.warn("No bonded atom were found in CONECT record."
@@ -483,7 +493,7 @@ class PDBParser(object):
                                          if orig_serial_number in conects
                                          else [])
 
-                    orig_bonded_atoms += list(bonded_atoms)
+                    orig_bonded_atoms += bonded_atoms
                     conects[orig_serial_number] = orig_bonded_atoms
 
             local_line_counter += 1

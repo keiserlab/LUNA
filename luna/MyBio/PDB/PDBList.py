@@ -281,7 +281,6 @@ class PDBList(object):
                 return final_file
 
         # Retrieve the file
-        print("Downloading PDB structure '%s'..." % pdb_code)
         try:
             _urlcleanup()
             _urlretrieve(url, filename)

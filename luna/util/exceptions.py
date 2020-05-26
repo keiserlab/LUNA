@@ -1,3 +1,7 @@
+class CompatibilityError(RuntimeError):
+    pass
+
+
 class EntityLevelError(KeyError):
     pass
 

@@ -1,4 +1,4 @@
-from collections import Counter
+from collections import Counter, defaultdict
 
 
 class InteractingResidues:
@@ -35,8 +35,8 @@ def get_interacting_residues(interactions, targets, key_map={}):
     for i in interactions:
         if (i.src_grp.compound in targets and i.trgt_grp.compound.is_residue()):
 
-        # TODO: fix this code to accept the new format of AtomGroups as the atoms can be from different compounds
-        # if (any([c in targets for c in i.src_grp.compounds]) and i.trgt_grp.is_residue())
+            # TODO: fix this code to accept the new format of AtomGroups as the atoms can be from different compounds
+            # if (any([c in targets for c in i.src_grp.compounds]) and i.trgt_grp.is_residue())
 
             res.add(i.trgt_grp.compound)
             res_inter.add((i.trgt_grp.compound, i.type))
@@ -47,3 +47,34 @@ def get_interacting_residues(interactions, targets, key_map={}):
             res_inter_atm.add((i.src_grp.compound, i.type, i.src_grp))
 
     return InteractingResidues(res, res_inter, res_inter_atm)
+
+
+class ResidueFrequencies(object):
+
+    def __init__(self):
+        self.entries = []
+        self.interactions = []
+        self.freq = 0
+
+    def add(self, entry, interactions):
+        self.entries.append(entry)
+        self.interactions = list(set(self.interactions + list(interactions)))
+        self.freq += 1
+
+
+def calculate_residues_frequency(interaction_tuples):
+
+    global_freq = defaultdict(ResidueFrequencies)
+    for entry, inter_mngr in interaction_tuples:
+        interacting_res_mapping = defaultdict(list)
+        for inter in inter_mngr:
+            comps1 = tuple(sorted([(r.parent.parent.id, r.parent.id, r.resname, r.id[1:]) for r in inter.src_grp.compounds]))
+            comps2 = tuple(sorted([(r.parent.parent.id, r.parent.id, r.resname, r.id[1:]) for r in inter.trgt_grp.compounds]))
+            comps1, comps2 = tuple(sorted([comps1, comps2]))
+
+            interacting_res_mapping[(comps1, comps2, inter.type)].append(inter)
+
+        for k in interacting_res_mapping:
+            global_freq[k].add(entry, interacting_res_mapping[k])
+
+    return global_freq

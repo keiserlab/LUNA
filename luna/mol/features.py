@@ -1,8 +1,10 @@
 from collections import defaultdict
 
+# Open Babel
+from openbabel.openbabel import OBMol, OBSmartsPattern
+from openbabel.pybel import Molecule as PybelMol
+# RDKit
 from rdkit.Chem import Mol as RDMol
-from openbabel import OBMol, OBSmartsPattern
-from pybel import Molecule as PybelMol
 
 from luna.util import stringcase as case
 from luna.util.exceptions import MoleculeObjectTypeError

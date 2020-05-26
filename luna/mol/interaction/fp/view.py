@@ -45,10 +45,18 @@ class ShellViewer(PymolSessionManager):
         self.set_last_details_to_view()
 
         self.wrapper.label([("visible and !name PS*", "name")])
-        self.wrapper.label([("visible and !name PS* and !hetatm and name CA", '"%s%s" % (resn, resi)')])
 
         for target_entry, shells in shell_tuples:
             for index, shell in enumerate(shells):
                 for c in shell.central_atm_grp.compounds:
                     self.wrapper.hide([("sticks", mybio_to_pymol_selection(c))])
                     self.wrapper.show([("lines", mybio_to_pymol_selection(c))])
+
+                    # Show residue label if required.
+                    if self.show_comp_labels:
+                        if c.is_residue():
+                            self.wrapper.label([("%s AND name CA" % mybio_to_pymol_selection(c), '"%s-%s" % (resn, resi)')])
+                        else:
+                            any_atm = next(c.get_atoms())
+                            atm_sel = mybio_to_pymol_selection(any_atm)
+                            self.wrapper.label([(atm_sel, '"%s-%s" % (resn, resi)')])

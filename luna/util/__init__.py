@@ -5,7 +5,7 @@ logger = logging.getLogger()
 
 # TODO: Transform hex to rgb and vice versa
 class ColorPallete:
-    def __init__(self, color_map=None, default_color=None):
+    def __init__(self, color_map=None, default_color=(255, 255, 255)):
         self.color_map = color_map or {}
         self.default_color = default_color
 
@@ -28,15 +28,17 @@ class ColorPallete:
             logger.warning("Key '%s' does not exist. Then, the default color will be used: %s." % (key, self.default_color))
             return self.default_color
         else:
-            raise KeyError("Key '%s' does not exist and no default color was defined." % (key, self.default_color))
+            raise KeyError("Key '%s' does not exist and no default color was defined." % key)
+
+    def __contains__(self, key):
+        return key in self.color_map
 
 
 def func_call_to_str(func, *args, **kwargs):
     arg_names = func.__code__.co_varnames[:func.__code__.co_argcount]
     args = args[:len(arg_names)]
     defaults = func.__defaults__ or ()
-    args = (args + defaults[len(defaults) -
-            (func.__code__.co_argcount - len(args)):])
+    args = (args + defaults[len(defaults) - (func.__code__.co_argcount - len(args)):])
     params = zip(arg_names, args)
     args = args[len(arg_names):]
     if args:

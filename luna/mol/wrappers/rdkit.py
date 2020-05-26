@@ -1,20 +1,24 @@
-from rdkit.Chem import (MolFromMol2File, MolFromPDBFile, MolFromMolFile, MolFromMolBlock, MolFromMol2Block, SanitizeFlags, SanitizeMol)
+from rdkit.Chem import MolFromMol2File, MolFromPDBFile, MolFromMolFile, MolFromMolBlock, MolFromMol2Block, SanitizeFlags, SanitizeMol
+from xopen import xopen
 
 from luna.util.file import get_file_format
 from luna.util.exceptions import IllegalArgumentError
 
+import re
 import logging
 
 logger = logging.getLogger()
 
 RDKIT_FORMATS = ("mol2", "mol", "mdl", "sdf", "sd", "pdb")
 
+REGEX_MOL_FILE = re.compile(r' (V2000|V3000)$')
+
 
 def read_mol_from_file(mol_file, mol_format, sanitize=True, removeHs=True):
     if mol_format == "mol2":
         # First it creates the molecule without applying the sanitization function.
         rdk_mol = MolFromMol2File(mol_file, sanitize=False, removeHs=removeHs)
-    if mol_format == "pdb":
+    elif mol_format == "pdb":
         # First it creates the molecule without applying the sanitization function.
         rdk_mol = MolFromPDBFile(mol_file, sanitize=False, removeHs=removeHs)
     elif mol_format in RDKIT_FORMATS:
@@ -55,26 +59,56 @@ def new_mol_from_block(block, mol_format, sanitize=True, removeHs=True):
     return rdk_mol
 
 
-def read_multimol_file(mol_file, mol_format=None, targets=None, sanitize=True, removeHs=True):
+def read_multimol_file(mol_file, targets=None, mol_format=None, sanitize=True, removeHs=True):
 
-    ext = mol_format or get_file_format(mol_file)
+    def apply_mol_format(lines):
+        # Check if the MOL file contains a valid header comprising a Title line, Program/file timestamp line, and a Comment line.
+        # Thus, the Counts line must be in line 4 (index 3). If it's not, add blank lines to match the format.
+        # This amendment is necessary otherwise RDKit will crash.
+        if not REGEX_MOL_FILE.search(lines[3]):
+            logger.warning("While parsing the file '%s', we found a molecule starting at line #%d that does not contain a valid header. "
+                           "We will add empty lines to its header to match the MOL file format." % (mol_file, mol_starts_at))
+
+            counts_line_pos = None
+            for i, line in enumerate(lines):
+                if REGEX_MOL_FILE.search(line):
+                    counts_line_pos = i
+                    break
+
+            missing_lines = ["\n"] * (3 - counts_line_pos)
+            lines = missing_lines + lines
+
+        if lines[-1].strip() != "M  END":
+            logger.warning("While parsing the file '%s', we found a molecule starting at line #%d that does not contain the END line. "
+                           "We will add it to the block end to match the MOL file format." % (mol_file, mol_starts_at))
+            lines.append("M  END\n")
+        return lines
+
+    ext = mol_format or get_file_format(mol_file, ignore_compression=True)
 
     if ext not in RDKIT_FORMATS:
         raise IllegalArgumentError("Format '%s' informed or assumed from the filename is invalid. The accepted formats are: %s."
                                    % (ext, ",".join(RDKIT_FORMATS)))
 
-    with open(mol_file, "r") as IN:
-
+    with xopen(mol_file, "r") as IN:
         if targets is not None:
             targets = set(targets)
 
         mol = []
+        line_count = 0
         while True:
             try:
-                line = next(IN)
+                line = IN.readline()
+                line_count += 1
+                # readline() returns empty strings when EOF is reached.
+                if not line:
+                    raise StopIteration
                 # Ignore new lines before a molecule block.
                 if len(mol) == 0 and line == "\n":
                     continue
+                # Save the line in which the new molecule starts.
+                if len(mol) == 0:
+                    mol_starts_at = line_count
 
                 if ext == "mol2":
                     if line.startswith("#"):
@@ -83,40 +117,56 @@ def read_multimol_file(mol_file, mol_format=None, targets=None, sanitize=True, r
                     if line.startswith("@<TRIPOS>MOLECULE"):
                         # New molecule identified but an old one already exists.
                         if mol:
+                            mol_id = mol[1].strip()
                             # If a target list is not informed, create a new molecule object.
                             if targets is None:
                                 # Create a new RDKit object
-                                yield(new_mol_from_block("".join(mol), ext, sanitize, removeHs))
-                            # Otherwise, creat a new molecule only if it is in the list.
-                            elif mol[1].strip() in targets:
-                                targets.remove(mol[1].strip())
+                                rdk_mol = new_mol_from_block("".join(mol), ext, sanitize, removeHs)
+                                yield ((rdk_mol, mol_id))
+                            # Otherwise, create a new molecule only if it is in the list.
+                            elif mol_id in targets:
+                                targets.remove(mol_id)
                                 # Create a new RDKit object
-                                yield(new_mol_from_block("".join(mol), ext, sanitize, removeHs))
+                                rdk_mol = new_mol_from_block("".join(mol), ext, sanitize, removeHs)
+                                yield ((rdk_mol, mol_id))
                         # Restart the molecule block.
                         mol = []
                     mol.append(line)
                 else:
                     if line.startswith("M  END"):
                         mol.append(line)
+                        # Fix the MOL block in cases where the header or end lines do not match the MOL file format.
+                        mol = apply_mol_format(mol)
+                        mol_id = mol[0].strip()
+
                         # If a target list is informed, create a new molecule only if it is in the list.
                         if targets is None:
                             # Create a new RDKit object
-                            yield(new_mol_from_block("".join(mol), ext, sanitize, removeHs))
+                            rdk_mol = new_mol_from_block("".join(mol), ext, sanitize, removeHs)
+                            yield((rdk_mol, mol_id))
+
                         elif mol[0].strip() in targets:
+                            targets.remove(mol_id)
                             # Create a new RDKit object
-                            yield(new_mol_from_block("".join(mol), ext, sanitize, removeHs))
-                            targets.remove(mol[0].strip())
+                            rdk_mol = new_mol_from_block("".join(mol), ext, sanitize, removeHs)
+                            yield((rdk_mol, mol_id))
                         # Restart the molecule block.
                         mol = []
                     elif line.startswith("$$$$") is False:
                         mol.append(line)
             except StopIteration:
                 if mol:
+                    if ext == "mol":
+                        # Fix the MOL block in cases where the header or end lines do not match the MOL file format.
+                        mol = apply_mol_format(mol)
+
                     mol_id = mol[1].strip() if ext == "mol2" else mol[0].strip()
+
                     # If a target list is informed, create a new molecule only if it is in the list.
                     if targets is None or (targets is not None and mol_id in targets):
                         # Create a new RDKit object
-                        yield(new_mol_from_block("".join(mol), ext, sanitize, removeHs))
+                        rdk_mol = new_mol_from_block("".join(mol), ext, sanitize, removeHs)
+                        yield ((rdk_mol, mol_id))
                 break
 
             # If all target compounds were already found, just break the loop.

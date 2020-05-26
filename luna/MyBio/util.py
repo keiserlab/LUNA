@@ -3,7 +3,7 @@ from io import StringIO
 from os.path import exists
 from shutil import move as rename_pdb_file
 from itertools import product, combinations
-from openbabel import etab
+from openbabel import openbabel as ob
 
 
 from luna.util.exceptions import IllegalArgumentError, MoleculeNotFoundError, ChainNotFoundError
@@ -28,7 +28,7 @@ def download_pdb(pdb_id, output_path=".", overwrite=False):
         @param output_path: put the PDB file in this directory.
         @type  output_path: string
     """
-    logger.info("Trying to download the PDB '%s' and store it at the directory '%s'." % (pdb_id, output_path))
+    logger.debug("Trying to download the PDB '%s' and store it at the directory '%s'." % (pdb_id, output_path))
 
     try:
         if pdb_id is not None and pdb_id.strip() != "":
@@ -38,13 +38,13 @@ def download_pdb(pdb_id, output_path=".", overwrite=False):
                 if overwrite is False and not exists(new_pdb_file):
                     pdbl = PDBList()
                     pdbl.retrieve_pdb_file(pdb_id, pdir=output_path, file_format="pdb", overwrite=overwrite)
-                    logger.info("Download completed!!")
+                    logger.debug("Download of the PDB '%s' completed." % pdb_id)
 
                     # Rename files.
                     cur_pdb_file = '%s/pdb%s.ent' % (output_path, pdb_id.lower())
                     rename_pdb_file(cur_pdb_file, new_pdb_file)
                 else:
-                    logger.info("File already exists. It will not be downloaded again.")
+                    logger.debug("File '%s' already exists. It will not be downloaded again." % new_pdb_file)
         else:
             raise IllegalArgumentError("An empty PDB id ('%s') was informed." % pdb_id)
     except Exception as e:
@@ -149,8 +149,8 @@ def is_covalently_bound(mybio_atm1, mybio_atm2):
     # Distance atom-atom
     dist = mybio_atm1 - mybio_atm2
     # Covalent radius
-    cov1 = etab.GetCovalentRad(etab.GetAtomicNum(mybio_atm1.element))
-    cov2 = etab.GetCovalentRad(etab.GetAtomicNum(mybio_atm2.element))
+    cov1 = ob.GetCovalentRad(ob.GetAtomicNum(mybio_atm1.element))
+    cov2 = ob.GetCovalentRad(ob.GetAtomicNum(mybio_atm2.element))
 
     # OpenBabel thresholds.
     if 0.4 <= dist <= cov1 + cov2 + 0.45:
@@ -178,11 +178,11 @@ def get_residue_neighbors(residue, select=Select()):
 
     if residue.is_residue():
         if "N" not in trgt_res_atms:
-            logger.warning("There is a missing N in the residue %s. It may have been filtered out by the provided "
-                           "selection function. So, the predecessor residue cannot be identified." % residue)
+            logger.debug("There is a missing N in the residue %s. It may have been filtered out by the provided "
+                         "selection function. So, the predecessor residue cannot be identified." % residue)
         if "C" not in trgt_res_atms:
-            logger.warning("There is a missing C in the residue %s. It may have been filtered out by the provided "
-                           "selection function. So, the successor residue cannot be identified." % residue)
+            logger.debug("There is a missing C in the residue %s. It may have been filtered out by the provided "
+                         "selection function. So, the successor residue cannot be identified." % residue)
 
         # If neither N and C are available in the valid atom list.
         if "N" not in trgt_res_atms and "C" not in trgt_res_atms:
@@ -201,16 +201,16 @@ def get_residue_neighbors(residue, select=Select()):
                 if is_covalently_bound(trgt_res_atms["N"], prev_res_atms["C"]):
                     neighbors["previous"] = prev_res
                 else:
-                    logger.warning("The first residue before %s is too distant to fulfill the covalent thresholds. "
-                                   "It may be an indication of bad atom positioning or that there are missing residues." % residue)
+                    logger.debug("The first residue before %s is too distant to fulfill the covalent thresholds. "
+                                 "It may be an indication of bad atom positioning or that there are missing residues." % residue)
             elif "C" not in prev_res_atms:
-                logger.warning("There is a missing C in %s, the first residue before %s in the chain list. "
-                               "It may have been filtered out by the provided selection function. "
-                               "So, the predecessor residue cannot be identified." % (prev_res, residue))
+                logger.debug("There is a missing C in %s, the first residue before %s in the chain list. "
+                             "It may have been filtered out by the provided selection function. "
+                             "So, the predecessor residue cannot be identified." % (prev_res, residue))
         # Otherwise, it could mean that the residue is the first one in the sequence or there are missing residues.
         else:
-            logger.warning("The residue %s seems not to have any predecessor residue. "
-                           "It may be the first in the chain sequence or there are missing residues." % residue)
+            logger.debug("The residue %s seems not to have any predecessor residue. "
+                         "It may be the first in the chain sequence or there are missing residues." % residue)
 
         # If the chain has a residue coming after the target residue.
         if residue.idx + 1 < len(residue.parent.child_list):
@@ -224,17 +224,16 @@ def get_residue_neighbors(residue, select=Select()):
                 if is_covalently_bound(trgt_res_atms["C"], next_res_atms["N"]):
                     neighbors["next"] = next_res
                 else:
-                    logger.warning("The first residue after %s is too distant to fulfill the covalent thresholds. "
-                                   "It may be an indication of bad atom positioning or that there are missing residues." % residue)
+                    logger.debug("The first residue after %s is too distant to fulfill the covalent thresholds. "
+                                 "It may be an indication of bad atom positioning or that there are missing residues." % residue)
             elif "N" in next_res_atms:
-                logger.warning("There is a missing N in %s, the first residue after %s in the chain list. "
-                               "It may have been filtered out by the provided selection function. "
-                               "So, the predecessor residue cannot be identified." % (next_res, residue))
+                logger.debug("There is a missing N in %s, the first residue after %s in the chain list. "
+                             "It may have been filtered out by the provided selection function. "
+                             "So, the predecessor residue cannot be identified." % (next_res, residue))
         # Otherwise, it could mean that the residue is the last one in the sequence or there are missing residues.
         else:
-
-            logger.warning("The residue %s seems not to have any successor residue. "
-                           "It may be the last in the chain sequence or there are missing residues." % residue)
+            logger.debug("The residue %s seems not to have any successor residue. "
+                         "It may be the last in the chain sequence or there are missing residues." % residue)
         return neighbors
     else:
         # First residue before the target in the chain list.
@@ -256,12 +255,12 @@ def get_residue_neighbors(residue, select=Select()):
                     break
 
             if "previous" not in neighbors:
-                logger.warning("The first residue after %s is too distant to fulfill the covalent thresholds. "
-                               "It may be an indication of bad atom positioning or that there are missing residues." % residue)
+                logger.debug("The first residue after %s is too distant to fulfill the covalent thresholds. "
+                             "It may be an indication of bad atom positioning or that there are missing residues." % residue)
         # Otherwise, it could mean that the residue is the first one in the sequence or there are missing residues.
         else:
-            logger.warning("The residue %s seems not to have any predecessor residue. "
-                           "It may be the first in the chain sequence or there are missing residues." % residue)
+            logger.debug("The residue %s seems not to have any predecessor residue. "
+                         "It may be the first in the chain sequence or there are missing residues." % residue)
 
         # If the chain has a residue coming after the target residue.
         if residue.idx + 1 < len(residue.parent.child_list):
@@ -277,11 +276,11 @@ def get_residue_neighbors(residue, select=Select()):
                     break
 
             if "next" not in neighbors:
-                logger.warning("The first residue after %s is too distant to fulfill the covalent thresholds. "
-                               "It may be an indication of bad atom positioning or that there are missing residues." % residue)
+                logger.debug("The first residue after %s is too distant to fulfill the covalent thresholds. "
+                             "It may be an indication of bad atom positioning or that there are missing residues." % residue)
         # Otherwise, it could mean that the residue is the last one in the sequence or there are missing residues.
         else:
-            logger.warning("The residue %s seems not to have any successor residue. "
-                           "It may be the last in the chain sequence or there are missing residues." % residue)
+            logger.debug("The residue %s seems not to have any successor residue. "
+                         "It may be the last in the chain sequence or there are missing residues." % residue)
         return neighbors
     return {}

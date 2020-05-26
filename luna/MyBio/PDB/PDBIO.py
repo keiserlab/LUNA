@@ -213,6 +213,7 @@ class PDBIO(object):
         # MODBY: Alexandre Fassio
         # Atom serial numbers to save on the PDB, i.e., not filtered atoms.
         valid_serial_numbers = set()
+        serial_number_mapping = {}
 
         # multiple models?
         if len(self.structure) > 1 or self.use_model_flag:
@@ -248,8 +249,16 @@ class PDBIO(object):
                         if select.accept_atom(atom):
                             chain_residues_written = 1
                             model_residues_written = 1
+
                             if preserve_atom_numbering:
                                 atom_number = atom.get_serial_number()
+
+                            # MODBY: Alexandre Fassio
+                            # Create a mapping between the current serial number and the new serial number.
+                            # If preserve_atom_numbering is set to True, this mapping is irrelevant as both
+                            # serial numbers will be the same.
+                            serial_number_mapping[atom.get_serial_number()] = atom_number
+
                             s = get_atom_line(atom, hetfield, segid,
                                               atom_number, resname,
                                               resseq, icode, chain_id)
@@ -260,7 +269,14 @@ class PDBIO(object):
                             fp.write(s)
                             if not preserve_atom_numbering:
                                 atom_number += 1
+
                 if chain_residues_written:
+                    # MODBY: Alexandre Fassio
+                    # It's necessary to correct the last serial number if the preserve_atom_numbering is set
+                    # to True as the FOR always increment this value by 1.
+                    if not preserve_atom_numbering:
+                        atom_number -= 1
+
                     fp.write("TER   %5i      %3s %c%4i%c                                                      \n"
                              % (atom_number, resname, chain_id, resseq, icode))
 
@@ -271,10 +287,15 @@ class PDBIO(object):
         # Print CONECT records
         if write_conects:
             conects = self.structure.conects
+
             for serial_number in sorted(conects):
-                if serial_number not in valid_serial_numbers:
+                # Substitutes the old serial number by the new serial number
+                new_serial_number = serial_number_mapping.get(serial_number, None)
+
+                if new_serial_number not in valid_serial_numbers:
                     continue
 
+                # It may return a list of lists as some atoms may have more than one CONECT line.
                 bonded_atoms = conects[serial_number]
                 max_num_fields = 4
                 bonded_atoms_sets = [bonded_atoms[i:i + max_num_fields]
@@ -282,19 +303,22 @@ class PDBIO(object):
                                                     max_num_fields)]
 
                 for bonded_atoms in bonded_atoms_sets:
-                    valid_bonded_atoms = set()
+                    valid_bonded_atoms = []
                     for tmp_serial_number in bonded_atoms:
-                        if tmp_serial_number in valid_serial_numbers:
-                            valid_bonded_atoms.add(tmp_serial_number)
+                        # Substitutes the old serial number by the new serial number
+                        tmp_serial_number = serial_number_mapping.get(tmp_serial_number, None)
 
-                    if (len(valid_bonded_atoms) == 0):
+                        if tmp_serial_number in valid_serial_numbers:
+                            valid_bonded_atoms.append(tmp_serial_number)
+
+                    if len(valid_bonded_atoms) == 0:
                         continue
 
                     valid_bonded_atoms = [str(x) for x in valid_bonded_atoms]
                     missing_values = max_num_fields - len(valid_bonded_atoms)
                     valid_bonded_atoms += [''] * missing_values
 
-                    record = _CONECT_FORMAT_STRING % (str(serial_number),
+                    record = _CONECT_FORMAT_STRING % (str(new_serial_number),
                                                       *valid_bonded_atoms)
 
                     fp.write(record)

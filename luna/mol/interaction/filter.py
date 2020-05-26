@@ -6,48 +6,62 @@ from luna.mol.interaction.conf import DefaultInteractionConf
 class InteractionFilter:
 
     def __init__(self, funcs=None, inter_conf=DefaultInteractionConf(),
-                 ignore_self_inter=True, ignore_prot_prot=True, ignore_prot_nucl=True,
-                 ignore_prot_lig=True, ignore_nucl_nucl=True, ignore_nucl_lig=True,
-                 ignore_lig_lig=True, ignore_h2o_h2o=True, ignore_any_h2o=False,
-                 ignore_multi_comps=False, ignore_mixed_class=False):
+                 ignore_self_inter=True, ignore_intra_chain=True, ignore_inter_chain=True,
+                 ignore_res_res=True, ignore_res_nucl=True, ignore_res_hetatm=True,
+                 ignore_nucl_nucl=True, ignore_nucl_hetatm=True, ignore_hetatm_hetatm=True,
+                 ignore_h2o_h2o=True, ignore_any_h2o=False, ignore_multi_comps=False, ignore_mixed_class=False):
 
         if funcs is None:
             funcs = self._default_functions()
+
         self._funcs = funcs
 
         self.inter_conf = inter_conf
 
         self.ignore_self_inter = ignore_self_inter
-        self.ignore_prot_prot = ignore_prot_prot
-        self.ignore_prot_nucl = ignore_prot_nucl
-        self.ignore_prot_lig = ignore_prot_lig
+        self.ignore_intra_chain = ignore_intra_chain
+        self.ignore_inter_chain = ignore_inter_chain
+        self.ignore_res_res = ignore_res_res
+        self.ignore_res_nucl = ignore_res_nucl
+        self.ignore_res_hetatm = ignore_res_hetatm
         self.ignore_nucl_nucl = ignore_nucl_nucl
-        self.ignore_nucl_lig = ignore_nucl_lig
-        self.ignore_lig_lig = ignore_lig_lig
+        self.ignore_nucl_hetatm = ignore_nucl_hetatm
+        self.ignore_hetatm_hetatm = ignore_hetatm_hetatm
         self.ignore_h2o_h2o = ignore_h2o_h2o
         self.ignore_any_h2o = ignore_any_h2o
         self.ignore_multi_comps = ignore_multi_comps
         self.ignore_mixed_class = ignore_mixed_class
 
     @classmethod
-    def new_pli_filter(cls, ignore_prot_lig=False, ignore_any_h2o=False, ignore_self_inter=False, **kwargs):
-        return cls(ignore_prot_lig=ignore_prot_lig, ignore_any_h2o=ignore_any_h2o, ignore_self_inter=ignore_self_inter, **kwargs)
+    def new_pli_filter(cls, ignore_res_hetatm=False, ignore_hetatm_hetatm=False, ignore_any_h2o=False, ignore_self_inter=False, **kwargs):
+        return cls(ignore_res_hetatm=ignore_res_hetatm, ignore_hetatm_hetatm=ignore_hetatm_hetatm, ignore_any_h2o=ignore_any_h2o,
+                   ignore_self_inter=ignore_self_inter, **kwargs)
 
     @classmethod
-    def new_ppi_filter(cls, ignore_prot_prot=False, ignore_any_h2o=False, ignore_self_inter=False, **kwargs):
-        return cls(ignore_prot_prot=ignore_prot_prot, ignore_any_h2o=ignore_any_h2o, ignore_self_inter=ignore_self_inter, **kwargs)
+    def new_ppi_filter(cls, ignore_res_res=False, ignore_inter_chain=False, ignore_intra_chain=False, ignore_any_h2o=False,
+                       ignore_self_inter=False, **kwargs):
+
+        return cls(ignore_res_res=ignore_res_res, ignore_inter_chain=ignore_inter_chain, ignore_intra_chain=ignore_intra_chain,
+                   ignore_any_h2o=ignore_any_h2o, ignore_self_inter=ignore_self_inter, **kwargs)
 
     @classmethod
-    def new_pni_filter(cls, ignore_prot_nucl=False, ignore_any_h2o=False, ignore_self_inter=False, **kwargs):
-        return cls(ignore_prot_nucl=ignore_prot_nucl, ignore_any_h2o=ignore_any_h2o, ignore_self_inter=ignore_self_inter, **kwargs)
+    def new_pni_filter(cls, ignore_res_nucl=False, ignore_inter_chain=False, ignore_intra_chain=False, ignore_any_h2o=False,
+                       ignore_self_inter=False, **kwargs):
+
+        return cls(ignore_res_nucl=ignore_res_nucl, ignore_inter_chain=ignore_inter_chain, ignore_intra_chain=ignore_intra_chain,
+                   ignore_any_h2o=ignore_any_h2o, ignore_self_inter=ignore_self_inter, **kwargs)
 
     @classmethod
-    def new_nni_filter(cls, ignore_nucl_nucl=False, ignore_any_h2o=False, ignore_self_inter=False, **kwargs):
-        return cls(ignore_nucl_nucl=ignore_nucl_nucl, ignore_any_h2o=ignore_any_h2o, ignore_self_inter=ignore_self_inter, **kwargs)
+    def new_nni_filter(cls, ignore_nucl_nucl=False, ignore_inter_chain=False, ignore_intra_chain=False,
+                       ignore_any_h2o=False, ignore_self_inter=False, **kwargs):
+
+        return cls(ignore_nucl_nucl=ignore_nucl_nucl, ignore_inter_chain=ignore_inter_chain, ignore_intra_chain=ignore_intra_chain,
+                   ignore_any_h2o=ignore_any_h2o, ignore_self_inter=ignore_self_inter, **kwargs)
 
     @classmethod
-    def new_nli_filter(cls, ignore_nucl_lig=False, ignore_any_h2o=False, ignore_self_inter=False, **kwargs):
-        return cls(ignore_nucl_lig=ignore_nucl_lig, ignore_any_h2o=ignore_any_h2o, ignore_self_inter=ignore_self_inter, **kwargs)
+    def new_nli_filter(cls, ignore_nucl_hetatm=False, ignore_hetatm_hetatm=False, ignore_any_h2o=False, ignore_self_inter=False, **kwargs):
+        return cls(ignore_nucl_hetatm=ignore_nucl_hetatm, ignore_hetatm_hetatm=ignore_hetatm_hetatm, ignore_any_h2o=ignore_any_h2o,
+                   ignore_self_inter=ignore_self_inter, **kwargs)
 
     @property
     def funcs(self):
@@ -89,51 +103,69 @@ class InteractionFilter:
         if self.ignore_mixed_class and has_any_mixed:
             return False
 
-        # It ignores interactions involving the same compounds if it is required.
+        # It ignores interactions involving the same compounds if required.
         # As each group may have atoms from different compounds, we can check if there is at least
         # one common compound between the two groups. Remember that if two or more compounds exist in a group,
         # it means that these molecules are covalently bonded and should be considered the same molecule.
         # For example: a carbohydrate can be expressed in a PDB as its subparts:
-        # GLC + GLC = CBI
+        #      E.g.: GLC + GLC = CBI
+        # The same applies to any group formed after covalently bonding a residue to a hetatm (ligand or non-standard amino acid
+        # represented as hetatm)
         is_same_compounds = len(src_grp.compounds.intersection(trgt_grp.compounds)) >= 1
         if self.ignore_self_inter and is_same_compounds:
             return False
-        # It promptly accepts all pairs composed by atom groups from the same target compound when
-        # ignore_self_inter is set off.
-        elif not self.ignore_self_inter and is_same_compounds and src_grp.has_target():
-            return True
 
-        # It ignores protein-protein interactions if it is required.
-        is_prot_prot = (src_grp.is_residue() and trgt_grp.is_residue())
-        if self.ignore_prot_prot and is_prot_prot:
+        # Check if two groups contain the same chains and if both of them contain only one chain. The second condition removes
+        # groups containing residues of different chains as may occur due to disulfide bonds.
+        # Note, however, that this flag will be used only as a filter for intra-interactions in protein/RNA/DNA chains.
+        is_same_chain = src_grp.get_chains() == trgt_grp.get_chains() and len(src_grp.get_chains()) == 1
+
+        # Filters for residue-residue interactions if required.
+        is_res_res = (src_grp.is_residue() and trgt_grp.is_residue())
+        if is_res_res:
+            # Ignore all residue-residue interactions.
+            if self.ignore_res_res:
+                return False
+            # Ignore all intra-chain interactions involving two residues.
+            elif self.ignore_intra_chain and is_same_chain:
+                return False
+            elif self.ignore_inter_chain and not is_same_chain:
+                return False
+
+        # It ignores residue-nucleic acid interactions if required.
+        is_res_nucl = ((src_grp.is_residue() and trgt_grp.is_nucleotide()) or
+                       (src_grp.is_nucleotide() and trgt_grp.is_residue()))
+        if self.ignore_res_nucl and is_res_nucl:
             return False
 
-        # It ignores protein-nucleic acid interactions if it is required.
-        is_prot_nucl = ((src_grp.is_residue() and trgt_grp.is_nucleotide()) or
-                        (src_grp.is_nucleotide() and trgt_grp.is_residue()))
-        if self.ignore_prot_nucl and is_prot_nucl:
+        # It ignores residue-ligand interactions if required.
+        is_res_hetatm = ((src_grp.is_residue() and trgt_grp.is_hetatm()) or
+                         (src_grp.is_hetatm() and trgt_grp.is_residue()))
+        if self.ignore_res_hetatm and is_res_hetatm:
             return False
 
-        # It ignores protein-ligand interactions if it is required.
-        is_prot_lig = ((src_grp.is_residue() and trgt_grp.is_hetatm()) or
-                       (src_grp.is_hetatm() and trgt_grp.is_residue()))
-        if self.ignore_prot_lig and is_prot_lig:
-            return False
-
-        # It ignores nucleic acid-nucleic acid interactions if it is required.
+        # Filters for nucleic acid-nucleic acid interactions if required.
         is_nucl_nucl = (src_grp.is_nucleotide() and trgt_grp.is_nucleotide())
-        if self.ignore_nucl_nucl and is_nucl_nucl:
+        if is_nucl_nucl:
+            # Ignore all nucleic acid-nucleic acid interactions
+            if self.ignore_nucl_nucl:
+                return False
+            # Ignore all intra-chain interactions involving two nucleic acids (RNA/DNA chains).
+            elif self.ignore_intra_chain and is_same_chain:
+                return False
+            # Ignore all inter-chain interactions involving two nucleic acids (RNA/DNA chains).
+            elif self.ignore_inter_chain and not is_same_chain:
+                return False
+
+        # It ignores nucleic acid-ligand interactions if required.
+        is_nucl_hetatm = ((src_grp.is_nucleotide() and trgt_grp.is_hetatm()) or
+                          (src_grp.is_hetatm() and trgt_grp.is_nucleotide()))
+        if self.ignore_nucl_hetatm and is_nucl_hetatm:
             return False
 
-        # It ignores nucleic acid-ligand interactions if it is required.
-        is_nucl_lig = ((src_grp.is_nucleotide() and trgt_grp.is_hetatm()) or
-                       (src_grp.is_hetatm() and trgt_grp.is_nucleotide()))
-        if self.ignore_nucl_lig and is_nucl_lig:
-            return False
-
-        # It ignores ligand-ligand interactions if it is required.
-        is_lig_lig = (src_grp.is_hetatm() and trgt_grp.is_hetatm())
-        if self.ignore_lig_lig and is_lig_lig:
+        # It ignores ligand-ligand interactions if required.
+        is_hetatm_hetatm = (src_grp.is_hetatm() and trgt_grp.is_hetatm())
+        if self.ignore_hetatm_hetatm and is_hetatm_hetatm:
             return False
 
         # It ignores interactions of other molecule types with water.
@@ -143,8 +175,8 @@ class InteractionFilter:
         if self.ignore_any_h2o and is_any_h2o:
             return False
 
-        # It ignores interactions involving two waters if it is required.
-        # If it is on, it will produce water-bridged interactions of multiple levels
+        # It ignores interactions involving two waters if required.
+        # if on, it will produce water-bridged interactions of multiple levels
         # Eg: residue -- h2o -- h2o -- ligand, residue -- residue -- h2o -- h2o -- ligand.
         is_h2o_h2o = (src_grp.is_water() and trgt_grp.is_water())
         if self.ignore_h2o_h2o and is_h2o_h2o:
@@ -164,70 +196,25 @@ class InteractionFilter:
             return func(interaction)
 
     def filter_hbond(self, interaction):
-        is_valid = False
-
-        if self.is_within_boundary(interaction.da_dist_hb_inter, "max_da_dist_hb_inter", le):
-
-            if (interaction.ha_dist_hb_inter == -1 and interaction.dha_ang_hb_inter == -1):
-                # If the angle DHA and the distance HA is equal -1, it is
-                # expected that the molecules to be water molecules. "
-                if (interaction.src_grp.compound.is_water() or interaction.trgt_grp.compound.is_water()):
-                    ha_dist = interaction.da_dist_hb_inter - 1
-                    if (self.is_within_boundary(ha_dist, "max_ha_dist_hb_inter", le)):
-                        is_valid = True
-            else:
-                if (self.is_within_boundary(interaction.ha_dist_hb_inter, "max_ha_dist_hb_inter", le) and
-                        self.is_within_boundary(interaction.dha_ang_hb_inter, "min_dha_ang_hb_inter", ge)):
-                        is_valid = True
-        return is_valid
+        pass
 
     def filter_attractive(self, interaction):
-        return self.is_within_boundary(interaction.dist_attract_inter, "max_dist_attract_inter", le)
+        pass
 
     def filter_cation_pi(self, interaction):
-        return self.is_within_boundary(interaction.dist_cation_pi_inter, "max_dist_cation_pi_inter", le)
+        pass
 
     def filter_pi_pi(self, interaction):
-        is_valid = False
-        if self.is_within_boundary(interaction.cc_dist_pi_pi_inter, "max_cc_dist_pi_pi_inter", le):
-            # If the angle criteria is defined, test if the interaction fits the requirements.
-            if "min_dihed_ang_pi_pi_inter" in self.inter_conf.conf and "max_disp_ang_pi_pi_inter" in self.inter_conf.conf:
-                if self.is_within_boundary(interaction.dihed_ang_pi_pi_inter, "min_dihed_ang_pi_pi_inter", ge):
-                    # It overwrites a general Pi-stacking interaction.
-                    interaction.type = "Edge-to-face pi-stacking"
-                elif self.is_within_boundary(interaction.disp_ang_pi_pi_inter, "max_disp_ang_pi_pi_inter", le):
-                    # It overwrites a general Pi-stacking interaction.
-                    interaction.type = "Face-to-face pi-stacking"
-                else:
-                    # It overwrites a general Pi-stacking interaction.
-                    interaction.type = "Parallel-displaced pi-stacking"
-            else:
-                interaction.type = "Pi-stacking"
-
-            # It requires that at least the distance fits the criteria to an interaction to be considered valid.
-            # For example, if the angle criteria were not defined, it is not possible to attribute an explicit type
-            # of aromatic stacking, however the interaction should be considered valid.
-            is_valid = True
-
-        return is_valid
+        pass
 
     def filter_hydrop(self, interaction):
-        return self.is_within_boundary(interaction.dist_hydrop_inter, "max_dist_hydrop_inter", le)
+        pass
 
     def filter_xbond(self, interaction):
-        # Halogen bond involving a PI system (aromatic ring)
-        if (interaction.src_grp == "Aromatic" or interaction.trgt_grp == "Aromatic"):
-            return (self.is_within_boundary(interaction.xc_dist_xbond_inter, "max_xc_dist_xbond_inter", le) and
-                    self.is_within_boundary(interaction.disp_ang_xbond_inter, "max_disp_ang_xbond_inter", le) and
-                    self.is_within_boundary(interaction.cxa_ang_xbond_inter, "min_cxa_ang_xbond_inter", ge))
-        # Classical halogen bond, i.e., does not envolve a PI system
-        else:
-            return (self.is_within_boundary(interaction.xa_dist_xbond_inter, "max_xa_dist_xbond_inter", le) and
-                    self.is_within_boundary(interaction.cxa_ang_xbond_inter, "min_cxa_ang_xbond_inter", ge) and
-                    self.is_within_boundary(interaction.xar_ang_xbond_inter, "min_xar_ang_xbond_inter", ge))
+        pass
 
     def filter_repulsive(self, interaction):
-        return self.is_within_boundary(interaction.dist_repuls_inter, "max_dist_repuls_inter", le)
+        pass
 
     def is_within_boundary(self, value, key, func):
         if key not in self.inter_conf.conf:

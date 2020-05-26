@@ -1,4 +1,4 @@
-from openbabel import etab
+from openbabel import openbabel as ob
 from operator import le, ge
 from itertools import combinations, product
 from collections import defaultdict
@@ -8,10 +8,11 @@ from luna.mol.interaction.conf import DefaultInteractionConf, InteractionConf
 from luna.mol.interaction.filter import InteractionFilter
 from luna.mol.interaction.type import InteractionType
 from luna.mol.features import ChemicalFeature
+from luna.mol.wrappers.base import BondType
 from luna.util.exceptions import IllegalArgumentError
 from luna.mol.groups import AtomGroupNeighborhood
 from luna.util.file import pickle_data, unpickle_data
-
+from luna.version import __version__
 
 import logging
 logger = logging.getLogger()
@@ -20,13 +21,26 @@ logger = logging.getLogger()
 CATIONS = ("PositivelyIonizable", "PosIonizable", "Positive")
 ANIONS = ("NegativelyIonizable", "NegIonizable", "Negative")
 
+COV_BONDS_MAPPING = {
+    BondType.SINGLE: "Single bond",
+    BondType.DOUBLE: "Double bond",
+    BondType.TRIPLE: "Triple bond",
+    BondType.AROMATIC: "Aromatic bond"
+}
+
+WATER_NAMES = ['HOH', 'DOD', 'WAT', 'H2O', 'OH2']
+
 
 class InteractionsManager:
 
-    def __init__(self, interactions=None):
+    def __init__(self, interactions=None, entry=None):
         if interactions is None:
             interactions = []
+
+        self.entry = entry
         self._interactions = list(interactions)
+
+        self.version = __version__
 
     @property
     def interactions(self):
@@ -58,6 +72,23 @@ class InteractionsManager:
             if inter.type in types:
                 yield inter
 
+    def filter_by_centroids(self, centroids, radius):
+        pass
+
+    def to_csv(self, output_file):
+        interactions_set = set()
+        for inter in self.interactions:
+            grp1 = ";".join(sorted(["/".join(a.full_atom_name.split("/")) for a in inter.src_grp.atoms]))
+            grp2 = ";".join(sorted(["/".join(a.full_atom_name.split("/")) for a in inter.trgt_grp.atoms]))
+
+            grp1, grp2 = sorted([grp1, grp2])
+            interactions_set.add((grp1, grp2, inter.type))
+
+        with open(output_file, "w") as OUT:
+            OUT.write("atom_group1,atom_group2,interaction\n")
+            # Sort lines before writing to always keep the same order.
+            OUT.write("\n".join([",".join(k) for k in sorted(interactions_set)]))
+
     def save(self, output_file, compressed=True):
         pickle_data(self, output_file, compressed)
 
@@ -69,12 +100,18 @@ class InteractionsManager:
         # Number of interactions
         return self.size
 
+    def __iter__(self):
+        """Iterate over children."""
+        for inter in self.interactions:
+            yield inter
+
 
 class InteractionCalculator:
 
     def __init__(self, inter_conf=DefaultInteractionConf(), inter_filter=None, inter_funcs=None,
-                 add_non_cov=True, add_proximal=False, add_atom_atom=True, add_dependent_inter=False,
-                 add_h2o_pairs_with_no_target=False, strict_donor_rules=False):
+                 add_non_cov=True, add_cov=True, add_proximal=False, add_atom_atom=True,
+                 add_dependent_inter=False, add_h2o_pairs_with_no_target=False, strict_donor_rules=False,
+                 strict_weak_donor_rules=True, lazy_comps_list=WATER_NAMES):
 
         if inter_conf is not None and isinstance(inter_conf, InteractionConf) is False:
             raise IllegalArgumentError("The informed interaction configuration must be an instance of '%s'." % InteractionConf)
@@ -83,14 +120,20 @@ class InteractionCalculator:
             raise IllegalArgumentError("The informed interaction filter must be an instance of '%s'." % InteractionFilter)
 
         self.inter_conf = inter_conf
-        self.add_non_cov = add_non_cov
-        self.add_proximal = add_proximal
-        self.add_atom_atom = add_atom_atom
-        self.add_dependent_inter = add_dependent_inter
-        self.add_h2o_pairs_with_no_target = add_h2o_pairs_with_no_target
-        self.strict_donor_rules = strict_donor_rules
         self.inter_filter = inter_filter
         self._inter_funcs = inter_funcs or self._default_functions()
+
+        self.add_non_cov = add_non_cov
+        self.add_cov = add_cov
+        self.add_proximal = add_proximal
+        self.add_atom_atom = add_atom_atom
+
+        self.add_dependent_inter = add_dependent_inter
+        self.add_h2o_pairs_with_no_target = add_h2o_pairs_with_no_target
+
+        self.strict_donor_rules = strict_donor_rules
+        self.strict_weak_donor_rules = strict_weak_donor_rules
+        self.lazy_comps_list = lazy_comps_list or []
 
     @property
     def funcs(self):
@@ -139,7 +182,7 @@ class InteractionCalculator:
 
                 # If the groups belongs to the same molecule (intramolecule interaction).
                 is_intramol_inter = self.is_intramol_inter(trgt_atm_grp, nb_atm_grp)
-                shortest_path_size = None
+                shortest_path_length = None
 
                 for pair in feat_pairs:
                     # It will ignore interactions for atoms in the same molecule that are separated from each other by only N bonds.
@@ -148,12 +191,18 @@ class InteractionCalculator:
                     #
                     # But, it will never skip pairs of Atom features because they are used to calculate covalent interactions.
                     if pair[0].name != "Atom" and pair[1].name != "Atom" and is_intramol_inter:
-                        # Compute shortest path only once. The reason not to precompute it outside the For is to avoid computing
-                        # the Bellman-Ford algorithm if the groups only have Atom features.
-                        if shortest_path_size is None:
-                            shortest_path_size = trgt_atm_grp.get_shortest_path_size(nb_atm_grp)
-                        # Ignore groups according to the min bond separation threshold.
-                        if shortest_path_size <= self.inter_conf.conf.get("min_bond_separation", 0):
+                        # Compute the shortest path only once. The reason not to precompute it outside the For is to avoid computing
+                        # the algorithm for groups containing only Atom features.
+                        if shortest_path_length is None:
+                            # By providing a cutoff, it will force the algorithm to return paths only for groups connected by
+                            # less than or equal N paths. So, if two groups return INF, it means they are a valid combination as they
+                            # match the minimum bond separation.
+                            cutoff = self.inter_conf.conf.get("min_bond_separation", 0)
+                            shortest_path_length = trgt_atm_grp.get_shortest_path_length(nb_atm_grp, cutoff)
+
+                        # If get_shortest_path_length() returns any value that is not infinite (INF), it means these two groups
+                        # contain a path with at less than or equal to the cutoff 'min_bond_separation'. Therefore, ignore them.
+                        if shortest_path_length != float('inf'):
                             continue
 
                     calc_inter_params = (trgt_atm_grp, nb_atm_grp) + pair
@@ -173,7 +222,7 @@ class InteractionCalculator:
         if not self.add_h2o_pairs_with_no_target:
             self.remove_h2o_pairs_with_no_target(all_interactions)
 
-        logger.info("Number of potential interactions found: %d" % len(all_interactions))
+        logger.debug("Number of potential interactions found: %d" % len(all_interactions))
 
         return InteractionsManager(all_interactions)
 
@@ -1262,8 +1311,12 @@ class InteractionCalculator:
             # and only hydrogens as neighbours (water, solvents, ammonia, SH2). In the latter case, the
             # hydrogens can be positioned in many different ways, and each run of a tool like OpenBabel
             # would vary the hydrogen bond list when one applies this algorithm.
-            if (self.strict_donor_rules is False and
-                    (len(hydrog_coords) == 0 or len(hydrog_coords) == len(donor_atm.neighbors_info))):
+            #
+            # If the user has also defined a list of lazy compounds, we can skip the application of strict rules on
+            # them as well. By default, the list contains only Water molecules.
+            if ((self.strict_donor_rules is False and (len(hydrog_coords) == 0 or
+                                                       len(hydrog_coords) == len(donor_atm.neighbors_info))) or
+                    (donor_atm.parent.resname in self.lazy_comps_list)):
 
                 # When the position of the hydrogen cannot be defined, it assumes the hydrogen to be located 1A
                 # away from the donor in a line formed by the donor and the acceptor.
@@ -1428,8 +1481,12 @@ class InteractionCalculator:
             # and only hydrogens as neighbours (water, solvents, ammonia, SH2). In the latter case, the
             # hydrogens can be positioned in many different set of ways, and each run of a tool like
             # OpenBabel would vary the hydrogen bond list when one applies this algorithm.
-            if (self.strict_donor_rules is False and
-                    (len(hydrog_coords) == 0 or len(hydrog_coords) == len(donor_atm.neighbors_info))):
+            #
+            # If the user has also defined a list of lazy compounds, we can skip the application of strict rules on
+            # them as well. By default, the list contains only Water molecules.
+            if ((self.strict_weak_donor_rules is False and (len(hydrog_coords) == 0 or
+                                                            len(hydrog_coords) == len(donor_atm.neighbors_info))) or
+                    (donor_atm.parent.resname in self.lazy_comps_list)):
 
                 # When the position of the hydrogen cannot be defined, it assumes the hydrogen to be located 1A
                 # away from the donor in a line formed by the donor and the acceptor.
@@ -1591,8 +1648,12 @@ class InteractionCalculator:
             # and only hydrogens as neighbours (water, solvents, ammonia, SH2). In the latter case, the
             # hydrogens can be positioned in many different set of ways, and each run of a tool like
             # OpenBabel would vary the hydrogen bond list when one applies this algorithm.
-            if (self.strict_donor_rules is False and
-                    (len(hydrog_coords) == 0 or len(hydrog_coords) == len(donor_atm.neighbors_info))):
+            #
+            # If the user has also defined a list of lazy compounds, we can skip the application of strict rules on
+            # them as well. By default, the list contains only Water molecules.
+            if ((self.strict_weak_donor_rules is False and (len(hydrog_coords) == 0 or
+                                                            len(hydrog_coords) == len(donor_atm.neighbors_info))) or
+                    (donor_atm.parent.resname in self.lazy_comps_list)):
 
                 # When the position of the hydrogen cannot be defined, it assumes the hydrogen to be located 1A
                 # away from the donor in a line formed by the donor and the acceptor.
@@ -1697,9 +1758,6 @@ class InteractionCalculator:
 
     @staticmethod
     def calc_atom_atom(self, params):
-        if not self.add_atom_atom:
-            return []
-
         group1, group2, feat1, feat2 = params
         interactions = []
 
@@ -1714,40 +1772,67 @@ class InteractionCalculator:
         # states that two atoms are covalently bonded if:
         #       0.4 <= d(a1, a2) <= cov_rad(a1) + cov_rad(a2) + 0.45
         if atm1.is_neighbor(atm2):
-            inter = InteractionType(group1, group2, "Covalent bond", params=params)
+            # Ignore covalent bonds.
+            if not self.add_cov:
+                return []
+
+            bond_type = atm1.get_neighbor_info(atm2).bond_type
+
+            if bond_type in COV_BONDS_MAPPING:
+                bond_name = COV_BONDS_MAPPING[bond_type]
+            else:
+                bond_name = "Other bond"
+                logger.warning("An unexpected bond (%s) was found between the atoms %s and %s. "
+                               "Therefore, a general bond name (%s) will be used instead." % (bond_type, atm1, atm2, bond_name))
+
+            inter = InteractionType(group1, group2, bond_name, params=params)
             interactions.append(inter)
         else:
-            cov1 = etab.GetCovalentRad(etab.GetAtomicNum(atm1.element))
-            cov2 = etab.GetCovalentRad(etab.GetAtomicNum(atm2.element))
+            if not self.add_atom_atom:
+                return []
+
+            cov1 = ob.GetCovalentRad(ob.GetAtomicNum(atm1.element))
+            cov2 = ob.GetCovalentRad(ob.GetAtomicNum(atm2.element))
 
             if cc_dist <= cov1 + cov2:
                 inter = InteractionType(group1, group2, "Atom overlap", params=params)
                 interactions.append(inter)
             else:
-                rdw1 = etab.GetVdwRad(etab.GetAtomicNum(atm1.element))
-                rdw2 = etab.GetVdwRad(etab.GetAtomicNum(atm2.element))
-
-                # The graph of a molecule neighborhood contains only the information of its own atoms and their immediate neighbors.
-                # That is why it needs to merge two neighborhood graphs when an intermolecular interaction is to be calculated.
-                merge_neighborhods = self.is_intramol_inter(group1, group2) is False
-                # Ignore Van der Waals and clashes for atoms separated from each other by only N bonds.
-                # Covalent bonds keep atoms very tightly, producing distances lower than their sum of Van der Waals radius.
-                # As a consequence the algorithm will find a lot of false clashes and Van der Waals interactions.
-                shortest_path_size = group1.atoms[0].get_shortest_path_size(group2.atoms[0], merge_neighborhods)
+                rdw1 = ob.GetVdwRad(ob.GetAtomicNum(atm1.element))
+                rdw2 = ob.GetVdwRad(ob.GetAtomicNum(atm2.element))
 
                 # r1 + r2 - d < 0 => no clash
                 # r1 + r2 - d = 0 => in the limit, i.e., spheres are touching.
                 # r1 + r2 - d > 0 => clash.
                 if (rdw1 + rdw2 - cc_dist) >= self.inter_conf.conf.get("vdw_clash_tolerance", 0):
-                    # Checks if the number of bonds matches the criterion for clashes.
-                    if shortest_path_size <= self.inter_conf.conf.get("min_bond_separation_for_clash", 0):
+                    # Ignore Van der Waals and clashes for atoms separated from each other by only N bonds.
+                    # Covalent bonds keep atoms very tightly, producing distances lower than their sum of Van der Waals radius.
+                    # As a consequence the algorithm will find a lot of false clashes and Van der Waals interactions.
+                    #
+                    # It is better to keep this function inside the IFs to avoid the Dijkstra processing for pairs of atoms
+                    # that wouldn't enter inside the IF.
+                    shortest_path_length = group1.get_shortest_path_length(group2, self.inter_conf.conf.get("min_bond_separation", 0))
+
+                    # If get_shortest_path_length() returns any value that is not infinite (INF), it means these two groups
+                    # contain a path with at less than or equal to the cutoff 'min_bond_separation'. Therefore, ignore them.
+                    if shortest_path_length != float('inf'):
                         return []
 
                     inter = InteractionType(group1, group2, "Van der Waals clash", params=params)
                     interactions.append(inter)
+
                 elif cc_dist <= rdw1 + rdw2 + self.inter_conf.conf.get("vdw_tolerance", 0):
-                    # Checks if the number of bonds matches the general criterion.
-                    if shortest_path_size <= self.inter_conf.conf.get("min_bond_separation", 0):
+                    # Ignore Van der Waals and clashes for atoms separated from each other by only N bonds.
+                    # Covalent bonds keep atoms very tightly, producing distances lower than their sum of Van der Waals radius.
+                    # As a consequence the algorithm will find a lot of false clashes and Van der Waals interactions.
+                    #
+                    # It is better to keep this function inside the IFs to avoid the Dijkstra processing for pairs of atoms
+                    # that wouldn't enter inside the IF.
+                    shortest_path_length = group1.get_shortest_path_length(group2, self.inter_conf.conf.get("min_bond_separation", 0))
+
+                    # If get_shortest_path_length() returns any value that is not infinite (INF), it means these two groups
+                    # contain a path with at less than or equal to the cutoff 'min_bond_separation'. Therefore, ignore them.
+                    if shortest_path_length != float('inf'):
                         return []
 
                     inter = InteractionType(group1, group2, "Van der Waals", params=params)

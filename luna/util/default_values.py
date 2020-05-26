@@ -27,17 +27,27 @@ ACCEPTED_MOL_OBJ_TYPES = ("rdkit", "openbabel")
 
 OPENBABEL = "/usr/bin/obabel"
 
+RECURSION_LIMIT = 600000
+
 ATOM_TYPES_COLOR = ColorPallete({
-    "Acceptor": (252, 141, 89),
-    "Donor": (145, 191, 219),
-    "Aromatic": (224, 243, 248),
-    "Hydrophobic": (254, 224, 144),
+    "Aromatic": (255, 187, 204),
+    "Acceptor": (158, 154, 200),
+    "Donor": (17, 170, 119),
     "Hydrophobe": (254, 224, 144),
-    "LumpedHydrophobe": (254, 224, 144),
-    "PosIonizable": (69, 117, 180),
-    "NegIonizable": (215, 48, 3),
-    "HalogenAcceptor": (215, 48, 3),
-    "HalogenDonor": (215, 48, 3),
+    "Hydrophobic": (254, 224, 144),
+    "Negative": (251, 128, 114),
+    "Positive": (31, 120, 180),
+    "NegIonizable": (251, 128, 114),
+    "PosIonizable": (31, 120, 180),
+    "NegativelyIonizable": (251, 128, 114),
+    "PositivelyIonizable": (31, 120, 180),
+    "HalogenDonor": (196, 156, 148),
+    "Metal": (96, 125, 139),
+    "WeakDonor": (161, 217, 155),
+    "WeakAcceptor": (188, 194, 220),
+    "Electrophile": (251, 138, 124),
+    "Nucleophile": (158, 218, 229),
+    "ChalcogenDonor": (255, 193, 7),
 }, (255, 255, 255))
 
 CHEMICAL_FEATURE_IDS = {
@@ -51,7 +61,6 @@ CHEMICAL_FEATURE_IDS = {
     "Negatively ionizable": 8,
     "Positively ionizable": 9,
     "Halogen donor": 10,
-    "Halogen acceptor": 11,
     "Metal": 12,
     "Lumped hydrophobe": 13,
     "Weak donor": 14,
@@ -103,6 +112,11 @@ INTERACTION_IDS = {
     "Displaced face-to-face pi-stacking": 36,
     "Displaced face-to-edge pi-stacking": 37,
     "Displaced face-to-slope pi-stacking": 38,
+    "Single bond": 39,
+    "Double bond": 40,
+    "Triple bond": 41,
+    "Aromatic bond": 42,
+    "Other bond": 43
 }
 
 INTERACTION_SHORT_NAMES = {
@@ -145,6 +159,11 @@ INTERACTION_SHORT_NAMES = {
     "Displaced face-to-face pi-stacking": "disp_face-to-face_stack",
     "Displaced face-to-edge pi-stacking": "disp_face-to-edge_stack",
     "Displaced face-to-slope pi-stacking": "disp_face-to-slope_stack",
+    "Single bond": "single-bond",
+    "Double bond": "double-bond",
+    "Triple bond": "triple-bond",
+    "Aromatic bond": "aromatic-bond",
+    "Other bond": "other-bond",
 }
 
 PYMOL_INTERACTION_COLOR = ColorPallete({
@@ -187,4 +206,9 @@ PYMOL_INTERACTION_COLOR = ColorPallete({
     "Displaced face-to-face pi-stacking": "tv_red",
     "Displaced face-to-edge pi-stacking": "tv_red",
     "Displaced face-to-slope pi-stacking": "tv_red",
+    "Single bond": "black",
+    "Double bond": "black",
+    "Triple bond": "black",
+    "Aromatic bond": "black",
+    "Other bond": "black",
 }, "white")

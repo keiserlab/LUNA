@@ -1,5 +1,5 @@
 from os.path import basename, exists, isdir, isfile, splitext
-from os import makedirs, remove
+from os import makedirs, remove, listdir
 from shutil import rmtree
 import string
 import random
@@ -7,14 +7,32 @@ import logging
 import pickle
 import gzip
 
-
 from luna.util.exceptions import FileNotCreated, PKLNotReadError
 
 
 logger = logging.getLogger()
 
 
-def get_file_format(path, max_split=None):
+def detect_compression_format(filename):
+    """
+    Attempts to detect file format from the filename extension.
+    Returns None if no format could be detected.
+    """
+    if filename.endswith('.bz2'):
+        return "bz2"
+    elif filename.endswith('.xz'):
+        return "xz"
+    elif filename.endswith('.gz'):
+        return "gz"
+    else:
+        return None
+
+
+def get_file_format(path, max_split=None, ignore_compression=False):
+    if ignore_compression is True:
+        comp_format = detect_compression_format(path)
+        if comp_format:
+            path = path[:-(len(comp_format) + 1)]
     return generic_splitext(path, max_split)[1][1:]
 
 
@@ -44,9 +62,9 @@ def generic_splitext(path, max_split=None):
 def generate_json_file(json_data, output_file):
     try:
         import simplejson as json
-        logger.info("Module 'simplejson' imported.")
+        logger.warning("Module 'simplejson' imported.")
     except ImportError:
-        logger.info("Module 'simplejson' not available. Built-in module 'json' will be imported.")
+        logger.warning("Module 'simplejson' not available. Built-in module 'json' will be imported.")
         import json
 
     try:
@@ -60,9 +78,9 @@ def generate_json_file(json_data, output_file):
 def parse_json_file(json_file):
     try:
         import simplejson as json
-        logger.info("Module 'simplejson' imported.")
+        logger.warning("Module 'simplejson' imported.")
     except ImportError:
-        logger.info("Module 'simplejson' not available. Built-in module 'json' will be imported.")
+        logger.warning("Module 'simplejson' not available. Built-in module 'json' will be imported.")
         import json
 
     try:
@@ -78,10 +96,10 @@ def create_directory(path, clear=False):
         if not exists(path):
             makedirs(path)
         elif clear:
-            logger.warning("The directory '%s' already exists, and it will be cleaned before the program continues." % path)
+            logger.info("The directory '%s' already exists, and it will be cleared before the program continues." % path)
             clear_directory(path)
         else:
-            logger.warning("The directory '%s' already exists, but it will not be cleaned before the program continues." % path)
+            logger.info("The directory '%s' already exists, but it will not be cleared." % path)
     except OSError as e:
         logger.exception(e)
         raise
@@ -92,15 +110,18 @@ def remove_files(files):
         if exists(f):
             remove(f)
         else:
-            logger.info("File %s does not exist." % f)
+            logger.info("File '%s' does not exist." % f)
 
 
-def clear_directory(path):
+def clear_directory(path, only_empty_paths=False):
     if isdir(path):
+        # Do nothing if the directory is not empty and if only empty paths must be removed.
+        if only_empty_paths and len(listdir(path)) != 0:
+            return
+
         try:
             rmtree(path, ignore_errors=True)
-        except OSError as e:
-            logger.exception(e)
+        except OSError:
             raise
 
 
@@ -154,7 +175,6 @@ def pickle_data(data, output_file, compressed=True):
     open_func = open
     if compressed:
         open_func = gzip.open
-
         if output_file.endswith(".gz") is False:
             output_file += ".gz"
 
@@ -162,10 +182,8 @@ def pickle_data(data, output_file, compressed=True):
         with open_func(output_file, "wb") as OUT:
             pickle.dump(data, OUT, pickle.HIGHEST_PROTOCOL)
     except OSError as e:
-        logger.exception(e)
-        raise FileNotCreated("File '%s' could not be created." % output_file)
-    except Exception as e:
-        logger.exception(e)
+        raise FileNotCreated("File '%s' could not be created." % output_file) from e
+    except Exception:
         raise
 
 
@@ -183,6 +201,4 @@ def unpickle_data(input_file):
         with open(input_file, "rb") as IN:
             return pickle.load(IN)
     except OSError as e:
-        logger.exception(e)
-        raise PKLNotReadError("File '%s' could not be loaded." % input_file)
-    return None
+        raise PKLNotReadError("File '%s' could not be loaded." % input_file) from e
