@@ -79,6 +79,11 @@ class AtomGroupsManager():
     def get_all_interactions(self):
         return set(chain.from_iterable([atm_grp.interactions for atm_grp in self.atm_grps]))
 
+    def apply_filter(self, func):
+        for atm_grp in self.atm_grps:
+            if func(atm_grp):
+                yield atm_grp
+
     def filter_by_types(self, types):
         for atm_grp in self.atm_grps:
             if set(types).issubset(set(atm_grp.feature_names)):
