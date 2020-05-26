@@ -1,3 +1,0 @@
-In the binding site around the ligand defined by the entry 1OZH:A:HE3:1406, there is a Mg with 6 bonds. As a consequence, RDKit fails with the following error message:
-
-    - Explicit valence for atom # 20 Mg, 6, is greater than permitted
