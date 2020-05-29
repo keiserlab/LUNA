@@ -136,7 +136,7 @@ class Project:
         if inter_calc is not None and isinstance(inter_calc, InteractionCalculator) is False:
             raise IllegalArgumentError("The informed interaction configuration must be an instance of %s."
                                        % ".".join([InteractionCalculator.__module__, InteractionCalculator.__name__]))
-        else:
+        elif inter_calc is None:
             logger.info("No interaction calculator object was defined and the default will be used instead.")
 
         if append_mode:
@@ -599,6 +599,8 @@ class LocalProject(Project):
         pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
 
         if self.append_mode and exists(pkl_file):
+            logger.debug("Since append mode is set ON, it will skip entry '%s' because a result for "
+                         "this entry already exists in the working path." % entry.to_string())
             return
 
         # TODO: allow the user to pass a pdb_file through entries.
