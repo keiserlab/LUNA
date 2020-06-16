@@ -1,16 +1,54 @@
 import logging
 import logging.config
-import os.path
+import os
 import colorlog
+import gzip
 
 
 FILE_FORMAT = '[%(asctime)s]    %(levelname)-8s %(filename)16s:%(lineno)-10d %(processName)-20s %(message)s'
 CONSOLE_FORMAT = '[%(asctime)s]    %(log_color)s%(levelname)-10s %(reset)s%(filename)16s:%(lineno)-10d %(message)s'
 
 
+class CompressedRotatingFileHandler(logging.handlers.RotatingFileHandler):
+
+    # Source: http://roadtodistributed.blogspot.com/2011/04/compressed-rotatingfilehandler-for.html
+    def doRollover(self):
+        self.stream.close()
+        if self.backupCount > 0:
+            for i in range(self.backupCount - 1, 0, -1):
+                sfn = "%s.%d.gz" % (self.baseFilename, i)
+                dfn = "%s.%d.gz" % (self.baseFilename, i + 1)
+
+                if os.path.exists(sfn):
+                    if os.path.exists(dfn):
+                        os.remove(dfn)
+                    os.rename(sfn, dfn)
+            dfn = self.baseFilename + ".1.gz"
+
+            if os.path.exists(dfn):
+                os.remove(dfn)
+            try:
+                f_in = open(self.baseFilename, 'rb')
+                f_out = gzip.open(dfn, 'wb')
+                f_out.writelines(f_in)
+            except Exception:
+                if not os.path.exists(dfn):
+                    if os.path.exists(self.baseFilename):
+                        os.rename(self.baseFilename, dfn)
+            finally:
+                if "f_out" in dir() and f_out is not None:
+                    f_out.close()
+                if "f_in" in dir() and f_in is not None:
+                    f_in.close()
+            if os.path.exists(self.baseFilename):
+                os.remove(self.baseFilename)
+        self.mode = 'w'
+        self.stream = self._open()
+
+
 def new_logging_file(filename, logging_level=logging.INFO, logger_name=None, propagate=True, log_format=None, mode='a'):
     # Set the LOG file at the working path
-    fh = logging.handlers.RotatingFileHandler(filename, mode, 5 * 1024 * 1024, 100)
+    fh = CompressedRotatingFileHandler(filename, mode, 5 * 1024 * 1024, 20)
     file_format = log_format or FILE_FORMAT
     file_formatter = logging.Formatter(file_format, '%Y-%m-%d %H:%M:%S')
     fh.setFormatter(file_formatter)
