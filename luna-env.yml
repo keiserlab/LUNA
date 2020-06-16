@@ -23,7 +23,6 @@ dependencies:
   - cloudpickle=1.4.1=py_0
   - colorlog=4.1.0=py37hc8dfbb8_2
   - cryptography=2.9.2=py37hb09aad4_0
-  - cudatoolkit=10.1.243=h6bb024c_0
   - cycler=0.10.0=py_2
   - dbus=1.13.6=he372182_0
   - decorator=4.4.2=py_0

@@ -1,5 +1,4 @@
-import sys
-from os.path import exists
+from os.path import exists, abspath, dirname
 from collections import defaultdict
 import time
 import logging
@@ -548,6 +547,11 @@ class Project:
         proj_obj = unpickle_data(input_file)
 
         if has_version_compatibility(proj_obj.version):
+            # Update the working path if the project has been moved to a different path.
+            curr_working_path = dirname(abspath(input_file))
+            if proj_obj.working_path != curr_working_path:
+                proj_obj.working_path = curr_working_path
+
             proj_obj.init_logging_file("%s/logs/project.log" % proj_obj.working_path)
 
             logger.info("Project reloaded successfully.")
