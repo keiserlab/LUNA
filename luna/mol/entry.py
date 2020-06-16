@@ -24,7 +24,7 @@ logger = logging.getLogger()
 # Source: https://richjenks.com/filename-regex/
 FILENAME_REGEX = r"(?!.{256,})(?!(aux|clock\$|con|nul|prn|com[1-9]|lpt[1-9])(?:$|\.))[^ ][ \.\w\-$()+=[\];#@~,&']+[^\. ]"
 
-REGEX_RESNUM_ICODE = re.compile(r'^(\d+)([a-zA-z]?)$')
+REGEX_RESNUM_ICODE = re.compile(r'^(\-?\d+)([a-zA-z]?)$')
 
 PCI_ENTRY_REGEX = re.compile(r'^%s:\w:\w[\w+\-]{1,2}?:\-?\d{1,4}[a-zA-z]?$' % FILENAME_REGEX)
 PPI_ENTRY_REGEX = re.compile(r'^%s:\w$' % FILENAME_REGEX)
