@@ -261,13 +261,16 @@ class Project:
         params = ["\t\t\t-- %s = %s" % (key, str(self.__dict__[key])) for key in sorted(self.__dict__)]
         logger.debug("Preferences:\n%s" % "\n".join(params))
 
-    def prepare_project_path(self):
+    def prepare_project_path(self, subdirs=None):
         logger.info("Initializing project directory '%s'." % self.working_path)
+
+        if subdirs is None:
+            subdirs = self._paths
 
         # Create main project directory.
         create_directory(self.working_path, self.overwrite_path)
         # Create subdirectories.
-        for path in self._paths:
+        for path in subdirs:
             create_directory("%s/%s" % (self.working_path, path))
 
         logger.info("Project directory '%s' created successfully." % self.working_path)
@@ -486,8 +489,8 @@ class Project:
         return sm.to_fingerprint(fold_to_size=self.ifp_length, unique_shells=unique_shells, count_fp=self.ifp_count)
 
     def create_ifp_file(self):
-        self.ifp_output = self.ifp_output or "%s/results/fingerprints/ifp.csv" % self.working_path
-        with open(self.ifp_output, "w") as OUT:
+        ifp_output = self.ifp_output or "%s/results/fingerprints/ifp.csv" % self.working_path
+        with open(ifp_output, "w") as OUT:
             if self.ifp_count:
                 OUT.write("ligand_id,smiles,on_bits,count\n")
             else:
@@ -744,6 +747,9 @@ class LocalProject(Project):
         start = time.time()
 
         self.calc_ifp = True
+
+        if self.ifp_output is None:
+            self.prepare_project_path(subdirs=["results", "results/fingerprints"])
 
         job_queue = mp.JoinableQueue(maxsize=self.nproc)
         progress_queue = mp.JoinableQueue(maxsize=1)
