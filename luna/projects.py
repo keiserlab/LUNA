@@ -52,6 +52,8 @@ VERBOSITY_LEVEL = {4: logging.DEBUG,
                    1: logging.ERROR,
                    0: logging.CRITICAL}
 
+MAX_NPROCS = mp.cpu_count() - 1
+
 
 class EntryResults:
 
@@ -108,7 +110,7 @@ class Project:
 
                  append_mode=False,
                  verbosity=3,
-                 nproc=None):
+                 nproc=MAX_NPROCS):
 
         if len(entries) == 0:
             logger.warning("Nothing to be done as no entry was informed.")
@@ -181,19 +183,6 @@ class Project:
         self.append_mode = append_mode
         self.verbosity = VERBOSITY_LEVEL[verbosity]
 
-        if nproc is None:
-            nproc = mp.cpu_count() - 1
-        elif nproc < 1:
-            logger.warning("It was trying to create an invalid number of processes (%s). Therefore, the number of "
-                           "processes 'nproc' was set to its maximum accepted capability (%d)." % (str(nproc), (mp.cpu_count() - 1)))
-            nproc = mp.cpu_count() - 1
-        elif nproc >= mp.cpu_count():
-            logger.warning("It was trying to create %d processes, which is equal to or greater than the maximum "
-                           "amount of available CPUs (%d). Therefore, the number of processes 'nproc' was set to %d "
-                           "to leave at least one CPU free." % (nproc, mp.cpu_count(), (mp.cpu_count() - 1)))
-            nproc = mp.cpu_count() - 1
-        logger.info("The number of processes was set to: %d." % nproc)
-
         self.nproc = nproc
 
         self.version = __version__
@@ -245,6 +234,35 @@ class Project:
             results = self.get_entry_results(entry)
             if results:
                 yield entry, results.mfp
+
+    @property
+    def nproc(self):
+        return self._nproc
+
+    @nproc.setter
+    def nproc(self, nproc):
+        if nproc is not None:
+            if not isinstance(nproc, int) or isinstance(nproc, bool):
+                logger.warning("The number of processes must be an integer value, but a(n) %s was provided instead. "
+                               "Therefore, the number of processes 'nproc' was set to its maximum accepted capability "
+                               "(%d - 1 = %d)." % (nproc.__class__.__name__, mp.cpu_count(), MAX_NPROCS))
+                nproc = MAX_NPROCS
+
+            elif nproc < 1:
+                logger.warning("It was trying to create an invalid number of processes (%s). Therefore, the number of "
+                               "processes 'nproc' was set to its maximum accepted capability (%d - 1 = %d)." % (str(nproc), mp.cpu_count(),
+                                                                                                                MAX_NPROCS))
+                nproc = MAX_NPROCS
+
+            elif nproc >= mp.cpu_count():
+                logger.warning("It was trying to create %d processes, which is equal to or greater than the maximum "
+                               "amount of available CPUs (%d). Therefore, the number of processes 'nproc' was set to %d "
+                               "to leave at least one CPU free." % (nproc, mp.cpu_count(), MAX_NPROCS))
+                nproc = MAX_NPROCS
+        else:
+            logger.warning("The number of processes was set to '%s'. Therefore, LUNA will run jobs sequentially." % nproc)
+
+        self._nproc = nproc
 
     def get_entry_results(self, entry):
         pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
@@ -569,22 +587,10 @@ class Project:
 
     def _consumer(self, func, job_queue, progress_queue):
         while True:
-            start = time.time()
             entry = job_queue.get()
 
-            failed = False
             # Run the provided function
-            try:
-                func(entry)
-            except Exception as e:
-                logger.exception(e)
-                logger.debug("Processing of entry '%s' failed. Check the logs for more information." % entry.to_string())
-                failed = True
-
-            end = time.time()
-
-            # Add progress data to be consumed.
-            progress_queue.put((entry.to_string(), (end - start), failed))
+            func(entry, progress_queue)
 
             job_queue.task_done()
 
@@ -594,88 +600,124 @@ class LocalProject(Project):
     def __init__(self, entries, working_path, has_local_files=False, **kwargs):
         super().__init__(entries=entries, working_path=working_path, has_local_files=has_local_files, **kwargs)
 
-    def _process_entry(self, entry):
+    def _process_entry(self, entry, progress_queue):
+
+        start = time.time()
+        failed = False
+
         logger.debug("Starting entry processing: %s." % entry.to_string())
 
-        # Check if the entry is in the correct format.
-        # It also accepts entries whose pdb_id is defined by the filename.
-        if isinstance(entry, MolEntry) is False:
-            self.validate_entry_format(entry)
+        try:
+            # Check if the entry is in the correct format.
+            # It also accepts entries whose pdb_id is defined by the filename.
+            if isinstance(entry, MolEntry) is False:
+                self.validate_entry_format(entry)
 
-        # Entry results will be saved here.
-        pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
+            # Entry results will be saved here.
+            pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
 
-        if self.append_mode and exists(pkl_file):
-            logger.debug("Since append mode is set ON, it will skip entry '%s' because a result for "
-                         "this entry already exists in the working path." % entry.to_string())
-            return
+            if self.append_mode and exists(pkl_file):
+                logger.debug("Since append mode is set ON, it will skip entry '%s' because a result for "
+                             "this entry already exists in the working path." % entry.to_string())
+                return
 
-        # TODO: allow the user to pass a pdb_file through entries.
-        pdb_file = self.get_pdb_file(entry.pdb_id)
-        entry.pdb_file = pdb_file
+            # TODO: allow the user to pass a pdb_file through entries.
+            pdb_file = self.get_pdb_file(entry.pdb_id)
+            entry.pdb_file = pdb_file
 
-        pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=False)
-        structure = pdb_parser.get_structure(entry.pdb_id, pdb_file)
-        add_hydrogen = self.decide_hydrogen_addition(pdb_parser.get_header(), entry)
+            pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=False)
+            structure = pdb_parser.get_structure(entry.pdb_id, pdb_file)
+            add_hydrogen = self.decide_hydrogen_addition(pdb_parser.get_header(), entry)
 
-        if isinstance(entry, MolEntry):
-            structure = entry.get_biopython_structure(structure, pdb_parser)
+            if isinstance(entry, MolEntry):
+                structure = entry.get_biopython_structure(structure, pdb_parser)
 
-        ligand = get_entity_from_entry(structure, entry)
-        ligand.set_as_target(is_target=True)
+            ligand = get_entity_from_entry(structure, entry)
+            ligand.set_as_target(is_target=True)
 
-        #
-        # Perceive pharmacophoric properties
-        #
-        atm_grps_mngr = self.perceive_chemical_groups(entry, structure[0], ligand, add_hydrogen)
-        atm_grps_mngr.entry = entry
+            #
+            # Perceive pharmacophoric properties
+            #
+            atm_grps_mngr = self.perceive_chemical_groups(entry, structure[0], ligand, add_hydrogen)
+            atm_grps_mngr.entry = entry
 
-        #
-        # Calculate interactions
-        #
-        interactions_mngr = self.inter_calc.calc_interactions(atm_grps_mngr.atm_grps)
-        interactions_mngr.entry = entry
+            #
+            # Calculate interactions
+            #
+            interactions_mngr = self.inter_calc.calc_interactions(atm_grps_mngr.atm_grps)
+            interactions_mngr.entry = entry
 
-        # Create hydrophobic islands.
-        atm_grps_mngr.merge_hydrophobic_atoms(interactions_mngr)
+            # Create hydrophobic islands.
+            atm_grps_mngr.merge_hydrophobic_atoms(interactions_mngr)
 
-        # Generate IFP (Interaction fingerprint)
-        ifp = None
-        if self.calc_ifp:
-            ifp = self.create_ifp(atm_grps_mngr)
+            # Generate IFP (Interaction fingerprint)
+            ifp = None
+            if self.calc_ifp:
+                ifp = self.create_ifp(atm_grps_mngr)
 
-        # Generate MFP (Molecular fingerprint)
-        mfp = None
-        if self.calc_mfp:
-            mfp = self.create_mfp()
+            # Generate MFP (Molecular fingerprint)
+            mfp = None
+            if self.calc_mfp:
+                mfp = self.create_mfp()
 
-        # Saving entry results.
-        entry_results = EntryResults(entry, atm_grps_mngr, interactions_mngr, ifp, mfp)
-        entry_results.save(pkl_file)
-
-        # Saving interactions to CSV file.
-        csv_file = "%s/results/interactions/%s.csv" % (self.working_path, entry.to_string())
-        interactions_mngr.to_csv(csv_file)
-
-        logger.debug("Processing of entry '%s' finished successfully." % entry.to_string())
-
-    def _process_ifps(self, entry):
-        pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
-
-        if exists(pkl_file):
-            # Reload results.
-            entry_results = EntryResults.load(pkl_file)
-            atm_grps_mngr = entry_results.atm_grps_mngr
-
-            # Generate a new IFP.
-            ifp = self.create_ifp(atm_grps_mngr)
-
-            # Substitute old IFP by the new version and save the project.
-            entry_results.ifp = ifp
+            # Saving entry results.
+            entry_results = EntryResults(entry, atm_grps_mngr, interactions_mngr, ifp, mfp)
             entry_results.save(pkl_file)
-        else:
-            raise FileNotFoundError("The IFP for the entry '%s' cannot be generated because its pickled "
-                                    "data file '%s' was not found." % (entry.to_string(), pkl_file))
+
+            # Saving interactions to CSV file.
+            csv_file = "%s/results/interactions/%s.csv" % (self.working_path, entry.to_string())
+            interactions_mngr.to_csv(csv_file)
+
+            logger.debug("Processing of entry '%s' finished successfully." % entry.to_string())
+
+        except Exception as e:
+            logger.exception(e)
+            logger.debug("Processing of entry '%s' failed. Check the logs for more information." % entry.to_string())
+            failed = True
+
+        proc_time = time.time() - start
+
+        logger.debug("Processing of entry '%s' took %.2fs." % (entry.to_string(), proc_time))
+
+        # Add progress data to be consumed.
+        progress_queue.put((entry.to_string(), proc_time, failed))
+
+    def _process_ifps(self, entry, progress_queue):
+
+        start = time.time()
+        failed = False
+
+        logger.debug("Starting IFP processing for entry '%s'." % entry.to_string())
+
+        try:
+            pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
+
+            if exists(pkl_file):
+                # Reload results.
+                entry_results = EntryResults.load(pkl_file)
+                atm_grps_mngr = entry_results.atm_grps_mngr
+
+                # Generate a new IFP.
+                ifp = self.create_ifp(atm_grps_mngr)
+
+                # Substitute old IFP by the new version and save the project.
+                entry_results.ifp = ifp
+                entry_results.save(pkl_file)
+            else:
+                raise FileNotFoundError("The IFP for the entry '%s' cannot be generated because its pickled "
+                                        "data file '%s' was not found." % (entry.to_string(), pkl_file))
+
+        except Exception as e:
+            logger.exception(e)
+            logger.debug("IFP processing for entry '%s' failed. Check the logs for more information." % entry.to_string())
+            failed = True
+
+        proc_time = time.time() - start
+
+        logger.debug("IFP processing for entry '%s' took %.2fs." % (entry.to_string(), proc_time))
+
+        # Add progress data to be consumed.
+        progress_queue.put((entry.to_string(), proc_time, failed))
 
     def __call__(self):
         start = time.time()
@@ -688,25 +730,36 @@ class LocalProject(Project):
         if self.preload_mol_files:
             self.add_mol_obj_to_entries()
 
-        job_queue = mp.JoinableQueue(maxsize=self.nproc)
-        progress_queue = mp.JoinableQueue(maxsize=1)
-
         logger.info("Entries processing will start. Number of entries to be processed is: %d." % len(self.entries))
+        logger.info("The number of processes was set to: %s." % self.nproc)
 
+        # Queue for progress tracker.
+        progress_queue = mp.JoinableQueue(maxsize=1)
         entry_processing = ProgressTracker(len(self.entries), progress_queue, "Entries processing.")
         entry_processing.start()
 
-        for i in range(self.nproc):
-            p = mp.Process(name="ConsumerProcess-%d" % i, target=self._consumer, args=(self._process_entry, job_queue, progress_queue))
-            p.daemon = True
-            p.start()
-
         # Initialize a new progress bar (display a 0% progress).
         progress_queue.put(None)
-        # Produce tasks to the consumers to process.
-        self._producer(job_queue)
-        # Join all processes and finalize the progress tracker.
-        job_queue.join()
+
+        # If jobs should run in parallel.
+        if self.nproc is not None:
+            job_queue = mp.JoinableQueue(maxsize=self.nproc)
+
+            for i in range(self.nproc):
+                p = mp.Process(name="ConsumerProcess-%d" % i, target=self._consumer, args=(self._process_entry, job_queue, progress_queue))
+                p.daemon = True
+                p.start()
+
+            # Produce tasks to consumers.
+            self._producer(job_queue)
+
+            # Join all processes and finalize the progress tracker.
+            job_queue.join()
+        # Otherwise, run the jobs sequentially.
+        else:
+            [self._process_entry(e, progress_queue) for e in self.entries]
+
+        # Finish the progress tracker.
         entry_processing.end()
 
         # Remove failed entries.
@@ -751,34 +804,61 @@ class LocalProject(Project):
         if self.ifp_output is None:
             self.prepare_project_path(subdirs=["results", "results/fingerprints"])
 
-        job_queue = mp.JoinableQueue(maxsize=self.nproc)
-        progress_queue = mp.JoinableQueue(maxsize=1)
-
         logger.info("Fingerprint generation will start. Number of entries to be processed is: %d." % len(self.entries))
+        logger.info("The number of processes was set to: %s." % self.nproc)
 
-        entry_processing = ProgressTracker(len(self.entries), progress_queue, "IFPs generation.")
+        # Queue for progress tracker.
+        progress_queue = mp.JoinableQueue(maxsize=1)
+        entry_processing = ProgressTracker(len(self.entries), progress_queue, "Fingerprint generation.")
         entry_processing.start()
-
-        for i in range(self.nproc):
-            p = mp.Process(name="ConsumerProcess-%d" % i, target=self._consumer, args=(self._process_ifps, job_queue, progress_queue))
-            p.daemon = True
-            p.start()
 
         # Initialize a new progress bar (display a 0% progress).
         progress_queue.put(None)
-        # Produce tasks to the consumers to process.
-        self._producer(job_queue)
-        # Join all processes and finalize the progress tracker.
-        job_queue.join()
+
+        # If jobs should run in parallel.
+        if self.nproc is not None:
+            job_queue = mp.JoinableQueue(maxsize=self.nproc)
+
+            for i in range(self.nproc):
+                p = mp.Process(name="ConsumerProcess-%d" % i, target=self._consumer, args=(self._process_ifps, job_queue, progress_queue))
+                p.daemon = True
+                p.start()
+
+            # Produce tasks to consumers.
+            self._producer(job_queue)
+
+            # Join all processes and finalize the progress tracker.
+            job_queue.join()
+        # Otherwise, run the jobs sequentially.
+        else:
+            [self._process_ifps(e, progress_queue) for e in self.entries]
+
+        # Finish the progress tracker.
         entry_processing.end()
 
-        # Generate IFP/MFP files
-        if self.calc_ifp:
-            self.create_ifp_file()
-        if self.calc_mfp:
-            self.create_mfp_file()
+        tmp_entries = self.entries
+        # Remove failed entries.
+        if entry_processing.errors:
+            tmp_entries = [e for e in self.entries if e.to_string() not in entry_processing.errors]
+
+        # If all molecules failed, it won't try to create fingerprints.
+        if len(tmp_entries) == 0:
+            logger.critical("Fingerprint generation failed.")
+        else:
+            logger.info("Fingerprint generation finished successfully.")
+
+            # Warn the users for any errors found during the entries processing.
+            if entry_processing.errors:
+                logger.warning("Number of entries with errors: %d. Check the log file for the complete list of entries that failed."
+                               % len(entry_processing.errors))
+                logger.debug("Entries that failed: %s." % ", ".join([e for e in entry_processing.errors]))
+
+            # Generate IFP/MFP files
+            if self.calc_ifp:
+                self.create_ifp_file()
+            if self.calc_mfp:
+                self.create_mfp_file()
 
         end = time.time()
-        logger.info("IFPs created successfully!!!")
         logger.info("Total processing time: %.2fs." % (end - start))
         logger.info("Results were saved at %s.\n\n" % self.working_path)
