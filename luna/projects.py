@@ -116,13 +116,6 @@ class Project:
             logger.warning("Nothing to be done as no entry was informed.")
             return
 
-        if verbosity not in VERBOSITY_LEVEL:
-            raise IllegalArgumentError("The informed logging level '%s' is not valid. The valid levels are: %s."
-                                       % (repr(verbosity), ", ".join(["%d (%s)" % (k, logging.getLevelName(v))
-                                                                      for k, v in sorted(VERBOSITY_LEVEL.items())])))
-        else:
-            logger.info("Verbosity set to: %d (%s)." % (verbosity, logging.getLevelName(verbosity)))
-
         if mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES:
             raise IllegalArgumentError("Invalid value for 'mol_obj_type'. Objects of type '%s' are not currently accepted. "
                                        "The available options are: %s." % (mol_obj_type,
@@ -181,7 +174,9 @@ class Project:
 
         self.step_controls = {}
         self.append_mode = append_mode
-        self.verbosity = VERBOSITY_LEVEL[verbosity]
+        self.logging_file = "%s/logs/project.log" % self.working_path
+        self._loaded_logging_file = False
+        self.verbosity = verbosity
 
         self.nproc = nproc
 
@@ -264,6 +259,25 @@ class Project:
 
         self._nproc = nproc
 
+    @property
+    def verbosity(self):
+        return self._verbosity
+
+    @verbosity.setter
+    def verbosity(self, verbosity):
+        if verbosity not in VERBOSITY_LEVEL:
+            raise IllegalArgumentError("The informed logging level '%s' is not valid. The valid levels are: %s."
+                                       % (repr(verbosity), ", ".join(["%d (%s)" % (k, logging.getLevelName(v))
+                                                                      for k, v in sorted(VERBOSITY_LEVEL.items())])))
+        else:
+            logger.info("Verbosity set to: %d (%s)." % (verbosity, logging.getLevelName(VERBOSITY_LEVEL[verbosity])))
+
+        self._verbosity = VERBOSITY_LEVEL[verbosity]
+
+        # If the logging file has already been loaded, it is necessary to update the logging verbosity level.
+        if self._loaded_logging_file:
+            self.init_logging_file(self.logging_file)
+
     def get_entry_results(self, entry):
         pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
         try:
@@ -280,7 +294,7 @@ class Project:
         logger.debug("Preferences:\n%s" % "\n".join(params))
 
     def prepare_project_path(self, subdirs=None):
-        logger.info("Initializing project directory '%s'." % self.working_path)
+        logger.info("Preparing project directory '%s'." % self.working_path)
 
         if subdirs is None:
             subdirs = self._paths
@@ -310,6 +324,8 @@ class Project:
 
             # Print preferences at the new logging file.
             self.log_preferences()
+
+            self._loaded_logging_file = True
         except Exception as e:
             logger.exception(e)
             raise FileNotCreated("Logging file '%s' could not be created." % logging_filename)
@@ -550,30 +566,47 @@ class Project:
         pickle_data(self, output_file, compressed)
 
     @staticmethod
-    def load(input_path):
+    def load(input_path, verbosity=3):
+
         input_file = None
+
+        #
+        # Check if the provided input path is a valid file or directory containing saved projects.
+        #
         if is_file_valid(input_path):
             input_file = input_path
-
         elif is_directory_valid(input_path):
             project_files = glob.glob("%s/project_v*.pkl.gz" % input_path)
             if len(project_files) == 1:
                 input_file = project_files[0]
+            elif len(project_files) == 0:
+                raise PKLNotReadError("In the provided working path '%s', there is no saved project." % input_path)
             else:
                 raise PKLNotReadError("In the provided working path '%s', there are multiple saved projects. "
                                       "Please, specify which one you want to load." % input_path)
+        else:
+            raise IllegalArgumentError("The provided path '%s' does not exist or is an invalid file/directory." % input_path)
 
         logger.info("Reloading project saved in '%s'" % input_file)
 
         proj_obj = unpickle_data(input_file)
 
         if has_version_compatibility(proj_obj.version):
+            proj_obj._loaded_logging_file = False
+            proj_obj.verbosity = verbosity
+
             # Update the working path if the project has been moved to a different path.
             curr_working_path = dirname(abspath(input_file))
+
             if proj_obj.working_path != curr_working_path:
                 proj_obj.working_path = curr_working_path
+                proj_obj.logging_file = "%s/logs/project.log" % proj_obj.working_path
 
-            proj_obj.init_logging_file("%s/logs/project.log" % proj_obj.working_path)
+            # Create a new directory for logs.
+            if not exists("%s/logs/" % proj_obj.working_path):
+                proj_obj.prepare_project_path(subdirs=["logs"])
+
+            proj_obj.init_logging_file(proj_obj.logging_file)
 
             logger.info("Project reloaded successfully.")
             return proj_obj
@@ -723,7 +756,7 @@ class LocalProject(Project):
         start = time.time()
 
         self.prepare_project_path()
-        self.init_logging_file("%s/logs/project.log" % self.working_path)
+        self.init_logging_file(self.logging_file)
 
         self.remove_duplicate_entries()
 
