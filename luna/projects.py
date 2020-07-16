@@ -3,9 +3,10 @@ from collections import defaultdict
 import time
 import logging
 import glob
-
+import warnings
 import multiprocessing as mp
 
+# Open Babel and RDKit libraries
 from openbabel.pybel import readfile
 from openbabel.pybel import informats as OB_FORMATS
 from rdkit.Chem import ChemicalFeatures
@@ -29,8 +30,7 @@ from luna.util.default_values import *
 from luna.util.exceptions import *
 from luna.util.file import *
 from luna.util.logging import new_logging_file, load_default_logging_conf
-from luna.util.multiprocessing_logging import start_mp_handler
-import luna.util.logging_ini
+from luna.util.multiprocessing_logging import start_mp_handler, MultiProcessingHandler
 
 from luna.MyBio.PDB.PDBParser import PDBParser
 from luna.MyBio.selector import ResidueSelector
@@ -42,9 +42,7 @@ from sys import setrecursionlimit
 # Set a recursion limit to avoid RecursionError with the library pickle.
 setrecursionlimit(RECURSION_LIMIT)
 
-
-logger = logging.getLogger()
-
+logger = load_default_logging_conf()
 
 VERBOSITY_LEVEL = {4: logging.DEBUG,
                    3: logging.INFO,
@@ -110,11 +108,11 @@ class Project:
 
                  append_mode=False,
                  verbosity=3,
+                 logging_enabled=True,
                  nproc=MAX_NPROCS):
 
-        if len(entries) == 0:
-            logger.warning("Nothing to be done as no entry was informed.")
-            return
+        # Property required by self._log()
+        self.logging_enabled = logging_enabled
 
         if mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES:
             raise IllegalArgumentError("Invalid value for 'mol_obj_type'. Objects of type '%s' are not currently accepted. "
@@ -122,7 +120,7 @@ class Project:
                                                                            ", ".join(["'%s'" % m for m in ACCEPTED_MOL_OBJ_TYPES])))
 
         if inter_conf is None:
-            logger.info("No interaction configuration was set and the default will be used instead")
+            self._log("info", "No interaction configuration was set and the default will be used instead")
         elif inter_conf is not None and isinstance(inter_conf, InteractionConf) is False:
             raise IllegalArgumentError("The informed interaction configuration must be an instance of %s."
                                        % ".".join([InteractionConf.__module__, InteractionConf.__name__]))
@@ -131,10 +129,10 @@ class Project:
             raise IllegalArgumentError("The informed interaction configuration must be an instance of %s."
                                        % ".".join([InteractionCalculator.__module__, InteractionCalculator.__name__]))
         elif inter_calc is None:
-            logger.info("No interaction calculator object was defined and the default will be used instead.")
+            self._log("info", "No interaction calculator object was defined and the default will be used instead.")
 
         if append_mode:
-            logger.warning("Append mode set ON, entries with already existing results will skip the entries processing.")
+            self._log("warning", "Append mode set ON, entries with already existing results will skip the entries processing.")
 
         self.entries = entries
         self.working_path = working_path
@@ -174,8 +172,9 @@ class Project:
 
         self.step_controls = {}
         self.append_mode = append_mode
-        self.logging_file = "%s/logs/project.log" % self.working_path
+
         self._loaded_logging_file = False
+        self.logging_file = "%s/logs/project.log" % self.working_path
         self.verbosity = verbosity
 
         self.nproc = nproc
@@ -183,10 +182,6 @@ class Project:
         self.version = __version__
 
         self._paths = ["chunks", "figures", "logs", "pdbs", "results/interactions", "results/fingerprints", "results", "tmp"]
-
-        load_default_logging_conf()
-
-        self.log_preferences()
 
     def __call__(self):
         raise NotImplementedError("This class is not callable. Use a class that implements this method.")
@@ -238,26 +233,41 @@ class Project:
     def nproc(self, nproc):
         if nproc is not None:
             if not isinstance(nproc, int) or isinstance(nproc, bool):
-                logger.warning("The number of processes must be an integer value, but a(n) %s was provided instead. "
-                               "Therefore, the number of processes 'nproc' was set to its maximum accepted capability "
-                               "(%d - 1 = %d)." % (nproc.__class__.__name__, mp.cpu_count(), MAX_NPROCS))
+                self._log("warning", "The number of processes must be an integer value, but a(n) %s was provided instead. "
+                          "Therefore, the number of processes 'nproc' was set to its maximum accepted capacity "
+                          "(%d - 1 = %d)." % (nproc.__class__.__name__, mp.cpu_count(), MAX_NPROCS))
                 nproc = MAX_NPROCS
 
             elif nproc < 1:
-                logger.warning("It was trying to create an invalid number of processes (%s). Therefore, the number of "
-                               "processes 'nproc' was set to its maximum accepted capability (%d - 1 = %d)." % (str(nproc), mp.cpu_count(),
-                                                                                                                MAX_NPROCS))
+                self._log("warning", "It was trying to create an invalid number of processes (%s). Therefore, the number of "
+                          "processes 'nproc' was set to its maximum accepted capacity (%d - 1 = %d)." % (str(nproc), mp.cpu_count(),
+                                                                                                         MAX_NPROCS))
                 nproc = MAX_NPROCS
 
             elif nproc >= mp.cpu_count():
-                logger.warning("It was trying to create %d processes, which is equal to or greater than the maximum "
-                               "amount of available CPUs (%d). Therefore, the number of processes 'nproc' was set to %d "
-                               "to leave at least one CPU free." % (nproc, mp.cpu_count(), MAX_NPROCS))
+                self._log("warning", "It was trying to create %d processes, which is equal to or greater than the maximum "
+                          "amount of available CPUs (%d). Therefore, the number of processes 'nproc' was set to %d "
+                          "to leave at least one CPU free." % (nproc, mp.cpu_count(), MAX_NPROCS))
                 nproc = MAX_NPROCS
         else:
-            logger.warning("The number of processes was set to '%s'. Therefore, LUNA will run jobs sequentially." % nproc)
+            self._log("warning", "The number of processes was set to '%s'. Therefore, LUNA will run jobs sequentially." % nproc)
 
         self._nproc = nproc
+
+    @property
+    def logging_enabled(self):
+        return self._logging_enabled
+
+    @logging_enabled.setter
+    def logging_enabled(self, is_enabled):
+        if not is_enabled:
+            warnings.warn("Logging mode was set OFF. No logging information will be saved from now on.")
+            logger.disabled = True
+        else:
+            warnings.warn("Logging mode was set ON. Logging information will be saved from now on.")
+            logger.disabled = False
+
+        self._logging_enabled = is_enabled
 
     @property
     def verbosity(self):
@@ -270,7 +280,7 @@ class Project:
                                        % (repr(verbosity), ", ".join(["%d (%s)" % (k, logging.getLevelName(v))
                                                                       for k, v in sorted(VERBOSITY_LEVEL.items())])))
         else:
-            logger.info("Verbosity set to: %d (%s)." % (verbosity, logging.getLevelName(VERBOSITY_LEVEL[verbosity])))
+            self._log("info", "Verbosity set to: %d (%s)." % (verbosity, logging.getLevelName(VERBOSITY_LEVEL[verbosity])))
 
         self._verbosity = VERBOSITY_LEVEL[verbosity]
 
@@ -283,18 +293,57 @@ class Project:
         try:
             return EntryResults.load(pkl_file)
         except Exception as e:
-            logger.exception(e)
+            self._log("exception", e)
 
-    def run(self):
-        self()
+    def _log(self, level, message):
+        if self._logging_enabled:
+            try:
+                getattr(logger, level)(message)
+            except Exception:
+                raise
 
-    def log_preferences(self):
-        logger.debug("New project initialized...")
-        params = ["\t\t\t-- %s = %s" % (key, str(self.__dict__[key])) for key in sorted(self.__dict__)]
-        logger.debug("Preferences:\n%s" % "\n".join(params))
+    def _log_preferences(self):
+        self._log("debug", "New project initialized...")
+        params = []
+        for key in sorted(self.__dict__):
+            if key == "entries":
+                params.append("\t\t\t-- # %s = %d" % (key, len(self.__dict__[key])))
+            else:
+                params.append("\t\t\t-- %s = %s" % (key, str(self.__dict__[key])))
+        self._log("debug", "Preferences:\n%s" % "\n".join(params))
+
+    def init_logging_file(self, logging_filename=None, use_mp_handler=True):
+        if self._logging_enabled:
+            if not logging_filename:
+                logging_filename = get_unique_filename(TMP_FILES)
+
+            try:
+                new_logging_file(logging_filename, logging_level=self.verbosity)
+
+                start_mp_handler()
+
+                self._log("info", "Logging file '%s' initialized successfully." % logging_filename)
+
+                # Print preferences at the new logging file.
+                self._log_preferences()
+
+                self._loaded_logging_file = True
+            except Exception as e:
+                self._log("exception", e)
+                raise FileNotCreated("Logging file '%s' could not be created." % logging_filename)
+
+    def close_logging_file(self):
+        try:
+            for handler in logger.handlers:
+                if isinstance(handler, MultiProcessingHandler):
+                    if isinstance(handler.sub_handler, logging.FileHandler):
+                        handler.close()
+                        logger.removeHandler(handler)
+        except Exception:
+            pass
 
     def prepare_project_path(self, subdirs=None):
-        logger.info("Preparing project directory '%s'." % self.working_path)
+        self._log("info", "Preparing project directory '%s'." % self.working_path)
 
         if subdirs is None:
             subdirs = self._paths
@@ -305,30 +354,11 @@ class Project:
         for path in subdirs:
             create_directory("%s/%s" % (self.working_path, path))
 
-        logger.info("Project directory '%s' created successfully." % self.working_path)
+        self._log("info", "Project directory '%s' created successfully." % self.working_path)
 
     def remove_empty_paths(self):
         for path in self._paths:
             clear_directory("%s/%s" % (self.working_path, path), only_empty_paths=True)
-
-    def init_logging_file(self, logging_filename=None, use_mp_handler=True):
-        if not logging_filename:
-            logging_filename = get_unique_filename(TMP_FILES)
-
-        try:
-            new_logging_file(logging_filename, logging_level=self.verbosity)
-
-            start_mp_handler()
-
-            logger.info("Logging file '%s' initialized successfully." % logging_filename)
-
-            # Print preferences at the new logging file.
-            self.log_preferences()
-
-            self._loaded_logging_file = True
-        except Exception as e:
-            logger.exception(e)
-            raise FileNotCreated("Logging file '%s' could not be created." % logging_filename)
 
     def remove_duplicate_entries(self):
         entries = {}
@@ -336,10 +366,10 @@ class Project:
             if entry.to_string() not in entries:
                 entries[entry.to_string()] = entry
             else:
-                logger.debug("An entry with id '%s' already exists in the list of entries, so the entry %s is a duplicate and will "
-                             "be removed." % (entry.to_string(), entry))
+                self._log("debug", "An entry with id '%s' already exists in the list of entries, so the entry %s is a duplicate and will "
+                          "be removed." % (entry.to_string(), entry))
 
-        logger.info("The remotion of duplicate entries was finished. %d entrie(s) were removed." % (len(self.entries) - len(entries)))
+        self._log("info", "The remotion of duplicate entries was finished. %d entrie(s) were removed." % (len(self.entries) - len(entries)))
 
         self.entries = list(entries.values())
 
@@ -360,7 +390,7 @@ class Project:
             try:
                 download_pdb(pdb_id=pdb_id, output_path=working_pdb_path)
             except Exception as e:
-                logger.exception(e)
+                self._log("exception", e)
                 raise FileNotCreated("PDB file '%s' was not created." % pdb_file) from e
         return pdb_file
 
@@ -370,14 +400,14 @@ class Project:
                 method = pdb_header["structure_method"]
                 # If the method is not a NMR type does not add hydrogen as it usually already has hydrogens.
                 if method.upper() in NMR_METHODS:
-                    logger.debug("The structure related to the entry '%s' was obtained by NMR, so it will "
-                                 "not add hydrogens to it." % entry.to_string())
+                    self._log("debug", "The structure related to the entry '%s' was obtained by NMR, so it will "
+                              "not add hydrogens to it." % entry.to_string())
                     return False
             return True
         return False
 
     def perceive_chemical_groups(self, entry, entity, ligand, add_h=False):
-        logger.debug("Starting pharmacophore perception for entry '%s'" % entry.to_string())
+        self._log("debug", "Starting pharmacophore perception for entry '%s'" % entry.to_string())
 
         feature_factory = ChemicalFeatures.BuildFeatureFactory(self.atom_prop_file)
         feature_extractor = FeatureExtractor(feature_factory)
@@ -394,7 +424,7 @@ class Project:
 
         atm_grps_mngr = perceiver.perceive_atom_groups(set([x[1] for x in nb_compounds]), mol_objs_dict=mol_objs_dict)
 
-        logger.debug("Pharmacophore perception for entry '%s' has finished." % entry.to_string())
+        self._log("debug", "Pharmacophore perception for entry '%s' has finished." % entry.to_string())
 
         return atm_grps_mngr
 
@@ -412,11 +442,11 @@ class Project:
                 entry.mol_obj_type = self.mol_obj_type
                 mol_files[(entry.mol_file, entry.mol_file_ext)][entry.mol_id] = entry
             else:
-                logger.debug("Molecular object in entry '%s' was manually informed and will not be reloaded." % entry.to_string())
+                self._log("debug", "Molecular object in entry '%s' was manually informed and will not be reloaded." % entry.to_string())
 
         tool = "Open Babel" if self.mol_obj_type == "openbabel" else "RDKit"
-        logger.info("It will try to preload the molecular objects using %s. Total of files to be read: %d."
-                    % (tool, len(mol_files)))
+        self._log("info", "It will try to preload the molecular objects using %s. Total of files to be read: %d."
+                  % (tool, len(mol_files)))
 
         try:
             for mol_file, mol_file_ext in mol_files:
@@ -431,8 +461,8 @@ class Project:
                 if not exists(mol_file):
                     raise FileNotFoundError("The file '%s' was not found." % mol_file)
 
-                logger.info("Reading the file '%s'. The number of target entries located in this file is %d."
-                            % (mol_file, len(mol_files[key])))
+                self._log("info", "Reading the file '%s'. The number of target entries located in this file is %d."
+                          % (mol_file, len(mol_files[key])))
 
                 try:
                     if self.mol_obj_type == "openbabel":
@@ -442,14 +472,14 @@ class Project:
                                 entry = mol_files[key][mol_id]
                                 entry.mol_obj = ob_mol
                                 del(mol_files[key][mol_id])
-                                logger.debug("A structure to the entry '%s' was found in the file '%s' and loaded "
-                                             "into the entry." % (entry.to_string(), mol_file))
+                                self._log("debug", "A structure to the entry '%s' was found in the file '%s' and loaded "
+                                          "into the entry." % (entry.to_string(), mol_file))
 
                                 # If there is no other molecules to search, just stop the loop.
                                 if len(mol_files[key]) == 0:
                                     break
                         else:
-                            logger.info("All target ligands located in the file '%s' were successfully loaded." % mol_file)
+                            self._log("info", "All target ligands located in the file '%s' were successfully loaded." % mol_file)
                     else:
                         targets = list(mol_files[key].keys())
 
@@ -461,18 +491,18 @@ class Project:
                             if rdk_mol:
                                 entry.mol_obj = rdk_mol
                                 del(mol_files[key][mol_id])
-                                logger.debug("A structure to the entry '%s' was found in the file '%s' and loaded "
-                                             "into the entry." % (entry.to_string(), mol_file))
+                                self._log("debug", "A structure to the entry '%s' was found in the file '%s' and loaded "
+                                          "into the entry." % (entry.to_string(), mol_file))
                             else:
-                                logger.debug("The structure related to the entry '%s' was found in the file '%s', but it could "
-                                             "not be loaded as errors were found while parsing it." % (entry.to_string(), mol_file))
+                                self._log("debug", "The structure related to the entry '%s' was found in the file '%s', but it could "
+                                          "not be loaded as errors were found while parsing it." % (entry.to_string(), mol_file))
                 except Exception as e:
-                    logger.exception(e)
+                    self._log("exception", e)
                     raise MoleculeObjectError("An error occurred while parsing the molecular file '%s' with %s and the molecule "
                                               "objects could not be created. Check the logs for more information." %
                                               (mol_file, tool))
         except Exception as e:
-            logger.exception(e)
+            self._log("exception", e)
             raise
 
         invalid_entries = [e for m in mol_files for e in mol_files[m].values()]
@@ -480,10 +510,10 @@ class Project:
             entries = set(self.entries)
             for entry in invalid_entries:
                 entries.remove(entry)
-                logger.debug("Entry '%s' was not found or generated errors, so it will be removed "
-                             "from the entries list." % entry.to_string())
-            logger.warning("%d entrie(s) were removed during molecules loading due to errors or structure identification."
-                           % len(invalid_entries))
+                self._log("debug", "Entry '%s' was not found or generated errors, so it will be removed "
+                          "from the entries list." % entry.to_string())
+            self._log("warning", "%d entrie(s) were removed during molecules loading due to errors or structure identification."
+                      % len(invalid_entries))
             self.entries = entries
 
     def generate_ligand_figure(self, rdmol, group_types):
@@ -510,8 +540,8 @@ class Project:
 
             return generate_fp_for_mols([rdmol_lig], "morgan_fp")[0]["fp"]
         else:
-            logger.warning("Currently, it cannot generate molecular fingerprints for "
-                           "instances of %s." % entry.__class__.__name__)
+            self._log("warning", "Currently, it cannot generate molecular fingerprints for "
+                      "instances of %s." % entry.__class__.__name__)
 
     def create_ifp(self, atm_grps_mngr):
         sg = ShellGenerator(self.ifp_num_levels, self.ifp_radius_step,
@@ -562,16 +592,17 @@ class Project:
 
         return lig_clusters
 
+    def run(self):
+        self()
+
     def save(self, output_file, compressed=True):
         pickle_data(self, output_file, compressed)
 
     @staticmethod
-    def load(input_path, verbosity=3):
-
-        input_file = None
+    def load(input_path, verbosity=3, logging_enabled=True):
 
         #
-        # Check if the provided input path is a valid file or directory containing saved projects.
+        # Check if the provided input path is a valid file or a directory containing saved projects.
         #
         if is_file_valid(input_path):
             input_file = input_path
@@ -587,13 +618,17 @@ class Project:
         else:
             raise IllegalArgumentError("The provided path '%s' does not exist or is an invalid file/directory." % input_path)
 
-        logger.info("Reloading project saved in '%s'" % input_file)
+        if not logging_enabled:
+            logger.disabled = True
+
+        logger.info("Reloading project saved in '%s'.\n" % input_file)
 
         proj_obj = unpickle_data(input_file)
 
         if has_version_compatibility(proj_obj.version):
             proj_obj._loaded_logging_file = False
             proj_obj.verbosity = verbosity
+            proj_obj.logging_enabled = logging_enabled
 
             # Update the working path if the project has been moved to a different path.
             curr_working_path = dirname(abspath(input_file))
@@ -602,13 +637,7 @@ class Project:
                 proj_obj.working_path = curr_working_path
                 proj_obj.logging_file = "%s/logs/project.log" % proj_obj.working_path
 
-            # Create a new directory for logs.
-            if not exists("%s/logs/" % proj_obj.working_path):
-                proj_obj.prepare_project_path(subdirs=["logs"])
-
-            proj_obj.init_logging_file(proj_obj.logging_file)
-
-            logger.info("Project reloaded successfully.")
+            proj_obj._log("info", "Project reloaded successfully.")
             return proj_obj
         else:
             raise CompatibilityError("The project loaded from '%s' has a version (%s) not compatible with the "
@@ -638,7 +667,7 @@ class LocalProject(Project):
         start = time.time()
         failed = False
 
-        logger.debug("Starting entry processing: %s." % entry.to_string())
+        self._log("debug", "Starting entry processing: %s." % entry.to_string())
 
         try:
             # Check if the entry is in the correct format.
@@ -650,8 +679,8 @@ class LocalProject(Project):
             pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
 
             if self.append_mode and exists(pkl_file):
-                logger.debug("Since append mode is set ON, it will skip entry '%s' because a result for "
-                             "this entry already exists in the working path." % entry.to_string())
+                self._log("debug", "Since append mode is set ON, it will skip entry '%s' because a result for "
+                          "this entry already exists in the working path." % entry.to_string())
                 return
 
             # TODO: allow the user to pass a pdb_file through entries.
@@ -701,16 +730,16 @@ class LocalProject(Project):
             csv_file = "%s/results/interactions/%s.csv" % (self.working_path, entry.to_string())
             interactions_mngr.to_csv(csv_file)
 
-            logger.debug("Processing of entry '%s' finished successfully." % entry.to_string())
+            self._log("debug", "Processing of entry '%s' finished successfully." % entry.to_string())
 
         except Exception as e:
-            logger.exception(e)
-            logger.debug("Processing of entry '%s' failed. Check the logs for more information." % entry.to_string())
+            self._log("exception", e)
+            self._log("debug", "Processing of entry '%s' failed. Check the logs for more information." % entry.to_string())
             failed = True
 
         proc_time = time.time() - start
 
-        logger.debug("Processing of entry '%s' took %.2fs." % (entry.to_string(), proc_time))
+        self._log("debug", "Processing of entry '%s' took %.2fs." % (entry.to_string(), proc_time))
 
         # Add progress data to be consumed.
         progress_queue.put((entry.to_string(), proc_time, failed))
@@ -720,7 +749,7 @@ class LocalProject(Project):
         start = time.time()
         failed = False
 
-        logger.debug("Starting IFP processing for entry '%s'." % entry.to_string())
+        self._log("debug", "Starting IFP processing for entry '%s'." % entry.to_string())
 
         try:
             pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
@@ -741,18 +770,23 @@ class LocalProject(Project):
                                         "data file '%s' was not found." % (entry.to_string(), pkl_file))
 
         except Exception as e:
-            logger.exception(e)
-            logger.debug("IFP processing for entry '%s' failed. Check the logs for more information." % entry.to_string())
+            self._log("exception", e)
+            self._log("debug", "IFP processing for entry '%s' failed. Check the logs for more information." % entry.to_string())
             failed = True
 
         proc_time = time.time() - start
 
-        logger.debug("IFP processing for entry '%s' took %.2fs." % (entry.to_string(), proc_time))
+        self._log("debug", "IFP processing for entry '%s' took %.2fs." % (entry.to_string(), proc_time))
 
         # Add progress data to be consumed.
         progress_queue.put((entry.to_string(), proc_time, failed))
 
     def __call__(self):
+
+        if len(self.entries) == 0:
+            logger.warning("There is nothing to be done as no entry was informed.")
+            return
+
         start = time.time()
 
         self.prepare_project_path()
@@ -763,8 +797,8 @@ class LocalProject(Project):
         if self.preload_mol_files:
             self.add_mol_obj_to_entries()
 
-        logger.info("Entries processing will start. Number of entries to be processed is: %d." % len(self.entries))
-        logger.info("The number of processes was set to: %s." % self.nproc)
+        self._log("info", "Entries processing will start. Number of entries to be processed is: %d." % len(self.entries))
+        self._log("info", "The number of processes was set to: %s." % self.nproc)
 
         # Queue for progress tracker.
         progress_queue = mp.JoinableQueue(maxsize=1)
@@ -801,15 +835,15 @@ class LocalProject(Project):
 
         # If all molecules failed, it won't try to create fingerprints.
         if len(self.entries) == 0:
-            logger.critical("Entries processing failed.")
+            self._log("critical", "Entries processing failed.")
         else:
-            logger.info("Entries processing finished successfully.")
+            self._log("info", "Entries processing finished successfully.")
 
             # Warn the users for any errors found during the entries processing.
             if entry_processing.errors:
-                logger.warning("Number of entries with errors: %d. Check the log file for the complete list of entries that failed."
-                               % len(entry_processing.errors))
-                logger.debug("Entries that failed: %s." % ", ".join([e for e in entry_processing.errors]))
+                self._log("warning", "Number of entries with errors: %d. Check the log file for the complete list of entries that failed."
+                          % len(entry_processing.errors))
+                self._log("debug", "Entries that failed: %s." % ", ".join([e for e in entry_processing.errors]))
 
             # Generate IFP/MFP files
             if self.calc_ifp:
@@ -824,12 +858,20 @@ class LocalProject(Project):
         self.remove_empty_paths()
 
         end = time.time()
-        logger.info("Project creation completed!!!")
-        logger.info("Total processing time: %.2fs." % (end - start))
-        logger.info("Results were saved at %s." % self.working_path)
-        logger.info("You can reload your project from %s.\n\n" % self.project_file)
+        self._log("info", "Project creation completed!!!")
+        self._log("info", "Total processing time: %.2fs." % (end - start))
+        self._log("info", "Results were saved at %s." % self.working_path)
+        self._log("info", "You can reload your project from %s.\n\n" % self.project_file)
+
+        # Properly close any filehandlers.
+        self.close_logging_file()
 
     def generate_ifps(self):
+
+        if len(self.entries) == 0:
+            logger.warning("There is nothing to be done as no entry was informed.")
+            return
+
         start = time.time()
 
         self.calc_ifp = True
@@ -837,8 +879,14 @@ class LocalProject(Project):
         if self.ifp_output is None:
             self.prepare_project_path(subdirs=["results", "results/fingerprints"])
 
-        logger.info("Fingerprint generation will start. Number of entries to be processed is: %d." % len(self.entries))
-        logger.info("The number of processes was set to: %s." % self.nproc)
+        # Create a new directory for logs.
+        if self.logging_enabled:
+            if not exists("%s/logs/" % self.working_path):
+                self.prepare_project_path(subdirs=["logs"])
+            self.init_logging_file(self.logging_file)
+
+        self._log("info", "Fingerprint generation will start. Number of entries to be processed is: %d." % len(self.entries))
+        self._log("info", "The number of processes was set to: %s." % self.nproc)
 
         # Queue for progress tracker.
         progress_queue = mp.JoinableQueue(maxsize=1)
@@ -876,15 +924,15 @@ class LocalProject(Project):
 
         # If all molecules failed, it won't try to create fingerprints.
         if len(tmp_entries) == 0:
-            logger.critical("Fingerprint generation failed.")
+            self._log("critical", "Fingerprint generation failed.")
         else:
-            logger.info("Fingerprint generation finished successfully.")
+            self._log("info", "Fingerprint generation finished successfully.")
 
             # Warn the users for any errors found during the entries processing.
             if entry_processing.errors:
-                logger.warning("Number of entries with errors: %d. Check the log file for the complete list of entries that failed."
-                               % len(entry_processing.errors))
-                logger.debug("Entries that failed: %s." % ", ".join([e for e in entry_processing.errors]))
+                self._log("warning", "Number of entries with errors: %d. Check the log file for the complete list of entries that failed."
+                          % len(entry_processing.errors))
+                self._log("debug", "Entries that failed: %s." % ", ".join([e for e in entry_processing.errors]))
 
             # Generate IFP/MFP files
             if self.calc_ifp:
@@ -892,6 +940,12 @@ class LocalProject(Project):
             if self.calc_mfp:
                 self.create_mfp_file()
 
+        # Remove unnecessary paths.
+        self.remove_empty_paths()
+
         end = time.time()
-        logger.info("Total processing time: %.2fs." % (end - start))
-        logger.info("Results were saved at %s.\n\n" % self.working_path)
+        self._log("info", "Total processing time: %.2fs." % (end - start))
+        self._log("info", "Results were saved at %s.\n\n" % self.working_path)
+
+        # Properly close any filehandlers.
+        self.close_logging_file()
