@@ -88,3 +88,5 @@ def load_default_logging_conf():
 
     LOGGING_CONF = os.path.join(os.path.dirname(__file__), "logging.ini")
     logging.config.fileConfig(LOGGING_CONF)
+
+    return logger
