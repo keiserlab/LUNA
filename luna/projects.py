@@ -296,7 +296,7 @@ class Project:
             self._log("exception", e)
 
     def _log(self, level, message):
-        if self._logging_enabled:
+        if self.logging_enabled:
             try:
                 getattr(logger, level)(message)
             except Exception:
@@ -313,7 +313,7 @@ class Project:
         self._log("debug", "Preferences:\n%s" % "\n".join(params))
 
     def init_logging_file(self, logging_filename=None, use_mp_handler=True):
-        if self._logging_enabled:
+        if self.logging_enabled:
             if not logging_filename:
                 logging_filename = get_unique_filename(TMP_FILES)
 
