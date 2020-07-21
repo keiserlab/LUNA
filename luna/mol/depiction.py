@@ -56,7 +56,6 @@ class PharmacophoreDepiction:
         opts = drawer.drawOptions()
 
         highlight = {}
-
         for atm_id in atm_types:
             centroid = list(rwm.GetConformer().GetAtomPosition(atm_id))
             valid_features = [f for f in atm_types[atm_id] if f.name in self.colors]
@@ -110,8 +109,8 @@ class PharmacophoreDepiction:
 
     def _add_dummy_atom(self, mol, pos=None):
         new_atm = Chem.rdchem.Atom(10)
-        new_atm.SetNoImplicit(True)
         atm_id = mol.AddAtom(new_atm)
         mol.GetConformer().SetAtomPosition(atm_id, pos)
+        new_atm.SetNoImplicit(True)
 
         return atm_id

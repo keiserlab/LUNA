@@ -784,7 +784,7 @@ class LocalProject(Project):
     def __call__(self):
 
         if len(self.entries) == 0:
-            logger.warning("There is nothing to be done as no entry was informed.")
+            warnings.warn("There is nothing to be done as no entry was informed.")
             return
 
         start = time.time()
@@ -798,7 +798,7 @@ class LocalProject(Project):
             self.add_mol_obj_to_entries()
 
         self._log("info", "Entries processing will start. Number of entries to be processed is: %d." % len(self.entries))
-        self._log("info", "The number of processes was set to: %s." % self.nproc)
+        self._log("info", "The number of processes was set to: '%s'." % str(self.nproc))
 
         # Queue for progress tracker.
         progress_queue = mp.JoinableQueue(maxsize=1)
@@ -869,7 +869,7 @@ class LocalProject(Project):
     def generate_ifps(self):
 
         if len(self.entries) == 0:
-            logger.warning("There is nothing to be done as no entry was informed.")
+            warnings.warn("There is nothing to be done as no entry was informed.")
             return
 
         start = time.time()
@@ -886,7 +886,7 @@ class LocalProject(Project):
             self.init_logging_file(self.logging_file)
 
         self._log("info", "Fingerprint generation will start. Number of entries to be processed is: %d." % len(self.entries))
-        self._log("info", "The number of processes was set to: %s." % self.nproc)
+        self._log("info", "The number of processes was set to: %s." % str(self.nproc))
 
         # Queue for progress tracker.
         progress_queue = mp.JoinableQueue(maxsize=1)
