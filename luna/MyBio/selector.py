@@ -31,6 +31,9 @@ class ResidueSelectorByResSeq(Selector):
     def accept_residue(self, res):
         return True if (res.get_id()[1] in self.entries) else False
 
+    def accept_atom(self, atom):
+        return super().accept_atom(atom) and self.accept_residue(atom.get_parent())
+
 
 class ChainSelector(Selector):
 
@@ -40,6 +43,12 @@ class ChainSelector(Selector):
 
     def accept_chain(self, chain):
         return True if (chain in self.entries) else False
+
+    def accept_residue(self, res):
+        return self.accept_chain(res.get_parent())
+
+    def accept_atom(self, atom):
+        return super().accept_atom(atom) and self.accept_residue(atom.get_parent())
 
 
 class ResidueSelector(Selector):
@@ -51,6 +60,15 @@ class ResidueSelector(Selector):
     def accept_residue(self, res):
         return res in self.entries
 
+    def accept_atom(self, atom):
+        return super().accept_atom(atom) and self.accept_residue(atom.get_parent())
+
 
 class AtomSelector(Selector):
-    pass
+
+    def __init__(self, entries, **kwargs):
+        self.entries = entries
+        super().__init__(**kwargs)
+
+    def accept_atom(self, atom):
+        return super().accept_atom(atom) and atom in self.entries
