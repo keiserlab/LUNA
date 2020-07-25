@@ -1,10 +1,10 @@
-from openbabel.pybel import informats, outformats
 from subprocess import Popen, PIPE, TimeoutExpired
+
+from openbabel.pybel import informats, outformats
 
 from luna.util.exceptions import FileNotCreated, InvalidFileFormat
 from luna.util.default_values import OPENBABEL
 from luna.util.file import is_file_valid, try_validate_file, get_file_format
-
 
 import logging
 logger = logging.getLogger()
