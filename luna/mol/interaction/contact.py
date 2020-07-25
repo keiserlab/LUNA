@@ -2,11 +2,11 @@ from itertools import product
 
 
 from luna.util.default_values import COV_SEARCH_RADIUS, BOUNDARY_CONF
-from luna.util.exceptions import EntityLevelError
+from luna.util.exceptions import EntityLevelError, IllegalArgumentError
 from luna.MyBio.util import get_entity_level_name, is_covalently_bound
 from luna.MyBio.PDB.NeighborSearch import NeighborSearch
 from luna.MyBio.PDB import Selection
-
+from luna.MyBio.PDB.Entity import Entity
 
 import logging
 
@@ -76,3 +76,23 @@ def get_cov_contacts_for_entity(entity, source, target=None):
             cov_bonds.add(tuple(sorted([atm1, atm2], key=lambda x: x.serial_number)))
 
     return cov_bonds
+
+
+def get_proximal_compounds(comp_or_atm, radius=COV_SEARCH_RADIUS):
+
+    if not isinstance(comp_or_atm, Entity):
+        raise IllegalArgumentError("Invalid provided object. An Atom ('A') or Residue ('R') object was expected instead.")
+
+    entity_names = get_entity_level_name()
+    if comp_or_atm.level != "R":
+        raise EntityLevelError("The provided entity is a(n) %s ('%s'), but an Atom ('A') or "
+                               "Residue ('R') was expected instead." % (entity_names[comp_or_atm.level], comp_or_atm.level))
+
+    if comp_or_atm.level == "A":
+        comp_or_atm = comp_or_atm.parent
+
+    model = comp_or_atm.get_parent_by_level('M')
+    proximal = get_contacts_for_entity(entity=model, source=comp_or_atm, radius=radius, level='R')
+
+    # Sorted by the compound order as in the PDB.
+    return sorted(list(set([p[1] for p in proximal])), key=lambda r: (r.parent.parent.id, r.parent.id, r.idx))
