@@ -84,10 +84,14 @@ class AtomGroupsManager():
             if func(atm_grp):
                 yield atm_grp
 
-    def filter_by_types(self, types):
+    def filter_by_types(self, types, must_contain_all=True):
         for atm_grp in self.atm_grps:
-            if set(types).issubset(set(atm_grp.feature_names)):
-                yield atm_grp
+            if must_contain_all:
+                if set(types).issubset(set(atm_grp.feature_names)):
+                    yield atm_grp
+            else:
+                if len(set(types) & set(atm_grp.feature_names)) > 0:
+                    yield atm_grp
 
     def add_atm_grps(self, atm_grps):
         atm_grps = atm_grps or []
