@@ -7,13 +7,11 @@ import warnings
 import multiprocessing as mp
 
 # Open Babel and RDKit libraries
-from openbabel.pybel import readfile
-from openbabel.pybel import informats as OB_FORMATS
 from rdkit.Chem import ChemicalFeatures
 from rdkit.Chem import MolFromPDBBlock, MolFromSmiles
 
 # Local modules
-from luna.util.progress_tracker import ProgressTracker
+from luna.util.jobs import ParallelJobs
 from luna.mol.depiction import PharmacophoreDepiction
 from luna.mol.clustering import cluster_fps_butina
 from luna.mol.features import FeatureExtractor
@@ -25,7 +23,6 @@ from luna.mol.interaction.calc import InteractionCalculator
 from luna.mol.interaction.conf import InteractionConf
 from luna.mol.interaction.fp.shell import ShellGenerator, IFPType
 from luna.mol.wrappers.base import MolWrapper
-from luna.mol.wrappers.rdkit import RDKIT_FORMATS, read_multimol_file
 from luna.util.default_values import *
 from luna.util.exceptions import *
 from luna.util.file import *
@@ -78,14 +75,12 @@ class Project:
                  entries,
                  working_path,
                  pdb_path=PDB_PATH,
-                 has_local_files=False,
                  overwrite_path=False,
 
                  try_h_addition=True,
                  ph=7.4,
                  amend_mol=True,
                  mol_obj_type='rdkit',
-                 preload_mol_files=False,
                  atom_prop_file=ATOM_PROP_FILE,
                  inter_conf=INTERACTION_CONF,
                  inter_calc=None,
@@ -134,10 +129,15 @@ class Project:
         if append_mode:
             self._log("warning", "Append mode set ON, entries with already existing results will skip the entries processing.")
 
+        if pdb_path is None or not is_directory_valid(pdb_path):
+            new_pdb_path = "%s/pdbs/" % working_path
+            self._log("warning", "The provided PDB path '%s' is not valid or does not exist. "
+                      "Therefore, PDBs will be saved at the working path: %s" % (pdb_path, new_pdb_path))
+            pdb_path = new_pdb_path
+
         self.entries = entries
         self.working_path = working_path
         self.pdb_path = pdb_path
-        self.has_local_files = has_local_files
         self.overwrite_path = overwrite_path
         self.atom_prop_file = atom_prop_file
         self.ph = ph
@@ -168,7 +168,6 @@ class Project:
 
         self.similarity_func = similarity_func
         self.butina_cutoff = butina_cutoff
-        self.preload_mol_files = preload_mol_files
 
         self.step_controls = {}
         self.append_mode = append_mode
@@ -377,22 +376,30 @@ class Project:
         if not entry.is_valid():
             raise InvalidEntry("Entry '%s' does not match a LUNA's entry format." % entry.to_string())
 
-    def get_pdb_file(self, pdb_id):
-        pdb_file = "%s/%s.pdb" % (self.pdb_path, pdb_id)
-
-        if self.has_local_files:
+    def verify_pdb_files_existence(self):
+        all_pdb_ids = set()
+        to_download = set()
+        for entry in self.entries:
+            pdb_file = "%s/%s.pdb" % (self.pdb_path, entry.pdb_id)
             if not exists(pdb_file):
-                raise FileNotFoundError("The PDB file '%s' was not found." % pdb_file)
-        elif not exists(pdb_file):
-            working_pdb_path = "%s/pdbs" % self.working_path
-            pdb_file = "%s/%s.pdb" % (working_pdb_path, pdb_id)
+                to_download.add(entry.pdb_id)
 
-            try:
-                download_pdb(pdb_id=pdb_id, output_path=working_pdb_path)
-            except Exception as e:
-                self._log("exception", e)
-                raise FileNotCreated("PDB file '%s' was not created." % pdb_file) from e
-        return pdb_file
+            all_pdb_ids.add(entry.pdb_id)
+
+        logger.info("%d PDB file(s) found at '%s' from a total of %d PDB(s). "
+                    "So, %d PDB(s) need to be downloaded." % ((len(all_pdb_ids) - len(to_download)), self.pdb_path, len(all_pdb_ids),
+                                                              len(to_download)))
+
+        if to_download:
+            args = [(pdb_id, self.pdb_path) for pdb_id in to_download]
+            pj = ParallelJobs(self.nproc)
+            errors = pj.run_jobs(args_list=args, consumer_func=download_pdb, job_name="Download PDBs")
+
+            # Warn the users for any errors found during the entries processing.
+            if errors:
+                self._log("warning", "Number of PDBs with errors: %d. Check the log file for the complete list of PDBs that failed."
+                          % len(errors))
+                self._log("debug", "PDBs that failed: %s." % ", ".join([e[0] for e in errors]))
 
     def decide_hydrogen_addition(self, pdb_header, entry):
         if self.try_h_addition:
@@ -434,87 +441,6 @@ class Project:
         rdmol = MolFromPDBBlock(pdb_block)
         rdmol.SetProp("_Name", mol_name)
         return rdmol
-
-    def add_mol_obj_to_entries(self):
-        mol_files = defaultdict(dict)
-        for entry in self.entries:
-            if not entry.is_mol_obj_loaded():
-                entry.mol_obj_type = self.mol_obj_type
-                mol_files[(entry.mol_file, entry.mol_file_ext)][entry.mol_id] = entry
-            else:
-                self._log("debug", "Molecular object in entry '%s' was manually informed and will not be reloaded." % entry.to_string())
-
-        tool = "Open Babel" if self.mol_obj_type == "openbabel" else "RDKit"
-        self._log("info", "It will try to preload the molecular objects using %s. Total of files to be read: %d."
-                  % (tool, len(mol_files)))
-
-        try:
-            for mol_file, mol_file_ext in mol_files:
-                key = (mol_file, mol_file_ext)
-                ext = mol_file_ext or get_file_format(mol_file)
-
-                available_formats = OB_FORMATS if self.mol_obj_type == "openbabel" else RDKIT_FORMATS
-                if ext not in available_formats:
-                    raise IllegalArgumentError("Extension '%s' informed or assumed from the filename is not a format "
-                                               "recognized by %s." % (ext, tool))
-
-                if not exists(mol_file):
-                    raise FileNotFoundError("The file '%s' was not found." % mol_file)
-
-                self._log("info", "Reading the file '%s'. The number of target entries located in this file is %d."
-                          % (mol_file, len(mol_files[key])))
-
-                try:
-                    if self.mol_obj_type == "openbabel":
-                        for ob_mol in readfile(ext, mol_file):
-                            mol_id = ob_mol.OBMol.GetTitle().strip()
-                            if mol_id in mol_files[key]:
-                                entry = mol_files[key][mol_id]
-                                entry.mol_obj = ob_mol
-                                del(mol_files[key][mol_id])
-                                self._log("debug", "A structure to the entry '%s' was found in the file '%s' and loaded "
-                                          "into the entry." % (entry.to_string(), mol_file))
-
-                                # If there is no other molecules to search, just stop the loop.
-                                if len(mol_files[key]) == 0:
-                                    break
-                        else:
-                            self._log("info", "All target ligands located in the file '%s' were successfully loaded." % mol_file)
-                    else:
-                        targets = list(mol_files[key].keys())
-
-                        for i, data in enumerate(read_multimol_file(mol_file, mol_format=ext, targets=targets, removeHs=False)):
-                            rdk_mol = data[0]
-                            mol_id = targets[i]
-                            entry = mol_files[key][mol_id]
-                            # It returns None if the molecule parsing generated errors.
-                            if rdk_mol:
-                                entry.mol_obj = rdk_mol
-                                del(mol_files[key][mol_id])
-                                self._log("debug", "A structure to the entry '%s' was found in the file '%s' and loaded "
-                                          "into the entry." % (entry.to_string(), mol_file))
-                            else:
-                                self._log("debug", "The structure related to the entry '%s' was found in the file '%s', but it could "
-                                          "not be loaded as errors were found while parsing it." % (entry.to_string(), mol_file))
-                except Exception as e:
-                    self._log("exception", e)
-                    raise MoleculeObjectError("An error occurred while parsing the molecular file '%s' with %s and the molecule "
-                                              "objects could not be created. Check the logs for more information." %
-                                              (mol_file, tool))
-        except Exception as e:
-            self._log("exception", e)
-            raise
-
-        invalid_entries = [e for m in mol_files for e in mol_files[m].values()]
-        if invalid_entries:
-            entries = set(self.entries)
-            for entry in invalid_entries:
-                entries.remove(entry)
-                self._log("debug", "Entry '%s' was not found or generated errors, so it will be removed "
-                          "from the entries list." % entry.to_string())
-            self._log("warning", "%d entrie(s) were removed during molecules loading due to errors or structure identification."
-                      % len(invalid_entries))
-            self.entries = entries
 
     def generate_ligand_figure(self, rdmol, group_types):
         atm_types = defaultdict(set)
@@ -643,29 +569,15 @@ class Project:
             raise CompatibilityError("The project loaded from '%s' has a version (%s) not compatible with the "
                                      "current %s's version (%s)." % (input_file, proj_obj.version, __package__.upper(), __version__))
 
-    def _producer(self, job_queue):
-        for entry in self.entries:
-            job_queue.put(entry)
-
-    def _consumer(self, func, job_queue, progress_queue):
-        while True:
-            entry = job_queue.get()
-
-            # Run the provided function
-            func(entry, progress_queue)
-
-            job_queue.task_done()
-
 
 class LocalProject(Project):
 
-    def __init__(self, entries, working_path, has_local_files=False, **kwargs):
-        super().__init__(entries=entries, working_path=working_path, has_local_files=has_local_files, **kwargs)
+    def __init__(self, entries, working_path, **kwargs):
+        super().__init__(entries=entries, working_path=working_path, **kwargs)
 
-    def _process_entry(self, entry, progress_queue):
+    def _process_entry(self, entry):
 
         start = time.time()
-        failed = False
 
         self._log("debug", "Starting entry processing: %s." % entry.to_string())
 
@@ -684,7 +596,7 @@ class LocalProject(Project):
                 return
 
             # TODO: allow the user to pass a pdb_file through entries.
-            pdb_file = self.get_pdb_file(entry.pdb_id)
+            pdb_file = "%s/%s.pdb" % (self.pdb_path, entry.pdb_id)
             entry.pdb_file = pdb_file
 
             pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=False)
@@ -732,22 +644,16 @@ class LocalProject(Project):
 
             self._log("debug", "Processing of entry '%s' finished successfully." % entry.to_string())
 
-        except Exception as e:
-            self._log("exception", e)
+        except Exception:
             self._log("debug", "Processing of entry '%s' failed. Check the logs for more information." % entry.to_string())
-            failed = True
+            raise
 
         proc_time = time.time() - start
-
         self._log("debug", "Processing of entry '%s' took %.2fs." % (entry.to_string(), proc_time))
 
-        # Add progress data to be consumed.
-        progress_queue.put((entry.to_string(), proc_time, failed))
-
-    def _process_ifps(self, entry, progress_queue):
+    def _process_ifps(self, entry):
 
         start = time.time()
-        failed = False
 
         self._log("debug", "Starting IFP processing for entry '%s'." % entry.to_string())
 
@@ -769,17 +675,12 @@ class LocalProject(Project):
                 raise FileNotFoundError("The IFP for the entry '%s' cannot be generated because its pickled "
                                         "data file '%s' was not found." % (entry.to_string(), pkl_file))
 
-        except Exception as e:
-            self._log("exception", e)
+        except Exception:
             self._log("debug", "IFP processing for entry '%s' failed. Check the logs for more information." % entry.to_string())
-            failed = True
+            raise
 
         proc_time = time.time() - start
-
         self._log("debug", "IFP processing for entry '%s' took %.2fs." % (entry.to_string(), proc_time))
-
-        # Add progress data to be consumed.
-        progress_queue.put((entry.to_string(), proc_time, failed))
 
     def __call__(self):
 
@@ -794,44 +695,20 @@ class LocalProject(Project):
 
         self.remove_duplicate_entries()
 
-        if self.preload_mol_files:
-            self.add_mol_obj_to_entries()
+        self._log("info", "It will verify the existence of PDB files and download them as necessary.")
+        self.verify_pdb_files_existence()
 
         self._log("info", "Entries processing will start. Number of entries to be processed is: %d." % len(self.entries))
-        self._log("info", "The number of processes was set to: '%s'." % str(self.nproc))
+        self._log("info", "The number of processes was set to: %s." % str(self.nproc))
 
-        # Queue for progress tracker.
-        progress_queue = mp.JoinableQueue(maxsize=1)
-        entry_processing = ProgressTracker(len(self.entries), progress_queue, "Entries processing.")
-        entry_processing.start()
-
-        # Initialize a new progress bar (display a 0% progress).
-        progress_queue.put(None)
-
-        # If jobs should run in parallel.
-        if self.nproc is not None:
-            job_queue = mp.JoinableQueue(maxsize=self.nproc)
-
-            for i in range(self.nproc):
-                p = mp.Process(name="ConsumerProcess-%d" % i, target=self._consumer, args=(self._process_entry, job_queue, progress_queue))
-                p.daemon = True
-                p.start()
-
-            # Produce tasks to consumers.
-            self._producer(job_queue)
-
-            # Join all processes and finalize the progress tracker.
-            job_queue.join()
-        # Otherwise, run the jobs sequentially.
-        else:
-            [self._process_entry(e, progress_queue) for e in self.entries]
-
-        # Finish the progress tracker.
-        entry_processing.end()
+        # Run jobs either in Parallel or Sequentially (nproc = None).
+        pj = ParallelJobs(self.nproc)
+        errors = pj.run_jobs(args_list=self.entries, consumer_func=self._process_entry, job_name="Entries processing")
 
         # Remove failed entries.
-        if entry_processing.errors:
-            self.entries = [e for e in self.entries if e.to_string() not in entry_processing.errors]
+        if errors:
+            errors = set([e.to_string() for e in errors])
+            self.entries = [e for e in self.entries if e.to_string() not in errors]
 
         # If all molecules failed, it won't try to create fingerprints.
         if len(self.entries) == 0:
@@ -840,10 +717,10 @@ class LocalProject(Project):
             self._log("info", "Entries processing finished successfully.")
 
             # Warn the users for any errors found during the entries processing.
-            if entry_processing.errors:
+            if errors:
                 self._log("warning", "Number of entries with errors: %d. Check the log file for the complete list of entries that failed."
-                          % len(entry_processing.errors))
-                self._log("debug", "Entries that failed: %s." % ", ".join([e for e in entry_processing.errors]))
+                          % len(errors))
+                self._log("debug", "Entries that failed: %s." % ", ".join([e for e in errors]))
 
             # Generate IFP/MFP files
             if self.calc_ifp:
@@ -888,39 +765,15 @@ class LocalProject(Project):
         self._log("info", "Fingerprint generation will start. Number of entries to be processed is: %d." % len(self.entries))
         self._log("info", "The number of processes was set to: %s." % str(self.nproc))
 
-        # Queue for progress tracker.
-        progress_queue = mp.JoinableQueue(maxsize=1)
-        entry_processing = ProgressTracker(len(self.entries), progress_queue, "Fingerprint generation.")
-        entry_processing.start()
-
-        # Initialize a new progress bar (display a 0% progress).
-        progress_queue.put(None)
-
-        # If jobs should run in parallel.
-        if self.nproc is not None:
-            job_queue = mp.JoinableQueue(maxsize=self.nproc)
-
-            for i in range(self.nproc):
-                p = mp.Process(name="ConsumerProcess-%d" % i, target=self._consumer, args=(self._process_ifps, job_queue, progress_queue))
-                p.daemon = True
-                p.start()
-
-            # Produce tasks to consumers.
-            self._producer(job_queue)
-
-            # Join all processes and finalize the progress tracker.
-            job_queue.join()
-        # Otherwise, run the jobs sequentially.
-        else:
-            [self._process_ifps(e, progress_queue) for e in self.entries]
-
-        # Finish the progress tracker.
-        entry_processing.end()
+        # Run jobs either in Parallel or Sequentially (nproc = None).
+        pj = ParallelJobs(self.nproc)
+        errors = pj.run_jobs(args_list=self.entries, consumer_func=self._process_ifps, job_name="Fingerprint generation")
 
         tmp_entries = self.entries
         # Remove failed entries.
-        if entry_processing.errors:
-            tmp_entries = [e for e in self.entries if e.to_string() not in entry_processing.errors]
+        if errors:
+            errors = set([e.to_string() for e in errors])
+            tmp_entries = [e for e in self.entries if e.to_string() not in errors]
 
         # If all molecules failed, it won't try to create fingerprints.
         if len(tmp_entries) == 0:
@@ -929,10 +782,10 @@ class LocalProject(Project):
             self._log("info", "Fingerprint generation finished successfully.")
 
             # Warn the users for any errors found during the entries processing.
-            if entry_processing.errors:
+            if errors:
                 self._log("warning", "Number of entries with errors: %d. Check the log file for the complete list of entries that failed."
-                          % len(entry_processing.errors))
-                self._log("debug", "Entries that failed: %s." % ", ".join([e for e in entry_processing.errors]))
+                          % len(errors))
+                self._log("debug", "Entries that failed: %s." % ", ".join([e for e in errors]))
 
             # Generate IFP/MFP files
             if self.calc_ifp:
