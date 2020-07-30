@@ -28,28 +28,24 @@ def download_pdb(pdb_id, output_path=".", overwrite=False):
         @param output_path: put the PDB file in this directory.
         @type  output_path: string
     """
-    logger.debug("Trying to download the PDB '%s' and store it at the directory '%s'." % (pdb_id, output_path))
+    logger.debug("It will try to download the PDB '%s' and store it at the directory '%s'." % (pdb_id, output_path))
 
-    try:
-        if pdb_id is not None and pdb_id.strip() != "":
-            if is_directory_valid(output_path):
-                new_pdb_file = "%s/%s.pdb" % (output_path, pdb_id)
-                # If the file already exists and is not to overwrite the file, do nothing.
-                if overwrite is False and not exists(new_pdb_file):
-                    pdbl = PDBList()
-                    pdbl.retrieve_pdb_file(pdb_id, pdir=output_path, file_format="pdb", overwrite=overwrite)
-                    logger.debug("Download of the PDB '%s' completed." % pdb_id)
+    if pdb_id is not None and pdb_id.strip() != "":
+        if is_directory_valid(output_path):
+            new_pdb_file = "%s/%s.pdb" % (output_path, pdb_id)
+            # If the file already exists and is not to overwrite the file, do nothing.
+            if overwrite is False and not exists(new_pdb_file):
+                pdbl = PDBList()
+                pdbl.retrieve_pdb_file(pdb_id, pdir=output_path, file_format="pdb", overwrite=overwrite)
+                logger.debug("Download of the PDB '%s' completed." % pdb_id)
 
-                    # Rename files.
-                    cur_pdb_file = '%s/pdb%s.ent' % (output_path, pdb_id.lower())
-                    rename_pdb_file(cur_pdb_file, new_pdb_file)
-                else:
-                    logger.debug("File '%s' already exists. It will not be downloaded again." % new_pdb_file)
-        else:
-            raise IllegalArgumentError("An empty PDB id ('%s') was informed." % pdb_id)
-    except Exception as e:
-        logger.exception(e)
-        raise
+                # Rename files.
+                cur_pdb_file = '%s/pdb%s.ent' % (output_path, pdb_id.lower())
+                rename_pdb_file(cur_pdb_file, new_pdb_file)
+            else:
+                logger.debug("File '%s' already exists. It will not be downloaded again." % new_pdb_file)
+    else:
+        raise IllegalArgumentError("An empty PDB id ('%s') was informed." % pdb_id)
 
 
 def parse_from_file(id, file):
