@@ -3,7 +3,6 @@ import logging
 from operator import xor
 from os.path import exists
 
-from rdkit.Chem import MolToPDBBlock
 from rdkit.Chem import Mol as RDMol
 from openbabel import OBMol
 from openbabel.pybel import readfile

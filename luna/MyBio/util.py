@@ -1,19 +1,31 @@
+import tempfile
 import logging
 from io import StringIO
 from os.path import exists
 from shutil import move as rename_pdb_file
 from itertools import product, combinations
+
 from openbabel import openbabel as ob
+from openbabel.pybel import readfile
+from openbabel.pybel import Molecule as PybelWrapper
 
+from rdkit.Chem import MolFromMolBlock, MolFromMolFile, SanitizeFlags, SanitizeMol
 
-from luna.util.exceptions import IllegalArgumentError, MoleculeNotFoundError, ChainNotFoundError
-from luna.util.file import is_directory_valid
-from luna.util.default_values import ENTRY_SEPARATOR
+from luna.util.file import is_directory_valid, get_unique_filename, remove_files
+from luna.util.default_values import ENTRY_SEPARATOR, OPENBABEL
+from luna.MyBio.selector import AtomSelector
 from luna.MyBio.PDB.PDBList import PDBList
 from luna.MyBio.PDB.PDBIO import Select
+from luna.MyBio.PDB import Selection
 from luna.MyBio.PDB.PDBIO import PDBIO
 from luna.MyBio.PDB.PDBParser import PDBParser
-from luna.util.exceptions import FileNotCreated, PDBNotReadError
+from luna.mol.validator import MolValidator
+from luna.mol.standardiser import ResiduesStandardiser
+from luna.mol.wrappers.base import MolWrapper
+from luna.mol.wrappers.obabel import convert_molecule
+
+from luna.util.exceptions import (IllegalArgumentError, MoleculeNotFoundError, ChainNotFoundError,
+                                  FileNotCreated, PDBNotReadError, MoleculeSizeError, MoleculeObjectError)
 
 
 logger = logging.getLogger()
@@ -48,22 +60,22 @@ def download_pdb(pdb_id, output_path=".", overwrite=False):
         raise IllegalArgumentError("An empty PDB id ('%s') was informed." % pdb_id)
 
 
-def parse_from_file(id, file):
+def parse_from_file(pdb_id, file):
     """Read a PDB file and return a Structure object.
 
-        @param id: the id that will be used for the structure
-        @type id: string
+        @param pdb_id: the structure identifier
+        @type pdb_id: string
 
         @param file: name of the PDB file
         @type file: string
     """
     try:
-        parser = PDBParser(PERMISSIVE=1, QUIET=True)
-        structure = parser.get_structure(id, file)
+        parser = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=False)
+        structure = parser.get_structure(pdb_id, file)
         return structure
     except Exception as e:
         logger.exception(e)
-        raise PDBNotReadError("File '%s' not parsed as a PDB file.")
+        raise PDBNotReadError("File '%s' could not be parsed." % file)
 
 
 def save_to_file(entity, output_file, select=Select(), write_conects=True, write_end=True,
@@ -280,3 +292,143 @@ def get_residue_neighbors(residue, select=Select()):
                          "It may be the last in the chain sequence or there are missing residues." % residue)
         return neighbors
     return {}
+
+
+def biopython_entity_to_mol(entity, select=Select(), validate_mol=True, standardize_mol=True,
+                            add_h=False, ph=None, break_metal_bonds=False, mol_obj_type="rdkit", openbabel=OPENBABEL,
+                            tmp_path=None, keep_tmp_files=False):
+
+    tmp_path = tmp_path or tempfile.gettempdir()
+
+    logger.debug("It will try to create a new MOL object from the provided entity.")
+    logger.debug("Temporary files will be saved at '%s'." % tmp_path)
+
+    # First it saves the selection into a PDB file and then it converts the file to .mol.
+    # I had to do it because the OpenBabel 2.4.1 had a problem with some molecules containing aromatic rings.
+    # In such cases, the aromatic ring was being wrongly perceived and some atoms received more double bonds than it
+    # was expected. The version 2.3.2 works better. Therefore, I defined this version manually (openbabel property).
+    filename = get_unique_filename(tmp_path)
+    pdb_file = '%s_pdb-file.pdb' % filename
+
+    logger.debug("First: try to create a new PDB file (%s) from the provided entity." % pdb_file)
+    # Apparently, Open Babel creates a bug when it tries to parse a file with CONECTS containing serial numbers with more than 4 digits.
+    # E.g.: 1OZH:A:HE3:1406, line CONECT162811627916282.
+    # By setting preserve_atom_numbering to False, it seems the problem is solved.
+    save_to_file(entity, pdb_file, select, preserve_atom_numbering=False)
+
+    # Convert the PDB file to Mol file with the proper protonation and hydrogen addition if required.
+    mol_file = '%s_mol-file.mol' % filename
+    ob_opt = {"error-level": 5}
+    logger.debug("Next: try to convert the PDB file to .mol using Open Babel.")
+    if add_h:
+        logger.debug("Hydrogens will be added to the molecule.")
+        if ph is not None:
+            ob_opt["p"] = ph
+        else:
+            ob_opt["h"] = ""
+    convert_molecule(pdb_file, mol_file, opt=ob_opt, openbabel=openbabel)
+
+    # Currently, ignored atoms are only metals.
+    ignored_atoms = []
+
+    mol_obj = None
+    if validate_mol or standardize_mol:
+        logger.debug("Now: a validation will be performed and it will try to fix some errors.")
+
+        try:
+            mol_obj = next(readfile("mol", mol_file))
+        except Exception:
+            raise MoleculeObjectError("An error occurred while parsing the file '%s' with Open Babel and the molecule "
+                                      "object could not be created. Check the logs for more information." % mol_file)
+
+        if standardize_mol:
+            # Standardize a specific set of atoms if provided, otherwise use all atoms from entity.
+            if isinstance(select, AtomSelector):
+                target_atoms = select.entries
+            else:
+                target_atoms = Selection.unfold_entities(entity, 'A')
+
+            # If the add_h property is set to False, the code will not remove any existing hydrogens from the PDB structure.
+            # In these situations, the list of atoms may contain hydrogens. But, we do not need to attribute properties to hydrogens.
+            # We just need them to correctly set properties to heavy atoms. So let's just ignore them.
+            target_atoms = [atm for atm in target_atoms if select.accept_atom(atm) and atm.element != "H"]
+
+            mol_obj = MolWrapper(mol_obj)
+            if mol_obj.get_num_heavy_atoms() != len(target_atoms):
+                raise MoleculeSizeError("The number of heavy atoms in the PDB selection and in the MOL file are different.")
+
+            # Ignore hydrogen atoms.
+            atm_obj_list = [atm for atm in mol_obj.get_atoms() if atm.get_atomic_num() != 1]
+
+            atom_pairs = []
+            for i, atm_obj in enumerate(atm_obj_list):
+                if target_atoms[i].parent.is_residue():
+                    atom_pairs.append((atm_obj, target_atoms[i]))
+
+            rs = ResiduesStandardiser(break_metal_bonds=break_metal_bonds)
+            mol_obj.unwrap().DeleteHydrogens()
+            rs.standardise(atom_pairs)
+
+            for i, atm_obj in enumerate(atm_obj_list):
+                if atm_obj.get_id() in rs.removed_atoms:
+                    ignored_atoms.append(target_atoms[i])
+
+            # After standardizing residues, we need to recreate the Mol file, otherwise implicit hydrogens will not be included in the
+            # MOL object and, therefore, their coordinates could not be accessed. If you try to generate coordinates directly from the
+            # object, hydrogens will be incorrectly placed.
+            mol_obj = PybelWrapper(mol_obj.unwrap())
+            new_mol_file = '%s_tmp-mol-file.mol' % filename
+            mol_obj.write("mol", new_mol_file, overwrite=True)
+            # Overwrite mol_file by converting the new molecular file using the user specified parameters.
+            # Note that right now it will add explicit hydrogens to the molecules according to the provided pH.
+            convert_molecule(new_mol_file, mol_file, opt=ob_opt, openbabel=OPENBABEL)
+
+            # Let's finally read the correct and standardized molecular file.
+            try:
+                mol_obj = next(readfile("mol", mol_file))
+            except Exception:
+                raise MoleculeObjectError("An error occurred while parsing the file '%s' with Open Babel and the molecule "
+                                          "object could not be created. Check the logs for more information." % mol_file)
+
+            # Remove temporary files.
+            if not keep_tmp_files:
+                remove_files([new_mol_file])
+
+        mv = MolValidator()
+        is_valid = mv.validate_mol(mol_obj)
+        logger.debug('Validation finished!!!')
+
+        if not is_valid:
+            logger.warning("The molecular file '%s' contain invalid atoms. Check the logs for more information." % mol_file)
+
+        if mol_obj_type == "rdkit":
+            try:
+                # The sanitization is set off. We will apply it in the next step.
+                mol_obj = MolFromMolBlock(mol_obj.write('mol'), sanitize=False, removeHs=False)
+                # Sanitize molecule is applied now, so we will be able to catch the exceptions raised by RDKit,
+                # otherwise it would not be possible.
+                SanitizeMol(mol_obj, SanitizeFlags.SANITIZE_ALL)
+            except Exception:
+                raise MoleculeObjectError("An error occurred while parsing the molecular block with RDKit. The block was "
+                                          "generated by Open Babel from the file '%s'. Check the logs for more information." % mol_file)
+    else:
+        try:
+            # Create a new Mol object.
+            if mol_obj_type == "openbabel":
+                mol_obj = next(readfile("mol", mol_file))
+            else:
+                # The sanitization is set off. We will apply it in the next statement.
+                mol_obj = MolFromMolFile(mol_file, sanitize=False, removeHs=False)
+                # Sanitize molecule is applied now, so we will be able to catch the exceptions raised by RDKit,
+                # otherwise it would not be possible.
+                SanitizeMol(mol_obj, SanitizeFlags.SANITIZE_ALL)
+        except Exception:
+            tool = "Open Babel" if mol_obj_type == "openbabel" else "RDKit"
+            raise MoleculeObjectError("An error occurred while parsing the file '%s' with %s and the molecule "
+                                      "object could not be created. Check the logs for more information." % (mol_file, tool))
+
+    # Remove temporary files.
+    if not keep_tmp_files:
+        remove_files([pdb_file, mol_file])
+
+    return mol_obj, ignored_atoms
