@@ -64,22 +64,22 @@ def download_pdb(pdb_id, output_path=".", overwrite=False):
         raise
 
 
-def parse_from_file(id, file):
+def parse_from_file(pdb_id, file):
     """Read a PDB file and return a Structure object.
 
-        @param id: the id that will be used for the structure
-        @type id: string
+        @param pdb_id: the structure identifier
+        @type pdb_id: string
 
         @param file: name of the PDB file
         @type file: string
     """
     try:
-        parser = PDBParser(PERMISSIVE=1, QUIET=True)
-        structure = parser.get_structure(id, file)
+        parser = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=False)
+        structure = parser.get_structure(pdb_id, file)
         return structure
     except Exception as e:
         logger.exception(e)
-        raise PDBNotReadError("File '%s' not parsed as a PDB file.")
+        raise PDBNotReadError("File '%s' could not be parsed." % file)
 
 
 def save_to_file(entity, output_file, select=Select(), write_conects=True, write_end=True,

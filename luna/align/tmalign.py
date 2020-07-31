@@ -10,7 +10,7 @@ from Bio.SeqRecord import SeqRecord
 from Bio.Align import MultipleSeqAlignment
 from Bio.Alphabet import generic_protein
 
-from luna.MyBio.util import try_parse_from_pdb, try_save_2pdb
+from luna.MyBio.util import parse_from_file, save_to_file
 from luna.util.exceptions import InvalidSuperpositionFileError
 from luna.util.file import is_directory_valid, is_file_valid
 
@@ -20,6 +20,13 @@ logger = logging.getLogger()
 
 
 TMALIGN = "/bin/tmalign"
+
+
+class TMAlignment(MultipleSeqAlignment):
+
+    def __init__(self, score, **kwargs):
+        self.score = score
+        super().__init__(**kwargs)
 
 
 def run_tmalign(file1, file2, output_path, tmalign):
@@ -32,8 +39,8 @@ def run_tmalign(file1, file2, output_path, tmalign):
             raise FileNotFoundError("Missing file: %s", fname)
 
     try:
-        if (output_path is not None and output_path.strip() != ""):
-            if (is_directory_valid(output_path)):
+        if output_path is not None and output_path.strip() != "":
+            if is_directory_valid(output_path):
                 logger.debug("The superposition files will be saved "
                              "at the directory '%s'" % output_path)
 
@@ -45,9 +52,9 @@ def run_tmalign(file1, file2, output_path, tmalign):
 
         output = subprocess.check_output(args)
     except subprocess.CalledProcessError as e:
-        logger.exception("%s TMalign failed (returned %s):\n%s" % (e.returncode, e.output))
+        logger.exception(e)
 
-        raise RuntimeError("TMalign failed for PDB files: %s %s" % (file1, file2))
+        raise RuntimeError("TMalign failed for PDB files: %s and %s" % (file1, file2))
 
     return output.decode()
 
@@ -61,21 +68,21 @@ def get_seq_records(tm_output, ref_id, eqv_id):
 
     # Extract the TM-score (measure of structure similarity)
     # Take the mean of the (two) given TM-scores -- not sure which is reference
-    tmScores = []
+    tm_scores = []
     for line in lines:
         if line.startswith('TM-score'):
             # TMalign v. 2012/05/07 or earlier
-            tmScores.append(float(line.split(None, 2)[1]))
+            tm_scores.append(float(line.split(None, 2)[1]))
         elif 'TM-score=' in line:
             # TMalign v. 2013/05/11 or so
             tokens = line.split()
             for token in tokens:
                 if token.startswith('TM-score='):
                     _key, _val = token.split('=')
-                    tmScores.append(float(_val.rstrip(',')))
+                    tm_scores.append(float(_val.rstrip(',')))
                     break
 
-    tmScore = math.fsum(tmScores) / len(tmScores)
+    tm_score = math.fsum(tm_scores) / len(tm_scores)
     # Extract the sequence alignment
     lastLines = lines[-7:]
 
@@ -84,20 +91,23 @@ def get_seq_records(tm_output, ref_id, eqv_id):
 
     refSeq, eqvSeq = lastLines[1].strip(), lastLines[3].strip()
 
-    return (SeqRecord(Seq(refSeq), id=ref_id, description="TMalign TM-score=%f" % tmScore),
-            SeqRecord(Seq(eqvSeq), id=eqv_id, description="TMalign TM-score=%f" % tmScore))
+    return (SeqRecord(Seq(refSeq), id=ref_id, description="TM-score=%f" % tm_score),
+            SeqRecord(Seq(eqvSeq), id=eqv_id, description="TM-score=%f" % tm_score)), tm_score
 
 
 def align_2struct(file1, file2, output_path=None, tmalign=None):
 
-    if (tmalign is None):
-        tmalign = TMALIGN
+    tmalign = tmalign or TMALIGN
+
+    logger.info("TMAlign will try to align the files %s and %s." % (file1, file2))
 
     output = run_tmalign(file1, file2, output_path, tmalign)
 
-    seq_pair = get_seq_records(output, file1, file2)
+    seq_pair, tm_score = get_seq_records(output, file1, file2)
 
-    alignment = MultipleSeqAlignment(seq_pair, generic_protein)
+    alignment = TMAlignment(tm_score, records=seq_pair, alphabet=generic_protein)
+
+    logger.info("TMAlign finished successfully. %s." % alignment[0].description)
 
     return alignment
 
@@ -130,10 +140,10 @@ def extract_chain_from_sup(sup_file, extract_chain, new_chain_id, output_file, Q
             logger.warning("Quiet mode could not be activated.")
 
     try:
-        if (is_file_valid(sup_file)):
+        if is_file_valid(sup_file):
             logger.debug("Trying to parse the file '%s'." % sup_file)
 
-            structure = try_parse_from_pdb("SUP", sup_file)
+            structure = parse_from_file("SUP", sup_file)
 
             model = structure[0]
             if (len(model.child_list) != 2):
@@ -148,7 +158,7 @@ def extract_chain_from_sup(sup_file, extract_chain, new_chain_id, output_file, Q
 
             logger.debug("Now, it will try to parse the file '%s'." % sup_file)
 
-            try_save_2pdb(structure, output_file)
+            save_to_file(structure, output_file)
 
             logger.debug("File '%s' created successfully." % output_file)
     except Exception as e:
