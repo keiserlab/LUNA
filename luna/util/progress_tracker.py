@@ -1,6 +1,5 @@
 # Source: http://www.codekoala.com/posts/command-line-progress-bar-python/
 
-from queue import Queue
 from threading import Thread, Event
 
 import time
@@ -27,6 +26,7 @@ class ProgressTracker:
 
         # Save any errors found during the task processing.
         self.errors = set()
+
         self.running_times = []
         self._start_time = None
         self._end_time = None
@@ -36,9 +36,9 @@ class ProgressTracker:
         if self.task_name:
             task_name = " - %s" % self.task_name
 
-        msg = '%s%% [%s] %d/%d [Avg: %.2fs/task; Errors: %d]%s' % (int(perc), ("\u25A0" * int(perc / 2)).ljust(50, ' '),
-                                                                   p, self.ntasks, self.avg_running_time, len(self.errors),
-                                                                   task_name)
+        msg = '%s%% [%s] %d/%d [Avg: %.2fs/task; Errors: %d]%s.' % (int(perc), ("\u25A0" * int(perc / 2)).ljust(50, ' '),
+                                                                    p, self.ntasks, self.avg_running_time, len(self.errors),
+                                                                    task_name)
 
         format_str = '\r[%s]    %s%s %s%s  %s'
         progress_str = format_str % (time.strftime('%Y-%m-%d %H:%M:%S'), parse_colors("purple"),

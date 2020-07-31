@@ -8,25 +8,15 @@ from networkx.algorithms.shortest_paths.weighted import single_source_dijkstra
 
 from Bio.KDTree import KDTree
 
-# Open Babel
-from openbabel.pybel import readfile
-from openbabel.pybel import Molecule as PybelWrapper
-# RDKit
-from rdkit.Chem import MolFromMolBlock, MolFromMolFile, SanitizeFlags, SanitizeMol
-
-from luna.MyBio.selector import ResidueSelector
-from luna.MyBio.util import save_to_file
-from luna.mol.interaction.contact import get_contacts_for_entity
+from luna.MyBio.selector import Selector, AtomSelector
+from luna.MyBio.util import biopython_entity_to_mol
+from luna.mol.interaction.contact import get_proximal_compounds
 from luna.mol.atom import ExtendedAtom, AtomData
 from luna.mol.charge_model import OpenEyeModel
-from luna.mol.validator import MolValidator
-from luna.mol.standardiser import ResiduesStandardiser
-from luna.mol.wrappers.obabel import convert_molecule
 from luna.mol.wrappers.base import MolWrapper
 from luna.mol.features import ChemicalFeature
-from luna.util.file import get_unique_filename, remove_files
-from luna.util.exceptions import MoleculeSizeError, IllegalArgumentError, MoleculeObjectError
-from luna.util.default_values import ACCEPTED_MOL_OBJ_TYPES, COV_SEARCH_RADIUS, OPENBABEL
+from luna.util.exceptions import MoleculeSizeError, IllegalArgumentError
+from luna.util.default_values import ACCEPTED_MOL_OBJ_TYPES, COV_SEARCH_RADIUS
 from luna.mol.interaction.type import InteractionType
 from luna.mol.interaction import math as im
 from luna.util.file import pickle_data, unpickle_data
@@ -84,10 +74,14 @@ class AtomGroupsManager():
             if func(atm_grp):
                 yield atm_grp
 
-    def filter_by_types(self, types):
+    def filter_by_types(self, types, must_contain_all=True):
         for atm_grp in self.atm_grps:
-            if set(types).issubset(set(atm_grp.feature_names)):
-                yield atm_grp
+            if must_contain_all:
+                if set(types).issubset(set(atm_grp.feature_names)):
+                    yield atm_grp
+            else:
+                if len(set(types) & set(atm_grp.feature_names)) > 0:
+                    yield atm_grp
 
     def add_atm_grps(self, atm_grps):
         atm_grps = atm_grps or []
@@ -515,7 +509,7 @@ class AtomGroupPerceiver():
                 # If no OBMol object was defined and expand_selection was set ON and it is not a border compound,
                 # it will get all compounds around the target and create a new OBMol object with them.
                 if mol_obj is None and self.expand_selection:
-                    comp_list = self._get_proximal_compounds(comp)
+                    comp_list = get_proximal_compounds(comp)
 
                     # Expands the queue of compounds with any new border compound.
                     if comp not in pruned_comps:
@@ -527,13 +521,11 @@ class AtomGroupPerceiver():
                 else:
                     comp_list = [comp]
 
-                # Select compounds based on the compounds list defined previously.
-                comp_sel = ResidueSelector(comp_list, keep_altloc=False, keep_hydrog=self.keep_hydrog)
-
                 # Recover all atoms from the previous selected compounds.
-                atoms = tuple([a for r in comp_list for a in r.get_unpacked_list() if comp_sel.accept_atom(a)])
+                selector = Selector(keep_altloc=False, keep_hydrog=self.keep_hydrog)
+                atoms = tuple([a for r in comp_list for a in r.get_unpacked_list() if selector.accept_atom(a)])
 
-                self._assign_properties(comp, atoms, comp_sel, mol_obj)
+                self._assign_properties(comp, atoms, mol_obj)
             except Exception:
                 logger.debug("Features for the compound '%s' were not correctly perceived." % comp)
 
@@ -549,20 +541,12 @@ class AtomGroupPerceiver():
 
         return self.atm_grps_mngr
 
-    def _get_proximal_compounds(self, target_compound):
-        model = target_compound.get_parent_by_level('M')
-        proximal = get_contacts_for_entity(entity=model, source=target_compound, radius=self.radius, level='R')
-
-        # Sorted by the compound order as in the PDB.
-        return sorted(list(set([p[1] for p in proximal])), key=lambda r: (r.parent.parent.id, r.parent.id, r.idx))
-
-    def _assign_properties(self, target_compound, target_atoms, compound_selector, mol_obj=None):
+    def _assign_properties(self, target_compound, target_atoms, mol_obj=None):
 
         # If no OBMol was defined, create a new one with the compound list.
         ignored_atoms = []
         if mol_obj is None:
-            mol_obj, ignored_atoms = self._get_mol_from_entity(target_compound.get_parent_by_level('M'),
-                                                               target_compound, target_atoms, compound_selector)
+            mol_obj, ignored_atoms = self._get_mol_from_entity(target_compound, target_atoms)
         # Create a new MolWrapper object.
         mol_obj = MolWrapper(mol_obj)
 
@@ -662,126 +646,15 @@ class AtomGroupPerceiver():
 
         return self.atm_mapping[atm]
 
-    def _get_mol_from_entity(self, entity, target_compound, target_atoms, compound_selector):
-        # First it saves the selection into a PDB file and then it converts the file to .mol.
-        # I had to do it because the OpenBabel 2.4.1 had a problem with some molecules containing aromatic rings.
-        # In such cases, the aromatic ring was being wrongly perceived and some atoms received more double bonds than it
-        # was expected. The version 2.3.2 works better. Therefore, I defined this version manually (openbabel property).
-        filename = get_unique_filename(self.tmp_path)
-        pdb_file = '%s_pdb-file.pdb' % filename
-        logger.debug("Saving the PDB object as a PDB file named '%s'." % pdb_file)
-        # Apparently, Open Babel creates a bug when it tries to parse a file with CONECTS containing serial numbers with more than 4 digits.
-        # E.g.: 1OZH:A:HE3:1406, line CONECT162811627916282.
-        # By setting preserve_atom_numbering to False, it seems the problem is solved.
-        save_to_file(entity, pdb_file, compound_selector, preserve_atom_numbering=False)
+    def _get_mol_from_entity(self, target_compound, target_atoms):
+        validate_mol = self.amend_mol
+        standardize_mol = self.amend_mol and target_compound.is_residue()
 
-        mol_file = '%s_mol-file.mol' % filename
-        ob_opt = {"error-level": 5}
-        logger.debug("Converting the PDB file '%s' to a Mol file named '%s' using Open Babel." % (pdb_file, mol_file))
-        if self.add_h:
-            logger.debug("Hydrogens will be added to the molecule.")
-            if self.ph is not None:
-                ob_opt["p"] = self.ph
-            else:
-                ob_opt["h"] = ""
-        convert_molecule(pdb_file, mol_file, opt=ob_opt, openbabel=OPENBABEL)
+        atom_selector = AtomSelector(target_atoms, keep_altloc=False, keep_hydrog=self.keep_hydrog)
 
-        # Currently, ignored atoms are only metals.
-        ignored_atoms = []
-
-        mol_obj = None
-        if self.amend_mol:
-            logger.debug("A validation will be performed and it will try to fix some errors.")
-
-            try:
-                mol_obj = next(readfile("mol", mol_file))
-            except Exception:
-                raise MoleculeObjectError("An error occurred while parsing the file '%s' with Open Babel and the molecule "
-                                          "object could not be created. Check the logs for more information." % mol_file)
-
-            if target_compound.is_residue():
-                # If the add_h property is set to False, the code will not remove any existing hydrogens from the PDB structure.
-                # In these situations, the list of atoms may contain hydrogens. But, we do not need to attribute properties to hydrogens.
-                # We just need them to correctly set properties to heavy atoms. So let's just ignore them.
-                target_atoms = [atm for atm in target_atoms if atm.element != "H"]
-
-                mol_obj = MolWrapper(mol_obj)
-                if mol_obj.get_num_heavy_atoms() != len(target_atoms):
-                    raise MoleculeSizeError("The number of heavy atoms in the PDB selection and in the MOL file are different.")
-
-                # Ignore hydrogen atoms.
-                atm_obj_list = [atm for atm in mol_obj.get_atoms() if atm.get_atomic_num() != 1]
-
-                atom_pairs = []
-                for i, atm_obj in enumerate(atm_obj_list):
-                    if target_atoms[i].parent.is_residue():
-                        atom_pairs.append((atm_obj, target_atoms[i]))
-
-                rs = ResiduesStandardiser(break_metal_bonds=False)
-                mol_obj.unwrap().DeleteHydrogens()
-                rs.standardise(atom_pairs)
-
-                for i, atm_obj in enumerate(atm_obj_list):
-                    if atm_obj.get_id() in rs.removed_atoms:
-                        ignored_atoms.append(target_atoms[i])
-
-                # After standardizing residues, we need to recreate the Mol file, otherwise implicit hydrogens will not be included in the
-                # MOL object and, therefore, their coordinates could not be accessed. If you try to generate coordinates directly from the
-                # object, hydrogens will be incorrectly placed.
-                mol_obj = PybelWrapper(mol_obj.unwrap())
-                new_mol_file = '%s_tmp-mol-file.mol' % filename
-                mol_obj.write("mol", new_mol_file, overwrite=True)
-                # Overwrite mol_file by converting the new molecular file using the user specified parameters.
-                # Note that right now it will add explicit hydrogens to the molecules according to the provided pH.
-                convert_molecule(new_mol_file, mol_file, opt=ob_opt, openbabel=OPENBABEL)
-
-                # Let's finally read the correct and standardized molecular file.
-                try:
-                    mol_obj = next(readfile("mol", mol_file))
-                except Exception:
-                    raise MoleculeObjectError("An error occurred while parsing the file '%s' with Open Babel and the molecule "
-                                              "object could not be created. Check the logs for more information." % mol_file)
-
-                # Remove temporary files.
-                remove_files([new_mol_file])
-
-            mv = MolValidator()
-            is_valid = mv.validate_mol(mol_obj)
-            logger.debug('Validation finished!!!')
-
-            if not is_valid:
-                logger.warning("The molecular file '%s' contain invalid atoms. Check the logs for more information." % mol_file)
-
-            if self.mol_obj_type == "rdkit":
-                try:
-                    # The sanitization is set off. We will apply it in the next step.
-                    mol_obj = MolFromMolBlock(mol_obj.write('mol'), sanitize=False, removeHs=False)
-                    # Sanitize molecule is applied now, so we will be able to catch the exceptions raised by RDKit,
-                    # otherwise it would not be possible.
-                    SanitizeMol(mol_obj, SanitizeFlags.SANITIZE_ALL)
-                except Exception:
-                    raise MoleculeObjectError("An error occurred while parsing the molecular block with RDKit. The block was "
-                                              "generated by Open Babel from the file '%s'. Check the logs for more information." % mol_file)
-        else:
-            try:
-                # Create a new Mol object.
-                if self.mol_obj_type == "openbabel":
-                    mol_obj = next(readfile("mol", mol_file))
-                else:
-                    # The sanitization is set off. We will apply it in the next statement.
-                    mol_obj = MolFromMolFile(mol_file, sanitize=False, removeHs=False)
-                    # Sanitize molecule is applied now, so we will be able to catch the exceptions raised by RDKit,
-                    # otherwise it would not be possible.
-                    SanitizeMol(mol_obj, SanitizeFlags.SANITIZE_ALL)
-            except Exception:
-                tool = "Open Babel" if self.mol_obj_type == "openbabel" else "RDKit"
-                raise MoleculeObjectError("An error occurred while parsing the file '%s' with %s and the molecule "
-                                          "object could not be created. Check the logs for more information." % (mol_file, tool))
-
-        # Remove temporary files.
-        remove_files([pdb_file, mol_file])
-
-        return mol_obj, ignored_atoms
+        return biopython_entity_to_mol(target_compound.get_parent_by_level('M'), atom_selector,
+                                       validate_mol=validate_mol, standardize_mol=standardize_mol, add_h=self.add_h,
+                                       ph=self.ph, mol_obj_type=self.mol_obj_type, tmp_path=self.tmp_path)
 
 
 class AtomGroupNeighborhood:

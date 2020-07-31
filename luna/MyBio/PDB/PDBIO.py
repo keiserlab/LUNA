@@ -158,21 +158,31 @@ class PDBIO(object):
                 else:
                     sb.init_chain('A')
                     if pdb_object.level == "R":
+                        parent_id = pdb_object.parent.id
                         try:
-                            parent_id = pdb_object.parent.id
                             sb.structure[0]['A'].id = parent_id
                         except Exception:
                             pass
-                        sb.structure[0]['A'].add(pdb_object)
+
+                        # MODBY: Alexandre Fassio
+                        # The old code (sb.structure[0]['A'].add(pdb_object)) used to try to access a chain whose id is always 'A'.
+                        # However, when the informed residue has a different chain id, this access will raise a KeyError exception.
+                        # Thus, we should always access the new chain id by using the parent_id variable.
+                        sb.structure[0][parent_id].add(pdb_object)
                     else:
                         # Atom
                         sb.init_residue('DUM', ' ', 1, ' ')
+                        parent_id = pdb_object.parent.parent.id
                         try:
-                            parent_id = pdb_object.parent.parent.id
                             sb.structure[0]['A'].id = parent_id
                         except Exception:
                             pass
-                        sb.structure[0]['A'].child_list[0].add(pdb_object)
+
+                        # MODBY: Alexandre Fassio
+                        # The old code (sb.structure[0]['A'].child_list[0].add(pdb_object)) used to try to access a chain whose id
+                        # is always 'A'. However, when the informed atom has a different chain id, this access will raise a
+                        # KeyError exception. Thus, we should always access the new chain id by using the parent_id variable.
+                        sb.structure[0][parent_id].child_list[0].add(pdb_object)
 
             # Return structure
             structure = sb.structure

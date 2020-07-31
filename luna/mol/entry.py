@@ -3,7 +3,6 @@ import logging
 from operator import xor
 from os.path import exists
 
-from rdkit.Chem import MolToPDBBlock
 from rdkit.Chem import Mol as RDMol
 from openbabel import OBMol
 from openbabel.pybel import readfile
@@ -24,7 +23,7 @@ logger = logging.getLogger()
 # Source: https://richjenks.com/filename-regex/
 FILENAME_REGEX = r"(?!.{256,})(?!(aux|clock\$|con|nul|prn|com[1-9]|lpt[1-9])(?:$|\.))[^ ][ \.\w\-$()+=[\];#@~,&']+[^\. ]"
 
-REGEX_RESNUM_ICODE = re.compile(r'^(\d+)([a-zA-z]?)$')
+REGEX_RESNUM_ICODE = re.compile(r'^(\-?\d+)([a-zA-z]?)$')
 
 PCI_ENTRY_REGEX = re.compile(r'^%s:\w:\w[\w+\-]{1,2}?:\-?\d{1,4}[a-zA-z]?$' % FILENAME_REGEX)
 PPI_ENTRY_REGEX = re.compile(r'^%s:\w$' % FILENAME_REGEX)
@@ -456,7 +455,12 @@ def recover_entries_from_entity(entity, get_small_molecules=True, get_chains=Tru
         pdb_id = entity.get_parent_by_level("S").id
         for res in residues:
             if res.is_hetatm():
-                entry = sep.join([pdb_id, res.parent.id, res.resname, "%d%s" % res.id[1:]])
+                comp_num_and_icode = ""
+                if isinstance(res.id[1], int):
+                    comp_num_and_icode = str(res.id[1])
+                comp_num_and_icode += str(res.id[2]) if res.id[2].strip() else ""
+
+                entry = sep.join([pdb_id, res.parent.id, res.resname, comp_num_and_icode])
                 yield entry
 
     if get_chains:

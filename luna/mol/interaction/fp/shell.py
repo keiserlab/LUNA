@@ -193,8 +193,7 @@ class ShellManager:
 
         if fold_to_size:
             return fp.fold(fold_to_size)
-        else:
-            return fp
+        return fp
 
     def _init_controllers(self):
         levels = defaultdict(list)

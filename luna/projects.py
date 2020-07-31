@@ -1,19 +1,17 @@
-import sys
-from os.path import exists
+from os.path import exists, abspath, dirname
 from collections import defaultdict
 import time
 import logging
 import glob
-
+import warnings
 import multiprocessing as mp
 
-from openbabel.pybel import readfile
-from openbabel.pybel import informats as OB_FORMATS
+# Open Babel and RDKit libraries
 from rdkit.Chem import ChemicalFeatures
 from rdkit.Chem import MolFromPDBBlock, MolFromSmiles
 
 # Local modules
-from luna.util.progress_tracker import ProgressTracker
+from luna.util.jobs import ParallelJobs
 from luna.mol.depiction import PharmacophoreDepiction
 from luna.mol.clustering import cluster_fps_butina
 from luna.mol.features import FeatureExtractor
@@ -25,13 +23,11 @@ from luna.mol.interaction.calc import InteractionCalculator
 from luna.mol.interaction.conf import InteractionConf
 from luna.mol.interaction.fp.shell import ShellGenerator, IFPType
 from luna.mol.wrappers.base import MolWrapper
-from luna.mol.wrappers.rdkit import RDKIT_FORMATS, read_multimol_file
 from luna.util.default_values import *
 from luna.util.exceptions import *
 from luna.util.file import *
 from luna.util.logging import new_logging_file, load_default_logging_conf
-from luna.util.multiprocessing_logging import start_mp_handler
-import luna.util.logging_ini
+from luna.util.multiprocessing_logging import start_mp_handler, MultiProcessingHandler
 
 from luna.MyBio.PDB.PDBParser import PDBParser
 from luna.MyBio.selector import ResidueSelector
@@ -43,15 +39,15 @@ from sys import setrecursionlimit
 # Set a recursion limit to avoid RecursionError with the library pickle.
 setrecursionlimit(RECURSION_LIMIT)
 
-
-logger = logging.getLogger()
-
+logger = load_default_logging_conf()
 
 VERBOSITY_LEVEL = {4: logging.DEBUG,
                    3: logging.INFO,
                    2: logging.WARNING,
                    1: logging.ERROR,
                    0: logging.CRITICAL}
+
+MAX_NPROCS = mp.cpu_count() - 1
 
 
 class EntryResults:
@@ -79,14 +75,12 @@ class Project:
                  entries,
                  working_path,
                  pdb_path=PDB_PATH,
-                 has_local_files=False,
                  overwrite_path=False,
 
                  try_h_addition=True,
                  ph=7.4,
                  amend_mol=True,
                  mol_obj_type='rdkit',
-                 preload_mol_files=False,
                  atom_prop_file=ATOM_PROP_FILE,
                  inter_conf=INTERACTION_CONF,
                  inter_calc=None,
@@ -109,18 +103,11 @@ class Project:
 
                  append_mode=False,
                  verbosity=3,
-                 nproc=None):
+                 logging_enabled=True,
+                 nproc=MAX_NPROCS):
 
-        if len(entries) == 0:
-            logger.warning("Nothing to be done as no entry was informed.")
-            return
-
-        if verbosity not in VERBOSITY_LEVEL:
-            raise IllegalArgumentError("The informed logging level '%s' is not valid. The valid levels are: %s."
-                                       % (repr(verbosity), ", ".join(["%d (%s)" % (k, logging.getLevelName(v))
-                                                                      for k, v in sorted(VERBOSITY_LEVEL.items())])))
-        else:
-            logger.info("Verbosity set to: %d (%s)." % (verbosity, logging.getLevelName(verbosity)))
+        # Property required by self._log()
+        self.logging_enabled = logging_enabled
 
         if mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES:
             raise IllegalArgumentError("Invalid value for 'mol_obj_type'. Objects of type '%s' are not currently accepted. "
@@ -128,7 +115,7 @@ class Project:
                                                                            ", ".join(["'%s'" % m for m in ACCEPTED_MOL_OBJ_TYPES])))
 
         if inter_conf is None:
-            logger.info("No interaction configuration was set and the default will be used instead")
+            self._log("info", "No interaction configuration was set and the default will be used instead")
         elif inter_conf is not None and isinstance(inter_conf, InteractionConf) is False:
             raise IllegalArgumentError("The informed interaction configuration must be an instance of %s."
                                        % ".".join([InteractionConf.__module__, InteractionConf.__name__]))
@@ -136,16 +123,21 @@ class Project:
         if inter_calc is not None and isinstance(inter_calc, InteractionCalculator) is False:
             raise IllegalArgumentError("The informed interaction configuration must be an instance of %s."
                                        % ".".join([InteractionCalculator.__module__, InteractionCalculator.__name__]))
-        else:
-            logger.info("No interaction calculator object was defined and the default will be used instead.")
+        elif inter_calc is None:
+            self._log("info", "No interaction calculator object was defined and the default will be used instead.")
 
         if append_mode:
-            logger.warning("Append mode set ON, entries with already existing results will skip the entries processing.")
+            self._log("warning", "Append mode set ON, entries with already existing results will skip the entries processing.")
+
+        if pdb_path is None or not is_directory_valid(pdb_path):
+            new_pdb_path = "%s/pdbs/" % working_path
+            self._log("warning", "The provided PDB path '%s' is not valid or does not exist. "
+                      "Therefore, PDBs will be saved at the working path: %s" % (pdb_path, new_pdb_path))
+            pdb_path = new_pdb_path
 
         self.entries = entries
         self.working_path = working_path
         self.pdb_path = pdb_path
-        self.has_local_files = has_local_files
         self.overwrite_path = overwrite_path
         self.atom_prop_file = atom_prop_file
         self.ph = ph
@@ -176,34 +168,19 @@ class Project:
 
         self.similarity_func = similarity_func
         self.butina_cutoff = butina_cutoff
-        self.preload_mol_files = preload_mol_files
 
         self.step_controls = {}
         self.append_mode = append_mode
-        self.verbosity = VERBOSITY_LEVEL[verbosity]
 
-        if nproc is None:
-            nproc = mp.cpu_count() - 1
-        elif nproc < 1:
-            logger.warning("It was trying to create an invalid number of processes (%s). Therefore, the number of "
-                           "processes 'nproc' was set to its maximum accepted capability (%d)." % (str(nproc), (mp.cpu_count() - 1)))
-            nproc = mp.cpu_count() - 1
-        elif nproc >= mp.cpu_count():
-            logger.warning("It was trying to create %d processes, which is equal to or greater than the maximum "
-                           "amount of available CPUs (%d). Therefore, the number of processes 'nproc' was set to %d "
-                           "to leave at least one CPU free." % (nproc, mp.cpu_count(), (mp.cpu_count() - 1)))
-            nproc = mp.cpu_count() - 1
-        logger.info("The number of processes was set to: %d." % nproc)
+        self._loaded_logging_file = False
+        self.logging_file = "%s/logs/project.log" % self.working_path
+        self.verbosity = verbosity
 
         self.nproc = nproc
 
         self.version = __version__
 
         self._paths = ["chunks", "figures", "logs", "pdbs", "results/interactions", "results/fingerprints", "results", "tmp"]
-
-        load_default_logging_conf()
-
-        self.log_preferences()
 
     def __call__(self):
         raise NotImplementedError("This class is not callable. Use a class that implements this method.")
@@ -247,52 +224,140 @@ class Project:
             if results:
                 yield entry, results.mfp
 
+    @property
+    def nproc(self):
+        return self._nproc
+
+    @nproc.setter
+    def nproc(self, nproc):
+        if nproc is not None:
+            if not isinstance(nproc, int) or isinstance(nproc, bool):
+                self._log("warning", "The number of processes must be an integer value, but a(n) %s was provided instead. "
+                          "Therefore, the number of processes 'nproc' was set to its maximum accepted capacity "
+                          "(%d - 1 = %d)." % (nproc.__class__.__name__, mp.cpu_count(), MAX_NPROCS))
+                nproc = MAX_NPROCS
+
+            elif nproc < 1:
+                self._log("warning", "It was trying to create an invalid number of processes (%s). Therefore, the number of "
+                          "processes 'nproc' was set to its maximum accepted capacity (%d - 1 = %d)." % (str(nproc), mp.cpu_count(),
+                                                                                                         MAX_NPROCS))
+                nproc = MAX_NPROCS
+
+            elif nproc >= mp.cpu_count():
+                self._log("warning", "It was trying to create %d processes, which is equal to or greater than the maximum "
+                          "amount of available CPUs (%d). Therefore, the number of processes 'nproc' was set to %d "
+                          "to leave at least one CPU free." % (nproc, mp.cpu_count(), MAX_NPROCS))
+                nproc = MAX_NPROCS
+        else:
+            self._log("warning", "The number of processes was set to '%s'. Therefore, LUNA will run jobs sequentially." % nproc)
+
+        self._nproc = nproc
+
+    @property
+    def logging_enabled(self):
+        return self._logging_enabled
+
+    @logging_enabled.setter
+    def logging_enabled(self, is_enabled):
+        if not is_enabled:
+            warnings.warn("Logging mode was set OFF. No logging information will be saved from now on.")
+            logger.disabled = True
+        else:
+            warnings.warn("Logging mode was set ON. Logging information will be saved from now on.")
+            logger.disabled = False
+
+        self._logging_enabled = is_enabled
+
+    @property
+    def verbosity(self):
+        return self._verbosity
+
+    @verbosity.setter
+    def verbosity(self, verbosity):
+        if verbosity not in VERBOSITY_LEVEL:
+            raise IllegalArgumentError("The informed logging level '%s' is not valid. The valid levels are: %s."
+                                       % (repr(verbosity), ", ".join(["%d (%s)" % (k, logging.getLevelName(v))
+                                                                      for k, v in sorted(VERBOSITY_LEVEL.items())])))
+        else:
+            self._log("info", "Verbosity set to: %d (%s)." % (verbosity, logging.getLevelName(VERBOSITY_LEVEL[verbosity])))
+
+        self._verbosity = VERBOSITY_LEVEL[verbosity]
+
+        # If the logging file has already been loaded, it is necessary to update the logging verbosity level.
+        if self._loaded_logging_file:
+            self.init_logging_file(self.logging_file)
+
     def get_entry_results(self, entry):
         pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
         try:
             return EntryResults.load(pkl_file)
         except Exception as e:
-            logger.exception(e)
+            self._log("exception", e)
 
-    def run(self):
-        self()
+    def _log(self, level, message):
+        if self.logging_enabled:
+            try:
+                getattr(logger, level)(message)
+            except Exception:
+                raise
 
-    def log_preferences(self):
-        logger.debug("New project initialized...")
-        params = ["\t\t\t-- %s = %s" % (key, str(self.__dict__[key])) for key in sorted(self.__dict__)]
-        logger.debug("Preferences:\n%s" % "\n".join(params))
+    def _log_preferences(self):
+        self._log("debug", "New project initialized...")
+        params = []
+        for key in sorted(self.__dict__):
+            if key == "entries":
+                params.append("\t\t\t-- # %s = %d" % (key, len(self.__dict__[key])))
+            else:
+                params.append("\t\t\t-- %s = %s" % (key, str(self.__dict__[key])))
+        self._log("debug", "Preferences:\n%s" % "\n".join(params))
 
-    def prepare_project_path(self):
-        logger.info("Initializing project directory '%s'." % self.working_path)
+    def init_logging_file(self, logging_filename=None, use_mp_handler=True):
+        if self.logging_enabled:
+            if not logging_filename:
+                logging_filename = get_unique_filename(TMP_FILES)
+
+            try:
+                new_logging_file(logging_filename, logging_level=self.verbosity)
+
+                start_mp_handler()
+
+                self._log("info", "Logging file '%s' initialized successfully." % logging_filename)
+
+                # Print preferences at the new logging file.
+                self._log_preferences()
+
+                self._loaded_logging_file = True
+            except Exception as e:
+                self._log("exception", e)
+                raise FileNotCreated("Logging file '%s' could not be created." % logging_filename)
+
+    def close_logging_file(self):
+        try:
+            for handler in logger.handlers:
+                if isinstance(handler, MultiProcessingHandler):
+                    if isinstance(handler.sub_handler, logging.FileHandler):
+                        handler.close()
+                        logger.removeHandler(handler)
+        except Exception:
+            pass
+
+    def prepare_project_path(self, subdirs=None):
+        self._log("info", "Preparing project directory '%s'." % self.working_path)
+
+        if subdirs is None:
+            subdirs = self._paths
 
         # Create main project directory.
         create_directory(self.working_path, self.overwrite_path)
         # Create subdirectories.
-        for path in self._paths:
+        for path in subdirs:
             create_directory("%s/%s" % (self.working_path, path))
 
-        logger.info("Project directory '%s' created successfully." % self.working_path)
+        self._log("info", "Project directory '%s' created successfully." % self.working_path)
 
     def remove_empty_paths(self):
         for path in self._paths:
             clear_directory("%s/%s" % (self.working_path, path), only_empty_paths=True)
-
-    def init_logging_file(self, logging_filename=None, use_mp_handler=True):
-        if not logging_filename:
-            logging_filename = get_unique_filename(TMP_FILES)
-
-        try:
-            new_logging_file(logging_filename, logging_level=self.verbosity)
-
-            start_mp_handler()
-
-            logger.info("Logging file '%s' initialized successfully." % logging_filename)
-
-            # Print preferences at the new logging file.
-            self.log_preferences()
-        except Exception as e:
-            logger.exception(e)
-            raise FileNotCreated("Logging file '%s' could not be created." % logging_filename)
 
     def remove_duplicate_entries(self):
         entries = {}
@@ -300,10 +365,10 @@ class Project:
             if entry.to_string() not in entries:
                 entries[entry.to_string()] = entry
             else:
-                logger.debug("An entry with id '%s' already exists in the list of entries, so the entry %s is a duplicate and will "
-                             "be removed." % (entry.to_string(), entry))
+                self._log("debug", "An entry with id '%s' already exists in the list of entries, so the entry %s is a duplicate and will "
+                          "be removed." % (entry.to_string(), entry))
 
-        logger.info("The remotion of duplicate entries was finished. %d entrie(s) were removed." % (len(self.entries) - len(entries)))
+        self._log("info", "The remotion of duplicate entries was finished. %d entrie(s) were removed." % (len(self.entries) - len(entries)))
 
         self.entries = list(entries.values())
 
@@ -311,22 +376,30 @@ class Project:
         if not entry.is_valid():
             raise InvalidEntry("Entry '%s' does not match a LUNA's entry format." % entry.to_string())
 
-    def get_pdb_file(self, pdb_id):
-        pdb_file = "%s/%s.pdb" % (self.pdb_path, pdb_id)
-
-        if self.has_local_files:
+    def verify_pdb_files_existence(self):
+        all_pdb_ids = set()
+        to_download = set()
+        for entry in self.entries:
+            pdb_file = "%s/%s.pdb" % (self.pdb_path, entry.pdb_id)
             if not exists(pdb_file):
-                raise FileNotFoundError("The PDB file '%s' was not found." % pdb_file)
-        elif not exists(pdb_file):
-            working_pdb_path = "%s/pdbs" % self.working_path
-            pdb_file = "%s/%s.pdb" % (working_pdb_path, pdb_id)
+                to_download.add(entry.pdb_id)
 
-            try:
-                download_pdb(pdb_id=pdb_id, output_path=working_pdb_path)
-            except Exception as e:
-                logger.exception(e)
-                raise FileNotCreated("PDB file '%s' was not created." % pdb_file) from e
-        return pdb_file
+            all_pdb_ids.add(entry.pdb_id)
+
+        logger.info("%d PDB file(s) found at '%s' from a total of %d PDB(s). "
+                    "So, %d PDB(s) need to be downloaded." % ((len(all_pdb_ids) - len(to_download)), self.pdb_path, len(all_pdb_ids),
+                                                              len(to_download)))
+
+        if to_download:
+            args = [(pdb_id, self.pdb_path) for pdb_id in to_download]
+            pj = ParallelJobs(self.nproc)
+            errors = pj.run_jobs(args_list=args, consumer_func=download_pdb, job_name="Download PDBs")
+
+            # Warn the users for any errors found during the entries processing.
+            if errors:
+                self._log("warning", "Number of PDBs with errors: %d. Check the log file for the complete list of PDBs that failed."
+                          % len(errors))
+                self._log("debug", "PDBs that failed: %s." % ", ".join([e[0] for e in errors]))
 
     def decide_hydrogen_addition(self, pdb_header, entry):
         if self.try_h_addition:
@@ -334,14 +407,14 @@ class Project:
                 method = pdb_header["structure_method"]
                 # If the method is not a NMR type does not add hydrogen as it usually already has hydrogens.
                 if method.upper() in NMR_METHODS:
-                    logger.debug("The structure related to the entry '%s' was obtained by NMR, so it will "
-                                 "not add hydrogens to it." % entry.to_string())
+                    self._log("debug", "The structure related to the entry '%s' was obtained by NMR, so it will "
+                              "not add hydrogens to it." % entry.to_string())
                     return False
             return True
         return False
 
     def perceive_chemical_groups(self, entry, entity, ligand, add_h=False):
-        logger.debug("Starting pharmacophore perception for entry '%s'" % entry.to_string())
+        self._log("debug", "Starting pharmacophore perception for entry '%s'" % entry.to_string())
 
         feature_factory = ChemicalFeatures.BuildFeatureFactory(self.atom_prop_file)
         feature_extractor = FeatureExtractor(feature_factory)
@@ -358,7 +431,7 @@ class Project:
 
         atm_grps_mngr = perceiver.perceive_atom_groups(set([x[1] for x in nb_compounds]), mol_objs_dict=mol_objs_dict)
 
-        logger.debug("Pharmacophore perception for entry '%s' has finished." % entry.to_string())
+        self._log("debug", "Pharmacophore perception for entry '%s' has finished." % entry.to_string())
 
         return atm_grps_mngr
 
@@ -368,87 +441,6 @@ class Project:
         rdmol = MolFromPDBBlock(pdb_block)
         rdmol.SetProp("_Name", mol_name)
         return rdmol
-
-    def add_mol_obj_to_entries(self):
-        mol_files = defaultdict(dict)
-        for entry in self.entries:
-            if not entry.is_mol_obj_loaded():
-                entry.mol_obj_type = self.mol_obj_type
-                mol_files[(entry.mol_file, entry.mol_file_ext)][entry.mol_id] = entry
-            else:
-                logger.debug("Molecular object in entry '%s' was manually informed and will not be reloaded." % entry.to_string())
-
-        tool = "Open Babel" if self.mol_obj_type == "openbabel" else "RDKit"
-        logger.info("It will try to preload the molecular objects using %s. Total of files to be read: %d."
-                    % (tool, len(mol_files)))
-
-        try:
-            for mol_file, mol_file_ext in mol_files:
-                key = (mol_file, mol_file_ext)
-                ext = mol_file_ext or get_file_format(mol_file)
-
-                available_formats = OB_FORMATS if self.mol_obj_type == "openbabel" else RDKIT_FORMATS
-                if ext not in available_formats:
-                    raise IllegalArgumentError("Extension '%s' informed or assumed from the filename is not a format "
-                                               "recognized by %s." % (ext, tool))
-
-                if not exists(mol_file):
-                    raise FileNotFoundError("The file '%s' was not found." % mol_file)
-
-                logger.info("Reading the file '%s'. The number of target entries located in this file is %d."
-                            % (mol_file, len(mol_files[key])))
-
-                try:
-                    if self.mol_obj_type == "openbabel":
-                        for ob_mol in readfile(ext, mol_file):
-                            mol_id = ob_mol.OBMol.GetTitle().strip()
-                            if mol_id in mol_files[key]:
-                                entry = mol_files[key][mol_id]
-                                entry.mol_obj = ob_mol
-                                del(mol_files[key][mol_id])
-                                logger.debug("A structure to the entry '%s' was found in the file '%s' and loaded "
-                                             "into the entry." % (entry.to_string(), mol_file))
-
-                                # If there is no other molecules to search, just stop the loop.
-                                if len(mol_files[key]) == 0:
-                                    break
-                        else:
-                            logger.info("All target ligands located in the file '%s' were successfully loaded." % mol_file)
-                    else:
-                        targets = list(mol_files[key].keys())
-
-                        for i, data in enumerate(read_multimol_file(mol_file, mol_format=ext, targets=targets, removeHs=False)):
-                            rdk_mol = data[0]
-                            mol_id = targets[i]
-                            entry = mol_files[key][mol_id]
-                            # It returns None if the molecule parsing generated errors.
-                            if rdk_mol:
-                                entry.mol_obj = rdk_mol
-                                del(mol_files[key][mol_id])
-                                logger.debug("A structure to the entry '%s' was found in the file '%s' and loaded "
-                                             "into the entry." % (entry.to_string(), mol_file))
-                            else:
-                                logger.debug("The structure related to the entry '%s' was found in the file '%s', but it could "
-                                             "not be loaded as errors were found while parsing it." % (entry.to_string(), mol_file))
-                except Exception as e:
-                    logger.exception(e)
-                    raise MoleculeObjectError("An error occurred while parsing the molecular file '%s' with %s and the molecule "
-                                              "objects could not be created. Check the logs for more information." %
-                                              (mol_file, tool))
-        except Exception as e:
-            logger.exception(e)
-            raise
-
-        invalid_entries = [e for m in mol_files for e in mol_files[m].values()]
-        if invalid_entries:
-            entries = set(self.entries)
-            for entry in invalid_entries:
-                entries.remove(entry)
-                logger.debug("Entry '%s' was not found or generated errors, so it will be removed "
-                             "from the entries list." % entry.to_string())
-            logger.warning("%d entrie(s) were removed during molecules loading due to errors or structure identification."
-                           % len(invalid_entries))
-            self.entries = entries
 
     def generate_ligand_figure(self, rdmol, group_types):
         atm_types = defaultdict(set)
@@ -474,8 +466,8 @@ class Project:
 
             return generate_fp_for_mols([rdmol_lig], "morgan_fp")[0]["fp"]
         else:
-            logger.warning("Currently, it cannot generate molecular fingerprints for "
-                           "instances of %s." % entry.__class__.__name__)
+            self._log("warning", "Currently, it cannot generate molecular fingerprints for "
+                      "instances of %s." % entry.__class__.__name__)
 
     def create_ifp(self, atm_grps_mngr):
         sg = ShellGenerator(self.ifp_num_levels, self.ifp_radius_step,
@@ -487,8 +479,8 @@ class Project:
         return sm.to_fingerprint(fold_to_size=self.ifp_length, unique_shells=unique_shells, count_fp=self.ifp_count)
 
     def create_ifp_file(self):
-        self.ifp_output = self.ifp_output or "%s/results/fingerprints/ifp.csv" % self.working_path
-        with open(self.ifp_output, "w") as OUT:
+        ifp_output = self.ifp_output or "%s/results/fingerprints/ifp.csv" % self.working_path
+        with open(ifp_output, "w") as OUT:
             if self.ifp_count:
                 OUT.write("ligand_id,smiles,on_bits,count\n")
             else:
@@ -526,195 +518,209 @@ class Project:
 
         return lig_clusters
 
+    def run(self):
+        self()
+
     def save(self, output_file, compressed=True):
         pickle_data(self, output_file, compressed)
 
     @staticmethod
-    def load(input_path):
-        input_file = None
+    def load(input_path, verbosity=3, logging_enabled=True):
+
+        #
+        # Check if the provided input path is a valid file or a directory containing saved projects.
+        #
         if is_file_valid(input_path):
             input_file = input_path
-
         elif is_directory_valid(input_path):
             project_files = glob.glob("%s/project_v*.pkl.gz" % input_path)
             if len(project_files) == 1:
                 input_file = project_files[0]
+            elif len(project_files) == 0:
+                raise PKLNotReadError("In the provided working path '%s', there is no saved project." % input_path)
             else:
                 raise PKLNotReadError("In the provided working path '%s', there are multiple saved projects. "
                                       "Please, specify which one you want to load." % input_path)
+        else:
+            raise IllegalArgumentError("The provided path '%s' does not exist or is an invalid file/directory." % input_path)
 
-        logger.info("Reloading project saved in '%s'" % input_file)
+        if not logging_enabled:
+            logger.disabled = True
+
+        logger.info("Reloading project saved in '%s'.\n" % input_file)
 
         proj_obj = unpickle_data(input_file)
 
         if has_version_compatibility(proj_obj.version):
-            proj_obj.init_logging_file("%s/logs/project.log" % proj_obj.working_path)
+            proj_obj._loaded_logging_file = False
+            proj_obj.verbosity = verbosity
+            proj_obj.logging_enabled = logging_enabled
 
-            logger.info("Project reloaded successfully.")
+            # Update the working path if the project has been moved to a different path.
+            curr_working_path = dirname(abspath(input_file))
+
+            if proj_obj.working_path != curr_working_path:
+                proj_obj.working_path = curr_working_path
+                proj_obj.logging_file = "%s/logs/project.log" % proj_obj.working_path
+
+            proj_obj._log("info", "Project reloaded successfully.")
             return proj_obj
         else:
             raise CompatibilityError("The project loaded from '%s' has a version (%s) not compatible with the "
                                      "current %s's version (%s)." % (input_file, proj_obj.version, __package__.upper(), __version__))
 
-    def _producer(self, job_queue):
-        for entry in self.entries:
-            job_queue.put(entry)
-
-    def _consumer(self, func, job_queue, progress_queue):
-        while True:
-            start = time.time()
-            entry = job_queue.get()
-
-            failed = False
-            # Run the provided function
-            try:
-                func(entry)
-            except Exception as e:
-                logger.exception(e)
-                logger.debug("Processing of entry '%s' failed. Check the logs for more information." % entry.to_string())
-                failed = True
-
-            end = time.time()
-
-            # Add progress data to be consumed.
-            progress_queue.put((entry.to_string(), (end - start), failed))
-
-            job_queue.task_done()
-
 
 class LocalProject(Project):
 
-    def __init__(self, entries, working_path, has_local_files=False, **kwargs):
-        super().__init__(entries=entries, working_path=working_path, has_local_files=has_local_files, **kwargs)
+    def __init__(self, entries, working_path, **kwargs):
+        super().__init__(entries=entries, working_path=working_path, **kwargs)
 
     def _process_entry(self, entry):
-        logger.debug("Starting entry processing: %s." % entry.to_string())
 
-        # Check if the entry is in the correct format.
-        # It also accepts entries whose pdb_id is defined by the filename.
-        if isinstance(entry, MolEntry) is False:
-            self.validate_entry_format(entry)
+        start = time.time()
 
-        # Entry results will be saved here.
-        pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
+        self._log("debug", "Starting entry processing: %s." % entry.to_string())
 
-        if self.append_mode and exists(pkl_file):
-            return
+        try:
+            # Check if the entry is in the correct format.
+            # It also accepts entries whose pdb_id is defined by the filename.
+            if isinstance(entry, MolEntry) is False:
+                self.validate_entry_format(entry)
 
-        # TODO: allow the user to pass a pdb_file through entries.
-        pdb_file = self.get_pdb_file(entry.pdb_id)
-        entry.pdb_file = pdb_file
+            # Entry results will be saved here.
+            pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
 
-        pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=False)
-        structure = pdb_parser.get_structure(entry.pdb_id, pdb_file)
-        add_hydrogen = self.decide_hydrogen_addition(pdb_parser.get_header(), entry)
+            if self.append_mode and exists(pkl_file):
+                self._log("debug", "Since append mode is set ON, it will skip entry '%s' because a result for "
+                          "this entry already exists in the working path." % entry.to_string())
+                return
 
-        if isinstance(entry, MolEntry):
-            structure = entry.get_biopython_structure(structure, pdb_parser)
+            # TODO: allow the user to pass a pdb_file through entries.
+            pdb_file = "%s/%s.pdb" % (self.pdb_path, entry.pdb_id)
+            entry.pdb_file = pdb_file
 
-        ligand = get_entity_from_entry(structure, entry)
-        ligand.set_as_target(is_target=True)
+            pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=False)
+            structure = pdb_parser.get_structure(entry.pdb_id, pdb_file)
+            add_hydrogen = self.decide_hydrogen_addition(pdb_parser.get_header(), entry)
 
-        #
-        # Perceive pharmacophoric properties
-        #
-        atm_grps_mngr = self.perceive_chemical_groups(entry, structure[0], ligand, add_hydrogen)
-        atm_grps_mngr.entry = entry
+            if isinstance(entry, MolEntry):
+                structure = entry.get_biopython_structure(structure, pdb_parser)
 
-        #
-        # Calculate interactions
-        #
-        interactions_mngr = self.inter_calc.calc_interactions(atm_grps_mngr.atm_grps)
-        interactions_mngr.entry = entry
+            ligand = get_entity_from_entry(structure, entry)
+            ligand.set_as_target(is_target=True)
 
-        # Create hydrophobic islands.
-        atm_grps_mngr.merge_hydrophobic_atoms(interactions_mngr)
+            #
+            # Perceive pharmacophoric properties
+            #
+            atm_grps_mngr = self.perceive_chemical_groups(entry, structure[0], ligand, add_hydrogen)
+            atm_grps_mngr.entry = entry
 
-        # Generate IFP (Interaction fingerprint)
-        ifp = None
-        if self.calc_ifp:
-            ifp = self.create_ifp(atm_grps_mngr)
+            #
+            # Calculate interactions
+            #
+            interactions_mngr = self.inter_calc.calc_interactions(atm_grps_mngr.atm_grps)
+            interactions_mngr.entry = entry
 
-        # Generate MFP (Molecular fingerprint)
-        mfp = None
-        if self.calc_mfp:
-            mfp = self.create_mfp()
+            # Create hydrophobic islands.
+            atm_grps_mngr.merge_hydrophobic_atoms(interactions_mngr)
 
-        # Saving entry results.
-        entry_results = EntryResults(entry, atm_grps_mngr, interactions_mngr, ifp, mfp)
-        entry_results.save(pkl_file)
+            # Generate IFP (Interaction fingerprint)
+            ifp = None
+            if self.calc_ifp:
+                ifp = self.create_ifp(atm_grps_mngr)
 
-        # Saving interactions to CSV file.
-        csv_file = "%s/results/interactions/%s.csv" % (self.working_path, entry.to_string())
-        interactions_mngr.to_csv(csv_file)
+            # Generate MFP (Molecular fingerprint)
+            mfp = None
+            if self.calc_mfp:
+                mfp = self.create_mfp()
 
-        logger.debug("Processing of entry '%s' finished successfully." % entry.to_string())
+            # Saving entry results.
+            entry_results = EntryResults(entry, atm_grps_mngr, interactions_mngr, ifp, mfp)
+            entry_results.save(pkl_file)
+
+            # Saving interactions to CSV file.
+            csv_file = "%s/results/interactions/%s.csv" % (self.working_path, entry.to_string())
+            interactions_mngr.to_csv(csv_file)
+
+            self._log("debug", "Processing of entry '%s' finished successfully." % entry.to_string())
+
+        except Exception:
+            self._log("debug", "Processing of entry '%s' failed. Check the logs for more information." % entry.to_string())
+            raise
+
+        proc_time = time.time() - start
+        self._log("debug", "Processing of entry '%s' took %.2fs." % (entry.to_string(), proc_time))
 
     def _process_ifps(self, entry):
-        pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
 
-        if exists(pkl_file):
-            # Reload results.
-            entry_results = EntryResults.load(pkl_file)
-            atm_grps_mngr = entry_results.atm_grps_mngr
+        start = time.time()
 
-            # Generate a new IFP.
-            ifp = self.create_ifp(atm_grps_mngr)
+        self._log("debug", "Starting IFP processing for entry '%s'." % entry.to_string())
 
-            # Substitute old IFP by the new version and save the project.
-            entry_results.ifp = ifp
-            entry_results.save(pkl_file)
-        else:
-            raise FileNotFoundError("The IFP for the entry '%s' cannot be generated because its pickled "
-                                    "data file '%s' was not found." % (entry.to_string(), pkl_file))
+        try:
+            pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
+
+            if exists(pkl_file):
+                # Reload results.
+                entry_results = EntryResults.load(pkl_file)
+                atm_grps_mngr = entry_results.atm_grps_mngr
+
+                # Generate a new IFP.
+                ifp = self.create_ifp(atm_grps_mngr)
+
+                # Substitute old IFP by the new version and save the project.
+                entry_results.ifp = ifp
+                entry_results.save(pkl_file)
+            else:
+                raise FileNotFoundError("The IFP for the entry '%s' cannot be generated because its pickled "
+                                        "data file '%s' was not found." % (entry.to_string(), pkl_file))
+
+        except Exception:
+            self._log("debug", "IFP processing for entry '%s' failed. Check the logs for more information." % entry.to_string())
+            raise
+
+        proc_time = time.time() - start
+        self._log("debug", "IFP processing for entry '%s' took %.2fs." % (entry.to_string(), proc_time))
 
     def __call__(self):
+
+        if len(self.entries) == 0:
+            warnings.warn("There is nothing to be done as no entry was informed.")
+            return
+
         start = time.time()
 
         self.prepare_project_path()
-        self.init_logging_file("%s/logs/project.log" % self.working_path)
+        self.init_logging_file(self.logging_file)
 
         self.remove_duplicate_entries()
 
-        if self.preload_mol_files:
-            self.add_mol_obj_to_entries()
+        self._log("info", "It will verify the existence of PDB files and download them as necessary.")
+        self.verify_pdb_files_existence()
 
-        job_queue = mp.JoinableQueue(maxsize=self.nproc)
-        progress_queue = mp.JoinableQueue(maxsize=1)
+        self._log("info", "Entries processing will start. Number of entries to be processed is: %d." % len(self.entries))
+        self._log("info", "The number of processes was set to: %s." % str(self.nproc))
 
-        logger.info("Entries processing will start. Number of entries to be processed is: %d." % len(self.entries))
-
-        entry_processing = ProgressTracker(len(self.entries), progress_queue, "Entries processing.")
-        entry_processing.start()
-
-        for i in range(self.nproc):
-            p = mp.Process(name="ConsumerProcess-%d" % i, target=self._consumer, args=(self._process_entry, job_queue, progress_queue))
-            p.daemon = True
-            p.start()
-
-        # Initialize a new progress bar (display a 0% progress).
-        progress_queue.put(None)
-        # Produce tasks to the consumers to process.
-        self._producer(job_queue)
-        # Join all processes and finalize the progress tracker.
-        job_queue.join()
-        entry_processing.end()
+        # Run jobs either in Parallel or Sequentially (nproc = None).
+        pj = ParallelJobs(self.nproc)
+        errors = pj.run_jobs(args_list=self.entries, consumer_func=self._process_entry, job_name="Entries processing")
 
         # Remove failed entries.
-        if entry_processing.errors:
-            self.entries = [e for e in self.entries if e.to_string() not in entry_processing.errors]
+        if errors:
+            errors = set([e.to_string() for e in errors])
+            self.entries = [e for e in self.entries if e.to_string() not in errors]
 
         # If all molecules failed, it won't try to create fingerprints.
         if len(self.entries) == 0:
-            logger.critical("Entries processing failed.")
+            self._log("critical", "Entries processing failed.")
         else:
-            logger.info("Entries processing finished successfully.")
+            self._log("info", "Entries processing finished successfully.")
 
             # Warn the users for any errors found during the entries processing.
-            if entry_processing.errors:
-                logger.warning("Number of entries with errors: %d. Check the log file for the complete list of entries that failed."
-                               % len(entry_processing.errors))
-                logger.debug("Entries that failed: %s." % ", ".join([e for e in entry_processing.errors]))
+            if errors:
+                self._log("warning", "Number of entries with errors: %d. Check the log file for the complete list of entries that failed."
+                          % len(errors))
+                self._log("debug", "Entries that failed: %s." % ", ".join([e for e in errors]))
 
             # Generate IFP/MFP files
             if self.calc_ifp:
@@ -729,44 +735,70 @@ class LocalProject(Project):
         self.remove_empty_paths()
 
         end = time.time()
-        logger.info("Project creation completed!!!")
-        logger.info("Total processing time: %.2fs." % (end - start))
-        logger.info("Results were saved at %s." % self.working_path)
-        logger.info("You can reload your project from %s.\n\n" % self.project_file)
+        self._log("info", "Project creation completed!!!")
+        self._log("info", "Total processing time: %.2fs." % (end - start))
+        self._log("info", "Results were saved at %s." % self.working_path)
+        self._log("info", "You can reload your project from %s.\n\n" % self.project_file)
+
+        # Properly close any filehandlers.
+        self.close_logging_file()
 
     def generate_ifps(self):
+
+        if len(self.entries) == 0:
+            warnings.warn("There is nothing to be done as no entry was informed.")
+            return
+
         start = time.time()
 
         self.calc_ifp = True
 
-        job_queue = mp.JoinableQueue(maxsize=self.nproc)
-        progress_queue = mp.JoinableQueue(maxsize=1)
+        if self.ifp_output is None:
+            self.prepare_project_path(subdirs=["results", "results/fingerprints"])
 
-        logger.info("Fingerprint generation will start. Number of entries to be processed is: %d." % len(self.entries))
+        # Create a new directory for logs.
+        if self.logging_enabled:
+            if not exists("%s/logs/" % self.working_path):
+                self.prepare_project_path(subdirs=["logs"])
+            self.init_logging_file(self.logging_file)
 
-        entry_processing = ProgressTracker(len(self.entries), progress_queue, "IFPs generation.")
-        entry_processing.start()
+        self._log("info", "Fingerprint generation will start. Number of entries to be processed is: %d." % len(self.entries))
+        self._log("info", "The number of processes was set to: %s." % str(self.nproc))
 
-        for i in range(self.nproc):
-            p = mp.Process(name="ConsumerProcess-%d" % i, target=self._consumer, args=(self._process_ifps, job_queue, progress_queue))
-            p.daemon = True
-            p.start()
+        # Run jobs either in Parallel or Sequentially (nproc = None).
+        pj = ParallelJobs(self.nproc)
+        errors = pj.run_jobs(args_list=self.entries, consumer_func=self._process_ifps, job_name="Fingerprint generation")
 
-        # Initialize a new progress bar (display a 0% progress).
-        progress_queue.put(None)
-        # Produce tasks to the consumers to process.
-        self._producer(job_queue)
-        # Join all processes and finalize the progress tracker.
-        job_queue.join()
-        entry_processing.end()
+        tmp_entries = self.entries
+        # Remove failed entries.
+        if errors:
+            errors = set([e.to_string() for e in errors])
+            tmp_entries = [e for e in self.entries if e.to_string() not in errors]
 
-        # Generate IFP/MFP files
-        if self.calc_ifp:
-            self.create_ifp_file()
-        if self.calc_mfp:
-            self.create_mfp_file()
+        # If all molecules failed, it won't try to create fingerprints.
+        if len(tmp_entries) == 0:
+            self._log("critical", "Fingerprint generation failed.")
+        else:
+            self._log("info", "Fingerprint generation finished successfully.")
+
+            # Warn the users for any errors found during the entries processing.
+            if errors:
+                self._log("warning", "Number of entries with errors: %d. Check the log file for the complete list of entries that failed."
+                          % len(errors))
+                self._log("debug", "Entries that failed: %s." % ", ".join([e for e in errors]))
+
+            # Generate IFP/MFP files
+            if self.calc_ifp:
+                self.create_ifp_file()
+            if self.calc_mfp:
+                self.create_mfp_file()
+
+        # Remove unnecessary paths.
+        self.remove_empty_paths()
 
         end = time.time()
-        logger.info("IFPs created successfully!!!")
-        logger.info("Total processing time: %.2fs." % (end - start))
-        logger.info("Results were saved at %s.\n\n" % self.working_path)
+        self._log("info", "Total processing time: %.2fs." % (end - start))
+        self._log("info", "Results were saved at %s.\n\n" % self.working_path)
+
+        # Properly close any filehandlers.
+        self.close_logging_file()
