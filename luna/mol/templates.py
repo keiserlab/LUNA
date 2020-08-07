@@ -38,8 +38,8 @@ class LigandExpoTemplate:
             smiles = self.get_ligand_smiles(lig_id)
             template = MolWrapper.from_smiles(smiles, mol_obj_type="rdkit").unwrap()
 
+            # Note that the template molecule should have no explicit hydrogens else the algorithm will fail.
             new_mol = AssignBondOrdersFromTemplate(template, tmp_mol_obj.unwrap())
-            print("HERE")
 
             if isinstance(mol_obj, MolWrapper):
                 return MolWrapper(mol_obj)

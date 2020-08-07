@@ -13,6 +13,7 @@ TMP_FILES = "%s/public/tmp" % LUNA_PATH
 CONF_PATH = path.abspath(path.join(path.realpath(__file__), '../../', 'data'))
 DB_CONF_FILE = "%s/mysql.ini" % CONF_PATH
 ATOM_PROP_FILE = "%s/LUNA.fdef" % CONF_PATH
+LIGAND_EXPO_FILE = "%s/ligand_expo.tsv" % CONF_PATH
 
 INTERACTION_CONF = DefaultInteractionConf()
 BOUNDARY_CONF = InteractionConf({"boundary_cutoff": 6.2})
