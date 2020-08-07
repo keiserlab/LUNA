@@ -9,7 +9,7 @@ from openbabel import openbabel as ob
 from openbabel.pybel import readfile
 from openbabel.pybel import Molecule as PybelWrapper
 
-from rdkit.Chem import MolFromMolBlock, MolFromMolFile, SanitizeFlags, SanitizeMol
+from rdkit.Chem import MolFromMolBlock, MolFromMolFile, SanitizeFlags, SanitizeMol, MolToMolFile
 
 from luna.util.file import is_directory_valid, get_unique_filename, remove_files
 from luna.util.default_values import ENTRY_SEPARATOR, OPENBABEL
@@ -23,6 +23,9 @@ from luna.mol.validator import MolValidator
 from luna.mol.standardiser import ResiduesStandardiser
 from luna.mol.wrappers.base import MolWrapper
 from luna.mol.wrappers.obabel import convert_molecule
+from luna.mol.wrappers.rdkit import read_mol_from_file
+
+from luna.mol.templates import LigandExpoTemplate
 
 from luna.util.exceptions import (IllegalArgumentError, MoleculeNotFoundError, ChainNotFoundError,
                                   FileNotCreated, PDBNotReadError, MoleculeSizeError, MoleculeObjectError)
@@ -295,8 +298,9 @@ def get_residue_neighbors(residue, select=Select()):
 
 
 def biopython_entity_to_mol(entity, select=Select(), validate_mol=True, standardize_mol=True,
-                            add_h=False, ph=None, break_metal_bonds=False, mol_obj_type="rdkit", openbabel=OPENBABEL,
-                            tmp_path=None, keep_tmp_files=False):
+                            template=None, add_h=False, ph=None,
+                            break_metal_bonds=False, mol_obj_type="rdkit", wrapped=True,
+                            openbabel=OPENBABEL, tmp_path=None, keep_tmp_files=False):
 
     tmp_path = tmp_path or tempfile.gettempdir()
 
@@ -312,9 +316,23 @@ def biopython_entity_to_mol(entity, select=Select(), validate_mol=True, standard
 
     logger.debug("First: try to create a new PDB file (%s) from the provided entity." % pdb_file)
     # Apparently, Open Babel creates a bug when it tries to parse a file with CONECTS containing serial numbers with more than 4 digits.
-    # E.g.: 1OZH:A:HE3:1406, line CONECT162811627916282.
-    # By setting preserve_atom_numbering to False, it seems the problem is solved.
+    # E.g.: 1OZH:A:HE3:1406, line CONECT162811627916282. By setting preserve_atom_numbering to False, it solves the problem.
     save_to_file(entity, pdb_file, select, preserve_atom_numbering=False)
+
+    ini_input_file = pdb_file
+    if template is not None:
+        if entity.level == "R" and entity.is_hetatm():
+            # Note that the template molecule should have no explicit hydrogens else the algorithm will fail.
+            rdmol = read_mol_from_file(pdb_file, mol_format="pdb", removeHs=True)
+            new_rdmol = template.assign_bond_order(rdmol, entity.resname)
+
+            ini_input_file = '%s_tmp-mol-file.mol' % filename
+            MolToMolFile(new_rdmol, ini_input_file)
+
+            if not keep_tmp_files:
+                remove_files([pdb_file])
+        else:
+            logger.warning("It cannot apply a template on the provided entity because it should be a single compound (Residue class).")
 
     # Convert the PDB file to Mol file with the proper protonation and hydrogen addition if required.
     mol_file = '%s_mol-file.mol' % filename
@@ -326,7 +344,7 @@ def biopython_entity_to_mol(entity, select=Select(), validate_mol=True, standard
             ob_opt["p"] = ph
         else:
             ob_opt["h"] = ""
-    convert_molecule(pdb_file, mol_file, opt=ob_opt, openbabel=openbabel)
+    convert_molecule(ini_input_file, mol_file, opt=ob_opt, openbabel=openbabel)
 
     # Currently, ignored atoms are only metals.
     ignored_atoms = []
@@ -429,6 +447,9 @@ def biopython_entity_to_mol(entity, select=Select(), validate_mol=True, standard
 
     # Remove temporary files.
     if not keep_tmp_files:
-        remove_files([pdb_file, mol_file])
+        remove_files([ini_input_file, mol_file])
+
+    if wrapped:
+        mol_obj = MolWrapper(mol_obj)
 
     return mol_obj, ignored_atoms
