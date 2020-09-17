@@ -5,20 +5,15 @@
 *.bak
 *.log
 
-test*.py
-
 .project
 .pydevproject
 
-
-# Todos arquivos dos diretórios:
-
+# Remove entire directories:
 tmp/
 www/system
 www/application/config
 www/data
 __pycache__
-scripts/output
 
 *.pdb
 
@@ -26,15 +21,4 @@ scripts/output
 
 *.csv
 
-scripts/compare_molecules\.py
-
-scripts/molecules_with_error\.py
-
-scripts/obsolete/
-
-scripts/connect_to_server\.sh
-
-scripts/napoli\.log*
-
 *\.fuse_hidden*
-scripts/classify_atom_groups\.py
