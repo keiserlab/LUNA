@@ -52,7 +52,7 @@ class ParallelJobs:
         for data in args_list:
             job_queue.put(data)
 
-    def _consumer(self, func, job_queue, output_queue, progress_queue):
+    def _consumer(self, func, job_queue, progress_queue, output_queue=None):
         while True:
             data = job_queue.get()
 
@@ -141,8 +141,8 @@ class ParallelJobs:
                 output_queue = mp.JoinableQueue()
 
             for i in range(self.nproc):
-                p = mp.Process(name="ConsumerProcess-%d" % i, target=self._consumer, args=(consumer_func, job_queue, output_queue,
-                                                                                           progress_queue,))
+                p = mp.Process(name="ConsumerProcess-%d" % i, target=self._consumer, args=(consumer_func, job_queue, progress_queue,
+                                                                                           output_queue,))
                 p.daemon = True
                 p.start()
 
