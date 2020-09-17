@@ -109,7 +109,7 @@ def convert_molecule(infile, output, infile_format=None,
 
         p = Popen(args, stdout=PIPE, stderr=PIPE)
         try:
-            stdout, stderr = p.communicate(timeout=15)
+            stdout, stderr = p.communicate(timeout=30)
         except TimeoutExpired:
             p.kill()
             raise
