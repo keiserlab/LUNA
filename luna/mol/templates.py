@@ -1,7 +1,7 @@
 import pandas as pd
 
 from luna.util.default_values import LIGAND_EXPO_FILE
-from luna.util.exceptions import MoleculeObjectTypeError
+from luna.util.exceptions import MoleculeNotFoundError, MoleculeObjectTypeError
 from luna.mol.wrappers.base import MolWrapper
 
 from rdkit.Chem.AllChem import AssignBondOrdersFromTemplate
@@ -30,12 +30,20 @@ class LigandExpoTemplate:
         return ligands
 
     def get_ligand_smiles(self, lig_id):
-        return self.data[self.data["ligand_id"] == lig_id]["smiles"].values[0]
+        data = self.data[self.data["ligand_id"] == lig_id]["smiles"]
+        if data.shape[0] == 0:
+            return None
+        return data.values[0]
 
     def assign_bond_order(self, mol_obj, lig_id):
         tmp_mol_obj = MolWrapper(mol_obj)
         if tmp_mol_obj.is_rdkit_obj():
             smiles = self.get_ligand_smiles(lig_id)
+            # Raise an exception when the template is not found.
+            if smiles is None:
+                raise MoleculeNotFoundError("It is not possible to assign the bond orders to the ligand %s because "
+                                            "its corresponding template was not found at Ligand Expo." % lig_id)
+
             template = MolWrapper.from_smiles(smiles, mol_obj_type="rdkit").unwrap()
 
             # Note that the template molecule should have no explicit hydrogens else the algorithm will fail.
