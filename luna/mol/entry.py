@@ -21,12 +21,13 @@ from luna.MyBio.PDB.Entity import Entity
 logger = logging.getLogger()
 
 # Source: https://richjenks.com/filename-regex/
-FILENAME_REGEX = r"(?!.{256,})(?!(aux|clock\$|con|nul|prn|com[1-9]|lpt[1-9])(?:$|\.))[^ ][ \.\w\-$()+=[\];#@~,&']+[^\. ]"
+FILENAME_REGEX = re.compile(r"^(?!.{256,})(?!(aux|clock\$|con|nul|prn|com[1-9]|lpt[1-9])(?:$|\.))[^ ][ \.\w\-$()+=[\];#@~,&']+[^\. ]$",
+                            flags=re.IGNORECASE)  # Case insentive pattern
 
-REGEX_RESNUM_ICODE = re.compile(r'^(\-?\d+)([a-zA-z]?)$')
+PCI_ENTRY_REGEX = re.compile(r'^.{1,255}:\w:\w[\w+\-]{0,2}:\-?\d{1,4}[a-zA-z]?$')
+PPI_ENTRY_REGEX = re.compile(r'^.{1,255}:\w$')
 
-PCI_ENTRY_REGEX = re.compile(r'^%s:\w:\w[\w+\-]{1,2}?:\-?\d{1,4}[a-zA-z]?$' % FILENAME_REGEX)
-PPI_ENTRY_REGEX = re.compile(r'^%s:\w$' % FILENAME_REGEX)
+REGEX_RESNUM_ICODE = re.compile(r'^([\-\+]?\d+)([a-zA-z]?)$')
 
 
 class Entry:
@@ -41,17 +42,17 @@ class Entry:
                 assert float(comp_num).is_integer()
                 comp_num = int(comp_num)
             except (ValueError, AssertionError):
-                raise IllegalArgumentError("The informed residue number '%s' is invalid. It must be an integer." % str(comp_num))
+                raise IllegalArgumentError("The informed compound number '%s' is invalid. It must be an integer." % str(comp_num))
 
         if comp_icode is not None:
             comp_icode = str(comp_icode)
             if comp_icode.isdigit() or len(comp_icode) > 1:
-                raise IllegalArgumentError("The informed residue icode '%s' is invalid. It must be a character." % str(comp_icode))
+                raise IllegalArgumentError("The informed compound icode '%s' is invalid. It must be a character." % str(comp_icode))
 
-        self.pdb_id = pdb_id
-        self.chain_id = chain_id
-        self.comp_name = comp_name
-        self.comp_num = comp_num
+        self._pdb_id = pdb_id
+        self._chain_id = chain_id
+        self._comp_name = comp_name
+        self._comp_num = comp_num
         self._comp_icode = comp_icode
         self.is_hetatm = is_hetatm
         self.sep = sep
@@ -62,23 +63,60 @@ class Entry:
     @classmethod
     def from_string(cls, entry_str, is_hetatm=True, sep=ENTRY_SEPARATOR):
         entries = entry_str.split(sep)
-        if len(entries) >= 2 and len(entries) <= 4:
-            if len(entries) == 4:
-                # Separate ligand number from insertion code.
-                matched = REGEX_RESNUM_ICODE.match(entries[3])
-                if matched:
-                    comp_num = matched.group(1)
-                    icode = None if matched.group(2) == "" else matched.group(2)
-                    entries = entries[0:3] + [comp_num, icode]
-                else:
-                    raise IllegalArgumentError("The field residue/ligand number and its insertion code (if applicable) '%s' is invalid. "
-                                               "It must be an integer followed by one insertion code character when applicable."
-                                               % entries[3])
+
+        # Try to initialize a new ChainEntry.
+        if len(entries) == 2:
+            if any([str(i).strip() == "" for i in entries]):
+                raise IllegalArgumentError("The number of fields in the informed string '%s' is incorrect. A valid ChainEntry must contain "
+                                           "two obligatory fields: PDB and chain id." % entry_str)
+
+            return cls(*entries, is_hetatm=False, sep=sep)
+
+        # Try to initialize a new CompoundEntry.
+        elif len(entries) == 4:
+            if any([str(i).strip() == "" for i in entries]):
+                raise IllegalArgumentError("The number of fields in the informed string '%s' is incorrect. A valid CompoundEntry "
+                                           "must contain four obligatory fields: PDB, chain id, compound name, and compound "
+                                           "number followed by its insertion code when applicable." % entry_str)
+
+            # Separate ligand number from insertion code.
+            matched = REGEX_RESNUM_ICODE.match(entries[3])
+            if matched:
+                comp_num = matched.group(1)
+                try:
+                    assert float(comp_num).is_integer()
+                    comp_num = int(comp_num)
+                except (ValueError, AssertionError):
+                    raise IllegalArgumentError("The informed compound number '%s' is invalid. It must be an integer." % str(comp_num))
+
+                icode = None if matched.group(2) == "" else matched.group(2)
+                entries = entries[0:3] + [comp_num, icode]
+            else:
+                raise IllegalArgumentError("The compound number and its insertion code (if applicable) '%s' is invalid. "
+                                           "It must be an integer followed by one insertion code character when applicable."
+                                           % entries[3])
             return cls(*entries, is_hetatm=is_hetatm, sep=sep)
+
         else:
             raise IllegalArgumentError("The number of fields in the informed string '%s' is incorrect. A valid string must contain "
-                                       "two obligatory fields (PDB and chain id) and may contain two optional fields (residue name "
-                                       "and residue number followed by its insertion code when applicable)." % entry_str)
+                                       "two obligatory fields (PDB and chain id) and it may contain two optional fields (compound name "
+                                       "and compound number followed by its insertion code when applicable)." % entry_str)
+
+    @property
+    def pdb_id(self):
+        return self._pdb_id
+
+    @property
+    def chain_id(self):
+        return self._chain_id
+
+    @property
+    def comp_name(self):
+        return self._comp_name
+
+    @property
+    def comp_num(self):
+        return self._comp_num
 
     @property
     def comp_icode(self):
@@ -89,7 +127,12 @@ class Entry:
 
     @property
     def full_id(self):
-        return (self.pdb_id, self.chain_id, self.comp_name, self.comp_num, self.comp_icode)
+        entry = [self.pdb_id, self.chain_id]
+        if self.comp_name is not None and self.comp_num is not None:
+            entry.append(self.comp_name)
+            entry.append(self.comp_num)
+            entry.append(self.comp_icode)
+        return tuple(entry)
 
     def to_string(self, sep=None):
         full_id = self.full_id
@@ -97,13 +140,11 @@ class Entry:
         # An entry object will always have a PDB and chain id.
         entry = list(full_id[0:2])
 
+        # If it contains additional information about the compound it will also include them.
         if len(full_id) > 2:
-            # If it contains additional information about the residue it will also include them.
-            if full_id[2] and full_id[3]:
-                comp_name = str(full_id[2]) if full_id[2] else ""
-
-                comp_num_and_icode = str(full_id[3]) if full_id[3] else ""
-                comp_num_and_icode += str(full_id[4]) if full_id[4].strip() else ""
+            if full_id[2] is not None and full_id[3] is not None:
+                comp_name = str(full_id[2]).strip()
+                comp_num_and_icode = str(full_id[3]).strip() + str(full_id[4]).strip()
                 entry += [comp_name, comp_num_and_icode]
 
         sep = sep or self.sep
@@ -113,14 +154,19 @@ class Entry:
     def is_valid(self):
         full_id = self.full_id
 
-        # If it contains additional information about the residue it will also include them.
-        if len(full_id) > 2:
-            if full_id[2] and full_id[3]:
-                regex = PCI_ENTRY_REGEX
-            else:
-                regex = PPI_ENTRY_REGEX
+        if FILENAME_REGEX.match(self.pdb_id) is None:
+            return False
 
-        return regex.match(self.to_string(":")) is not None
+        # Regex for ChainEntry (pdb_id, chain_id).
+        if len(full_id) == 2:
+            return PPI_ENTRY_REGEX.match(self.to_string(":")) is not None
+
+        # Regex for CompoundEntry (pdb_id, chain_id, comp_name, comp_num, icode).
+        elif len(full_id) == 5:
+            return PCI_ENTRY_REGEX.match(self.to_string(":")) is not None
+
+        # Return False for anything else
+        return False
 
     def get_biopython_key(self):
         if self.comp_name is not None and self.comp_num is not None:
@@ -137,14 +183,6 @@ class Entry:
         return '<%s: %s>' % (self.__class__.__name__, self.to_string(self.sep))
 
 
-class DBEntry(Entry):
-
-    def __init__(self, ligand_entry_id, pdb_id, chain_id, comp_name=None, comp_num=None, comp_icode=None):
-
-        self.id = ligand_entry_id
-        super().__init__(pdb_id, chain_id, comp_name, comp_num, comp_icode)
-
-
 class ChainEntry(Entry):
 
     def __init__(self, pdb_id, chain_id, sep=ENTRY_SEPARATOR):
@@ -158,6 +196,10 @@ class ChainEntry(Entry):
         else:
             raise IllegalArgumentError("The number of fields in the informed string '%s' is incorrect. A valid string must contain "
                                        "two obligatory fields: PDB and chain id." % entry_str)
+
+    @property
+    def full_id(self):
+        return (self.pdb_id, self.mol_id)
 
 
 class CompoundEntry(Entry):
@@ -177,13 +219,13 @@ class CompoundEntry(Entry):
                 icode = None if matched.group(2) == "" else matched.group(2)
                 entries = entries[0:3] + [comp_num, icode]
             else:
-                raise IllegalArgumentError("The field residue/ligand number and its insertion code (if applicable) '%s' is invalid. "
+                raise IllegalArgumentError("The compound number and its insertion code (if applicable) '%s' is invalid. "
                                            "It must be an integer followed by one insertion code character when applicable." % entries[3])
             return cls(*entries, sep=sep)
         else:
-            raise IllegalArgumentError("The number of fields in the informed string '%s' is incorrect. A valid ligand entry must contain "
-                                       "four obligatory fields: PDB, chain id, residue name, and residue number followed by its insertion "
-                                       "code when applicable)." % entry_str)
+            raise IllegalArgumentError("The number of fields in the informed string '%s' is incorrect. A valid compound entry must contain "
+                                       "four obligatory fields: PDB, chain id, compound name, and compound number followed by its "
+                                       "insertion code when applicable." % entry_str)
 
 
 class MolEntry(Entry):
@@ -270,7 +312,7 @@ class MolEntry(Entry):
         return True
 
     def is_mol_obj_loaded(self):
-        return self.mol_obj is not None
+        return self._mol_obj is not None
 
     def _load_mol_from_file(self):
         logger.debug("It will try to load the molecule '%s'." % self.mol_id)
@@ -319,7 +361,7 @@ class MolEntry(Entry):
                                       "object for the entry '%s' could not be created. Check the logs for more information."
                                       % (tool, self.to_string()))
 
-        if self.mol_obj is None:
+        if self._mol_obj is None:
             raise MoleculeNotFoundError("The ligand '%s' was not found in the input file or generated errors while parsing it with %s."
                                         % (self.mol_id, tool))
         else:
@@ -422,7 +464,7 @@ class MolEntry(Entry):
         return '<MolEntry: %s%s%s>' % (self.pdb_id, self.sep, self.mol_id)
 
     def __getstate__(self):
-        if self.mol_obj is not None:
+        if self._mol_obj is not None:
             self.mol_obj = MolWrapper(self.mol_obj)
         return self.__dict__
 
@@ -460,8 +502,7 @@ def recover_entries_from_entity(entity, get_small_molecules=True, get_chains=Tru
                     comp_num_and_icode = str(res.id[1])
                 comp_num_and_icode += str(res.id[2]) if res.id[2].strip() else ""
 
-                entry = sep.join([pdb_id, res.parent.id, res.resname, comp_num_and_icode])
-                yield entry
+                yield sep.join([pdb_id, res.parent.id, res.resname, comp_num_and_icode])
 
     if get_chains:
         pdb_id = entity.get_parent_by_level("S").id
