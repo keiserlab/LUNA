@@ -33,7 +33,9 @@ class PharmacophoreDepiction:
         self.svg_opts = svg_opts or {}
 
     def _perceive_atm_types(self, rdmol):
-        return self.feature_extractor.get_features_by_atoms(rdmol)
+        if self.feature_extractor is not None:
+            return self.feature_extractor.get_features_by_atoms(rdmol)
+        return {}
 
     def plot_fig(self, mol, output, atm_types=None, legend=None):
         rdmol = MolWrapper(mol).as_rdkit()

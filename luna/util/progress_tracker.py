@@ -11,6 +11,45 @@ import logging
 logger = logging.getLogger()
 
 
+class ProgressData:
+
+    def __init__(self, input_data, proc_time, output_data=None, exception=None, func=None):
+
+        self.input_data = input_data
+        self.output_data = output_data
+        self.proc_time = proc_time
+        self.exception = exception
+        self.func = func
+
+
+class ProgressResult:
+
+    def __init__(self, results=None):
+        self.results = results or []
+
+    @property
+    def inputs(self):
+        return [r.input_data for r in self.results]
+
+    @property
+    def outputs(self):
+        return [(r.input_data, r.output_data) for r in self.results]
+
+    @property
+    def errors(self):
+        return [(r.input_data, r.exception) for r in self.results if r.exception is not None]
+
+    def append(self, r):
+        self.results.append(r)
+
+    def __len__(self):
+        return len(self.results)
+
+    def __iter__(self):
+        for r in self.results:
+            yield r
+
+
 class ProgressTracker:
 
     def __init__(self, ntasks, queue, task_name=None):
@@ -24,8 +63,9 @@ class ProgressTracker:
         self.progress_bar = Thread(target=self.print_progress, args=(self.event, self.queue))
         self.progress_bar.daemon = True
 
-        # Save any errors found during the task processing.
-        self.errors = set()
+        # Save results and any errors found during the task processing.
+        self.results = ProgressResult()
+        self.errors = 0
 
         self.running_times = []
         self._start_time = None
@@ -37,8 +77,7 @@ class ProgressTracker:
             task_name = " - %s" % self.task_name
 
         msg = '%s%% [%s] %d/%d [Avg: %.2fs/task; Errors: %d]%s.' % (int(perc), ("\u25A0" * int(perc / 2)).ljust(50, ' '),
-                                                                    p, self.ntasks, self.avg_running_time, len(self.errors),
-                                                                    task_name)
+                                                                    p, self.ntasks, self.avg_running_time, self.errors, task_name)
 
         format_str = '\r[%s]    %s%s %s%s  %s'
         progress_str = format_str % (time.strftime('%Y-%m-%d %H:%M:%S'), parse_colors("purple"),
@@ -67,11 +106,12 @@ class ProgressTracker:
             progress_data = q.get()
 
             if progress_data is not None:
-                entry, proc_time, failed = progress_data
+                self.results.append(progress_data)
 
-                self.running_times.append(proc_time)
-                if failed:
-                    self.errors.add(entry)
+                self.running_times.append(progress_data.proc_time)
+
+                if progress_data.exception is not None:
+                    self.errors += 1
 
                 self.progress += 1
 

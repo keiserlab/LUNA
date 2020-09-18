@@ -16,7 +16,7 @@ from luna.mol.depiction import PharmacophoreDepiction
 from luna.mol.clustering import cluster_fps_butina
 from luna.mol.features import FeatureExtractor
 from luna.mol.fingerprint import generate_fp_for_mols
-from luna.mol.entry import MolEntry
+from luna.mol.entry import Entry, MolEntry
 from luna.mol.groups import AtomGroupPerceiver
 from luna.mol.interaction.contact import get_contacts_for_entity
 from luna.mol.interaction.calc import InteractionCalculator
@@ -181,6 +181,7 @@ class Project:
         self.version = __version__
 
         self._paths = ["chunks", "figures", "logs", "pdbs", "results/interactions", "results/fingerprints", "results", "tmp"]
+        self.errors = []
 
     def __call__(self):
         raise NotImplementedError("This class is not callable. Use a class that implements this method.")
@@ -288,7 +289,11 @@ class Project:
             self.init_logging_file(self.logging_file)
 
     def get_entry_results(self, entry):
-        pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
+
+        if isinstance(entry, Entry):
+            entry = entry.to_string()
+
+        pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry)
         try:
             return EntryResults.load(pkl_file)
         except Exception as e:
@@ -393,13 +398,14 @@ class Project:
         if to_download:
             args = [(pdb_id, self.pdb_path) for pdb_id in to_download]
             pj = ParallelJobs(self.nproc)
-            errors = pj.run_jobs(args_list=args, consumer_func=download_pdb, job_name="Download PDBs")
+            job_results = pj.run_jobs(args_list=args, consumer_func=download_pdb, job_name="Download PDBs")
+            errors = job_results.errors
 
             # Warn the users for any errors found during the entries processing.
             if errors:
-                self._log("warning", "Number of PDBs with errors: %d. Check the log file for the complete list of PDBs that failed."
+                self._log("warning", "Number of PDBs with errors: %d. Check the log file to see the complete list of PDBs that failed."
                           % len(errors))
-                self._log("debug", "PDBs that failed: %s." % ", ".join([e[0] for e in errors]))
+                self._log("debug", "PDBs that failed: %s." % ", ".join([e[0][0] for e in errors]))
 
     def decide_hydrogen_addition(self, pdb_header, entry):
         if self.try_h_addition:
@@ -589,7 +595,6 @@ class LocalProject(Project):
 
             # Entry results will be saved here.
             pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
-
             if self.append_mode and exists(pkl_file):
                 self._log("debug", "Since append mode is set ON, it will skip entry '%s' because a result for "
                           "this entry already exists in the working path." % entry.to_string())
@@ -672,7 +677,7 @@ class LocalProject(Project):
                 entry_results.ifp = ifp
                 entry_results.save(pkl_file)
             else:
-                raise FileNotFoundError("The IFP for the entry '%s' cannot be generated because its pickled "
+                raise FileNotFoundError("The IFP of the entry '%s' could not be generated because its pickled "
                                         "data file '%s' was not found." % (entry.to_string(), pkl_file))
 
         except Exception:
@@ -703,12 +708,13 @@ class LocalProject(Project):
 
         # Run jobs either in Parallel or Sequentially (nproc = None).
         pj = ParallelJobs(self.nproc)
-        errors = pj.run_jobs(args_list=self.entries, consumer_func=self._process_entry, job_name="Entries processing")
+        job_results = pj.run_jobs(args_list=self.entries, consumer_func=self._process_entry, job_name="Entries processing")
+        self.errors = job_results.errors
 
         # Remove failed entries.
-        if errors:
-            errors = set([e.to_string() for e in errors])
-            self.entries = [e for e in self.entries if e.to_string() not in errors]
+        if self.errors:
+            entries_with_error = set([e[0].to_string() for e in self.errors])
+            self.entries = [e for e in self.entries if e.to_string() not in entries_with_error]
 
         # If all molecules failed, it won't try to create fingerprints.
         if len(self.entries) == 0:
@@ -717,10 +723,10 @@ class LocalProject(Project):
             self._log("info", "Entries processing finished successfully.")
 
             # Warn the users for any errors found during the entries processing.
-            if errors:
-                self._log("warning", "Number of entries with errors: %d. Check the log file for the complete list of entries that failed."
-                          % len(errors))
-                self._log("debug", "Entries that failed: %s." % ", ".join([e for e in errors]))
+            if self.errors:
+                self._log("warning", "Number of entries with errors: %d. Check the log file to see the complete list of entries that failed."
+                          % len(entries_with_error))
+                self._log("debug", "Entries that failed: %s." % ", ".join([e for e in entries_with_error]))
 
             # Generate IFP/MFP files
             if self.calc_ifp:
@@ -767,13 +773,14 @@ class LocalProject(Project):
 
         # Run jobs either in Parallel or Sequentially (nproc = None).
         pj = ParallelJobs(self.nproc)
-        errors = pj.run_jobs(args_list=self.entries, consumer_func=self._process_ifps, job_name="Fingerprint generation")
+        job_results = pj.run_jobs(args_list=self.entries, consumer_func=self._process_ifps, job_name="Fingerprint generation")
+        self.errors = job_results.errors
 
         tmp_entries = self.entries
         # Remove failed entries.
-        if errors:
-            errors = set([e.to_string() for e in errors])
-            tmp_entries = [e for e in self.entries if e.to_string() not in errors]
+        if self.errors:
+            entries_with_error = set([e[0].to_string() for e in self.errors])
+            tmp_entries = [e for e in self.entries if e.to_string() not in entries_with_error]
 
         # If all molecules failed, it won't try to create fingerprints.
         if len(tmp_entries) == 0:
@@ -782,10 +789,10 @@ class LocalProject(Project):
             self._log("info", "Fingerprint generation finished successfully.")
 
             # Warn the users for any errors found during the entries processing.
-            if errors:
-                self._log("warning", "Number of entries with errors: %d. Check the log file for the complete list of entries that failed."
-                          % len(errors))
-                self._log("debug", "Entries that failed: %s." % ", ".join([e for e in errors]))
+            if self.errors:
+                self._log("warning", "Number of entries with errors: %d. Check the log file to see the complete list of entries that failed."
+                          % len(entries_with_error))
+                self._log("debug", "Entries that failed: %s." % ", ".join([e for e in entries_with_error]))
 
             # Generate IFP/MFP files
             if self.calc_ifp:

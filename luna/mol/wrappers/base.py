@@ -457,9 +457,14 @@ class MolWrapper:
     @classmethod
     def from_smiles(cls, smiles, mol_obj_type="rdkit"):
         if mol_obj_type == "rdkit":
-            return cls(MolFromSmiles(smiles))
+            mol = MolFromSmiles(smiles)
         elif mol_obj_type == "openbabel":
-            return cls(readstring("smi", smiles))
+            mol = readstring("smi", smiles)
+
+        # Raise an error if the molecule could not be created.
+        if mol is None:
+            raise MoleculeObjectError("It could not create a molecule from the provided SMILES '%s'." % smiles)
+        return cls(mol)
 
     @property
     def mol_obj(self):
