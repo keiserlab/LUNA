@@ -86,11 +86,13 @@ class ParallelJobs:
                 if isinstance(data, Sentinel):
                     break
 
-                line = data
+                line = None
                 if proc_func is not None:
                     # Execute the provided function.
                     output, exception, proc_time = self._exec_func(data, proc_func)
                     line = output
+                elif data is not None:
+                    line = data[1]
 
                 try:
                     OUT.write(str(line).strip())
