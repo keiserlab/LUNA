@@ -92,14 +92,13 @@ class ParallelJobs:
                     output, exception, proc_time = self._exec_func(data, proc_func)
                     line = output
 
-                if output is not None:
-                    try:
-                        OUT.write(str(line).strip())
-                        OUT.write("\n")
-                        OUT.flush()
-                    except Exception as e:
-                        logger.error("An error occurred while trying to save the output '%s'." % str(line))
-                        logger.exception(e)
+                try:
+                    OUT.write(str(line).strip())
+                    OUT.write("\n")
+                    OUT.flush()
+                except Exception as e:
+                    logger.error("An error occurred while trying to save the output '%s'." % str(line))
+                    logger.exception(e)
 
                 output_queue.task_done()
 
