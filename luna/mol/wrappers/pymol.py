@@ -137,7 +137,7 @@ class PymolWrapper:
 class PymolSessionManager:
 
     def __init__(self, show_cartoon=False, bg_color="white", pharm_color=None,
-                 add_directional_arrows=True, show_hydrop_surface=True, show_comp_labels=True,
+                 add_directional_arrows=True, show_hydrop_surface=False, show_comp_labels=True,
                  inter_color=PYMOL_INTERACTION_COLOR, pse_export_version="1.8"):
 
         self.show_cartoon = show_cartoon
@@ -185,8 +185,8 @@ class PymolSessionManager:
 
         for i, inter in enumerate(interactions):
 
-            if inter.type == "Proximal":
-                continue
+            # if inter.type == "Proximal":
+            #     continue
 
             #
             # Centroid 1
