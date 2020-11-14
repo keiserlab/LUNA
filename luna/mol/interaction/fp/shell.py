@@ -31,7 +31,7 @@ class CompoundClassIds(Enum):
 
 class ShellManager:
 
-    def __init__(self, num_levels, radius_step, num_bits, ifp_type, shells=None, full_control=True, verbose=False):
+    def __init__(self, num_levels, radius_step, num_bits, ifp_type, shells=None, verbose=False):
         self.num_levels = num_levels
         self.radius_steps = radius_step
         self.num_bits = num_bits
