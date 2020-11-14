@@ -5,7 +5,7 @@
             and interaction fingerprints;
        - PATCH stands for backward compatible bug fixes.
 """
-version_info = (0, 8, 0)
+version_info = (0, 9, 0)
 version = '.'.join(str(c) for c in version_info)
 __version__ = version
 
