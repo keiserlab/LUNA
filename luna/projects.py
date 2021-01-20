@@ -21,7 +21,8 @@ from luna.mol.groups import AtomGroupPerceiver
 from luna.mol.interaction.contact import get_contacts_for_entity
 from luna.mol.interaction.calc import InteractionCalculator
 from luna.mol.interaction.conf import InteractionConf
-from luna.mol.interaction.fp.shell import ShellGenerator, IFPType
+from luna.mol.interaction.fp.shell import ShellGenerator
+from luna.mol.interaction.fp.type import IFPType
 from luna.mol.wrappers.base import MolWrapper
 from luna.util.default_values import *
 from luna.util.exceptions import *
@@ -113,6 +114,8 @@ class Project:
             raise IllegalArgumentError("Invalid value for 'mol_obj_type'. Objects of type '%s' are not currently accepted. "
                                        "The available options are: %s." % (mol_obj_type,
                                                                            ", ".join(["'%s'" % m for m in ACCEPTED_MOL_OBJ_TYPES])))
+
+        self._log("info", "LUNA version: %s." % __version__)
 
         if inter_conf is None:
             self._log("info", "No interaction configuration was set and the default will be used instead")
