@@ -421,7 +421,7 @@ class Shell:
         return sorted(encoded_data)
 
     def __repr__(self):
-        return ("<Shell: level=%d, radius=%d, center=%s, interactions=%d>"
+        return ("<Shell: level=%d, radius=%f, center=%s, interactions=%d>"
                 % (self.level, self.radius, self.central_atm_grp, len(self.interactions)))
 
 
