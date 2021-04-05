@@ -52,16 +52,21 @@ def main():
                         help="the path where the project and its results will be saved")
 
     parser.add_argument('-L', dest="ifp_num_levels", type=int, default=2,
-                        help="the number of level defines the number of iterations to construct the fingerprint")
+                        help="the number of level defines the number of iterations to construct the fingerprint. "
+                             "Default: 2")
 
     parser.add_argument('-R', dest="ifp_radius_step", type=float, default=5.73171,
-                        help="the radius growth rate defines the multiplier to increase the sphere size at each level")
+                        help="the radius growth rate defines the multiplier to increase the sphere size at each level. "
+                             "Default: 5.73171")
 
     parser.add_argument('-S', dest="ifp_length", type=int, default=4096,
-                        help="the fingerprint length")
+                        help="the fingerprint length. Default: 4096")
 
     parser.add_argument('-T', dest="ifp_type", type=str, default="EIFP", choices=['EIFP', 'HIFP', 'FIFP'],
-                        help="the fingerprint type")
+                        help="the fingerprint type. Default: EIFP")
+
+    parser.add_argument('-O', dest="ifp_output", type=str,
+                        help="the fingerprint output file. Default: <WORKING_PATH>/results/fingerprints/ifp.csv")
 
     args = parser.parse_args()
 
@@ -91,11 +96,16 @@ def main():
         pli_obj = LocalProject.load(proj_pkl_file)
     print()
 
+    ifp_output = args.ifp_output
+    if ifp_output is None:
+        ifp_output = "%s/results/fingerprints/ifp.csv" % (args.working_path)
+
     pli_obj.calc_ifp = True
     pli_obj.ifp_num_levels = args.ifp_num_levels
     pli_obj.ifp_radius_step = args.ifp_radius_step
     pli_obj.ifp_length = args.ifp_length
     pli_obj.ifp_type = IFP_TYPES[args.ifp_type]
+    pli_obj.ifp_output = ifp_output
 
     pli_obj.generate_ifps()
 
