@@ -1,6 +1,6 @@
 from itertools import chain
 from collections import defaultdict
-from enum import Enum, auto
+from enum import Enum
 import numpy as np
 import mmh3
 
@@ -8,8 +8,10 @@ from luna.version import __version__
 from luna.util.exceptions import ShellCenterNotFound
 from luna.util.default_values import CHEMICAL_FEATURE_IDS, INTERACTION_IDS
 from luna.mol.interaction.fp.fingerprint import DEFAULT_FP_LENGTH, Fingerprint, CountFingerprint
+from luna.mol.interaction.fp.type import IFPType
 from luna.mol.groups import PseudoAtomGroup, AtomGroupNeighborhood
 from luna.mol.features import ChemicalFeature
+
 
 import logging
 
@@ -17,14 +19,6 @@ logger = logging.getLogger()
 
 
 PAD_DEFAULT = -9
-
-
-class IFPType(Enum):
-    # auto() creates automatic identifiers for each type as this value is not important.
-    # Therefore, always remember to compare IFP types using their names and not their values.
-    EIFP = auto()
-    EIFP_WITH_PHARM_FOR_GROUPS = auto()
-    FIFP = auto()
 
 
 class CompoundClassIds(Enum):
@@ -37,7 +31,7 @@ class CompoundClassIds(Enum):
 
 class ShellManager:
 
-    def __init__(self, num_levels, radius_step, num_bits, ifp_type, shells=None, full_control=True, verbose=False):
+    def __init__(self, num_levels, radius_step, num_bits, ifp_type, shells=None, verbose=False):
         self.num_levels = num_levels
         self.radius_steps = radius_step
         self.num_bits = num_bits

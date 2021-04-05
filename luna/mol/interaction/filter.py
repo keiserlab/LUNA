@@ -68,16 +68,7 @@ class InteractionFilter:
         return self._funcs
 
     def _default_functions(self):
-        return {"Hydrogen bond": self.filter_hbond,
-                "Attractive": self.filter_attractive,
-                "Cation-pi": self.filter_cation_pi,
-                "Edge-to-face pi-stacking": self.filter_pi_pi,
-                "Face-to-face pi-stacking": self.filter_pi_pi,
-                "Parallel-displaced pi-stacking": self.filter_pi_pi,
-                "Pi-stacking": self.filter_pi_pi,
-                "Hydrophobic": self.filter_hydrop,
-                "Halogen bond": self.filter_xbond,
-                "Repulsive": self.filter_repulsive}
+        return {}
 
     def is_valid_pair(self, src_grp, trgt_grp):
 
@@ -183,41 +174,3 @@ class InteractionFilter:
             return False
 
         return True
-
-    def is_valid_interaction(self, interaction, validate_pair=True):
-        if validate_pair:
-            if not self.is_valid_pair(interaction.src_grp, interaction.trgt_grp):
-                return False
-
-        if interaction.type not in self.funcs:
-            return True
-        else:
-            func = self.funcs[interaction.type]
-            return func(interaction)
-
-    def filter_hbond(self, interaction):
-        pass
-
-    def filter_attractive(self, interaction):
-        pass
-
-    def filter_cation_pi(self, interaction):
-        pass
-
-    def filter_pi_pi(self, interaction):
-        pass
-
-    def filter_hydrop(self, interaction):
-        pass
-
-    def filter_xbond(self, interaction):
-        pass
-
-    def filter_repulsive(self, interaction):
-        pass
-
-    def is_within_boundary(self, value, key, func):
-        if key not in self.inter_conf.conf:
-            return True
-        else:
-            return func(value, self.inter_conf.conf[key])
