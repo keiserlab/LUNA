@@ -4,6 +4,8 @@
 *.bak
 *.log
 *.pdb
+*.pkl
+*.pkl.gz
 
 *.output
 
