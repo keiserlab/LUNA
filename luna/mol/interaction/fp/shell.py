@@ -359,8 +359,8 @@ class Shell:
             # Shells use atomic invariants as data. In case of atom groups, the data consists of a list of invariants.
             data = sorted([atm.invariants for atm in self.central_atm_grp.atoms])
 
-        # EIFP_WITH_PHARM_FOR_GROUPS uses atomic invariants for atoms and pharmacophore information for atom groups.
-        elif self.manager.ifp_type == IFPType.EIFP_WITH_PHARM_FOR_GROUPS:
+        # HIFP uses atomic invariants for atoms and pharmacophore information for atom groups.
+        elif self.manager.ifp_type == IFPType.HIFP:
 
             if len(self.central_atm_grp.atoms) == 1:
                 # Shells whose centroid are atoms use invariants as data.
