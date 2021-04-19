@@ -491,18 +491,18 @@ class Project:
         ifp_output = self.ifp_output or "%s/results/fingerprints/ifp.csv" % self.working_path
         with open(ifp_output, "w") as OUT:
             if self.ifp_count:
-                OUT.write("ligand_id,smiles,on_bits,count\n")
+                OUT.write("ligand_id,on_bits,count\n")
             else:
-                OUT.write("ligand_id,smiles,on_bits\n")
+                OUT.write("ligand_id,on_bits\n")
 
             for entry, ifp in self.ifps:
                 if self.ifp_count:
                     fp_bits_str = "\t".join([str(idx) for idx in ifp.counts.keys()])
                     fp_count_str = "\t".join([str(count) for count in ifp.counts.values()])
-                    OUT.write("%s,%s,%s,%s\n" % (entry.to_string(), "", fp_bits_str, fp_count_str))
+                    OUT.write("%s,%s,%s\n" % (entry.to_string(), fp_bits_str, fp_count_str))
                 else:
                     fp_bits_str = "\t".join([str(x) for x in ifp.get_on_bits()])
-                    OUT.write("%s,%s,%s\n" % (entry.to_string(), "", fp_bits_str))
+                    OUT.write("%s,%s\n" % (entry.to_string(), fp_bits_str))
 
     def create_mfp_file(self):
         self.mfp_output = self.mfp_output or "%s/results/fingerprints/mfp.csv" % self.working_path
@@ -762,8 +762,6 @@ class LocalProject(Project):
 
         self.calc_ifp = True
         self.overwrite_path = False
-
-        print(self.ifp_type)
 
         if self.ifp_output is None:
             self.prepare_project_path(subdirs=["results", "results/fingerprints"])

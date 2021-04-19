@@ -470,6 +470,7 @@ class ShellGenerator:
         # Sort the atom groups for avoiding order dependence.
         sorted_neighborhood = sorted(neighborhood)
 
+        level = -1
         for level in range(self.num_levels):
             radius = self.radius_step * level
 

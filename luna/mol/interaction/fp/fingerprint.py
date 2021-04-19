@@ -331,9 +331,9 @@ class Fingerprint:
 
     def __eq__(self, other):
         if isinstance(other, Fingerprint):
-            return (self.__class__ == other.__class__ and
-                    self.fp_length == other.fp_length and
-                    np.all(np.in1d(self.indices, other.indices, assume_unique=True)))
+            return (self.__class__ == other.__class__
+                    and self.fp_length == other.fp_length
+                    and np.all(np.in1d(self.indices, other.indices, assume_unique=True)))
         return False
 
     def __ne__(self, other):
