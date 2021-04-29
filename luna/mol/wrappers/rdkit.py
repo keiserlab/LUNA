@@ -95,6 +95,7 @@ def read_multimol_file(mol_file, targets=None, mol_format=None, sanitize=True, r
             targets = set(targets)
 
         mol = []
+        ignore_lines = False
         line_count = 0
         while True:
             try:
@@ -152,8 +153,16 @@ def read_multimol_file(mol_file, targets=None, mol_format=None, sanitize=True, r
                             yield((rdk_mol, mol_id))
                         # Restart the molecule block.
                         mol = []
+                        # After finding a molecule block, ignore any following lines until it finds a line "$$$$".
+                        ignore_lines = True
                     elif line.startswith("$$$$") is False:
+                        # Ignore lines util it finds a line "$$$$".
+                        if ignore_lines:
+                            continue
                         mol.append(line)
+                    else:
+                        ignore_lines = False
+
             except StopIteration:
                 if mol:
                     if ext == "mol":
