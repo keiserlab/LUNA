@@ -1,5 +1,10 @@
 import argparse
 import os
+import sys
+from os import path
+
+scripts = path.abspath(path.join(path.realpath(__file__), '../..'))
+sys.path.append(scripts)
 
 from luna import LocalProject
 from luna.version import __version__ as version
