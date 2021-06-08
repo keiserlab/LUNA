@@ -23,3 +23,9 @@ class Config:
                 logger.exception(e)
                 section_map[option] = None
         return section_map
+
+    def __getattr__(self, attr):
+        if hasattr(self.config, attr):
+            return getattr(self.config, attr)
+        else:
+            raise AttributeError("The attribute '%s' does not exist in the class %s." % (attr, self.__class__.__name__))

@@ -91,12 +91,12 @@ class Project:
                  mfp_output=None,
 
                  calc_ifp=True,
-                 ifp_num_levels=7,
-                 ifp_radius_step=1,
+                 ifp_num_levels=2,
+                 ifp_radius_step=5.73171,
                  ifp_length=IFP_LENGTH,
-                 ifp_count=False,
+                 ifp_count=True,
                  ifp_diff_comp_classes=True,
-                 ifp_type=IFPType.FIFP,
+                 ifp_type=IFPType.EIFP,
                  ifp_output=None,
 
                  similarity_func="BulkTanimotoSimilarity",
@@ -761,6 +761,9 @@ class LocalProject(Project):
         start = time.time()
 
         self.calc_ifp = True
+        self.overwrite_path = False
+
+        print(self.ifp_type)
 
         if self.ifp_output is None:
             self.prepare_project_path(subdirs=["results", "results/fingerprints"])
