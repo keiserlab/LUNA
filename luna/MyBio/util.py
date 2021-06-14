@@ -25,8 +25,6 @@ from luna.mol.wrappers.base import MolWrapper
 from luna.mol.wrappers.obabel import convert_molecule
 from luna.mol.wrappers.rdkit import read_mol_from_file
 
-from luna.mol.templates import LigandExpoTemplate
-
 from luna.util.exceptions import (IllegalArgumentError, MoleculeNotFoundError, ChainNotFoundError,
                                   FileNotCreated, PDBNotReadError, MoleculeSizeError, MoleculeObjectError)
 

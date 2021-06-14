@@ -281,14 +281,15 @@ class PDBIO(object):
                                 atom_number += 1
 
                 if chain_residues_written:
-                    # MODBY: Alexandre Fassio
-                    # It's necessary to correct the last serial number if the preserve_atom_numbering is set
-                    # to True as the FOR always increment this value by 1.
+                    # The serial number of the TER record is always one number greater than the serial number of the ATOM/HETATM
+                    # preceding the TER.
+                    last_serial_num = atom_number
                     if not preserve_atom_numbering:
-                        atom_number -= 1
+                        # Now, increment the current serial number in case there is a new chain.
+                        atom_number += 1
 
                     fp.write("TER   %5i      %3s %c%4i%c                                                      \n"
-                             % (atom_number, resname, chain_id, resseq, icode))
+                             % (last_serial_num, resname, chain_id, resseq, icode))
 
             if model_flag and model_residues_written:
                 fp.write("ENDMDL\n")

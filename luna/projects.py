@@ -5,13 +5,14 @@ import logging
 import glob
 import warnings
 import multiprocessing as mp
+from scipy.special import comb
+import itertools
 
 # Open Babel and RDKit libraries
 from rdkit.Chem import ChemicalFeatures
 from rdkit.Chem import MolFromPDBBlock, MolFromSmiles
 
 # Local modules
-from luna.util.jobs import ParallelJobs
 from luna.mol.depiction import PharmacophoreDepiction
 from luna.mol.clustering import cluster_fps_butina
 from luna.mol.features import FeatureExtractor
@@ -21,6 +22,7 @@ from luna.mol.groups import AtomGroupPerceiver
 from luna.mol.interaction.contact import get_contacts_for_entity
 from luna.mol.interaction.calc import InteractionCalculator
 from luna.mol.interaction.conf import InteractionConf
+from luna.mol.interaction.view import InteractionViewer
 from luna.mol.interaction.fp.shell import ShellGenerator
 from luna.mol.interaction.fp.type import IFPType
 from luna.mol.wrappers.base import MolWrapper
@@ -29,6 +31,7 @@ from luna.util.exceptions import *
 from luna.util.file import *
 from luna.util.logging import new_logging_file, load_default_logging_conf
 from luna.util.multiprocessing_logging import start_mp_handler, MultiProcessingHandler
+from luna.util.jobs import ArgsGenerator, ParallelJobs
 
 from luna.MyBio.PDB.PDBParser import PDBParser
 from luna.MyBio.selector import ResidueSelector
@@ -85,6 +88,7 @@ class Project:
                  atom_prop_file=ATOM_PROP_FILE,
                  inter_conf=INTERACTION_CONF,
                  inter_calc=None,
+                 binding_mode_filter=None,
 
                  calc_mfp=False,
                  mfp_opts=None,
@@ -98,6 +102,9 @@ class Project:
                  ifp_diff_comp_classes=True,
                  ifp_type=IFPType.EIFP,
                  ifp_output=None,
+
+                 out_pse=False,
+                 out_ifp_sim_matrix=False,
 
                  similarity_func="BulkTanimotoSimilarity",
                  butina_cutoff=0.2,
@@ -155,6 +162,8 @@ class Project:
             inter_calc = InteractionCalculator(inter_conf=self.inter_conf)
         self.inter_calc = inter_calc
 
+        self.binding_mode_filter = binding_mode_filter
+
         # Fingerprint parameters.
         self.calc_mfp = calc_mfp
         self.mfp_opts = mfp_opts
@@ -168,6 +177,9 @@ class Project:
         self.ifp_diff_comp_classes = ifp_diff_comp_classes
         self.ifp_type = ifp_type
         self.ifp_output = ifp_output
+
+        self.out_pse = out_pse
+        self.out_ifp_sim_matrix = out_ifp_sim_matrix
 
         self.similarity_func = similarity_func
         self.butina_cutoff = butina_cutoff
@@ -183,7 +195,7 @@ class Project:
 
         self.version = __version__
 
-        self._paths = ["chunks", "figures", "logs", "pdbs", "results/interactions", "results/fingerprints", "results", "tmp"]
+        self._paths = ["chunks", "figures", "logs", "pdbs", "results/interactions", "results/fingerprints", "results/pse", "results", "tmp"]
         self.errors = []
 
     def __call__(self):
@@ -491,18 +503,18 @@ class Project:
         ifp_output = self.ifp_output or "%s/results/fingerprints/ifp.csv" % self.working_path
         with open(ifp_output, "w") as OUT:
             if self.ifp_count:
-                OUT.write("ligand_id,smiles,on_bits,count\n")
+                OUT.write("ligand_id,on_bits,count\n")
             else:
-                OUT.write("ligand_id,smiles,on_bits\n")
+                OUT.write("ligand_id,on_bits\n")
 
             for entry, ifp in self.ifps:
                 if self.ifp_count:
                     fp_bits_str = "\t".join([str(idx) for idx in ifp.counts.keys()])
                     fp_count_str = "\t".join([str(count) for count in ifp.counts.values()])
-                    OUT.write("%s,%s,%s,%s\n" % (entry.to_string(), "", fp_bits_str, fp_count_str))
+                    OUT.write("%s,%s,%s\n" % (entry.to_string(), fp_bits_str, fp_count_str))
                 else:
                     fp_bits_str = "\t".join([str(x) for x in ifp.get_on_bits()])
-                    OUT.write("%s,%s,%s\n" % (entry.to_string(), "", fp_bits_str))
+                    OUT.write("%s,%s\n" % (entry.to_string(), fp_bits_str))
 
     def create_mfp_file(self):
         self.mfp_output = self.mfp_output or "%s/results/fingerprints/mfp.csv" % self.working_path
@@ -511,6 +523,18 @@ class Project:
             for entry, mfp in self.mfps:
                 fp_str = "\t".join([str(x) for x in mfp.GetOnBits()])
                 OUT.write("%s,%s,%s\n" % (entry.to_string(), "", fp_str))
+
+    def _calc_similarity(self, res1, res2):
+        return "%s,%s,%s" % (res1.entry.to_string(), res2.entry.to_string(), str(res1.ifp.calc_similarity(res2.ifp)))
+
+    def generate_similarity_matrix(self, output_file):
+        n_args = int(comb(len(self.entries), 2))
+        args = ArgsGenerator(itertools.combinations(self.results, 2), n_args)
+
+        header = "entry1,entry2,similarity"
+        pj = ParallelJobs(self.nproc)
+        return pj.run_jobs(args_list=args, consumer_func=self._calc_similarity, output_file=output_file,
+                           output_header=header, job_name="Calculate similarities")
 
     def clusterize_ligands(self, fingerprints):
         fps_only = [x["fp"] for x in fingerprints]
@@ -632,6 +656,9 @@ class LocalProject(Project):
             # Create hydrophobic islands.
             atm_grps_mngr.merge_hydrophobic_atoms(interactions_mngr)
 
+            if self.binding_mode_filter is not None:
+                interactions_mngr.filter_by_binding_mode(self.binding_mode_filter)
+
             # Generate IFP (Interaction fingerprint)
             ifp = None
             if self.calc_ifp:
@@ -649,6 +676,12 @@ class LocalProject(Project):
             # Saving interactions to CSV file.
             csv_file = "%s/results/interactions/%s.csv" % (self.working_path, entry.to_string())
             interactions_mngr.to_csv(csv_file)
+
+            # Saving interactions into a Pymol session.
+            if self.out_pse:
+                pse_file = "%s/results/pse/%s.pse" % (self.working_path, entry.to_string())
+                piv = InteractionViewer(add_directional_arrows=False)
+                piv.new_session([(entry, interactions_mngr, self.pdb_path)], pse_file)
 
             self._log("debug", "Processing of entry '%s' finished successfully." % entry.to_string())
 
@@ -737,6 +770,11 @@ class LocalProject(Project):
             if self.calc_mfp:
                 self.create_mfp_file()
 
+            if self.out_ifp_sim_matrix and len(self.entries) > 1:
+                self._log("info", "Calculating the Tanimoto similarity between fingerprints.")
+                output_file = "%s/results/fingerprints/ifp_sim_matrix.csv" % self.working_path
+                self.generate_similarity_matrix(output_file)
+
         # Save the whole project information.
         self.save(self.project_file)
 
@@ -763,8 +801,6 @@ class LocalProject(Project):
         self.calc_ifp = True
         self.overwrite_path = False
 
-        print(self.ifp_type)
-
         if self.ifp_output is None:
             self.prepare_project_path(subdirs=["results", "results/fingerprints"])
 
@@ -788,7 +824,7 @@ class LocalProject(Project):
             entries_with_error = set([e[0].to_string() for e in self.errors])
             tmp_entries = [e for e in self.entries if e.to_string() not in entries_with_error]
 
-        # If all molecules failed, it won't try to create fingerprints.
+        # If all molecules failed, it won't try to create the output file.
         if len(tmp_entries) == 0:
             self._log("critical", "Fingerprint generation failed.")
         else:
@@ -805,6 +841,11 @@ class LocalProject(Project):
                 self.create_ifp_file()
             if self.calc_mfp:
                 self.create_mfp_file()
+
+            if self.out_ifp_sim_matrix and len(self.entries) > 1:
+                self._log("info", "Calculating the Tanimoto similarity between fingerprints.")
+                output_file = "%s/results/fingerprints/ifp_sim_matrix.csv" % self.working_path
+                self.generate_similarity_matrix(output_file)
 
         # Remove unnecessary paths.
         self.remove_empty_paths()

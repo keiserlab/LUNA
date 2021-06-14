@@ -1,6 +1,15 @@
-from operator import le, ge
+import re
+from ast import literal_eval
 
+from luna.mol.entry import REGEX_RESNUM_ICODE
 from luna.mol.interaction.conf import DefaultInteractionConf
+from luna.util.config_parser import Config
+from luna.util.exceptions import IllegalArgumentError
+
+
+AROMATIC_STACKINGS = ["pi-stacking", "face-to-face pi-stacking", "face-to-edge pi-stacking", "face-to-slope pi-stacking",
+                      "edge-to-edge pi-stacking", "edge-to-face pi-stacking", "edge-to-slope pi-stacking", "displaced face-to-face pi-stacking",
+                      "displaced face-to-edge pi-stacking", "displaced face-to-slope pi-stacking"]
 
 
 class InteractionFilter:
@@ -174,3 +183,182 @@ class InteractionFilter:
             return False
 
         return True
+
+
+class BindingModeCondition:
+
+    def __init__(self, condition_str):
+        self.accept_all = False
+        self.accept_all_chains = False
+        self.accept_all_comps = False
+        self.accept_all_atoms = False
+        self.accept_all_comp_nums = False
+
+        self.chain = None
+        self.comp_name = None
+        self.comp_num = None
+        self.comp_icode = None
+        self.atom = None
+
+        self._condition_repr = condition_str
+
+        self._parse_condition(condition_str.upper())
+
+    def _parse_condition(self, condition_str):
+        # Accept everything.
+        if condition_str == "*":
+            self.accept_all = True
+        else:
+            chain, comp_name, comp_num, atom = condition_str.split("/")
+
+            if chain == "*":
+                self.accept_all_chains = True
+            else:
+                self.chain = chain
+
+            if comp_name == "*":
+                self.accept_all_comps = True
+            else:
+                self.comp_name = comp_name
+
+            if comp_num == "*":
+                self.accept_all_comp_nums = True
+            else:
+                # Separate ligand number from insertion code.
+                matched = REGEX_RESNUM_ICODE.match(comp_num)
+                if matched:
+                    comp_num = matched.group(1)
+                    try:
+                        assert float(comp_num).is_integer()
+                        comp_num = int(comp_num)
+                    except (ValueError, AssertionError):
+                        raise IllegalArgumentError("The informed compound number '%s' is invalid. It must be an integer." % str(comp_num))
+
+                    icode = None if matched.group(2) == "" else matched.group(2)
+                else:
+                    raise IllegalArgumentError("The compound number and its insertion code (if applicable) '%s' is invalid. "
+                                               "It must be an integer followed by one insertion code character when applicable."
+                                               % comp_num)
+
+                self.comp_num = comp_num
+                self.comp_icode = icode
+
+            if atom == "*":
+                self.accept_all_atoms = True
+            else:
+                self.atom = atom
+
+    def is_valid(self, atm_grp):
+
+        # Accept everything.
+        if self.accept_all:
+            return True
+
+        # Accept everything.
+        if self.accept_all_chains and self.accept_all_comps and self.accept_all_comp_nums and self.accept_all_atoms:
+            return True
+
+        # Tries to identify the first valid compound in the atom group.
+        for atm in atm_grp.atoms:
+            comp = atm.parent
+
+            is_chain_valid, is_comp_valid, is_comp_num_valid, is_atom_valid = (self.accept_all_chains, self.accept_all_comps,
+                                                                               self.accept_all_comp_nums, self.accept_all_atoms)
+
+            # print("\t => ", comp, atm.name)
+            # print("\t     - Initial: ", is_chain_valid, is_comp_valid, is_comp_num_valid, is_atom_valid)
+
+            if self.chain is not None and self.chain == comp.parent.id:
+                is_chain_valid = True
+
+            if self.comp_name is not None and self.comp_name == comp.resname:
+                is_comp_valid = True
+
+            if self.comp_num is not None and self.comp_num == comp.id[1]:
+                icode = None if comp.id[2].strip() == "" else comp.id[2]
+
+                if self.comp_icode == icode:
+                    is_comp_num_valid = True
+
+            if self.atom is not None:
+
+                # Verify element equality.
+                if self.atom.endswith("*"):
+                    elem = self.atom.rstrip("*")
+
+                    if elem == atm.element:
+                        is_atom_valid = True
+
+                # Verify atom name equality.
+                elif self.atom == atm.name:
+                    is_atom_valid = True
+
+            # print("\t     -   Final: ", is_chain_valid, is_comp_valid, is_comp_num_valid, is_atom_valid)
+            # print()
+
+            if is_chain_valid and is_comp_valid and is_comp_num_valid and is_atom_valid:
+                return True
+
+        return False
+
+    def __repr__(self):
+        return "<BindingModeCondition: %s" % self._condition_repr
+
+
+class BindingModeFilter:
+
+    def __init__(self, config):
+        self.config = config
+
+    @classmethod
+    def from_config_file(cls, config_file):
+        filtering_config = {}
+
+        config = Config(config_file)
+
+        for inter_type in config.sections():
+            params = config.get_section_map(inter_type)
+
+            inter_type = inter_type.lower()
+
+            accept_all = False
+
+            values = []
+            if "accept_all" in params:
+                accept_all = literal_eval(params["accept_all"])
+                if accept_all is True:
+                    values = ["*"]
+
+            elif "accept_only" in params and not accept_all:
+                values = literal_eval(params["accept_only"])
+
+                if "*" in values:
+                    values = ["*"]
+
+            conditions = [BindingModeCondition(condition) for condition in values]
+            filtering_config[inter_type] = conditions
+
+        return cls(filtering_config)
+
+    def is_valid(self, inter):
+
+        if inter.type.lower() in self.config:
+            inter_type = inter.type.lower()
+
+        elif "aromatic stacking" in self.config and inter.type.lower() in AROMATIC_STACKINGS:
+            inter_type = "aromatic stacking"
+
+        elif "*" in self.config:
+            inter_type = "*"
+
+        else:
+            return False
+
+        for condition in self.config[inter_type]:
+            is_src_grp_valid = condition.is_valid(inter.src_grp)
+            is_trgt_grp_valid = condition.is_valid(inter.trgt_grp)
+
+            if is_src_grp_valid or is_trgt_grp_valid:
+                return True
+
+        return False

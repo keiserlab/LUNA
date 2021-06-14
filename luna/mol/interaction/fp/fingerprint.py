@@ -2,7 +2,7 @@ import numpy as np
 from rdkit.DataStructs.cDataStructs import (ExplicitBitVect, SparseBitVect)
 from scipy.sparse import (issparse, csr_matrix)
 from collections import defaultdict
-
+from rdkit import DataStructs
 
 from luna.util.exceptions import (BitsValueError, InvalidFingerprintType, IllegalArgumentError, FingerprintCountsError)
 from luna.version import __version__
@@ -325,15 +325,18 @@ class Fingerprint:
 
         return np.setxor1d(self.indices, other.indices, assume_unique=True)
 
+    def calc_similarity(self, other):
+        return DataStructs.FingerprintSimilarity(self.to_rdkit(), other.to_rdkit())
+
     def __repr__(self):
         return ("<%s: indices=%s length=%d>" %
                 (self.__class__, repr(self.indices).replace('\n', '').replace(' ', ''), self.fp_length))
 
     def __eq__(self, other):
         if isinstance(other, Fingerprint):
-            return (self.__class__ == other.__class__ and
-                    self.fp_length == other.fp_length and
-                    np.all(np.in1d(self.indices, other.indices, assume_unique=True)))
+            return (self.__class__ == other.__class__
+                    and self.fp_length == other.fp_length
+                    and np.all(np.in1d(self.indices, other.indices, assume_unique=True)))
         return False
 
     def __ne__(self, other):

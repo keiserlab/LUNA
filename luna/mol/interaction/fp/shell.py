@@ -189,6 +189,10 @@ class ShellManager:
             return fp.fold(fold_to_size)
         return fp
 
+    def trace_back_feature(self, feature_id, ifp, unique_shells=False):
+        for ori_feature in ifp.unfolding_map[feature_id]:
+            yield (ori_feature, self.get_shells_by_identifier(ori_feature, unique_shells))
+
     def _init_controllers(self):
         levels = defaultdict(list)
         centers = defaultdict(lambda: defaultdict(lambda: None))
@@ -470,6 +474,7 @@ class ShellGenerator:
         # Sort the atom groups for avoiding order dependence.
         sorted_neighborhood = sorted(neighborhood)
 
+        level = -1
         for level in range(self.num_levels):
             radius = self.radius_step * level
 

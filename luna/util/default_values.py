@@ -26,7 +26,7 @@ IFP_LENGTH = 4096
 
 ACCEPTED_MOL_OBJ_TYPES = ("rdkit", "openbabel")
 
-OPENBABEL = "/usr/bin/obabel"
+OPENBABEL = "obabel"
 
 RECURSION_LIMIT = 600000
 

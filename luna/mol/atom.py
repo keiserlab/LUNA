@@ -99,7 +99,7 @@ class ExtendedAtom:
     @property
     def full_atom_name(self):
         full_atom_name = "%s/%s/%s" % self.get_full_id()[0:3]
-        res_name = "%s-%d%s" % (self._atom.parent.resname, self._atom.parent.id[1], self._atom.parent.id[2].strip())
+        res_name = "%s/%d%s" % (self._atom.parent.resname, self._atom.parent.id[1], self._atom.parent.id[2].strip())
         atom_name = "%s" % self._atom.name
         if self.altloc != " ":
             atom_name += "-%s" % self.altloc

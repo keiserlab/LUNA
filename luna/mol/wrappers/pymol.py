@@ -136,7 +136,7 @@ class PymolWrapper:
 
 class PymolSessionManager:
 
-    def __init__(self, show_cartoon=False, bg_color="white", pharm_color=None,
+    def __init__(self, show_cartoon=False, bg_color="white",
                  add_directional_arrows=True, show_hydrop_surface=False, show_comp_labels=True,
                  inter_color=PYMOL_INTERACTION_COLOR, pse_export_version="1.8"):
 
@@ -144,10 +144,10 @@ class PymolSessionManager:
         self.bg_color = bg_color
         self.pse_export_version = pse_export_version
         self.inter_color = inter_color
-        self.wrapper = None
         self.add_directional_arrows = add_directional_arrows
         self.show_hydrop_surface = show_hydrop_surface
         self.show_comp_labels = show_comp_labels
+        self.wrapper = None
 
     def new_session(self, data, output_file):
         self.start_session()

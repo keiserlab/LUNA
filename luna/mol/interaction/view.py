@@ -12,8 +12,9 @@ class InteractionViewer(PymolSessionManager):
         if not isinstance(self.wrapper, PymolWrapper):
             raise PymolSessionNotInitialized("No session was initialized.")
 
-        for target_entry, inter_data in inter_tuples:
-            pdb_file = target_entry.pdb_file
+        for target_entry, inter_data, pdb_path in inter_tuples:
+
+            pdb_file = "%s/%s.pdb" % (pdb_path, target_entry.pdb_id)
             main_grp = target_entry.to_string(sep="-").replace("'", "-")
 
             mol_block = (entity_to_string(target_entry.get_biopython_structure())

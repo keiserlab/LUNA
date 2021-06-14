@@ -16,6 +16,20 @@ class Sentinel:
     pass
 
 
+class ArgsGenerator:
+
+    def __init__(self, generator, n_args):
+        self.generator = generator
+        self.n_args = n_args
+
+    def __len__(self):
+        return self.n_args
+
+    def __iter__(self):
+        for d in self.generator:
+            yield d
+
+
 class ParallelJobs:
 
     # TODO: add option to Threads/Multiprocessing

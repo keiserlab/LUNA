@@ -1,0 +1,78 @@
+atom_group1,atom_group2,interaction
+protein/0/A/ARG/186/CA,protein/0/z/LIG/9999/C10,Van der Waals
+protein/0/A/ARG/186/CA,protein/0/z/LIG/9999/C10;protein/0/z/LIG/9999/C11;protein/0/z/LIG/9999/C12;protein/0/z/LIG/9999/C13;protein/0/z/LIG/9999/C14;protein/0/z/LIG/9999/C9,Weak hydrogen bond
+protein/0/A/ARG/186/CB,protein/0/z/LIG/9999/C10,Van der Waals
+protein/0/A/ARG/186/CB;protein/0/A/ARG/186/CG,protein/0/z/LIG/9999/C10;protein/0/z/LIG/9999/C11;protein/0/z/LIG/9999/C12;protein/0/z/LIG/9999/C13;protein/0/z/LIG/9999/C9,Hydrophobic
+protein/0/A/ARG/186/CG,protein/0/z/LIG/9999/C10,Van der Waals
+protein/0/A/ARG/186/CG,protein/0/z/LIG/9999/C11,Van der Waals
+protein/0/A/ASP/115/CB,protein/0/z/LIG/9999/C16;protein/0/z/LIG/9999/C17,Hydrophobic
+protein/0/A/ASP/115/OD2,protein/0/z/LIG/9999/C17,Van der Waals
+protein/0/A/ASP/115/OD2,protein/0/z/LIG/9999/C17,Weak hydrogen bond
+protein/0/A/ASP/115/OD2,protein/0/z/LIG/9999/C3,Van der Waals
+protein/0/A/ASP/115/OD2,protein/0/z/LIG/9999/C3,Weak hydrogen bond
+protein/0/A/CYS/108/CB;protein/0/A/CYS/108/SG;protein/0/A/CYS/185/CB;protein/0/A/CYS/185/SG,protein/0/z/LIG/9999/C8,Hydrophobic
+protein/0/A/CYS/185/C;protein/0/A/CYS/185/O,protein/0/z/LIG/9999/C1;protein/0/z/LIG/9999/O1,Tilted multipolar
+protein/0/A/CYS/185/O,protein/0/z/LIG/9999/C1,Van der Waals
+protein/0/A/CYS/185/O,protein/0/z/LIG/9999/C8,Van der Waals
+protein/0/A/CYS/185/O,protein/0/z/LIG/9999/C8,Weak hydrogen bond
+protein/0/A/CYS/185/O,protein/0/z/LIG/9999/O1,Van der Waals
+protein/0/A/HIS/414/CD2,protein/0/z/LIG/9999/C12,Van der Waals
+protein/0/A/HIS/414/CD2,protein/0/z/LIG/9999/C13,Van der Waals
+protein/0/A/HIS/414/CD2;protein/0/A/HIS/414/CE1;protein/0/A/HIS/414/CG;protein/0/A/HIS/414/ND1;protein/0/A/HIS/414/NE2,protein/0/z/LIG/9999/C10;protein/0/z/LIG/9999/C11;protein/0/z/LIG/9999/C12;protein/0/z/LIG/9999/C13;protein/0/z/LIG/9999/C14;protein/0/z/LIG/9999/C9,Cation-pi
+protein/0/A/HIS/414/CD2;protein/0/A/HIS/414/CE1;protein/0/A/HIS/414/CG;protein/0/A/HIS/414/ND1;protein/0/A/HIS/414/NE2,protein/0/z/LIG/9999/C10;protein/0/z/LIG/9999/C11;protein/0/z/LIG/9999/C12;protein/0/z/LIG/9999/C13;protein/0/z/LIG/9999/C14;protein/0/z/LIG/9999/C9,Displaced face-to-edge pi-stacking
+protein/0/A/HIS/414/NE2,protein/0/z/LIG/9999/C10;protein/0/z/LIG/9999/C11;protein/0/z/LIG/9999/C12;protein/0/z/LIG/9999/C13;protein/0/z/LIG/9999/C14;protein/0/z/LIG/9999/C9,Weak hydrogen bond
+protein/0/A/HIS/414/NE2,protein/0/z/LIG/9999/C12,Van der Waals
+protein/0/A/LEU/187/CB;protein/0/A/LEU/187/CD1;protein/0/A/LEU/187/CD2;protein/0/A/LEU/187/CG,protein/0/z/LIG/9999/C10;protein/0/z/LIG/9999/C11;protein/0/z/LIG/9999/C12;protein/0/z/LIG/9999/C13;protein/0/z/LIG/9999/C9,Hydrophobic
+protein/0/A/LEU/187/CB;protein/0/A/LEU/187/CD1;protein/0/A/LEU/187/CD2;protein/0/A/LEU/187/CG,protein/0/z/LIG/9999/C16;protein/0/z/LIG/9999/C17,Hydrophobic
+protein/0/A/LEU/187/CD1,protein/0/z/LIG/9999/C15,Van der Waals
+protein/0/A/LEU/187/CD1,protein/0/z/LIG/9999/C16,Van der Waals
+protein/0/A/LEU/187/CG,protein/0/z/LIG/9999/O2,Van der Waals
+protein/0/A/LEU/187/CG,protein/0/z/LIG/9999/O2,Weak hydrogen bond
+protein/0/A/LEU/187/N,protein/0/z/LIG/9999/C10;protein/0/z/LIG/9999/C11;protein/0/z/LIG/9999/C12;protein/0/z/LIG/9999/C13;protein/0/z/LIG/9999/C14;protein/0/z/LIG/9999/C9,Weak hydrogen bond
+protein/0/A/LEU/90/C,protein/0/z/LIG/9999/C6,Van der Waals
+protein/0/A/MET/112/CG,protein/0/z/LIG/9999/O1,Van der Waals
+protein/0/A/MET/112/CG,protein/0/z/LIG/9999/O1,Weak hydrogen bond
+protein/0/A/MET/112/SD,protein/0/z/LIG/9999/O1,Chalcogen bond
+protein/0/A/MET/112/SD,protein/0/z/LIG/9999/O1,Van der Waals
+protein/0/A/PHE/410/CB;protein/0/A/PHE/410/CD1;protein/0/A/PHE/410/CD2;protein/0/A/PHE/410/CE1;protein/0/A/PHE/410/CE2;protein/0/A/PHE/410/CG;protein/0/A/PHE/410/CZ,protein/0/z/LIG/9999/C16;protein/0/z/LIG/9999/C17,Hydrophobic
+protein/0/A/PHE/91/CA,protein/0/z/LIG/9999/C5,Van der Waals
+protein/0/A/PHE/91/CA,protein/0/z/LIG/9999/C5;protein/0/z/LIG/9999/C6;protein/0/z/LIG/9999/C7;protein/0/z/LIG/9999/N2;protein/0/z/LIG/9999/N3,Weak hydrogen bond
+protein/0/A/PHE/91/CA,protein/0/z/LIG/9999/C6,Van der Waals
+protein/0/A/PHE/91/CB,protein/0/z/LIG/9999/C5,Van der Waals
+protein/0/A/PHE/91/CB;protein/0/A/PHE/91/CD1;protein/0/A/PHE/91/CD2;protein/0/A/PHE/91/CE1;protein/0/A/PHE/91/CE2;protein/0/A/PHE/91/CG;protein/0/A/PHE/91/CZ,protein/0/z/LIG/9999/C3,Hydrophobic
+protein/0/A/PHE/91/CD1;protein/0/A/PHE/91/CD2;protein/0/A/PHE/91/CE1;protein/0/A/PHE/91/CE2;protein/0/A/PHE/91/CG;protein/0/A/PHE/91/CZ,protein/0/z/LIG/9999/C5;protein/0/z/LIG/9999/C6;protein/0/z/LIG/9999/C7;protein/0/z/LIG/9999/N2;protein/0/z/LIG/9999/N3,Face-to-edge pi-stacking
+protein/0/A/PHE/91/N,protein/0/z/LIG/9999/C5,Van der Waals
+protein/0/A/TRP/101/CD2;protein/0/A/TRP/101/CE2;protein/0/A/TRP/101/CE3;protein/0/A/TRP/101/CH2;protein/0/A/TRP/101/CZ2;protein/0/A/TRP/101/CZ3,protein/0/z/LIG/9999/C5;protein/0/z/LIG/9999/C6;protein/0/z/LIG/9999/C7;protein/0/z/LIG/9999/N2;protein/0/z/LIG/9999/N3,Displaced face-to-edge pi-stacking
+protein/0/A/TYR/438/OH,protein/0/z/LIG/9999/C3,Van der Waals
+protein/0/A/TYR/438/OH,protein/0/z/LIG/9999/C3,Weak hydrogen bond
+protein/0/A/TYR/438/OH,protein/0/z/LIG/9999/C4,Van der Waals
+protein/0/A/TYR/438/OH,protein/0/z/LIG/9999/C4,Weak hydrogen bond
+protein/0/A/VAL/116/CB;protein/0/A/VAL/116/CG1;protein/0/A/VAL/116/CG2,protein/0/z/LIG/9999/C16;protein/0/z/LIG/9999/C17,Hydrophobic
+protein/0/A/VAL/116/CG2,protein/0/z/LIG/9999/C16,Van der Waals
+protein/0/A/VAL/87/O,protein/0/z/LIG/9999/C5,Weak hydrogen bond
+protein/0/z/LIG/9999/C1,protein/0/z/LIG/9999/C9,Single bond
+protein/0/z/LIG/9999/C1,protein/0/z/LIG/9999/N1,Single bond
+protein/0/z/LIG/9999/C1,protein/0/z/LIG/9999/O1,Double bond
+protein/0/z/LIG/9999/C10,protein/0/z/LIG/9999/C11,Aromatic bond
+protein/0/z/LIG/9999/C10,protein/0/z/LIG/9999/C9,Aromatic bond
+protein/0/z/LIG/9999/C11,protein/0/z/LIG/9999/C12,Aromatic bond
+protein/0/z/LIG/9999/C12,protein/0/z/LIG/9999/C13,Aromatic bond
+protein/0/z/LIG/9999/C13,protein/0/z/LIG/9999/C14,Aromatic bond
+protein/0/z/LIG/9999/C14,protein/0/z/LIG/9999/C9,Aromatic bond
+protein/0/z/LIG/9999/C14,protein/0/z/LIG/9999/O2,Single bond
+protein/0/z/LIG/9999/C15,protein/0/z/LIG/9999/C16,Single bond
+protein/0/z/LIG/9999/C15,protein/0/z/LIG/9999/C17,Single bond
+protein/0/z/LIG/9999/C15,protein/0/z/LIG/9999/O2,Single bond
+protein/0/z/LIG/9999/C16,protein/0/z/LIG/9999/C17,Single bond
+protein/0/z/LIG/9999/C2,protein/0/z/LIG/9999/C3,Single bond
+protein/0/z/LIG/9999/C2,protein/0/z/LIG/9999/C8,Single bond
+protein/0/z/LIG/9999/C2,protein/0/z/LIG/9999/N1,Single bond
+protein/0/z/LIG/9999/C3,protein/0/z/LIG/9999/C4,Single bond
+protein/0/z/LIG/9999/C4,protein/0/z/LIG/9999/N2,Single bond
+protein/0/z/LIG/9999/C5,protein/0/z/LIG/9999/C6,Aromatic bond
+protein/0/z/LIG/9999/C5,protein/0/z/LIG/9999/N2,Aromatic bond
+protein/0/z/LIG/9999/C6,protein/0/z/LIG/9999/N3,Aromatic bond
+protein/0/z/LIG/9999/C7,protein/0/z/LIG/9999/C8,Single bond
+protein/0/z/LIG/9999/C7,protein/0/z/LIG/9999/N2,Aromatic bond
+protein/0/z/LIG/9999/C7,protein/0/z/LIG/9999/N3,Aromatic bond
+protein/0/z/LIG/9999/O1,protein/0/z/LIG/9999/O2,Van der Waals
