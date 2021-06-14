@@ -6,7 +6,7 @@ logger = logging.getLogger()
 
 class Config:
     def __init__(self, conf_file):
-        self.config = configparser.ConfigParser()
+        self.config = configparser.ConfigParser(allow_no_value=True)
         try:
             self.config.read(conf_file)
         except Exception as e:
