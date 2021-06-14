@@ -10,13 +10,12 @@ from luna.util.default_values import ATOM_TYPES_COLOR
 
 class PharmacophoreDepiction:
 
-    def __init__(self, feature_extractor=None, colors=ATOM_TYPES_COLOR, add_legend=True, fig_ext="png",
+    def __init__(self, feature_extractor=None, colors=ATOM_TYPES_COLOR, fig_ext="png",
                  fig_size=(800, 800), font_size=0.5, circle_dist=0.2, circle_radius=0.3,
                  use_bw_atom_palette=True, svg_opts=None):
 
         self.feature_extractor = feature_extractor
         self.colors = colors
-        self.add_legend = add_legend
         self.fig_ext = fig_ext
         self.fig_size = fig_size
         self.font_size = font_size
@@ -37,7 +36,7 @@ class PharmacophoreDepiction:
             return self.feature_extractor.get_features_by_atoms(rdmol)
         return {}
 
-    def plot_fig(self, mol, output, atm_types=None, legend=None):
+    def plot_fig(self, mol, output=None, atm_types=None, legend=None):
         rdmol = MolWrapper(mol).as_rdkit()
 
         # Make a copy of the molecule
@@ -102,12 +101,15 @@ class PharmacophoreDepiction:
                             highlightBonds=[], highlightAtomRadii=radius, legend=legend)
         drawer.FinishDrawing()
 
-        if self.fig_ext == "png":
-            drawer.WriteDrawingText(output)
-        elif self.fig_ext == "svg":
-            svg = drawer.GetDrawingText().replace('svg:', '')
-            with open(output, "w") as fh:
-                fh.write(svg)
+        if output:
+            if self.fig_ext == "png":
+                drawer.WriteDrawingText(output)
+            elif self.fig_ext == "svg":
+                svg = drawer.GetDrawingText().replace('svg:', '')
+                with open(output, "w") as fh:
+                    fh.write(svg)
+        else:
+            return drawer
 
     def _add_dummy_atom(self, mol, pos=None):
         new_atm = Chem.rdchem.Atom(10)
