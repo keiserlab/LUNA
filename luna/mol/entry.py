@@ -227,6 +227,16 @@ class CompoundEntry(Entry):
                                        "four obligatory fields: PDB, chain id, compound name, and compound number followed by its "
                                        "insertion code when applicable." % entry_str)
 
+    @classmethod
+    def from_file(cls, input_file, sep=":"):
+        with open(input_file, "r") as IN:
+            for row in IN:
+                entry_str = row.strip()
+                if entry_str == "":
+                    continue
+
+                yield cls.from_string(entry_str)
+
 
 class MolEntry(Entry):
 
@@ -293,6 +303,16 @@ class MolEntry(Entry):
             entry._load_mol_from_file()
 
         return entry
+
+    @classmethod
+    def from_file(cls, input_file, pdb_id, mol_file, is_multimol_file, **kwargs):
+        with open(input_file, "r") as IN:
+            for row in IN:
+                ligand_id = row.strip()
+                if ligand_id == "":
+                    continue
+
+                yield cls.from_mol_file(pdb_id, ligand_id, mol_file, is_multimol_file, **kwargs)
 
     @property
     def full_id(self):
