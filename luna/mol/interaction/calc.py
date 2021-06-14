@@ -72,7 +72,18 @@ class InteractionsManager:
             if inter.type in types:
                 yield inter
 
+    def filter_by_binding_mode(self, binding_modes_filter):
+        inters_to_remove = set()
+        for inter in self.interactions:
+            if not binding_modes_filter.is_valid(inter):
+                inters_to_remove.add(inter)
+
+        self.remove_interactions(inters_to_remove)
+
+        return inters_to_remove
+
     def filter_by_centroids(self, centroids, radius):
+        # TODO: implement
         pass
 
     def to_csv(self, output_file):
