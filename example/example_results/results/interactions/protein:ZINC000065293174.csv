@@ -1,0 +1,59 @@
+atom_group1,atom_group2,interaction
+protein/0/A/ARG/186/CA,protein/0/z/LIG/9999/O1,Weak hydrogen bond
+protein/0/A/ARG/186/CB;protein/0/A/ARG/186/CG,protein/0/z/LIG/9999/C15;protein/0/z/LIG/9999/C16;protein/0/z/LIG/9999/C17;protein/0/z/LIG/9999/C18,Hydrophobic
+protein/0/A/ARG/186/CG,protein/0/z/LIG/9999/C15,Van der Waals
+protein/0/A/ASP/115/OD2,protein/0/z/LIG/9999/C2,Van der Waals
+protein/0/A/ASP/115/OD2,protein/0/z/LIG/9999/C2,Weak hydrogen bond
+protein/0/A/ASP/115/OD2,protein/0/z/LIG/9999/C8,Weak hydrogen bond
+protein/0/A/ASP/115/OD2,protein/0/z/LIG/9999/C9,Weak hydrogen bond
+protein/0/A/CYS/185/O,protein/0/z/LIG/9999/C15,Weak hydrogen bond
+protein/0/A/HIS/414/CD2;protein/0/A/HIS/414/CE1;protein/0/A/HIS/414/CG;protein/0/A/HIS/414/ND1;protein/0/A/HIS/414/NE2,protein/0/z/LIG/9999/C2;protein/0/z/LIG/9999/S1,Cation-nucleophile
+protein/0/A/HIS/414/CD2;protein/0/A/HIS/414/CE1;protein/0/A/HIS/414/CG;protein/0/A/HIS/414/ND1;protein/0/A/HIS/414/NE2,protein/0/z/LIG/9999/C3;protein/0/z/LIG/9999/C4;protein/0/z/LIG/9999/C5;protein/0/z/LIG/9999/C6;protein/0/z/LIG/9999/C7;protein/0/z/LIG/9999/C8,Cation-pi
+protein/0/A/HIS/414/CD2;protein/0/A/HIS/414/CE1;protein/0/A/HIS/414/CG;protein/0/A/HIS/414/ND1;protein/0/A/HIS/414/NE2,protein/0/z/LIG/9999/C3;protein/0/z/LIG/9999/C4;protein/0/z/LIG/9999/C5;protein/0/z/LIG/9999/C6;protein/0/z/LIG/9999/C7;protein/0/z/LIG/9999/C8,Face-to-edge pi-stacking
+protein/0/A/HIS/414/CD2;protein/0/A/HIS/414/CE1;protein/0/A/HIS/414/CG;protein/0/A/HIS/414/ND1;protein/0/A/HIS/414/NE2,protein/0/z/LIG/9999/C3;protein/0/z/LIG/9999/S1,Cation-nucleophile
+protein/0/A/HIS/414/NE2,protein/0/z/LIG/9999/C17,Weak hydrogen bond
+protein/0/A/LEU/187/CB;protein/0/A/LEU/187/CD1;protein/0/A/LEU/187/CD2;protein/0/A/LEU/187/CG,protein/0/z/LIG/9999/C2;protein/0/z/LIG/9999/C3;protein/0/z/LIG/9999/C4;protein/0/z/LIG/9999/C5;protein/0/z/LIG/9999/C6;protein/0/z/LIG/9999/C7;protein/0/z/LIG/9999/C8;protein/0/z/LIG/9999/S1,Hydrophobic
+protein/0/A/PHE/410/CB;protein/0/A/PHE/410/CD1;protein/0/A/PHE/410/CD2;protein/0/A/PHE/410/CE1;protein/0/A/PHE/410/CE2;protein/0/A/PHE/410/CG;protein/0/A/PHE/410/CZ,protein/0/z/LIG/9999/C2;protein/0/z/LIG/9999/C3;protein/0/z/LIG/9999/C4;protein/0/z/LIG/9999/C5;protein/0/z/LIG/9999/C6;protein/0/z/LIG/9999/C7;protein/0/z/LIG/9999/C8;protein/0/z/LIG/9999/S1,Hydrophobic
+protein/0/A/PHE/410/CD1;protein/0/A/PHE/410/CD2;protein/0/A/PHE/410/CE1;protein/0/A/PHE/410/CE2;protein/0/A/PHE/410/CG;protein/0/A/PHE/410/CZ,protein/0/z/LIG/9999/C3;protein/0/z/LIG/9999/C4;protein/0/z/LIG/9999/C5;protein/0/z/LIG/9999/C6;protein/0/z/LIG/9999/C7;protein/0/z/LIG/9999/C8,Face-to-edge pi-stacking
+protein/0/A/PHE/410/CE2,protein/0/z/LIG/9999/C3;protein/0/z/LIG/9999/C4;protein/0/z/LIG/9999/C5;protein/0/z/LIG/9999/C6;protein/0/z/LIG/9999/C7;protein/0/z/LIG/9999/C8,Weak hydrogen bond
+protein/0/A/PHE/410/CZ,protein/0/z/LIG/9999/C3;protein/0/z/LIG/9999/C4;protein/0/z/LIG/9999/C5;protein/0/z/LIG/9999/C6;protein/0/z/LIG/9999/C7;protein/0/z/LIG/9999/C8,Weak hydrogen bond
+protein/0/A/PHE/411/CB;protein/0/A/PHE/411/CD1;protein/0/A/PHE/411/CD2;protein/0/A/PHE/411/CE1;protein/0/A/PHE/411/CE2;protein/0/A/PHE/411/CG;protein/0/A/PHE/411/CZ,protein/0/z/LIG/9999/C2;protein/0/z/LIG/9999/C3;protein/0/z/LIG/9999/C4;protein/0/z/LIG/9999/C5;protein/0/z/LIG/9999/C6;protein/0/z/LIG/9999/C7;protein/0/z/LIG/9999/C8;protein/0/z/LIG/9999/S1,Hydrophobic
+protein/0/A/PHE/91/CB;protein/0/A/PHE/91/CD1;protein/0/A/PHE/91/CD2;protein/0/A/PHE/91/CE1;protein/0/A/PHE/91/CE2;protein/0/A/PHE/91/CG;protein/0/A/PHE/91/CZ,protein/0/z/LIG/9999/C10,Hydrophobic
+protein/0/A/PHE/91/CD1;protein/0/A/PHE/91/CD2;protein/0/A/PHE/91/CE1;protein/0/A/PHE/91/CE2;protein/0/A/PHE/91/CG;protein/0/A/PHE/91/CZ,protein/0/z/LIG/9999/C11;protein/0/z/LIG/9999/C12;protein/0/z/LIG/9999/C13;protein/0/z/LIG/9999/N2;protein/0/z/LIG/9999/N3,Face-to-edge pi-stacking
+protein/0/A/SER/94/OG,protein/0/z/LIG/9999/C13,Weak hydrogen bond
+protein/0/A/THR/434/CG2,protein/0/z/LIG/9999/C15;protein/0/z/LIG/9999/C16;protein/0/z/LIG/9999/C17;protein/0/z/LIG/9999/C18,Hydrophobic
+protein/0/A/THR/434/OG1,protein/0/z/LIG/9999/C18,Weak hydrogen bond
+protein/0/A/VAL/116/CB;protein/0/A/VAL/116/CG1;protein/0/A/VAL/116/CG2,protein/0/z/LIG/9999/C2;protein/0/z/LIG/9999/C3;protein/0/z/LIG/9999/C4;protein/0/z/LIG/9999/C5;protein/0/z/LIG/9999/C6;protein/0/z/LIG/9999/C7;protein/0/z/LIG/9999/C8;protein/0/z/LIG/9999/S1,Hydrophobic
+protein/0/A/VAL/116/CG2,protein/0/z/LIG/9999/C3;protein/0/z/LIG/9999/C4;protein/0/z/LIG/9999/C5;protein/0/z/LIG/9999/C6;protein/0/z/LIG/9999/C7;protein/0/z/LIG/9999/C8,Weak hydrogen bond
+protein/0/A/VAL/430/CB;protein/0/A/VAL/430/CG1;protein/0/A/VAL/430/CG2,protein/0/z/LIG/9999/C15;protein/0/z/LIG/9999/C16;protein/0/z/LIG/9999/C17;protein/0/z/LIG/9999/C18,Hydrophobic
+protein/0/z/LIG/9999/C1,protein/0/z/LIG/9999/C16,Van der Waals
+protein/0/z/LIG/9999/C1,protein/0/z/LIG/9999/C17,Van der Waals
+protein/0/z/LIG/9999/C1,protein/0/z/LIG/9999/C2,Single bond
+protein/0/z/LIG/9999/C1,protein/0/z/LIG/9999/N1,Single bond
+protein/0/z/LIG/9999/C1,protein/0/z/LIG/9999/O1,Double bond
+protein/0/z/LIG/9999/C10,protein/0/z/LIG/9999/C11,Single bond
+protein/0/z/LIG/9999/C10,protein/0/z/LIG/9999/C9,Single bond
+protein/0/z/LIG/9999/C11,protein/0/z/LIG/9999/C12,Aromatic bond
+protein/0/z/LIG/9999/C11,protein/0/z/LIG/9999/N3,Aromatic bond
+protein/0/z/LIG/9999/C12,protein/0/z/LIG/9999/C14,Single bond
+protein/0/z/LIG/9999/C12,protein/0/z/LIG/9999/N2,Aromatic bond
+protein/0/z/LIG/9999/C13,protein/0/z/LIG/9999/N2,Aromatic bond
+protein/0/z/LIG/9999/C13,protein/0/z/LIG/9999/N3,Aromatic bond
+protein/0/z/LIG/9999/C14,protein/0/z/LIG/9999/C15,Single bond
+protein/0/z/LIG/9999/C14,protein/0/z/LIG/9999/C18,Single bond
+protein/0/z/LIG/9999/C14,protein/0/z/LIG/9999/N1,Single bond
+protein/0/z/LIG/9999/C15,protein/0/z/LIG/9999/C16,Single bond
+protein/0/z/LIG/9999/C15,protein/0/z/LIG/9999/O1,Van der Waals clash
+protein/0/z/LIG/9999/C15,protein/0/z/LIG/9999/O1,Weak hydrogen bond
+protein/0/z/LIG/9999/C16,protein/0/z/LIG/9999/C17,Single bond
+protein/0/z/LIG/9999/C16,protein/0/z/LIG/9999/O1,Van der Waals clash
+protein/0/z/LIG/9999/C17,protein/0/z/LIG/9999/C18,Single bond
+protein/0/z/LIG/9999/C2,protein/0/z/LIG/9999/S1,Single bond
+protein/0/z/LIG/9999/C3,protein/0/z/LIG/9999/C4,Aromatic bond
+protein/0/z/LIG/9999/C3,protein/0/z/LIG/9999/C8,Aromatic bond
+protein/0/z/LIG/9999/C3,protein/0/z/LIG/9999/S1,Single bond
+protein/0/z/LIG/9999/C4,protein/0/z/LIG/9999/C5,Aromatic bond
+protein/0/z/LIG/9999/C5,protein/0/z/LIG/9999/C6,Aromatic bond
+protein/0/z/LIG/9999/C6,protein/0/z/LIG/9999/C7,Aromatic bond
+protein/0/z/LIG/9999/C7,protein/0/z/LIG/9999/C8,Aromatic bond
+protein/0/z/LIG/9999/C9,protein/0/z/LIG/9999/N1,Single bond
