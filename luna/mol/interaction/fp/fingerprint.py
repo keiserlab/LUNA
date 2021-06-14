@@ -2,7 +2,7 @@ import numpy as np
 from rdkit.DataStructs.cDataStructs import (ExplicitBitVect, SparseBitVect)
 from scipy.sparse import (issparse, csr_matrix)
 from collections import defaultdict
-
+from rdkit import DataStructs
 
 from luna.util.exceptions import (BitsValueError, InvalidFingerprintType, IllegalArgumentError, FingerprintCountsError)
 from luna.version import __version__
@@ -324,6 +324,9 @@ class Fingerprint:
             raise BitsValueError("Fingerprints are in a different bit scale")
 
         return np.setxor1d(self.indices, other.indices, assume_unique=True)
+
+    def calc_similarity(self, other):
+        return DataStructs.FingerprintSimilarity(self.to_rdkit(), other.to_rdkit())
 
     def __repr__(self):
         return ("<%s: indices=%s length=%d>" %
