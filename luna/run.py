@@ -84,6 +84,9 @@ def main():
     parser.add_argument('--out_sim', dest="out_sim", action="store_true",
                         help="defines whether it should generate a similarity matrix")
 
+    parser.add_argument("--nproc", dest="nproc", type=int,
+                        help="the number of processors to use")
+
     args = parser.parse_args()
 
     proj_pkl_file = "%s/project_v%s.pkl.gz" % (args.working_path, version)
@@ -107,6 +110,9 @@ def main():
         opt["amend_mol"] = True
         opt["calc_ifp"] = False
         opt["out_pse"] = args.out_pse
+
+        if args.nproc:
+            opt["nproc"] = args.nproc
 
         if args.binding_modes_file:
             opt["binding_mode_filter"] = BindingModeFilter.from_config_file(args.binding_modes_file)
