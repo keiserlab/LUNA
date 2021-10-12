@@ -3,6 +3,14 @@ import logging
 logger = logging.getLogger()
 
 
+def rgb2hex(r, g, b):
+    return "#{:02x}{:02x}{:02x}".format(r, g, b)
+
+
+def hex2rgb(hexcode):
+    return tuple(map(ord, hexcode[1:].decode('hex')))
+
+
 # TODO: Transform hex to rgb and vice versa
 class ColorPallete:
     def __init__(self, color_map=None, default_color=(255, 255, 255)):
@@ -20,6 +28,15 @@ class ColorPallete:
         elif all([x < 1 for x in color]):
             return color
         return tuple(c / 255 for c in color)
+
+    def get_unnormalized_color(self, key):
+        color = self.get_color(key)
+
+        if isinstance(color, str):
+            return color
+        elif all([x > 1 for x in color]):
+            return color
+        return tuple(int(c * 255) for c in color)
 
     def get_color(self, key):
         if key in self.color_map:

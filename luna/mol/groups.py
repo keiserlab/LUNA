@@ -407,6 +407,18 @@ class AtomGroup():
         """Return 1 if at least one compound is the target."""
         return any([a.parent.is_target() for a in self.atoms])
 
+    def as_json(self):
+        grp_obj = {}
+
+        grp_obj["atoms"] = [atm.as_json() for atm in self.atoms]
+
+        grp_obj["compounds"] = [comp.as_json() for comp in self.compounds]
+
+        grp_obj["features"] = [feat.name for feat in self.features if feat.name != "Atom"]
+        grp_obj["classes"] = [comps.get_class() for comps in self.compounds]
+
+        return grp_obj
+
     def clear_refs(self):
         if self._recursive:
             for atm in self.atoms:
