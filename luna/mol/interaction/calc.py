@@ -2,6 +2,7 @@ from openbabel import openbabel as ob
 from operator import le, ge
 from itertools import combinations, product
 from collections import defaultdict
+import json
 
 import luna.mol.interaction.math as im
 from luna.mol.interaction.conf import DefaultInteractionConf, InteractionConf
@@ -99,6 +100,11 @@ class InteractionsManager:
             OUT.write("atom_group1,atom_group2,interaction\n")
             # Sort lines before writing to always keep the same order.
             OUT.write("\n".join([",".join(k) for k in sorted(interactions_set)]))
+
+    def to_json(self, output_file=None, indent=None):
+        with open(output_file, 'w') as OUT:
+            inter_objs = [inter.as_json() for inter in self.interactions]
+            json.dump(inter_objs, OUT, indent=indent)
 
     def save(self, output_file, compressed=True):
         pickle_data(self, output_file, compressed)

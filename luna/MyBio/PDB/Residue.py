@@ -218,6 +218,24 @@ class Residue(Entity):
     def set_as_target(self, is_target=True):
         self._is_target = is_target
 
+    def as_json(self):
+
+        if self.is_water():
+            comp_repr = "sphere"
+        elif self.is_hetatm():
+            if len(self.child_list) == 1 or len([atm for atm in self.child_list if atm.element != "H"]) == 1:
+                comp_repr = "sphere"
+            else:
+                comp_repr = "stick"
+        else:
+            comp_repr = "stick"
+
+        return {"chain": self.parent.id,
+                "name": self.resname,
+                "number": self.id[1],
+                "icode": self.id[2].strip(),
+                "repr": comp_repr}
+
 
 class DisorderedResidue(DisorderedEntityWrapper):
     """DisorderedResidue is a wrapper around two or more Residue objects.

@@ -199,7 +199,7 @@ class ChainEntry(Entry):
 
     @property
     def full_id(self):
-        return (self.pdb_id, self.mol_id)
+        return (self.pdb_id, self.chain_id)
 
 
 class CompoundEntry(Entry):

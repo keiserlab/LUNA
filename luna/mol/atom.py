@@ -128,6 +128,16 @@ class ExtendedAtom:
     def is_neighbor(self, atom):
         return atom.serial_number in [i.serial_number for i in self._nb_info]
 
+    def as_json(self):
+        full_id = self.get_full_id()
+
+        return {"pdb_id": full_id[0],
+                "model": full_id[1],
+                "chain": full_id[2],
+                "res_name": self.parent.resname,
+                "res_id": [full_id[3][1], full_id[2].strip()],
+                "name": [full_id[4][0], full_id[4][1].strip()]}
+
     def __getattr__(self, attr):
         if hasattr(self._atom, attr):
             return getattr(self._atom, attr)

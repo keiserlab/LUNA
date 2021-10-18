@@ -1,6 +1,18 @@
 import numpy as np
 
 from luna.mol.interaction.math import atom_coordinates, centroid
+from luna.util.default_values import PYMOL_INTERACTION_COLOR_AS_RGB
+from luna.util import rgb2hex
+
+
+NUCLEOPHILE_INTERS = ["Orthogonal multipolar", "Parallel multipolar", "Antiparallel multipolar", "Tilted multipolar", "Multipolar",
+                      "Cation-nucleophile", "Unfavorable anion-nucleophile", "Unfavorable nucleophile-nucleophile"]
+
+ELECTROPHILE_INTERS = ["Orthogonal multipolar", "Parallel multipolar", "Antiparallel multipolar", "Tilted multipolar", "Multipolar",
+                       "Anion-electrophile", "Unfavorable cation-electrophile", "Unfavorable electrophile-electrophile"]
+
+UNFAVORABLE_INTERS = ["Repulsive", "Unfavorable anion-nucleophile", "Unfavorable cation-electrophile",
+                      "Unfavorable nucleophile-nucleophile", "Unfavorable electrophile-electrophile"]
 
 
 class InteractionType():
@@ -66,7 +78,21 @@ class InteractionType():
             if self._src_interacting_atms:
                 self._src_centroid = centroid(atom_coordinates(self._src_interacting_atms))
             else:
-                self._src_centroid = self._src_grp.centroid
+                src_centroid = self._src_grp.centroid
+                # Define the centroid in a nucleophile with two atoms as the position of its more electronegative atom.
+                # Remember that the position in the interaction object matters. We have defined that the first group is always
+                # the nucleophile for both dipole-dipole and ion-dipole interactions.
+                if self.type in NUCLEOPHILE_INTERS and len(self.src_grp.atoms) == 2:
+                    dipole_atm = self.src_grp.atoms[0] if (self.src_grp.atoms[0].electronegativity
+                                                           > self.src_grp.atoms[1].electronegativity) else self.src_grp.atoms[1]
+                    src_centroid = dipole_atm.coord
+                # For unfavorable multipolar interactions, it may happen that the first atom group is an electrophile as well.
+                elif self.type == "Unfavorable electrophile-electrophile" and len(self.src_grp.atoms) == 2:
+                    dipole_atm = self.src_grp.atoms[0] if (self.src_grp.atoms[0].electronegativity
+                                                           < self.src_grp.atoms[1].electronegativity) else self.src_grp.atoms[1]
+                    src_centroid = dipole_atm.coord
+
+                self._src_centroid = src_centroid
         return self._src_centroid
 
     @src_centroid.setter
@@ -82,7 +108,22 @@ class InteractionType():
             if self._trgt_interacting_atms:
                 self._trgt_centroid = centroid(atom_coordinates(self._trgt_interacting_atms))
             else:
-                self._trgt_centroid = self._trgt_grp.centroid
+                trgt_centroid = self._trgt_grp.centroid
+
+                # Define the centroid in an electrophile with two atoms as the position of its less electronegative atom.
+                # Remember that the position in the interaction object matters. We have defined that the second group is always
+                # the electrophile for both dipole-dipole and ion-dipole interactions.
+                if self.type in ELECTROPHILE_INTERS and len(self.trgt_grp.atoms) == 2:
+                    dipole_atm = self.trgt_grp.atoms[0] if (self.trgt_grp.atoms[0].electronegativity
+                                                            < self.trgt_grp.atoms[1].electronegativity) else self.trgt_grp.atoms[1]
+                    trgt_centroid = dipole_atm.coord
+                # For unfavorable multipolar interactions, it may happen that the second atom group is a nucleophile as well.
+                elif self.type == "Unfavorable nucleophile-nucleophile" and len(self.trgt_grp.atoms) == 2:
+                    dipole_atm = self.trgt_grp.atoms[0] if (self.trgt_grp.atoms[0].electronegativity
+                                                            > self.trgt_grp.atoms[1].electronegativity) else self.trgt_grp.atoms[1]
+                    trgt_centroid = dipole_atm.coord
+
+                self._trgt_centroid = trgt_centroid
         return self._trgt_centroid
 
     @trgt_centroid.setter
@@ -133,6 +174,34 @@ class InteractionType():
     def is_intermol_interaction(self):
         return not self.is_intramol_interaction()
 
+    def show_src_centroid(self):
+        show_centroid = True
+
+        # Define the centroid in a nucleophile with two atoms as the position of its more electronegative atom.
+        # Remember that the position in the interaction object matters. We have defined that the first group is always
+        # the nucleophile for both dipole-dipole and ion-dipole interactions.
+        if self.type in NUCLEOPHILE_INTERS and len(self.src_grp.atoms) == 2:
+            show_centroid = False
+        # For unfavorable multipolar interactions, it may happen that the first atom group is an electrophile as well.
+        elif self.type == "Unfavorable electrophile-electrophile" and len(self.src_grp.atoms) == 2:
+            show_centroid = False
+
+        return show_centroid
+
+    def show_trgt_centroid(self):
+        show_centroid = True
+
+        # Define the centroid in an electrophile with two atoms as the position of its less electronegative atom.
+        # Remember that the position in the interaction object matters. We have defined that the second group is always
+        # the electrophile for both dipole-dipole and ion-dipole interactions.
+        if self.type in ELECTROPHILE_INTERS and len(self.trgt_grp.atoms) == 2:
+            show_centroid = False
+        # For unfavorable multipolar interactions, it may happen that the second atom group is a nucleophile as well.
+        elif self.type == "Unfavorable nucleophile-nucleophile" and len(self.trgt_grp.atoms) == 2:
+            show_centroid = False
+
+        return show_centroid
+
     def apply_refs(self):
         self.src_grp.add_interactions([self])
         self.trgt_grp.add_interactions([self])
@@ -145,11 +214,45 @@ class InteractionType():
         for key in self._params:
             self.__dict__[key] = self._params[key]
 
+    def as_json(self):
+        inter_obj = {}
+        inter_obj["type"] = self.type
+
+        inter_obj["color"] = rgb2hex(*PYMOL_INTERACTION_COLOR_AS_RGB.get_unnormalized_color(self.type))
+        inter_obj["is_directional"] = self.is_directional()
+        inter_obj["is_intramol_interaction"] = self.is_intramol_interaction()
+        inter_obj["is_intermol_interaction"] = self.is_intermol_interaction()
+
+        src_grp_obj = self.src_grp.as_json()
+        src_grp_obj["add_pseudo_group"] = len(self.src_grp.atoms) > 1
+        src_grp_obj["centroid"] = self.src_centroid.tolist()
+        src_grp_obj["show_centroid"] = self.show_src_centroid()
+
+        if src_grp_obj["add_pseudo_group"]:
+            src_grp_obj["pseudo_group_name"] = "+".join([a.name for a in sorted(self.src_grp.atoms)])
+
+        inter_obj["src_grp"] = src_grp_obj
+
+        #
+        # Target atom group
+        #
+        trgt_grp_obj = self.trgt_grp.as_json()
+        trgt_grp_obj["add_pseudo_group"] = len(self.trgt_grp.atoms) > 1
+        trgt_grp_obj["centroid"] = self.trgt_centroid.tolist()
+        trgt_grp_obj["show_centroid"] = self.show_trgt_centroid()
+
+        if trgt_grp_obj["add_pseudo_group"]:
+            trgt_grp_obj["pseudo_group_name"] = "+".join([a.name for a in sorted(self.trgt_grp.atoms)])
+
+        inter_obj["trgt_grp"] = trgt_grp_obj
+
+        return inter_obj
+
     def __eq__(self, other):
         """Overrides the default implementation"""
         if isinstance(self, other.__class__):
-            is_equal_compounds = ((self.src_grp == other.src_grp and self.trgt_grp == other.trgt_grp) or
-                                  (self.src_grp == other.trgt_grp and self.trgt_grp == other.src_grp))
+            is_equal_compounds = ((self.src_grp == other.src_grp and self.trgt_grp == other.trgt_grp)
+                                  or (self.src_grp == other.trgt_grp and self.trgt_grp == other.src_grp))
 
             is_equal_interactions = self.type == other.type
             has_equal_params = self.params == other.params
