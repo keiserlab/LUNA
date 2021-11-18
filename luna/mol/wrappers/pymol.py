@@ -54,6 +54,9 @@ class PymolWrapper:
         opts = opts or {}
         cmd.pseudoatom(name, **opts)
 
+    def select(self, selection, name="sele", enable=0):
+        cmd.select(name, selection, enable=enable)
+
     def sel_exists(self, name):
         return name in cmd.get_names("selections")
 
@@ -137,7 +140,7 @@ class PymolWrapper:
 class PymolSessionManager:
 
     def __init__(self, show_cartoon=False, bg_color="white",
-                 add_directional_arrows=True, show_hydrop_surface=False, show_comp_labels=True,
+                 add_directional_arrows=True, show_hydrop_surface=False, show_res_labels=True,
                  inter_color=PYMOL_INTERACTION_COLOR, pse_export_version="1.8"):
 
         self.show_cartoon = show_cartoon
@@ -146,7 +149,7 @@ class PymolSessionManager:
         self.inter_color = inter_color
         self.add_directional_arrows = add_directional_arrows
         self.show_hydrop_surface = show_hydrop_surface
-        self.show_comp_labels = show_comp_labels
+        self.show_res_labels = show_res_labels
         self.wrapper = None
 
     def new_session(self, data, output_file):
@@ -181,32 +184,33 @@ class PymolSessionManager:
         if self.show_cartoon:
             self.wrapper.show([("cartoon", pdb_obj)])
 
-    def set_interactions_view(self, interactions, add_to_grp):
+    def set_interactions_view(self, interactions, main_grp, secondary_grp=None):
+
+        residue_selections = set()
+
+        secondary_grp = secondary_grp or main_grp
 
         for i, inter in enumerate(interactions):
-
-            # if inter.type == "Proximal":
-            #     continue
 
             #
             # Centroid 1
             #
-            obj1_name = "%s.grps.grp%s" % (add_to_grp, hash(tuple(sorted(inter.src_interacting_atms))))
+            obj1_name = "%s.centroids.%s" % (main_grp, hash(tuple(sorted(inter.src_interacting_atms))))
             centroid_obj1 = inter.src_centroid
             centroid_obj1_visible = True
             # Define the centroid in a nucleophile with two atoms as the position of its more electronegative atom.
             # Remember that the position in the interaction object matters. We have defined that the first group is always
             # the nucleophile for both dipole-dipole and ion-dipole interactions.
             if inter.type in NUCLEOPHILE_INTERS and len(inter.src_grp.atoms) == 2:
-                dipole_atm = inter.src_grp.atoms[0] if (inter.src_grp.atoms[0].electronegativity >
-                                                        inter.src_grp.atoms[1].electronegativity) else inter.src_grp.atoms[1]
+                dipole_atm = inter.src_grp.atoms[0] if (inter.src_grp.atoms[0].electronegativity
+                                                        > inter.src_grp.atoms[1].electronegativity) else inter.src_grp.atoms[1]
                 obj1_name += "_%s" % hash(dipole_atm.name)
                 centroid_obj1 = dipole_atm.coord
                 centroid_obj1_visible = False
             # For unfavorable multipolar interactions, it may happen that the first atom group is an electrophile as well.
             elif inter.type == "Unfavorable electrophile-electrophile" and len(inter.src_grp.atoms) == 2:
-                dipole_atm = inter.src_grp.atoms[0] if (inter.src_grp.atoms[0].electronegativity <
-                                                        inter.src_grp.atoms[1].electronegativity) else inter.src_grp.atoms[1]
+                dipole_atm = inter.src_grp.atoms[0] if (inter.src_grp.atoms[0].electronegativity
+                                                        < inter.src_grp.atoms[1].electronegativity) else inter.src_grp.atoms[1]
                 obj1_name += "_%s" % hash(dipole_atm.name)
                 centroid_obj1 = dipole_atm.coord
                 centroid_obj1_visible = False
@@ -214,22 +218,22 @@ class PymolSessionManager:
             #
             # Centroid 2
             #
-            obj2_name = "%s.grps.grp%s" % (add_to_grp, hash(tuple(sorted(inter.trgt_interacting_atms))))
+            obj2_name = "%s.centroids.%s" % (main_grp, hash(tuple(sorted(inter.trgt_interacting_atms))))
             centroid_obj2 = inter.trgt_centroid
             centroid_obj2_visible = True
             # Define the centroid in an electrophile with two atoms as the position of its less electronegative atom.
             # Remember that the position in the interaction object matters. We have defined that the second group is always
             # the electrophile for both dipole-dipole and ion-dipole interactions.
             if inter.type in ELECTROPHILE_INTERS and len(inter.trgt_grp.atoms) == 2:
-                dipole_atm = inter.trgt_grp.atoms[0] if (inter.trgt_grp.atoms[0].electronegativity <
-                                                         inter.trgt_grp.atoms[1].electronegativity) else inter.trgt_grp.atoms[1]
+                dipole_atm = inter.trgt_grp.atoms[0] if (inter.trgt_grp.atoms[0].electronegativity
+                                                         < inter.trgt_grp.atoms[1].electronegativity) else inter.trgt_grp.atoms[1]
                 obj2_name += "_%s" % hash(dipole_atm.name)
                 centroid_obj2 = dipole_atm.coord
                 centroid_obj2_visible = False
             # For unfavorable multipolar interactions, it may happen that the second atom group is a nucleophile as well.
             elif inter.type == "Unfavorable nucleophile-nucleophile" and len(inter.trgt_grp.atoms) == 2:
-                dipole_atm = inter.trgt_grp.atoms[0] if (inter.trgt_grp.atoms[0].electronegativity >
-                                                         inter.trgt_grp.atoms[1].electronegativity) else inter.trgt_grp.atoms[1]
+                dipole_atm = inter.trgt_grp.atoms[0] if (inter.trgt_grp.atoms[0].electronegativity
+                                                         > inter.trgt_grp.atoms[1].electronegativity) else inter.trgt_grp.atoms[1]
                 obj2_name += "_%s" % hash(dipole_atm.name)
                 centroid_obj2 = dipole_atm.coord
                 centroid_obj2_visible = False
@@ -252,10 +256,17 @@ class PymolSessionManager:
                 else:
                     comp_repr = "sticks"
 
-                comp_sel = mybio_to_pymol_selection(compound)
+                comp_sel = "%s and %s" % (main_grp, mybio_to_pymol_selection(compound))
                 self.wrapper.show([(comp_repr, comp_sel)])
                 carb_color = "green" if compound.is_target() else "gray"
                 self.wrapper.color([(carb_color, comp_sel + " AND elem C")])
+
+                if compound.is_residue():
+                    residue_selections.add(comp_sel)
+
+                    # Show residue label if required.
+                    if self.show_res_labels:
+                        self.wrapper.label([("%s AND name CA" % comp_sel, '"%s-%s" % (resn, resi)')])
 
             # Check if the interaction involves the same compound: intramolecular interactions.
             inter_grp = "intra" if inter.is_intramol_interaction() else "inter"
@@ -266,7 +277,7 @@ class PymolSessionManager:
             trgt_grp_name = "+".join(["%s-%s-%d%s" % (c.parent.id, c.resname, c.id[1], c.id[2].strip())
                                       for c in sorted(inter.trgt_grp.compounds)])
 
-            inter_name = "%s.all_inters.%s.%s.i%d_%s_and_%s.line" % (add_to_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type],
+            inter_name = "%s.all_inters.%s.%s.i%d_%s_and_%s.line" % (secondary_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type],
                                                                      i, src_grp_name, trgt_grp_name)
 
             self.wrapper.distance(inter_name, obj1_name, obj2_name)
@@ -277,9 +288,9 @@ class PymolSessionManager:
 
             if self.add_directional_arrows:
                 if inter.type in UNFAVORABLE_INTERS:
-                    arrow_name1 = "%s.all_inters.%s.%s.inter%d.arrow1" % (add_to_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type], i)
-                    arrow_name2 = "%s.all_inters.%s.%s.inter%d.arrow2" % (add_to_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type], i)
-                    square_name = "%s.all_inters.%s.%s.inter%d.block" % (add_to_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type], i)
+                    arrow_name1 = "%s.all_inters.%s.%s.inter%d.arrow1" % (secondary_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type], i)
+                    arrow_name2 = "%s.all_inters.%s.%s.inter%d.arrow2" % (secondary_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type], i)
+                    square_name = "%s.all_inters.%s.%s.inter%d.block" % (secondary_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type], i)
 
                     arrow_opts = {"radius": 0.03, "gap": 0.9, "hlength": 0.5, "hradius": 0.2,
                                   "color": self.inter_color.get_color(inter.type)}
@@ -296,14 +307,14 @@ class PymolSessionManager:
                     self.wrapper.arrow(square_name, obj1_name, obj2_name, square_opts)
                 # Add arrows over the interaction lines to represent directional interactions
                 elif inter.is_directional():
-                    arrow_name = "%s.all_inters.%s.%s.inter%d.arrow" % (add_to_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type], i)
+                    arrow_name = "%s.all_inters.%s.%s.inter%d.arrow" % (secondary_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type], i)
                     arrow_opts = {"radius": 0.03, "gap": 0.9, "hlength": 0.5, "hradius": 0.2,
                                   "color": self.inter_color.get_color(inter.type)}
                     self.wrapper.arrow(arrow_name, obj1_name, obj2_name, arrow_opts)
 
             # If a group object contains more than one atom.
             if inter.src_grp.size > 1 and centroid_obj1_visible:
-                # Add the centroids to the group "grps" and append them to the main group
+                # Add the centroids to the group "centroids" and append them to the main group
                 self._set_centroid_style(obj1_name)
             # Otherwise, just remove the centroid as it will not add any new information (the atom represented
             # by the centroid is already the atom itself).
@@ -312,12 +323,14 @@ class PymolSessionManager:
 
             # If a group object contains more than one atom.
             if inter.trgt_grp.size > 1 and centroid_obj2_visible:
-                # Add the centroids to the group "grps" and append them to the main group
+                # Add the centroids to the group "centroids" and append them to the main group
                 self._set_centroid_style(obj2_name)
             # Otherwise, just remove the centroid as it will not add any new information (the atom represented
             # by the centroid is already been displayed).
             else:
                 self.wrapper.delete([obj2_name])
+
+        return residue_selections
 
     def _set_centroid_style(self, centroid):
         # Set styles to the centroid.
@@ -326,6 +339,9 @@ class PymolSessionManager:
         self.wrapper.set("sphere_scale", 0.2, {"selection": centroid})
 
     def set_last_details_to_view(self):
+        self.wrapper.set("dash_radius", 0.08)
+        self.wrapper.set("label_font_id", "13")
+        self.wrapper.set("label_size", "20")
         self.wrapper.set("sphere_scale", "0.3", {"selection": "visible and not name PS*"})
         self.wrapper.hide([("everything", "elem H+D")])
         self.wrapper.center("visible")
@@ -351,16 +367,16 @@ def mybio_to_pymol_selection(entity):
     elif entity.level == 'C':
         params['chain'] = entity.id
     elif entity.level == 'R':
-            params['resn'] = entity.resname
-            params['res'] = str(entity.id[1]) + entity.id[2].strip()
-            params['chain'] = entity.get_parent().id
+        params['resn'] = entity.resname
+        params['res'] = str(entity.id[1]) + entity.id[2].strip()
+        params['chain'] = entity.get_parent().id
     elif entity.level == 'A':
-            residue = entity.get_parent()
-            params['id'] = entity.serial_number
-            params['name'] = entity.name
-            params['resn'] = residue.resname
-            params['res'] = str(residue.id[1]) + residue.id[2].strip()
-            params['chain'] = residue.get_parent().id
+        residue = entity.get_parent()
+        params['id'] = entity.serial_number
+        params['name'] = entity.name
+        params['resn'] = residue.resname
+        params['res'] = str(residue.id[1]) + residue.id[2].strip()
+        params['chain'] = residue.get_parent().id
     else:
         return {}
 
