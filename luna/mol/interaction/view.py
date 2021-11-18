@@ -29,20 +29,22 @@ class InteractionViewer(PymolSessionManager):
                 interactions = inter_data
 
             # Add interactions and styles.
-            self.set_interactions_view(interactions, main_grp)
+            interacting_residue_sels = self.set_interactions_view(interactions, main_grp)
+            self.wrapper.select(name="%s.inter_residues" % main_grp, selection=" or ".join(interacting_residue_sels))
 
             if self.show_hydrop_surface:
                 self.wrapper.color([("white", "%s and !name PS*" % main_grp)])
 
-                # It will display all hydrophobic groups if a AtomGroupsManager is available.
+                # It will display all hydrophobic groups if an AtomGroupsManager is available.
                 atm_grp_mngr = interactions[0].src_grp.manager
                 if atm_grp_mngr is not None:
                     interacting_atms = set()
                     for atm_grp in atm_grp_mngr.filter_by_types(["Hydrophobe", "Hydrophobic"], must_contain_all=False):
+
                         inters = [i for i in atm_grp.interactions if i.type == "Hydrophobic"]
 
                         for comp in atm_grp.compounds:
-                            comp_sel = mybio_to_pymol_selection(comp)
+                            comp_sel = "%s and %s" % (main_grp, mybio_to_pymol_selection(comp))
                             self.wrapper.show([("sticks", comp_sel)])
 
                         if len(inters) > 0:
@@ -58,6 +60,10 @@ class InteractionViewer(PymolSessionManager):
                         else:
                             for atm in atm_grp.atoms:
                                 self.wrapper.color([("wheat", "%s and %s" % (main_grp, mybio_to_pymol_selection(atm)))])
+
+                    self.wrapper.hide([("sticks", "%s and not hetatm" % main_grp)])
+                    self.wrapper.show([("sticks", "%s.inter_residues" % main_grp)])
+                    self.wrapper.color([("white", "%s and not hetatm and not %s.inter_residues and !name PS*" % (main_grp, main_grp))])
 
                 # Otherwise, it will display only hydrophobic groups comprising the interacting groups.
                 else:
