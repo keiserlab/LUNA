@@ -5,53 +5,37 @@ import logging
 logger = logging.getLogger()
 
 
-# TODO: fix this code to accept the new format of AtomGroups as the atoms can be from different compounds
-
-def count_group_types(compound, key_map={}):
-    grp_types = defaultdict(int)
-
-    for group in compound.atomGroups:
-        for feature in group.chemicalFeatures:
-            key = feature.format_name()
-            if key_map:
-                if key in key_map:
-                    key = key_map[key]
-                else:
-                    logger.warning("Does not exist a corresponding mapping to the key '%s'. It will be ignored." % key)
-                    continue
-
-            grp_types[key] += 1
-
-    return grp_types
-
-
 def count_interaction_types(interactions, must_have_target=True, compounds=None, key_map={}):
     """Count the number of each type of interaction in ``interactions``.
 
     Parameters
     ----------
     interactions : iterable
-           An iterable object containing a sequence of interactions (``InteractionType``).
-    must_have_target : bool, optional
-           If True, count only interactions involving the target ligand. Default value is True.
-    compounds: iterable or None, optional
-           Only count interactions involving the compounds in ``compounds``.
-           Default value is None, which implies that all compounds will be considered.
+            An iterable object containing a sequence of interactions (``InteractionType``).
+    must_have_target : bool
+            If True, count only interactions involving the target ligand. The default value is True.
+    compounds: iterable, optional
+            Only count interactions involving the compounds in ``compounds``.
+            The default value is None, which implies that all compounds will be considered.
     key_map: dictionary, optional
-           A dictionary to control which interactions to count and how to aggregate them.
-           The keys are the interaction types to be considered and the values are the final interaction type,
-           which can be used to aggregate interactions. If a value is None, the interaction will be ignored.
+            A dictionary to control which interactions to count and how to aggregate them.
+            The keys are the interaction types to be considered and the values are the final interaction type,
+            which can be used to aggregate interactions. If a value is None, the interaction will be ignored.
 
-           For example, to aggregate all covalent interactions, ``key_map`` would be defined as follows:
-           .. code-block:: python
-                key_map = {"Single bond": "Covalent bond",
-                           "Double bond": "Covalent bond",
-                           "Triple bond": "Covalent bond",
-                           "Aromatic bond": "Covalent bond"}
+            For example, to aggregate all covalent interactions, ``key_map`` could be defined as follows:
 
-            Now, if Ionic interactions should be ignored, ``key_map`` would be defined as follows:
-            .. code-block:: python
-                key_map = {"Ionic": None}
+               .. code-block:: python
+
+                    key_map = {"Single bond": "Covalent bond",
+                               "Double bond": "Covalent bond",
+                               "Triple bond": "Covalent bond",
+                               "Aromatic bond": "Covalent bond"}
+
+            Now, if Ionic interactions should be ignored, ``key_map`` could be defined as follows:
+
+                .. code-block:: python
+
+                    key_map = {"Ionic": None}
 
     Returns
     -------
