@@ -6,6 +6,28 @@ logger = logging.getLogger()
 
 
 class AtomData:
+    """Store atomic data (atomic number, coordinates, bond type, and serial number).
+
+    Parameters
+    ----------
+    atomic_num : int
+        Atomic number.
+    coord : array_like of float (size 3)
+        Atomic coordinates (x, y, z).
+    bond_type : int
+        Bond type.
+    serial_number : int, optional
+        Atom serial number.
+
+    Attributes
+    ----------
+    atomic_num : int
+        The atomic number.
+    bond_type : int
+        The bond type.
+    serial_number : int or None
+        The atom serial number.
+    """
 
     def __init__(self, atomic_num, coord, bond_type, serial_number=None):
         self.atomic_num = atomic_num
@@ -16,22 +38,22 @@ class AtomData:
 
     @property
     def x(self):
+        """float: The orthogonal coordinates for ``x`` in Angstroms."""
         return self._coord[0]
 
     @property
     def y(self):
+        """float: The orthogonal coordinates for ``y`` in Angstroms."""
         return self._coord[1]
 
     @property
     def z(self):
+        """float: The orthogonal coordinates for ``z`` in Angstroms."""
         return self._coord[2]
 
     @property
-    def vector(self):
-        return self._coord
-
-    @property
     def coord(self):
+        """array_like of float (size 3): The atomic coordinates (x, y, z)."""
         return self._coord
 
     @coord.setter
@@ -46,9 +68,9 @@ class AtomData:
     def __eq__(self, other):
         """Overrides the default implementation"""
         if isinstance(self, other.__class__):
-            return (self.atomic_num == other.atomic_num and
-                    np.all(self._coord == other._coord) and
-                    self.serial_number == other.serial_number)
+            return (self.atomic_num == other.atomic_num
+                    and np.all(self._coord == other._coord)
+                    and self.serial_number == other.serial_number)
         return False
 
     def __ne__(self, other):
@@ -61,27 +83,51 @@ class AtomData:
 
 
 class ExtendedAtom:
+    """Extend :class:`~luna.MyBio.PDB.Atom.Atom` with additional properties and methods.
 
-    def __init__(self, mybio_atom, nb_info=None, atm_grps=None, invariants=None):
-        self._atom = mybio_atom
+    Parameters
+    ----------
+    atom : :class:`~luna.MyBio.PDB.Atom.Atom`
+        An atom.
+    nb_info : iterable of `AtomData`, optional
+        A sequence of `AtomData` containing information about atoms covalently bound to ``atom``.
+    atm_grps : iterable of :class:`~luna.groups.AtomGroup`, optional
+        A sequence of atom groups that contain ``atom``.
+    invariants : list or tuple, optional
+        Atomic invariants.
+    """
+
+    def __init__(self, atom, nb_info=None, atm_grps=None, invariants=None):
+        self._atom = atom
         self._nb_info = nb_info or []
         self._atm_grps = atm_grps or []
         self._invariants = invariants
 
     @property
     def atom(self):
+        """:class:`~luna.MyBio.PDB.Atom.Atom`, read-only."""
         return self._atom
 
     @property
     def neighbors_info(self):
+        """list of `AtomData`, read-only: The list of `AtomData`
+        containing information about atoms covalently bound to ``atom``.
+
+        To add or remove neighbors information from ``neighbors_info`` use :py:meth:`add_nb_info`
+        or :py:meth:`remove_nb_info`, respectively."""
         return self._nb_info
 
     @property
     def atm_grps(self):
+        """list of :class:`~luna.groups.AtomGroup`, read-only: The list of atom groups that contain ``atom``.
+
+        To add or remove atom groups from ``atm_grps`` use :py:meth:`add_atm_grps`
+        or :py:meth:`remove_atm_grps`, respectively."""
         return self._atm_grps
 
     @property
     def invariants(self):
+        """list: The list of atomic invariants."""
         return self._invariants
 
     @invariants.setter
@@ -90,14 +136,20 @@ class ExtendedAtom:
 
     @property
     def electronegativity(self):
+        """float, read-only: The Pauling electronegativity for this atom. This information is obtained from Open Babel."""
         return ob.GetElectroNeg(ob.GetAtomicNum(self.element))
 
     @property
     def full_id(self):
+        """tuple, read-only: The full id of an atom is the tuple (structure id, model id, chain id,
+        residue id, atom name, alternate location)."""
         return self._atom.get_full_id()
 
     @property
     def full_atom_name(self):
+        """str, read-only: The full name of an atom is composed by the structure id, model id,
+                chain id, residue name, residue id, atom name, and alternate location if available.
+                Fields are slash-separated."""
         full_atom_name = "%s/%s/%s" % self.get_full_id()[0:3]
         res_name = "%s/%d%s" % (self._atom.parent.resname, self._atom.parent.id[1], self._atom.parent.id[2].strip())
         atom_name = "%s" % self._atom.name
@@ -108,35 +160,53 @@ class ExtendedAtom:
         return full_atom_name
 
     def add_nb_info(self, nb_info):
+        """ Add `AtomData` objects to ``neighbors_info``."""
         self._nb_info = list(set(self._nb_info + list(nb_info)))
 
     def add_atm_grps(self, atm_grps):
+        """ Add :class:`~luna.groups.AtomGroup` objects to ``atm_grps``."""
         self._atm_grps = list(set(self._atm_grps + list(atm_grps)))
 
     def remove_nb_info(self, nb_info):
+        """ Remove `AtomData` objects from ``neighbors_info``."""
         self._nb_info = list(set(self._nb_info) - set(nb_info))
 
     def remove_atm_grps(self, atm_grps):
+        """ Remove :class:`~luna.groups.AtomGroup` objects from ``atm_grps``."""
         self._atm_grps = list(set(self._atm_grps) - set(atm_grps))
 
     def get_neighbor_info(self, atom):
+        """Get information from a covalently bound atom."""
         for info in self._nb_info:
             if atom.serial_number == info.serial_number:
                 return info
-        return None
 
     def is_neighbor(self, atom):
+        """Check if a given atom is covalently bound to it."""
         return atom.serial_number in [i.serial_number for i in self._nb_info]
 
     def as_json(self):
+        """Represent the atom as a dict containing the structure id, model id,
+           chain id, residue name, residue id, and atom name.
+
+           The dict is defined as follows:
+
+            * ``pdb_id`` (str): structure id;
+            * ``model`` (str): model id;
+            * ``chain`` (str): chain id;
+            * ``res_name`` (str): residue name;
+            * ``res_id`` (tuple): residue id (hetflag, sequence identifier, insertion code);
+            * ``name`` (tuple): atom name (atom name, alternate location).
+
+        """
         full_id = self.get_full_id()
 
         return {"pdb_id": full_id[0],
                 "model": full_id[1],
                 "chain": full_id[2],
                 "res_name": self.parent.resname,
-                "res_id": [full_id[3][1], full_id[2].strip()],
-                "name": [full_id[4][0], full_id[4][1].strip()]}
+                "res_id": full_id[3],
+                "name": full_id[4]}
 
     def __getattr__(self, attr):
         if hasattr(self._atom, attr):

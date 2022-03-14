@@ -11,7 +11,7 @@ from openbabel.pybel import Molecule as PybelWrapper
 
 from rdkit.Chem import MolFromMolBlock, MolFromMolFile, SanitizeFlags, SanitizeMol, MolToMolFile
 
-from luna.util.file import is_directory_valid, get_unique_filename, remove_files
+from luna.util.file import is_directory_valid, new_unique_filename, remove_files
 from luna.util.default_values import ENTRY_SEPARATOR, OPENBABEL
 from luna.MyBio.selector import AtomSelector
 from luna.MyBio.PDB.PDBList import PDBList
@@ -21,9 +21,9 @@ from luna.MyBio.PDB.PDBIO import PDBIO
 from luna.MyBio.PDB.PDBParser import PDBParser
 from luna.mol.validator import MolValidator
 from luna.mol.standardiser import ResiduesStandardiser
-from luna.mol.wrappers.base import MolWrapper
-from luna.mol.wrappers.obabel import convert_molecule
-from luna.mol.wrappers.rdkit import read_mol_from_file
+from luna.wrappers.base import MolWrapper
+from luna.wrappers.obabel import convert_molecule
+from luna.wrappers.rdkit import read_mol_from_file
 
 from luna.util.exceptions import (IllegalArgumentError, MoleculeNotFoundError, ChainNotFoundError,
                                   FileNotCreated, PDBNotReadError, MoleculeSizeError, MoleculeObjectError)
@@ -32,14 +32,24 @@ from luna.util.exceptions import (IllegalArgumentError, MoleculeNotFoundError, C
 logger = logging.getLogger()
 
 
+ENTITY_LEVEL_NAME = {"A": "Atom",
+                     "R": "Residue",
+                     "C": "Chain",
+                     "M": "Model",
+                     "S": "Structure"}
+
+
 def download_pdb(pdb_id, output_path=".", overwrite=False):
     """Download a PDB file from RCSB.org.
 
-        @param pdb_id: 4-symbols structure Id from PDB (e.g. 3J92).
-        @type pdb_code: string
-
-        @param output_path: put the PDB file in this directory.
-        @type  output_path: string
+    Parameters
+    ----------
+    pdb_id : str
+        4-symbols structure Id from PDB (e.g. 3J92).
+    output_path : str
+        Put the PDB file in this directory.
+    overwrite : bool
+        If True, overwrite any existing PDB files.
     """
     logger.debug("It will try to download the PDB '%s' and store it at the directory '%s'." % (pdb_id, output_path))
 
@@ -62,16 +72,28 @@ def download_pdb(pdb_id, output_path=".", overwrite=False):
 
 
 def parse_from_file(pdb_id, file):
-    """Read a PDB file and return a Structure object.
+    """Read a PDB file and return a :class:`~luna.MyBio.PDB.Structure.Structure` object.
 
-        @param pdb_id: the structure identifier
-        @type pdb_id: string
+    Parameters
+    ----------
+    pdb_id : str
+        The structure identifier.
+    file : str
+        Pathname of the PDB file.
 
-        @param file: name of the PDB file
-        @type file: string
+    Returns
+    -------
+    structure : :class:`~luna.MyBio.PDB.Structure.Structure`
+        The parsed PDB file as a :class:`~luna.MyBio.PDB.Structure.Structure` object.
+
+    Raises
+    ------
+    PDBNotReadError
+        If the PDB file could not be parsed.
     """
     try:
-        parser = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=False)
+        parser = PDBParser(PERMISSIVE=True, QUIET=True, FIX_EMPTY_CHAINS=True,
+                           FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=False)
         structure = parser.get_structure(pdb_id, file)
         return structure
     except Exception as e:
@@ -81,25 +103,23 @@ def parse_from_file(pdb_id, file):
 
 def save_to_file(entity, output_file, select=Select(), write_conects=True, write_end=True,
                  preserve_atom_numbering=True):
-    """ Write a Structure object (or a subset of a Structure object) into a file.
+    """Write a Structure object (or a subset of a :class:`~luna.MyBio.PDB.Structure.Structure` object)
+    into a file.
 
-        @param entity: the PDB object to be saved
-        @type entity: object
-
-        @param output_file: the name of the new PDB file
-        @type output_file: string
-
-        @param select: a filtering function. Default: it extracts everything
-        @type select: Select
-
-        @param write_conects: decide if it is necessary to write CONECT fields.
-        @type write_conects: boolean
-
-        @param write_end: decide if it is necessary to write END fields.
-        @type write_end: boolean
-
-        @param preserve_atom_numbering: decide if it is necessary to re-enumerate the atom serial numbers.
-        @type preserve_atom_numbering: boolean
+    Parameters
+    ----------
+    entity : :class:`~luna.MyBio.PDB.Entity.Entity`
+        The PDB object to be saved.
+    output_file : str
+        Save the selected atoms to this file.
+    select : :class:`~luna.MyBio.PDB.PDBIO.Select`
+        Decide which atoms will be saved at the PDB output. By default, all atoms are accepted.
+    write_conects : bool
+        If True, write CONECT records.
+    write_end : bool
+        If True, write the END record.
+    preserve_atom_numbering : bool
+        If True, preserve the atom numbering. Otherwise, re-enumerate the atom serial numbers.
     """
     try:
         io = PDBIO()
@@ -112,6 +132,30 @@ def save_to_file(entity, output_file, select=Select(), write_conects=True, write
 
 
 def entity_to_string(entity, select=Select(), write_conects=True, write_end=True, preserve_atom_numbering=True):
+    """Convert a Structure object (or a subset of a :class:`~luna.MyBio.PDB.Structure.Structure` object) to string.
+
+    This function works on a structural level. That means if ``entity`` is not a :class:`~luna.MyBio.PDB.Structure.Structure` object,
+    the structure will be recovered directly from ``entity``.
+    Therefore, use ``select`` to select specific chains, residues, and atoms from the structure object.
+
+    Parameters
+    ----------
+    entity : :class:`~luna.MyBio.PDB.Entity.Entity`
+        The PDB object to be converted.
+    select : :class:`~luna.MyBio.PDB.PDBIO.Select`
+        Decides which atoms will be saved at the output. By default, all atoms are accepted.
+    write_conects : bool
+        If True, writes CONECT records.
+    write_end : bool
+        If True, writes the END record.
+    preserve_atom_numbering : bool
+        If True, preserve the atom numbering. Otherwise, re-enumerate the atom serial numbers.
+
+    Returns
+    -------
+    str
+        The converted ``entity``.
+    """
     fh = StringIO()
     io = PDBIO()
     io.set_structure(entity)
@@ -120,17 +164,31 @@ def entity_to_string(entity, select=Select(), write_conects=True, write_end=True
     return ''.join(fh.readlines())
 
 
-def get_entity_level_name():
-    return {
-        "A": "Atom",
-        "R": "Residue",
-        "C": "Chain",
-        "M": "Model",
-        "S": "Structure"
-    }
-
-
 def get_entity_from_entry(entity, entry, model=0):
+    """Get a :class:`~luna.MyBio.PDB.Entity.Chain` or :class:`~luna.MyBio.PDB.Residue.Residue`
+    instance based on the provided entry ``entry``.
+
+    Parameters
+    ----------
+    entity : :class:`~luna.MyBio.PDB.Entity.Entity`
+        The PDB object to recover the target entry from.
+    entry : :class:`luna.entry.Entry`
+        The target entry.
+    model : int
+        The PDB model where the entry could be found. The default value is 0.
+
+    Returns
+    -------
+    :class:`~luna.MyBio.PDB.Entity.Entity`
+        The target entry.
+
+    Raises
+    ------
+    MoleculeNotFoundError
+        If the entry's molecule was not found in ``entity``.
+    ChainNotFoundError
+        If the entry's chain was not found in ``entity``.
+    """
     structure = entity.get_parent_by_level("S")
     model = structure[model]
 
@@ -154,12 +212,14 @@ def get_entity_from_entry(entity, entry, model=0):
     return target_entity
 
 
-def is_covalently_bound(mybio_atm1, mybio_atm2):
+def is_covalently_bound(atm1, atm2):
+    """Verifies if atoms ``atm1`` and ``atm2`` are covalently bound."""
+
     # Distance atom-atom
-    dist = mybio_atm1 - mybio_atm2
+    dist = atm1 - atm2
     # Covalent radius
-    cov1 = ob.GetCovalentRad(ob.GetAtomicNum(mybio_atm1.element))
-    cov2 = ob.GetCovalentRad(ob.GetAtomicNum(mybio_atm2.element))
+    cov1 = ob.GetCovalentRad(ob.GetAtomicNum(atm1.element))
+    cov2 = ob.GetCovalentRad(ob.GetAtomicNum(atm2.element))
 
     # OpenBabel thresholds.
     if 0.4 <= dist <= cov1 + cov2 + 0.45:
@@ -168,6 +228,20 @@ def is_covalently_bound(mybio_atm1, mybio_atm2):
 
 
 def get_residue_cov_bonds(residue, select=Select()):
+    """Get covalently bound atoms from residues or other molecules.
+
+    Parameters
+    ----------
+    residue : :class:`~luna.MyBio.PDB.Residue.Residue`
+        The residue or other molecule from which covalently bound atoms will be recovered.
+    select : :class:`~luna.MyBio.PDB.PDBIO.Select`
+        Decides which atoms will be consired. By default, all atoms are accepted.
+
+    Returns
+    -------
+    list of tuple(:class:`~luna.MyBio.PDB.Atom.Atom`, :class:`~luna.MyBio.PDB.Atom.Atom`)
+        List of pairs of covalently bound atoms.
+    """
 
     # Get valid atoms according to the provided selection function.
     trgt_res_atms = {atm.name: atm for atm in residue.get_atoms() if select.accept_atom(atm)}
@@ -181,6 +255,23 @@ def get_residue_cov_bonds(residue, select=Select()):
 
 
 def get_residue_neighbors(residue, select=Select()):
+    """Get all neighbors from a residue.
+
+    In the case of an amino acid that is part of a peptide bond, its neighbors are any predecessor or successor residues.
+    The same idea applies to nucleic acids.
+
+    Parameters
+    ----------
+    residue : :class:`~luna.MyBio.PDB.Residue.Residue`
+        The residue or other molecule from which covalently bound molecules will be recovered.
+    select : :class:`~luna.MyBio.PDB.PDBIO.Select`
+        Decides which atoms will be consired. By default, all atoms are accepted.
+
+    Returns
+    -------
+    neighbors : dict of {str : :class:`~luna.MyBio.PDB.Residue.Residue`}
+        A dictionary containing the predecessor (``previous``) or successor (``next``) molecules.
+    """
 
     # Get valid atoms according to the provided selection function.
     trgt_res_atms = {atm.name: atm for atm in residue.get_atoms() if select.accept_atom(atm)}
@@ -299,6 +390,54 @@ def biopython_entity_to_mol(entity, select=Select(), validate_mol=True, standard
                             template=None, add_h=False, ph=None,
                             break_metal_bonds=False, mol_obj_type="rdkit", wrapped=True,
                             openbabel=OPENBABEL, tmp_path=None, keep_tmp_files=False):
+    """Convert an object :class:`~luna.MyBio.PDB.Entity.Entity` to a
+    molecular object (:class:`luna.wrappers.base.MolWrapper`,
+    :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`).
+
+    Parameters
+    ----------
+    entity : :class:`~luna.MyBio.PDB.Entity.Entity`
+        The entity to be converted.
+    select : :class:`~luna.MyBio.PDB.PDBIO.Select`
+        Decide which atoms will be consired. By default, all atoms are accepted.
+    validate_mol : bool
+        If True, validate the converted molecule with :class:`~luna.mol.validator.MolValidator`.
+    standardize_mol : bool
+        If True, standardize the converted molecule. Currently, only residues are standardized as it
+        uses :class:`luna.mol.standardiser.ResiduesStandardiser` by default.
+    template : :class:`luna.mol.template.Template`, optional
+        Fix the converted molecule's bond order based on the bond orders in a template molecule.
+        The ``template`` should implement assign_bond_order().
+    add_h : bool
+        If True, add hydrogen to the converted molecule.
+    ph : float, optional
+        Add hydrogens considering pH ``ph``.
+    break_metal_bonds : bool
+        If True, remove covalent bonds between residues and metals and fix the residue bond order.
+    mol_obj_type : {"rdkit", "openbabel"}
+        If "rdkit", parse the converted molecule with RDKit and return an instance of :class:`rdkit.Chem.Mol`.
+        If "openbabel", parse the converted molecule with Open Babel and return an instance of
+        :class:`openbabel.pybel.Molecule`.
+        If ``wrapped`` is True, the molecular object will be wrapped with :class:`~luna.wrappers.base.MolWrapper`.
+    wrapped : bool
+        If True, wrap the molecular object with :class:`~luna.wrappers.base.MolWrapper`.
+    openbabel : str
+        Pathname to Open Babel. Even if ``mol_obj_type`` is set to 'rdkit', this function uses
+        Open Babel to properly parse PDB files and to add hydrogens to the molecule
+        considering different pHs.
+    tmp_path : str
+        A temporary directory to where temporary files will be saved.
+        If not provided, the system's default temporary directory will be used instead.
+    keep_tmp_files : bool
+        If True, keep all temporary files. Otherwise, removes them in the end.
+
+    Returns
+    -------
+    mol_obj : :class:`luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`
+        The converted molecule.
+    ignored_atoms : list
+        List of ignored atoms. Currently, ignored atoms may contain only metals.
+    """
 
     tmp_path = tmp_path or tempfile.gettempdir()
 
@@ -309,7 +448,7 @@ def biopython_entity_to_mol(entity, select=Select(), validate_mol=True, standard
     # I had to do it because the OpenBabel 2.4.1 had a problem with some molecules containing aromatic rings.
     # In such cases, the aromatic ring was being wrongly perceived and some atoms received more double bonds than it
     # was expected. The version 2.3.2 works better. Therefore, I defined this version manually (openbabel property).
-    filename = get_unique_filename(tmp_path)
+    filename = new_unique_filename(tmp_path)
     pdb_file = '%s_pdb-file.pdb' % filename
 
     logger.debug("First: try to create a new PDB file (%s) from the provided entity." % pdb_file)
@@ -342,7 +481,7 @@ def biopython_entity_to_mol(entity, select=Select(), validate_mol=True, standard
             ob_opt["p"] = ph
         else:
             ob_opt["h"] = ""
-    convert_molecule(ini_input_file, mol_file, opt=ob_opt, openbabel=openbabel)
+    convert_molecule(ini_input_file, mol_file, opts=ob_opt, openbabel=openbabel)
 
     # Currently, ignored atoms are only metals.
     ignored_atoms = []
@@ -397,7 +536,7 @@ def biopython_entity_to_mol(entity, select=Select(), validate_mol=True, standard
             mol_obj.write("mol", new_mol_file, overwrite=True)
             # Overwrite mol_file by converting the new molecular file using the user specified parameters.
             # Note that right now it will add explicit hydrogens to the molecules according to the provided pH.
-            convert_molecule(new_mol_file, mol_file, opt=ob_opt, openbabel=OPENBABEL)
+            convert_molecule(new_mol_file, mol_file, opts=ob_opt, openbabel=OPENBABEL)
 
             # Let's finally read the correct and standardized molecular file.
             try:

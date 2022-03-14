@@ -8,18 +8,33 @@ from rdkit.Chem import Mol as RDMol
 
 from luna.util import stringcase as case
 from luna.util.exceptions import MoleculeObjectTypeError
-from luna.mol.wrappers.base import MolWrapper
+from luna.wrappers.base import MolWrapper
 
 import logging
 logger = logging.getLogger()
 
 
 class ChemicalFeature():
+    """Define chemical features as for example pharmacophore properties.
+
+    Parameters
+    ----------
+    name : str
+        The chemical feature name.
+    """
 
     def __init__(self, name):
         self.name = name
 
     def format_name(self, case_func="sentencecase"):
+        """Convert chemical feature names to another string case.
+
+        Parameters
+        ----------
+        name : str
+            The name of a string case function from :py:mod:`luna.util.stringcase`.
+        """
+
         func = getattr(case, case_func)
         return func(self.name)
 
@@ -44,28 +59,83 @@ class ChemicalFeature():
         return hash(self.name)
 
 
-class MolChemicalFeature:
+class OBMolChemicalFeature:
+    """Mimic :class:`rdkit.Chem.rdMolChemicalFeatures.MolChemicalFeature` for Open Babel.
+
+    Parameters
+    ----------
+    family : str
+        The family name, which is the term used by RDKit for chemical features.
+    atom_ids : list
+        List of atom identifiers.
+    """
 
     def __init__(self, family, atom_ids):
         self.family = family
         self.atom_ids = atom_ids
 
     def GetAtomIds(self):
+        """Get the IDs of the atoms that participate in the feature."""
         return self.atom_ids
 
     def GetFamily(self):
+        """Get the family to which the feature belongs (e.g., donor, acceptor, etc.)"""
         return self.family
 
 
 class FeatureExtractor:
+    """Perceive chemical features from molecules.
+
+    Parameters
+    ----------
+    feature_factory : :class:`rdkit.Chem.rdMolChemicalFeatures.MolChemicalFeatureFactory`
+        An RDKit feature factory.
+
+    Examples
+    --------
+
+    First, let's read a molecule (glutamine).
+
+    >>> from luna.wrappers.base import MolWrapper
+    >>> mol = MolWrapper.from_smiles("N[C@@H](CCC(N)=O)C(O)=O").unwrap()
+
+    Now, create a feature factory and instantiate a new FeatureExtractor object.
+
+    >>> from luna.util.default_values import ATOM_PROP_FILE
+    >>> from rdkit.Chem import ChemicalFeatures
+    >>> from luna.mol.features import FeatureExtractor
+    >>> feature_factory = ChemicalFeatures.BuildFeatureFactory(ATOM_PROP_FILE)
+    >>> feature_extractor = FeatureExtractor(feature_factory)
+
+    Finally, you can extract features by group or atom.
+
+    >>> features = feature_extractor.get_features_by_atoms(mol)
+    >>> features = feature_extractor.get_features_by_groups(mol)
+
+    """
 
     def __init__(self, feature_factory):
         self.feature_factory = feature_factory
 
-    def set_feature_factory(self, feature_factory):
-        self.feature_factory = feature_factory
-
     def get_features_by_atoms(self, mol_obj, atm_map=None):
+        """Perceive chemical features from the molecule ``mol_obj`` by atom.
+
+        Parameters
+        ----------
+        mol_obj : :class:`luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`
+            The molecule.
+        atm_map : dict
+            A dictionary to map an atom's index to a different value.
+
+        Returns
+        -------
+        atm_features : dict of {int : list of `ChemicalFeature`}
+            Chemical features by atoms that are represented by their index or by a value from ``atm_map``.
+
+        """
+        if isinstance(mol_obj, MolWrapper):
+            mol_obj = mol_obj.unwrap()
+
         if isinstance(mol_obj, RDMol):
             perceived_features = self.feature_factory.GetFeaturesForMol(mol_obj)
         elif isinstance(mol_obj, OBMol):
@@ -92,7 +162,24 @@ class FeatureExtractor:
         return atm_features
 
     def get_features_by_groups(self, mol_obj, atm_map=None):
+        """Perceive chemical features from the molecule ``mol_obj`` by atom groups.
 
+        Parameters
+        ----------
+        mol_obj : :class:`luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`
+            The molecule.
+        atm_map : dict
+            A dictionary to map an atom's index to a different value.
+
+        Returns
+        -------
+        grp_features : dict of {str : dict}
+            Chemical features by groups. Each dictionary value is defined as follows:
+
+            * ``atm_ids`` (list): list of atoms represented by their index or by a value from ``atm_map`` ;
+            * ``features`` (list of `ChemicalFeature`): list of chemical features.
+
+        """
         if isinstance(mol_obj, MolWrapper):
             mol_obj = mol_obj.unwrap()
 
@@ -169,4 +256,4 @@ class FeatureExtractor:
                             grp_features[grp_type].remove(ids)
                         grp_features[grp_type].add(tuple(cur_ids))
 
-        return [MolChemicalFeature(family, atom_ids) for family in grp_features for atom_ids in grp_features[family]]
+        return [OBMolChemicalFeature(family, atom_ids) for family in grp_features for atom_ids in grp_features[family]]
