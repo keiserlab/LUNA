@@ -1,7 +1,7 @@
 from rdkit.Chem import SanitizeFlags, SanitizeMol
 from openbabel.openbabel import OBSmartsPattern
 
-from luna.mol.wrappers.base import BondType, AtomWrapper, MolWrapper
+from luna.wrappers.base import BondType, AtomWrapper, MolWrapper
 from luna.mol.charge_model import OpenEyeModel
 
 import logging
@@ -10,45 +10,84 @@ logger = logging.getLogger()
 
 
 class MolValidator:
+    """Validate and fix molecules with the errors most commonly found when parsing PDB files with Open Babel.
 
-    def __init__(self, charge_model=OpenEyeModel(), references=None, fix_nitro=True, fix_amidine_and_guanidine=True,
+    Parameters
+    ----------
+    charge_model : :class:`~luna.mol.charge_model.ChargeModel`
+        A charge model object. By default, the implementation of OpenEye charge model is used.
+    fix_nitro : bool
+        If True, fix nitro groups whose nitrogens are perceived as having a valence of 5 and
+        that are double-bonded to the oxygens.
+        SMILES representation of the error: '[$([NX3v5]([!#8])(=O)=O)]'.
+    fix_amidine_and_guanidine : bool
+        If True, fix amidine and guanidine-like groups.
+        When the molecule is ionized, it may happen that the charge is incorrectly assigned to the
+        central carbon, which ends up with a +1 charge and the nitrogen double-bonded
+        to it ends up with a +0 charge.
+    fix_valence : bool
+        If True, fix the valence of atoms.
+        Currently, we only detect and fix errors of quaternary ammonium nitrogens.
+        These charged atoms are sometimes perceived as having a valence equal to 5 and no charge,
+        i.e., Open Babel considers those nitrogens as hypervalent.
+    fix_charges : bool
+        If True, fix charges on basis of the charge model ``charge_model``.
+    """
+
+    def __init__(self, charge_model=OpenEyeModel(), fix_nitro=True, fix_amidine_and_guanidine=True,
                  fix_valence=True, fix_charges=True):
         self.charge_model = charge_model
-        self.references = references
         self.fix_nitro = fix_nitro
         self.fix_amidine_and_guanidine = fix_amidine_and_guanidine
         self.fix_valence = fix_valence
         self.fix_charges = fix_charges
 
     def validate_mol(self, mol_obj):
+        """Validate molecule ``mol_obj``.
+
+        It will first try to fix the provided molecule according to the initialization flags.
+        If any errors are detected and if it fails to fix them, then this function may return False,
+        i.e., the molecule is invalid.
+
+        Parameters
+        ----------
+        mol_obj : :class:`luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`
+            The molecule.
+
+        Returns
+        -------
+        is_valid : bool
+            If the molecule is valid or not.
+        """
+
         if not isinstance(mol_obj, MolWrapper):
             mol_obj = MolWrapper(mol_obj)
 
         # Validations to be made...
         #       TODO: check aromaticity.
-        #       TODO: Return list of errors
+        #       TODO: return list of errors
 
         if self.fix_nitro:
-            self.fix_nitro_substructure_and_charge(mol_obj)
+            self._fix_nitro_substructure_and_charge(mol_obj)
 
         if self.fix_amidine_and_guanidine:
-            self.fix_amidine_and_guanidine_charges(mol_obj)
+            self._fix_amidine_and_guanidine_charges(mol_obj)
 
         # Check if the molecule has errors...
-        is_mol_valid = True
+        is_valid = True
         for atm_obj in mol_obj.get_atoms():
-            if not self.is_valence_valid(atm_obj):
-                is_mol_valid = False
+            if not self._is_valence_valid(atm_obj):
+                is_valid = False
 
-            if not self.is_charge_valid(atm_obj):
-                is_mol_valid = False
+            if not self._is_charge_valid(atm_obj):
+                is_valid = False
 
-        if not is_mol_valid:
+        if not is_valid:
             logger.debug("Invalid molecule: check the logs for more information.")
 
-        return is_mol_valid
+        return is_valid
 
-    def fix_nitro_substructure_and_charge(self, mol_obj):
+    def _fix_nitro_substructure_and_charge(self, mol_obj):
         ob_smart = OBSmartsPattern()
         # Invalid nitro pattern.
         ob_smart.Init("[$([NX3v5]([!#8])(=O)=O)]")
@@ -80,7 +119,7 @@ class MolValidator:
             if ob_smart.Match(mol_obj.unwrap()):
                 logger.debug("Invalid nitro substructures ('*-N(=O)=O') successfully substituted to '*-[N+]([O-])=O'.")
 
-    def fix_amidine_and_guanidine_charges(self, mol_obj):
+    def _fix_amidine_and_guanidine_charges(self, mol_obj):
         # These errors occur with guanidine-like substructures when the molecule is ionized. It happens that the charge is
         # incorrectly assigned to the central carbon, so the guanidine-like C ends up with a +1 charge and the N with a double bond
         # to the central C ends up with a +0 charge. To fix it, we assign the correct charges to the N (+1) and C (0).
@@ -120,11 +159,11 @@ class MolValidator:
             if ob_smart.Match(mol_obj.unwrap()):
                 logger.debug("Invalid amidine/guanidine substructures were correctly charged.")
 
-    def is_valence_valid(self, atm_obj):
+    def _is_valence_valid(self, atm_obj):
         if not isinstance(atm_obj, AtomWrapper):
             atm_obj = AtomWrapper(atm_obj)
 
-        # Atoms other than N are not currently evaluated because we did not find any similar errors with other atoms.
+        # Currently, atoms other than N are not evaluated as no valence error has been identified to them.
         if atm_obj.get_atomic_num() == 7:
             # It corrects quaternary ammonium Nitrogen errors.
             #
@@ -147,11 +186,11 @@ class MolValidator:
                 return False
         return True
 
-    def is_charge_valid(self, atm_obj):
+    def _is_charge_valid(self, atm_obj):
         if not isinstance(atm_obj, AtomWrapper):
             atm_obj = AtomWrapper(atm_obj)
 
-        expected_charge = self.get_expected_charge(atm_obj)
+        expected_charge = self._get_expected_charge(atm_obj)
 
         if expected_charge is not None and expected_charge != atm_obj.get_charge():
             logger.debug("Atom # %d has incorrect charges defined." % atm_obj.get_id())
@@ -165,23 +204,37 @@ class MolValidator:
                 return False
         return True
 
-    def get_expected_charge(self, atm_obj):
+    def _get_expected_charge(self, atm_obj):
         if not isinstance(atm_obj, AtomWrapper):
             atm_obj = AtomWrapper(atm_obj)
 
         return self.charge_model.get_charge(atm_obj)
 
-    def compare_to_ref(self, mol_obj, ref):
-        # to be implemented
-        pass
-
 
 class RDKitValidator:
+    """Check if RDKit molecular objects are valid or not.
+
+    Parameters
+    ----------
+    sanitize_opts : :class:`rdkit.Chem.SanitizeFlags`
+        Sanitization operations to be carried out.
+    """
 
     def __init__(self, sanitize_opts=SanitizeFlags.SANITIZE_ALL):
         self.sanitize_opts = sanitize_opts
 
-    def is_mol_valid(self, rdk_mol):
+    def is_valid(self, rdk_mol):
+        """Try to sanitize the molecule ``rdk_mol``. If it succeeds, returns True. Otherwise, returns False.
+
+        Parameters
+        ----------
+        rdk_mol : :class:`rdkit.Chem.Mol`
+
+        Returns
+        -------
+        is_valid : bool
+            If the molecule is valid or not.
+        """
         try:
             SanitizeMol(rdk_mol, sanitizeOps=self.sanitize_opts)
             return True

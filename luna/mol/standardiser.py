@@ -1,6 +1,6 @@
 from enum import Enum, auto
 
-from luna.mol.wrappers.base import BondType
+from luna.wrappers.base import BondType
 
 
 import logging
@@ -11,11 +11,11 @@ logger = logging.getLogger()
 METALS = ["Li", "Na", "K", "Rb", "Cs", "Fr", "Be", "Mg", "Ca", "Sr", "Ba", "Ra", "Sc", "Ti", "V", "Cr", "Mn", "Fe",
           "Co", "Ni", "Cu", "Zn", "Al", "Ga", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn", "Hf",
           "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi"]
-
 METAL_ATOM = "[%s]" % ",".join(METALS)
 
 
 class ResidueStandard(Enum):
+    """An enumeration of protonation states for standard residues."""
 
     # TODO: add other residues to the standard
 
@@ -35,6 +35,16 @@ class ResidueStandard(Enum):
 # TODO: create a new MetalStandardiser or LigandStandardiser for common ligands.
 
 class ResiduesStandardiser:
+    """Standardize residues.
+
+    Parameters
+    ----------
+    break_metal_bonds : bool
+        If True, break covalent bonds with metals and correct the topology of the involved atoms.
+    his_type : {:class:`~ResidueStandard.HID`, :class:`~ResidueStandard.HIE`, :class:`~ResidueStandard.HIP`}
+        Define which histidine protonation state to use. Currently, this option is still not been used.
+
+    """
 
     # TODO: create filters for specific patterns like HIS tautomers or CYS:S- vs CYS:SH
 
@@ -52,7 +62,13 @@ class ResiduesStandardiser:
         self.his_type = his_type
 
     def standardise(self, atom_pairs):
+        """Standardize residues.
 
+        Parameters
+        ----------
+        atom_pairs : iterable of tuple of (:class:`~luna.wrappers.base.MolWrapper`, :class:`~luna.MyBio.PDB.Atom.Atom`)
+            The atoms to standardise.
+        """
         pdb_map = {atm_obj.get_idx(): pdb_atm for atm_obj, pdb_atm in atom_pairs}
 
         self.found_metals = {}
@@ -81,34 +97,34 @@ class ResiduesStandardiser:
                     continue
 
                 # Any non-N-terminal N not from PRO.
-                if (pdb_atm.parent.resname != "PRO" and atm_obj.get_neighbors_number(True) == 2 and
-                        (atm_obj.get_valence() != 3 or atm_obj.get_charge() != 0 or
-                            atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 1 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
+                if (pdb_atm.parent.resname != "PRO" and atm_obj.get_neighbors_number(True) == 2
+                    and (atm_obj.get_valence() != 3 or atm_obj.get_charge() != 0
+                         or atm_obj.has_only_bond_type(BondType.SINGLE) is False
+                         or atm_obj.get_h_count() != 1 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
 
                     self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=1)
 
                 # Any N-terminal N not from PRO.
-                elif (pdb_atm.parent.resname != "PRO" and atm_obj.get_neighbors_number(True) == 1 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 1 or
-                            atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 3 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
+                elif (pdb_atm.parent.resname != "PRO" and atm_obj.get_neighbors_number(True) == 1
+                        and (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 1
+                             or atm_obj.has_only_bond_type(BondType.SINGLE) is False
+                             or atm_obj.get_h_count() != 3 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
 
                     self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=1, implicit_h_count=3)
 
                 # Non-N-terminal N from PRO.
-                elif (pdb_atm.parent.resname == "PRO" and atm_obj.get_neighbors_number(True) == 3 and
-                        (atm_obj.get_valence() != 3 or atm_obj.get_charge() != 0 or
-                            atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 0 or atm_obj.is_in_ring() is False or atm_obj.is_aromatic())):
+                elif (pdb_atm.parent.resname == "PRO" and atm_obj.get_neighbors_number(True) == 3
+                        and (atm_obj.get_valence() != 3 or atm_obj.get_charge() != 0
+                             or atm_obj.has_only_bond_type(BondType.SINGLE) is False
+                             or atm_obj.get_h_count() != 0 or atm_obj.is_in_ring() is False or atm_obj.is_aromatic())):
 
                     self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=0, in_ring=True)
 
                 # N-terminal N from PRO.
-                elif (pdb_atm.parent.resname == "PRO" and atm_obj.get_neighbors_number(True) == 2 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 1 or
-                            atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 2 or atm_obj.is_in_ring() is False or atm_obj.is_aromatic())):
+                elif (pdb_atm.parent.resname == "PRO" and atm_obj.get_neighbors_number(True) == 2
+                        and (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 1
+                             or atm_obj.has_only_bond_type(BondType.SINGLE) is False
+                             or atm_obj.get_h_count() != 2 or atm_obj.is_in_ring() is False or atm_obj.is_aromatic())):
 
                     self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=1, implicit_h_count=2, in_ring=True)
 
@@ -142,9 +158,9 @@ class ResiduesStandardiser:
 
                     # If the neighboring oxygen is bound to something else not comprised in the previous rule, it is better not to
                     # update anything. Otherwise, fix the C.
-                    elif (atm_obj.matches_smarts(f"[C;X4,X3]([OX2;$(O([C;X4,X3])[!#1]);!$(O{METAL_ATOM})])([#6])(-,=[N,O])") is False and
-                            atm_obj.matches_smarts("[CX3](=[OX1])([#6])[NX3]") is False and
-                            atm_obj.matches_smarts("[CX3](=[OX1])([#6])[O;H1,H0&-1]") is False):
+                    elif (atm_obj.matches_smarts(f"[C;X4,X3]([OX2;$(O([C;X4,X3])[!#1]);!$(O{METAL_ATOM})])([#6])(-,=[N,O])") is False
+                            and atm_obj.matches_smarts("[CX3](=[OX1])([#6])[NX3]") is False
+                            and atm_obj.matches_smarts("[CX3](=[OX1])([#6])[O;H1,H0&-1]") is False):
                         fix_atom = True
 
                     # Alert for unexpected atoms bound to the oxygen O.
