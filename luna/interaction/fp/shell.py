@@ -7,8 +7,8 @@ import mmh3
 from luna.version import __version__
 from luna.util.exceptions import ShellCenterNotFound
 from luna.util.default_values import CHEMICAL_FEATURE_IDS, INTERACTION_IDS
-from luna.mol.interaction.fp.fingerprint import DEFAULT_FP_LENGTH, Fingerprint, CountFingerprint
-from luna.mol.interaction.fp.type import IFPType
+from luna.interaction.fp.fingerprint import DEFAULT_FP_LENGTH, Fingerprint, CountFingerprint
+from luna.interaction.fp.type import IFPType
 from luna.mol.groups import PseudoAtomGroup, AtomGroupNeighborhood
 from luna.mol.features import ChemicalFeature
 
@@ -22,6 +22,7 @@ PAD_DEFAULT = -9
 
 
 class CompoundClassIds(Enum):
+    """An enumeration of compound classes."""
     HETATM = 1
     RESIDUE = 2
     NUCLEOTIDE = 3
@@ -31,10 +32,57 @@ class CompoundClassIds(Enum):
 
 class ShellManager:
 
-    def __init__(self, num_levels, radius_step, num_bits, ifp_type, shells=None, verbose=False):
+    """Store and manage :class:`Shell` objects.
+
+    Parameters
+    ----------
+    num_levels : int
+        The maximum number of iterations for fingerprint generation.
+    radius_step : float
+        The multiplier used to increase shell size at each iteration.
+        At iteration 0, shell radius is 0 * ``radius_step``, at iteration 1, radius is
+        1 * ``radius_step``, etc.
+    fp_length : int
+        The fingerprint length (total number of bits).
+    ifp_type : :class:`~luna.interaction.fp.type.IFPType`
+        The fingerprint type (EIFP, FIFP, or HIFP).
+    shells : iterable of :class:`Shell`, optional
+        An initial sequence of :class:`Shell` objects (fingerprint features).
+    verbose : bool
+        If True, warnings issued during the usage of this `ShellManager` will be displayed.
+        The default value is False.
+
+    Attributes
+    ----------
+    num_levels : int
+        The maximum number of iterations for fingerprint generation.
+    radius_step : float
+        The multiplier used to increase shell size at each iteration.
+    fp_length : int
+        The fingerprint length (total number of bits).
+    ifp_type : :class:`~luna.interaction.fp.type.IFPType`
+        The fingerprint type (EIFP, FIFP, or HIFP).
+    shells : iterable of :class:`Shell`
+        The sequence of shells (fingerprint features).
+    verbose : bool
+        The verbosity state.
+    version : str
+        The LUNA's version with which shells were generated.
+    levels : dict of {int: list of `Shell`}
+        Register shells by level, where keys are levels and values are lists of `Shell` objects.
+
+        .. note::
+            Levels are 0-indexed. So, the first level is 0, second is 1, etc.
+            That means if ``num_levels`` is 5, the last level will be 4.
+    centers : dict of dict of {int: `Shell`}
+        Register shells by center, where keys are :class:`~luna.mol.groups.AtomGroup` objects and
+        values are dict that store all shells generated for that center at each iteration (level).
+    """
+
+    def __init__(self, num_levels, radius_step, fp_length, ifp_type, shells=None, verbose=False):
         self.num_levels = num_levels
-        self.radius_steps = radius_step
-        self.num_bits = num_bits
+        self.radius_step = radius_step
+        self.fp_length = fp_length
         self.ifp_type = ifp_type
 
         self.shells = shells or []
@@ -46,18 +94,33 @@ class ShellManager:
 
     @property
     def num_shells(self):
+        """int, read-only: Total number of shells in ``shells``."""
         return len(self.shells)
 
     @property
     def num_unique_shells(self):
+        """int, read-only: Total number of unique shells in ``shells``."""
         return len(self.unique_shells)
 
     @property
     def unique_shells(self):
+        """iterable of `Shell`, read-only: Unique shells. Return the same as :meth:`get_valid_shells`."""
         return self.get_valid_shells()
 
     def find_similar_shell(self, shell):
+        """Find a shell in ``shells`` similar to ``shell``.
 
+        Two shells are similar if they represent the same substructural information.
+
+        Parameters
+        ----------
+        shell : `Shell`
+
+        Returns
+        -------
+         : `Shell` or None
+            Return a similar shell or None if it does not find any.
+        """
         for added_shell in self.shells:
             # For each group of similar shells, it will exist only one valid shell.
             if added_shell.is_valid():
@@ -66,6 +129,13 @@ class ShellManager:
         return None
 
     def add_shell(self, shell):
+        """Add a new shell to ``shells``.
+
+        Parameters
+        ----------
+        shell : `Shell`
+        """
+
         # Any new shell without interactions from level 1 onwards will be automatically considered invalid.
         if shell.level > 0 and len(shell.interactions) == 0:
             shell.valid = False
@@ -87,15 +157,57 @@ class ShellManager:
         self.centers[shell.central_atm_grp][shell.level] = shell
 
     def get_valid_shells(self):
+        """Return only valid shells.
+
+        A shell is considered invalid if, by the time it is added in ``shells``, there is another
+        shell representing the same substructural information.
+        That means this shell is not unique and does not contributes to any new information.
+
+        On the other hand, if the shell contributes by adding new information to ``shells``,
+        then it will be considered valid and unique.
+        So, the first shell of a series of shells containing the same information is considered
+        valid and the others invalid.
+
+        Returns
+        -------
+         : list of `Shell`
+        """
         return [s for s in self.shells if s.is_valid()]
 
     def get_shells_by_identifier(self, identifier, unique_shells=False):
+        """Get shells by identifier.
+
+        Parameters
+        ----------
+        identifier : int
+            The shell identifier.
+        unique_shells : bool
+            If True, return only unique shells.
+            Otherwise, return all shells having the identifier ``identifier`` (the default).
+
+        Returns
+        -------
+         : list of `Shell`
+        """
         if unique_shells:
             return [s for s in self.shells if s.identifier == identifier and s.is_valid()]
         else:
             return [s for s in self.shells if s.identifier == identifier]
 
     def get_shells_by_level(self, level, unique_shells=False):
+        """Get shells by level (iteration number).
+
+        Parameters
+        ----------
+        level : int
+        unique_shells : bool
+            If True, return only unique shells.
+            Otherwise, return all shells at level ``level`` (the default).
+
+        Returns
+        -------
+         : list of `Shell`
+        """
         shells = []
 
         if level in self.levels:
@@ -109,6 +221,22 @@ class ShellManager:
         return shells
 
     def get_shells_by_center(self, center, unique_shells=False):
+        """Get shells by center (:class:`~luna.mol.groups.AtomGroup` object).
+
+        Parameters
+        ----------
+        center : :class:`~luna.mol.groups.AtomGroup`
+            The center of a shell, which consists of an :class:`~luna.mol.groups.AtomGroup` object.
+        unique_shells : bool
+            If True, return only unique shells.
+            Otherwise, return all shells generated for center ``center`` (the default).
+
+
+        Returns
+        -------
+         : dict of {int: `Shell`}
+            All shells generated for center ``center`` at each iteration (key).
+        """
         shells = {}
 
         if center in self.centers:
@@ -122,6 +250,25 @@ class ShellManager:
         return shells
 
     def get_shell_by_center_and_level(self, center, level, unique_shells=False):
+        """Get the shell generated for center ``center``
+        (:class:`~luna.mol.groups.AtomGroup` object) at level (iteration) ``level``.
+
+        Parameters
+        ----------
+        center : :class:`~luna.mol.groups.AtomGroup`
+            The center of a shell, which consists of an :class:`~luna.mol.groups.AtomGroup` object.
+        level : int
+            The target level (iteration).
+        unique_shells : bool
+            If True, return the `Shell` object if it is unique and None otherwise.
+            The default value is False.
+
+        Returns
+        -------
+         : `Shell` or None
+            The shell generated for center ``center`` at level ``level``.
+            If the `Shell` object is not unique, return None.
+        """
         shell = self.centers.get(center, {}).get(level)
 
         if shell is None and self.verbose:
@@ -135,8 +282,27 @@ class ShellManager:
         return shell
 
     def get_previous_shell(self, center, curr_level, unique_shells=False):
-        shell = None
+        """Get the last shell having center ``center`` that was generated before level ``curr_level``.
+        For instance, if the current level (iteration) is 5 and the last valid shell generated for
+        center :math:`C` was at level 4, then :meth:`get_previous_shell` would return that shell at level 4.
 
+        Parameters
+        ----------
+        center : :class:`~luna.mol.groups.AtomGroup`
+            The center of a shell, which consists of an :class:`~luna.mol.groups.AtomGroup` object.
+        curr_level : int
+            The current level (iteration).
+        unique_shells : bool
+            If True, ignore non-valid shells and go down to inferior levels until a valid shell is found.
+            If level 0 was reached and no valid shell was found, then return None.
+            The default value is False.
+
+        Returns
+        -------
+         : `Shell` or None
+            The first previous valid shell or None if no valid shell was found.
+        """
+        shell = None
         while curr_level != 0 and shell is None:
             level = curr_level - 1
             shell = self.get_shell_by_center_and_level(center, level, unique_shells)
@@ -149,6 +315,22 @@ class ShellManager:
         return shell
 
     def get_last_shell(self, center, unique_shells=False):
+        """Get the last shell generated for center ``center``.
+
+        Parameters
+        ----------
+        center : :class:`~luna.mol.groups.AtomGroup`
+            The center of a shell, which consists of an :class:`~luna.mol.groups.AtomGroup` object.
+        unique_shells : bool
+            If True, ignore non-valid shells.
+            That means shells generated at superior levels may be ignored if they are not valid.
+            The default value is False.
+
+        Returns
+        -------
+         : `Shell` or None
+            The last shell generated for center ``center`` or None if no valid shell was found.
+        """
         shell = None
 
         shells = self.get_shells_by_center(center, unique_shells)
@@ -161,6 +343,19 @@ class ShellManager:
         return shell
 
     def get_identifiers(self, level=None, unique_shells=False):
+        """Get all shells' identifier.
+
+        Parameters
+        ----------
+        level : int, optional
+            If provided, only return identifiers of shells at level ``level``.
+        unique_shells : bool
+            If True, ignore identifiers of non-valid shells. The default value is False.
+
+        Returns
+        -------
+         : list of int
+        """
         if level is not None:
             if unique_shells:
                 identifiers = [s.identifier for s in self.get_shells_by_level(level) if s.is_valid()]
@@ -174,22 +369,88 @@ class ShellManager:
 
         return sorted(identifiers)
 
-    def to_fingerprint(self, unique_shells=False, fold_to_size=None, count_fp=False):
+    def to_fingerprint(self, fold_to_length=None, count_fp=False, unique_shells=False):
+        """Encode shells into an interaction fingerprint.
+
+        Parameters
+        ----------
+        fold_to_length : int, optional
+            If provided, fold the fingerprint to length ``fold_to_length``.
+        count_fp : bool
+            If True, create a count fingerprint (:class:`~luna.interaction.fp.fingerprint.CountFingerprint`).
+            Otherwise, return a bit fingerprint (:class:`~luna.interaction.fp.fingerprint.Fingerprint`).
+        unique_shells : bool
+            If True, only unique shells are used to create the fingerprint. The default value is False.
+
+        Returns
+        -------
+         : :class:`~luna.interaction.fp.fingerprint.CountFingerprint` or :class:`~luna.interaction.fp.fingerprint.Fingerprint`
+        """
         indices = self.get_identifiers(unique_shells=unique_shells)
         props = {"num_levels": self.num_levels,
-                 "num_bits": self.num_bits,
-                 "radius_steps": self.radius_steps}
+                 "fp_length": self.fp_length,
+                 "radius_step": self.radius_step}
 
         if count_fp:
-            fp = CountFingerprint(indices, fp_length=self.num_bits, props=props)
+            fp = CountFingerprint(indices, fp_length=self.fp_length, props=props)
         else:
-            fp = Fingerprint(indices, fp_length=self.num_bits, props=props)
+            fp = Fingerprint(indices, fp_length=self.fp_length, props=props)
 
-        if fold_to_size:
-            return fp.fold(fold_to_size)
+        if fold_to_length:
+            return fp.fold(fold_to_length)
         return fp
 
     def trace_back_feature(self, feature_id, ifp, unique_shells=False):
+        """Trace a feature from a fingerprint back to the shells that originated that feature.
+
+        .. note::
+            Due to fingerprint folding, multiple substructures may end up encoded in the same bit,
+            the so-called collision problem. So, if the provided feature contains collisions,
+            shells representing different substructures may be returned by :meth:`trace_back_feature`.
+
+        Parameters
+        ----------
+        feature_id: int
+            The target feature id.
+        ifp : `Fingerprint`
+            The fingerprint containing the feature ``feature_id``.
+        unique_shells : bool
+            If True, ignore identifiers of non-valid shells. The default value is False.
+
+        Yields
+        -------
+         : `Shell`
+
+        Examples
+        --------
+
+        In the below example, we will assume a LUNA project object named ``proj_obj`` already exists.
+        Then, we will generate an EIFP fingerprint for the first :class:`~luna.mol.groups.AtomGroupsManager`
+        object at ``proj_obj``.
+
+        >>> from luna.interaction.fp.shell import ShellGenerator
+        >>> from luna.interaction.fp.type import IFPType
+        >>> atm_grps_mngr = list(proj_obj.atm_grps_mngrs)[0]
+        >>> num_levels, radius_step = 2, 3
+        >>> sg = ShellGenerator(num_levels, radius_step, ifp_type=IFPType.EIFP)
+        >>> sm = sg.create_shells(atm_grps_mngr)
+        >>> fp = sm.to_fingerprint(fold_to_length=1024, count_fp=True)
+        >>> print(fp.indices)
+        [   2   19   22   23   34   37   39   45   54   67   71   75   83   84
+           93  109  138  140  157  162  181  182  186  187  191  194  206  209
+          211  237  246  251  263  271  281  296  304  315  323  358  370  374
+          388  392  399  400  419  439  476  481  487  509  519  527  532  578
+          587  592  604  605  629  635  645  661  668  698  711  713  732  736
+          740  753  764  795  813  815  820  824  825  831  836  855  873  882
+          911  926  967  975  976  984  990  996 1020]
+
+        Now, we can trace features back to original identifiers and investigate its substructural information.
+
+        >>> ori_indices = list(sm.trace_back_feature(34, fp, unique_shells=True))
+        >>> print(ori_indices)
+        [(494318626, [<Shell: level=0, radius=0.000000, center=<AtomGroup: [<ExtendedAtom: 3QQK/0/A/GLN/85/CD>, <ExtendedAtom: 3QQK/0/A/GLN/85/NE2>, <ExtendedAtom: 3QQK/0/A/GLN/85/OE1>]>, interactions=0>])]
+
+        """
         for ori_feature in ifp.unfolding_map[feature_id]:
             yield (ori_feature, self.get_shells_by_identifier(ori_feature, unique_shells))
 
@@ -207,8 +468,65 @@ class ShellManager:
 
 class Shell:
 
+    """
+    A container to store substructural information, which is the base for LUNA fingerprints.
+
+    Shells are centered on an atom or atom group (:class:`~luna.mol.groups.AtomGroup` objects)
+    and represent all atoms and interactions explicitly within it.
+
+    Parameters
+    ----------
+    central_atm_grp : :class:`~luna.mol.groups.AtomGroup`
+        The shell center.
+    level : int
+        The level (iteration) at which the shell was generated.
+    radius : float
+        The shell radius.
+    neighborhood : iterable of :class:`~luna.mol.groups.AtomGroup`
+        All atoms and atom groups within a shell of radius ``radius`` centered on ``central_atm_grp``.
+    inter_tuples : iterable of (:class:`~luna.interaction.type.InteractionType`, :class:`~luna.mol.groups.AtomGroup`)
+        All interactions within a shell of radius ``radius`` centered on ``central_atm_grp``.
+        Each tuple contains an :class:`~luna.interaction.type.InteractionType` object
+        and one of the :class:`~luna.mol.groups.AtomGroup` objects participating to the interaction.
+
+        .. note::
+            As an interaction involves two participants, it would be expected that each interaction produces two tuples.
+            However, by default, ShellGenerator sorts atom groups and considers only the first tuple that appears, \
+            which guarantees that only one of the possible tuples is added to avoid information duplication.
+    diff_comp_classes : bool
+        If True (the default), include differentiation between compound classes.
+        That means structural information originated from :class:`~luna.mol.groups.AtomGroup` objects
+        belonging to residues, nucleotides,  ligands, or water molecules will be considered different
+        even if their structural information are the same.
+        This is useful for example to differentiate protein-ligand interactions from residue-residue ones.
+    dtype : data-type
+        Use arrays of type ``dtype`` to store information. The default value is np.int64.
+    seed : int
+        A seed to generate shell identifiers through the MurmurHash3 hash function.
+        The default value is 0.
+    manager : `ShellManager`
+        The `ShellManager` object that stores and controls this `Shell` object.
+    valid : bool
+        If the shell is valid or not. By default, all shells are considered valid.
+    feature_mapper : dict, optional
+        A dict that maps atoms and interactions to unique values.
+        If not provided, ``feature_mapper`` will inherit from the default mappings
+        ``CHEMICAL_FEATURE_IDS`` and ``INTERACTION_IDS``.
+
+    Attributes
+    ----------
+    central_atm_grp : :class:`~luna.mol.groups.AtomGroup`
+    level : int
+    radius : float
+    diff_comp_classes : bool
+    dtype : data-type
+    seed : int
+    valid : bool
+    feature_mapper : dict
+    """
+
     def __init__(self, central_atm_grp, level, radius, neighborhood=None, inter_tuples=None,
-                 diff_comp_classes=True, np_dtype=np.int64, seed=0, manager=None,
+                 diff_comp_classes=True, dtype=np.int64, seed=0, manager=None,
                  valid=True, feature_mapper=None):
 
         self.central_atm_grp = central_atm_grp
@@ -218,7 +536,7 @@ class Shell:
         self.diff_comp_classes = diff_comp_classes
 
         if not neighborhood:
-            # If inter_tuples was not defined initialize the neighborhood as an empty list.
+            # If inter_tuples was not defined, initialize the neighborhood as an empty list.
             # Otherwise, define the neighborhood as the atom groups interacting with the central atom group.
             neighborhood = [] if not inter_tuples else [x[1] for x in self._inter_tuples]
         self._neighborhood = set(neighborhood)
@@ -240,7 +558,7 @@ class Shell:
             feature_mapper = default_dict
         self.feature_mapper = feature_mapper
 
-        self.np_dtype = np_dtype
+        self.dtype = dtype
         self.seed = seed
 
         self._manager = manager
@@ -252,41 +570,69 @@ class Shell:
 
     @property
     def neighborhood(self):
+        """iterable of :class:`~luna.mol.groups.AtomGroup`, read-only: All atoms and atom groups within this shell."""
         return self._neighborhood
 
     @property
     def interactions(self):
+        """iterable of :class:`~luna.interaction.type.InteractionType`, read-only: All interactions within this shell."""
         return self._interactions
 
     @property
     def inter_tuples(self):
+        """iterable of tuple, read-only: Each tuple contains an :class:`~luna.interaction.type.InteractionType` object \
+        and one of the :class:`~luna.mol.groups.AtomGroup` objects participating to the interaction."""
         return self._inter_tuples
 
     @property
     def manager(self):
+        """`ShellManager`, read-only: The `ShellManager` object that stores and controls this `Shell` object."""
         return self._manager
 
     @property
     def identifier(self):
+        """int, read-only: This shell identifier, which is generated by hashing its
+        encoded data with a hash function. By default, LUNA uses MurmurHash3 as the hash function."""
         return self._identifier
 
     @property
     def encoded_data(self):
+        """iterable of tuple, read-only: The data encoded in this shell."""
         return self._encoded_data
 
     @property
     def previous_shell(self):
+        """`Shell`, read-only: The previous shell, i.e., a shell centered on the same central \
+        :class:`~luna.mol.groups.AtomGroup` object from a previous level. \
+        For example, if this shell is in level 5, return a shell from level 4 having the same center."""
         shell = self._manager.get_previous_shell(self.central_atm_grp, self.level)
         if shell is None:
             logger.exception("No previous shell centered in '%s' was found." % self.central_atm_grp)
             raise ShellCenterNotFound("No previous shell centered in '%s' was found." % self.central_atm_grp)
-
         return shell
 
     def is_valid(self):
+        """If the shell is valid or not.
+
+        Returns
+        -------
+         : bool
+        """
         return self.valid
 
     def is_similar(self, shell):
+        """ If this shell is similar to ``shell``.
+
+        Two shells are similar if they represent the same substructural information.
+
+        Parameters
+        ----------
+        shell : `Shell`
+
+        Returns
+        -------
+         : bool
+        """
 
         # The shells' identifiers will be equal when the shells encode the same information and were constructed in the same level.
         if self.level == shell.level:
@@ -316,6 +662,14 @@ class Shell:
         return False
 
     def hash_shell(self):
+        """Hash this shells' substructural information into a 32-bit integer using MurmurHash3.
+
+        Returns
+        -------
+         : int
+            A 32-bit integer representing this shell's substructural information.
+        """
+
         if self.level == 0:
             # Get the initial data for the first shell according to the IFP type the user has chosen.
             data = self._initial_shell_data()
@@ -347,7 +701,7 @@ class Shell:
             # Join the interaction information to the feature vector.
             data += sorted_list
 
-        np_array = np.array(data, self.np_dtype)
+        np_array = np.array(data, self.dtype)
 
         # TODO: Let the user define a hash function
         hashed_shell = mmh3.hash(np_array, self.seed, signed=False)
@@ -355,7 +709,6 @@ class Shell:
         return hashed_shell
 
     def _initial_shell_data(self):
-
         data = []
 
         # EIFP uses atomic invariants.
@@ -397,12 +750,12 @@ class Shell:
         # Include differentiation between compound classes, i.e., groups belonging to Residues, Nucleotides, Ligands, or Waters
         # are treated as being different even when the group would be considered the same.
         if self.diff_comp_classes:
-            # Classes is a list as multiple classes (so multiple residues) can exist in a group.
-            # That can happen, for instance, in amide groups from the backbone.
+            # `classes` is a list because an atom group can be formed by multiple compounds, which can be from different
+            # (e.g., residue and ligand bound covalently) or same (e.g., amide groups formed by backbone residues) classes.
             classes = sorted([CompoundClassIds[c.get_class().upper()].value for c in self.central_atm_grp.compounds])
 
-            np_data = np.array(data, self.np_dtype)
-            np_classes = np.array(classes, self.np_dtype)
+            np_data = np.array(data, self.dtype)
+            np_classes = np.array(classes, self.dtype)
 
             # Add padding to np_classes
             if np_data.shape[1] > np_classes.shape[0]:
@@ -431,21 +784,125 @@ class Shell:
 
 class ShellGenerator:
 
-    def __init__(self, num_levels, radius_step, diff_comp_classes=True, num_bits=DEFAULT_FP_LENGTH, ifp_type=IFPType.FIFP,
-                 bucket_size=10, seed=0, np_dtype=np.int64):
+    """Generate shells, the base information of LUNA fingerprints.
+
+    Parameters
+    ----------
+    num_levels : int
+        The maximum number of iterations for fingerprint generation.
+    radius_step : float
+        The multiplier used to increase shell size at each iteration.
+        At iteration 0, shell radius is 0 * ``radius_step``, at iteration 1, radius is
+        1 * ``radius_step``, etc.
+    fp_length : int
+        The fingerprint length (total number of bits). The default value is :math:`2^{32}`.
+    ifp_type : :class:`~luna.interaction.fp.type.IFPType`
+        The fingerprint type (EIFP, FIFP, or HIFP). The default value is EIFP.
+    diff_comp_classes : bool
+        If True (the default), include differentiation between compound classes.
+        That means structural information originated from :class:`~luna.mol.groups.AtomGroup` objects
+        belonging to residues, nucleotides,  ligands, or water molecules will be considered different
+        even if their structural information are the same.
+        This is useful for example to differentiate protein-ligand interactions from residue-residue ones.
+    dtype : data-type
+        Use arrays of type ``dtype`` to store information. The default value is np.int64.
+    seed : int
+        A seed to generate shell identifiers through the MurmurHash3 hash function.
+        The default value is 0.
+    bucket_size : int
+        Bucket size of KD tree.
+        You can play around with this to optimize speed if you feel like it.
+        The default value is 10.
+
+    Attributes
+    ----------
+    num_levels : int
+    radius_step : float
+    fp_length : int
+    ifp_type : :class:`~luna.interaction.fp.type.IFPType`
+    diff_comp_classes : bool
+    dtype : data-type
+    seed : int
+    bucket_size : int
+
+    Examples
+    --------
+
+    In the below example, we will assume a LUNA project object named ``proj_obj`` already exists.
+
+    First, let's define a `ShellGenerator` object that will create shells over 2 iterations (levels).
+    At each iteration, the shell radius will be increased by 3 and substructural
+    information will be encoded following EIFP definition.
+
+    >>> from luna.interaction.fp.shell import ShellGenerator
+    >>> from luna.interaction.fp.type import IFPType
+    >>> num_levels, radius_step = 2, 3
+    >>> sg = ShellGenerator(num_levels, radius_step, ifp_type=IFPType.EIFP)
+
+    After defining the generator, we can create shells by calling :meth:`create_shells`, which
+    expects an :class:`~luna.mol.groups.AtomGroupsManager` object.
+    In this example, we will the first :class:`~luna.mol.groups.AtomGroupsManager` object
+    from an existing LUNA project (``proj_obj``).
+
+    >>> atm_grps_mngr = list(proj_obj.atm_grps_mngrs)[0]
+    >>> sm = sg.create_shells(atm_grps_mngr)
+    >>> print(sm.num_shells)
+    528
+
+    Now, with shells stored in the `ShellManager` object you can, for instance:
+
+        * Generate fingerprints:
+
+            >>> fp = sm.to_fingerprint(fold_to_length=1024)
+            >>> print(fp.indices)
+            [   2   19   22   23   34   37   39   45   54   67   71   75   83   84
+               93  109  138  140  157  162  181  182  186  187  191  194  206  209
+              211  237  246  251  263  271  281  296  304  315  323  358  370  374
+              388  392  399  400  419  439  476  481  487  509  519  527  532  578
+              587  592  604  605  629  635  645  661  668  698  711  713  732  736
+              740  753  764  795  813  815  820  824  825  831  836  855  873  882
+              911  926  967  975  976  984  990  996 1020]
+
+        * Visualize substructural information in Pymol\:
+
+            >>> from luna.interaction.fp.view import ShellViewer
+            >>> shell_tuples = [(atm_grps_mngr.entry, sm.unique_shells, proj_obj.pdb_path)]
+            >>> sv = ShellViewer()
+            >>> sv.new_session(shell_tuples, "example.pse")
+    """
+    def __init__(self, num_levels, radius_step, fp_length=DEFAULT_FP_LENGTH, ifp_type=IFPType.EIFP,
+                 diff_comp_classes=True, dtype=np.int64, seed=0, bucket_size=10):
 
         self.num_levels = num_levels
         self.radius_step = radius_step
-        self.diff_comp_classes = diff_comp_classes
-        self.num_bits = num_bits
+        self.fp_length = fp_length
         self.ifp_type = ifp_type
+        self.diff_comp_classes = diff_comp_classes
 
-        self.bucket_size = bucket_size
         self.seed = seed
-        self.np_dtype = np_dtype
+        self.dtype = dtype
+        self.bucket_size = bucket_size
 
     def create_shells(self, atm_grps_mngr):
-        sm = ShellManager(self.num_levels, self.radius_step, self.num_bits, self.ifp_type)
+        """Perceive substructural information from :class:`~luna.mol.groups.AtomGroup` objects
+        and their interactions, and represent such information as shells.
+
+        Parameters
+        ----------
+        atm_grps_mngr : :class:`~luna.mol.groups.AtomGroupsManager`
+            Container of :class:`~luna.mol.groups.AtomGroup` objects and their interactions.
+
+        Returns
+        -------
+         : `ShellManager`
+
+        Raises
+        ------
+        ShellCenterNotFound
+            If it fails to recover a shell having a given center.
+        """
+
+        sm = ShellManager(self.num_levels, self.radius_step, self.fp_length, self.ifp_type)
 
         all_interactions = atm_grps_mngr.get_all_interactions()
 
@@ -471,7 +928,7 @@ class ShellGenerator:
         # It controls which atom groups already converged.
         skip_atm_grps = set()
 
-        # Sort the atom groups for avoiding order dependence.
+        # Sort the atom groups to avoid order dependence.
         sorted_neighborhood = sorted(neighborhood)
 
         level = -1
@@ -489,7 +946,8 @@ class ShellGenerator:
                 # But, later it may also contain derived groups from interacting partner groups.
                 all_derived_atm_grps = self._get_derived_grps(atm_grp, pseudo_grps_mapping)
 
-                # In level 0, the number of unique derived groups is 0 as the shell initially only contains information of the centroid.
+                # In level 0, the number of unique derived groups is 0 as the shell initially only contains
+                # information of the centroid.
                 unique_derived_atm_grps = []
 
                 shell = None
@@ -508,7 +966,7 @@ class ShellGenerator:
                     inter_tuples = set()
                     interactions_to_add = set()
 
-                    # For each atom group from the previous shell
+                    # For each atom group from the previous shell.
                     for prev_atm_grp in sorted(prev_atm_grps):
                         # Include the partner's derived groups to the set of all derived groups.
                         all_derived_atm_grps.update(self._get_derived_grps(prev_atm_grp, pseudo_grps_mapping))
@@ -545,10 +1003,10 @@ class ShellGenerator:
 
                     shell = Shell(atm_grp, level, radius, neighborhood=shell_nb, inter_tuples=inter_tuples,
                                   manager=sm, diff_comp_classes=self.diff_comp_classes,
-                                  seed=self.seed, np_dtype=self.np_dtype)
+                                  seed=self.seed, dtype=self.dtype)
                 else:
                     shell = Shell(atm_grp, level, radius, manager=sm, diff_comp_classes=self.diff_comp_classes,
-                                  seed=self.seed, np_dtype=self.np_dtype)
+                                  seed=self.seed, dtype=self.dtype)
 
                 if shell:
                     sm.add_shell(shell)

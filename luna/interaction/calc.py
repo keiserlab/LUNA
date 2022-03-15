@@ -4,12 +4,13 @@ from itertools import combinations, product
 from collections import defaultdict
 import json
 
-import luna.mol.interaction.math as im
-from luna.mol.interaction.conf import DefaultInteractionConf, InteractionConf
-from luna.mol.interaction.filter import InteractionFilter
-from luna.mol.interaction.type import InteractionType
+from luna.interaction.conf import DefaultInteractionConf, InteractionConf
+from luna.interaction.filter import InteractionFilter
+from luna.interaction.type import InteractionType
 from luna.mol.features import ChemicalFeature
-from luna.mol.wrappers.base import BondType
+from luna.wrappers.base import BondType
+from luna.analysis.summary import count_interaction_types
+import luna.util.math as im
 from luna.util.exceptions import IllegalArgumentError
 from luna.mol.groups import AtomGroupNeighborhood
 from luna.util.file import pickle_data, unpickle_data
@@ -34,6 +35,17 @@ WATER_NAMES = ['HOH', 'DOD', 'WAT', 'H2O', 'OH2']
 
 class InteractionsManager:
 
+    """Store and manage :class:`~luna.interaction.type.InteractionType` objects.
+
+    Parameters
+    ----------
+    interactions : iterable of :class:`~luna.interaction.type.InteractionType`, optional
+        An initial sequence of :class:`~luna.interaction.type.InteractionType` objects.
+    entry : :class:`~luna.mol.entry.Entry`, optional
+        The chain or compound used as reference to calculate interactions.
+
+    """
+
     def __init__(self, interactions=None, entry=None):
         if interactions is None:
             interactions = []
@@ -45,35 +57,79 @@ class InteractionsManager:
 
     @property
     def interactions(self):
+        """ list of :class:`~luna.interaction.type.InteractionType`, read-only: The list of interactions.\
+        Additional interactions should be added using the method :py:meth:`add_interactions`."""
         return self._interactions
 
     @property
     def size(self):
+        """int, read-only: The number of interactions."""
         return len(self._interactions)
 
-    @property
-    def summary(self):
-        return self._summary
+    def count_interations(self, must_have_target=False):
+        """Count the number of each type of interaction in ``interactions``.
+
+        Parameters
+        ----------
+        must_have_target : bool
+                If True, count only interactions involving the target ligand.
+                The default value is False, which implies all interactions will be considered.
+
+        Returns
+        -------
+         : dict
+        """
+        return count_interaction_types(self.interactions, must_have_target=must_have_target)
 
     def add_interactions(self, interactions):
+        """Add one or more :class:`~luna.interaction.type.InteractionType` objects to
+         ``interactions``."""
+
         self._interactions = list(set(self.interactions + list(interactions)))
 
     def remove_interactions(self, interactions):
+        """Remove one or more :class:`~luna.interaction.type.InteractionType` objects from \
+        ``interactions``.
+
+        Any recursive references to the removed objects will also be cleared.
+        """
         self._interactions = list(set(self.interactions) - set(interactions))
 
         for inter in interactions:
             inter.clear_refs()
 
-    def find(self):
-        # TODO: implement
-        pass
-
     def filter_by_types(self, types):
+        """Filter :class:`~luna.interaction.type.InteractionType` objects by their types.
+
+        Parameters
+        ----------
+        types : iterable of str
+            A sequence of interaction types.
+
+        Yields
+        ------
+        :class:`~luna.interaction.type.InteractionType`
+        """
         for inter in self.interactions:
             if inter.type in types:
                 yield inter
 
-    def filter_by_binding_mode(self, binding_modes_filter):
+    def filter_out_by_binding_mode(self, binding_modes_filter):
+        """Filter out interactions based on binding modes.
+
+        **Note:** this method modifies ``interactions``.
+
+        Parameters
+        ----------
+        binding_modes_filter : :class:`~luna.interaction.filter.BindingModeFilter`
+            A :class:`~luna.interaction.filter.BindingModeFilter` object that defines binding mode conditions
+            to decide which interactions are valid.
+
+        Returns
+        -------
+         : set of :class:`~luna.interaction.type.InteractionType`
+            The interactions that were filtered out.
+        """
         inters_to_remove = set()
         for inter in self.interactions:
             if not binding_modes_filter.is_valid(inter):
@@ -83,11 +139,14 @@ class InteractionsManager:
 
         return inters_to_remove
 
-    def filter_by_centroids(self, centroids, radius):
-        # TODO: implement
-        pass
-
     def to_csv(self, output_file):
+        """Write interactions to a comma-separated values (csv) file.
+
+        Parameters
+        ----------
+        output_file : str
+            The output CSV file.
+        """
         interactions_set = set()
         for inter in self.interactions:
             grp1 = ";".join(sorted(["/".join(a.full_atom_name.split("/")) for a in inter.src_grp.atoms]))
@@ -102,15 +161,54 @@ class InteractionsManager:
             OUT.write("\n".join([",".join(k) for k in sorted(interactions_set)]))
 
     def to_json(self, output_file=None, indent=None):
+        """Write interactions to a_initial_shell_data JSON file.
+
+        Parameters
+        ----------
+        output_file : str
+            The output JSON file.
+        indent : int or str, optional
+            Indent level for pretty-printed JSON files.
+            An indent level of 0, negative, or '' only insert newlines.
+            Positive integers indent that many spaces per level.
+            If a string is provided (e.g., '\\\\t'), it will be used to indent each level.
+            The default value is None, which selects the most compact representation.
+        """
         with open(output_file, 'w') as OUT:
             inter_objs = [inter.as_json() for inter in self.interactions]
             json.dump(inter_objs, OUT, indent=indent)
 
     def save(self, output_file, compressed=True):
+        """Write the pickled representation of the `InteractionsManager` object to the file ``output_file``.
+
+        Parameters
+        ----------
+        output_file : str
+            The output file.
+        compressed : bool, optional
+            If True (the default), compress the pickled representation as a gzip file (.gz).
+
+        Raises
+        -------
+        FileNotCreated
+            If the file could not be created.
+        """
         pickle_data(self, output_file, compressed)
 
     @staticmethod
     def load(input_file):
+        """Load the pickled representation of an `InteractionsManager` object saved at the file ``input_file``.
+
+        Returns
+        ----------
+         : `InteractionsManager`
+            The reconstituted `InteractionsManager` object.
+
+        Raises
+        -------
+        PKLNotReadError
+            If the file could not be loaded.
+        """
         return unpickle_data(input_file)
 
     def __len__(self):
@@ -125,9 +223,265 @@ class InteractionsManager:
 
 class InteractionCalculator:
 
+    """Calculate interactions.
+
+    .. note::
+        This class provides default LUNA methods to calculate interactions.
+        However, one can provide their own methods without modifying this class.
+        In the **Examples** section, we will show how to define custom functions.
+
+    .. note::
+        In case you want to disable specific parameters (e.g., angles) used during
+        the calculation of interactions, you do not need to define a custom
+        function for it. You could just delete the parameter from the configuration
+        and LUNA will automatically recognize that a given parameter is not
+        necessary anymore.
+
+        Check **Examples 3** to see how to do it and how to implement this automatic
+        behavior on your custom functions.
+
+
+    Parameters
+    ----------
+    inter_conf : :class:`~luna.interaction.conf.InteractionConf`
+        An :class:`~luna.interaction.conf.InteractionConf` object with all parameters and cutoffs necessary
+        to compute interactions defined in ``inter_funcs``.
+        If not provided, the default LUNA configuration will be used instead \
+        (:class:`~luna.interaction.conf.DefaultInteractionConf`).
+    inter_filter : :class:`~luna.interaction.filter.InteractionFilter`, optional
+        An :class:`~luna.interaction.filter.InteractionFilter` object to filter out interactions on-the-fly.
+        The default value is None, which implies no interaction will be filtered out.
+    inter_funcs : dict of {tuple : iterable of callable}
+        A dict to define custom functions to calculate interactions,
+        where keys are tuples of feature names (e.g. ``("Hydrophobic", "Hydrophobic")``) and
+        values are lists of references to custom functions (see Examples for more details).
+        If not provided, the default LUNA methods will be used instead.
+    add_non_cov : bool
+         If True (the default), compute non-covalent interactions.
+         If you are providing custom functions to compute non-covalent interactions and
+         want to make them controllable by this flag, make sure to verify the state of
+         ``add_non_cov`` at the beginning of the function and return an empty list in case it is False.
+    add_cov : bool
+        If True (the default), compute covalent interactions.
+        If you are providing custom functions to compute covalent interactions and
+        want to make them controllable by this flag, make sure to verify the state of
+        ``add_cov`` at the beginning of the function and return an empty list in case it is False.
+    add_proximal : bool
+        If True, compute proximal interactions, which are only distance-based contacts between atoms
+        or atom groups that, therefore, only imply proximity. The default value is False.
+        If you are providing custom functions to compute proximal interactions and
+        want to make them controllable by this flag, make sure to verify the state of
+        ``add_proximal`` at the beginning of the function and return an empty list in case it is False.
+    add_atom_atom : bool
+        If True (the default), compute atom-atom interactions,
+        which, as the name suggests, are interactions that only involve atoms no matter their features.
+        If you are providing custom functions to compute atom-atom interactions and want to make them
+        controllable by this flag, make sure to verify the state of ``add_atom_atom`` at the beginning
+        of the function and return an empty list in case it is False.
+
+        .. note::
+            In LUNA, we consider the following interactions as atom-atom: `Van der Waals`,
+            `Van der Waals clash`, and `Atom overlap`. We opted to separate `Van der Waals` from
+            other non-covalent interactions because LUNA may generate an unnecessary number of additional
+            interactions that are usually already represented by other non-covalent interactions as
+            weak hydrogen bonds, hydrophobic, or dipole-dipole interactions.
+            Thus, to give users a fine-grain control over which interactions to calculate,
+            we provided this additional flag to turn off the calculation of Van der Waals interactions.
+    add_dependent_inter : bool
+        If True, compute interactions that depend on other interactions.
+        Currently, only water-bridged hydrogen bonds and salt bridges have a dependency on
+        other interactions. The first, depends on two or more hydrogen bonds, while the second depends on
+        an ionic and a hydrogen bond. The default value is False, which implies no dependent interaction
+        will be computed.
+    add_h2o_pairs_with_no_target : bool
+        If True, keep interactions of water with atoms and atom groups that do not belong to the target
+        of LUNA's analysis, which are chains or molecules defined as an :class:`~luna.mol.entry.Entry` instance.
+        For example, if the target is a ligand and ``add_h2o_pairs_with_no_target`` is False,
+        then water-water and water-residue hydrogen bonds will be removed because the ligand is not
+        participating in the interactions. The default value is False.
+    strict_donor_rules : bool
+        If True (the default), hydrogen bonds will only be considered for donor atoms with explicit
+        hydrogens bound to them. In that case, angles and distances will be evaluated.
+        However, if the molecule containing the donor atom is in ``lazy_comps_list``, then angles and hydrogens
+        will be ignored and LUNA will proceed with the determination of hydrogen bonds based only on
+        donor-acceptor distances.
+        Another exception occurs for solvent molecules in which the donor atom is only bound to hydrogens atoms
+        (e.g., water, ammonia, and hydrogen sulfide).
+        In that case, hydrogens can be positioned in many different ways by Open Babel, which may cause LUNA to
+        detect different hydrogen bonds at each run.
+        So, to circumvent this problem, by default, LUNA always ignores the explicit hydrogen position
+        for donor atoms that only contain hydrogens bound to it.
+    strict_weak_donor_rules : bool
+        If True (the default), weak hydrogen bonds will only be considered for donor atoms with explicit
+        hydrogens bound to them. In that case, angles and distances will be evaluated.
+        The same exceptions described for ``strict_donor_rules`` apply here.
+    lazy_comps_list : iterable
+         A sequence of molecule names to ignore explicit hydrogen position during the calculation of hydrogen bonds and weak hydrogen bonds.
+         The default list is ['HOH', 'DOD', 'WAT', 'H2O', 'OH2'], which only contains water molecule names,
+         including variations used by different programs.
+
+
+    Examples
+    --------
+
+    **Example 1) How to define custom interactions:**
+
+    In this example, we will define a custom function to calculate hydrogen bonds.
+
+    First, let's start importing the classes and the function we will use.
+
+    >>> from luna.interaction.type import InteractionType
+    >>> from luna.interaction.calc import InteractionCalculator
+    >>> from luna.util.math import euclidean_distance
+
+    Now, we define the custom function, which simply calculates hydrogen bonds based
+    on donor-acceptor distances. If it is less than 3.5, then a new
+    :class:`~luna.interaction.type.InteractionType` object is created with type `Hydrogen bond`.
+
+    .. code-block::
+
+        def custom_hbond_function(self, params):
+            if not self.add_non_cov:
+                return []
+
+            group1, group2, feat1, feat2 = params
+            interactions = []
+
+            cc_dist = euclidean_distance(group1.centroid, group2.centroid)
+            if cc_dist <= 3.5:
+                params = {"dist_hbond_inter": cc_dist}
+                inter = InteractionType(group1, group2, "Hydrogen bond", params=params)
+                interactions.append(inter)
+            return interactions
+
+    .. note::
+        Observe that the function checks if ``add_non_cov`` has been turned off and if
+        so returns an empty list. That's a recommended strategy because it allows one to
+        turn off all non-covalent interactions with a single flag.
+
+        Also, observe that `InteractionCalculator` always expects functions to return a list at the end.
+        That means multiple interactions may be detected for a single pair of
+        :class:`~luna.mol.groups.AtomGroup` objects.
+        For example, a donor atom containing 2 hydrogens could, in theory, form two
+        different hydrogen bonds with an acceptor atom.
+
+
+    Now, we have two options to set the custom function to an `InteractionCalculator` object:
+
+        1) Define a new dict with the custom functions:
+
+        >>> custom_funcs = {("Donor", "Acceptor"): [custom_hbond_function]}
+        >>> ic = InteractionCalculator(inter_funcs=custom_funcs)
+
+        2) Overwrite the default dict in InteractionCalculator:
+
+        >>> ic = InteractionCalculator()
+        >>> ic.funcs[("Donor", "Acceptor")] = [custom_hbond_function]
+
+    **Example 2)** How to modify parameters to calculate interactions:
+
+    If you just want to modify specific values from the default configuration,
+    you can create a new :class:`~luna.interaction.conf.DefaultInteractionConf`,
+    alter parameters, and pass it to `InteractionCalculator`.
+
+    >>> from luna.interaction.calc import InteractionCalculator
+    >>> from luna.interaction.conf import DefaultInteractionConf
+    >>> custom_conf = DefaultInteractionConf()
+    >>> custom_conf.conf["min_dha_ang_hb_inter"] = 120
+    >>> ic = InteractionCalculator(inter_conf=custom_conf)
+
+    Alternatively, you can initiate a new `InteractionCalculator` without providing an
+    :class:`~luna.interaction.conf.InteractionConf` object, which will cause
+    `InteractionCalculator` to initiate the default configuration.
+    Then, you can modify it directly as we did before.
+
+    >>> from luna.interaction.calc import InteractionCalculator
+    >>> ic = InteractionCalculator()
+    >>> print(ic.inter_conf.conf["min_dha_ang_hb_inter"])
+    90
+    >>> ic.inter_conf.conf["min_dha_ang_hb_inter"] = 120
+    120
+    >>> print(ic.inter_conf.conf["min_dha_ang_hb_inter"])
+
+    Finally, if you want to define a custom configuration that will be used in your custom functions,
+    you first need to define the parameters as a dict and then initiate a new
+    :class:`~luna.interaction.conf.InteractionConf`. See below:
+
+    >>> from luna.interaction.conf import InteractionConf
+    >>> conf = {"param1": 2.5, "param2": 90}
+    >>> custom_conf = InteractionConf(conf)
+    >>> ic = InteractionCalculator(inter_conf=custom_conf)
+    >>> print(ic.inter_conf.conf["param1"])
+    2.5
+    >>> print(ic.inter_conf.conf["param2"])
+    90
+
+    **Example 3)** How to disable specific parameters and how to enable
+    automatic recognition of disabled parameters in custom functions:
+
+    To automatically disable, for instance, verification of angles during the
+    calculation of interactions using LUNA's default functions, we just need to remove
+    the parameters related to angles from ``inter_conf``. Let's see an example where
+    we disable angles from hydrogen bonds:
+
+    >>> ic = InteractionCalculator()
+    >>> del ic.inter_conf.conf["min_dha_ang_hb_inter"]
+    >>> del ic.inter_conf.conf["min_har_ang_hb_inter"]
+    >>> del ic.inter_conf.conf["min_dar_ang_hb_inter"]
+
+    This simple behavior is possible thanks to the function `is_within_boundary`,
+    which always returns True if the parameter does not exist in ``inter_conf``.
+    Thus, you can take advantage of this system when implementing custom functions
+    so others will also have the possibility to turn off specific parameters without
+    modifying the code directly. Let's see that in practice.
+
+    First, let's start importing the classes and the function we will use.
+
+    >>> from luna.interaction.conf import InteractionConf
+    >>> from luna.interaction.type import InteractionType
+    >>> from luna.interaction.calc import InteractionCalculator
+    >>> from luna.util.math import euclidean_distance
+    >>> from operator import le
+
+    Now, we define a custom function that calculates hydrogen bonds based on donor-acceptor distances only.
+    Observe at line #9 that instead of checking the cutoff directly, we call `is_within_boundary`
+    with the value, parameter, and a comparison function (``le``: less than or equal), which will
+    make it possible to modify or even disable the parameter automatically.
+
+    .. code-block::
+        :linenos:
+        :emphasize-lines: 9
+
+        def custom_hbond_function(self, params):
+            if not self.add_non_cov:
+                return []
+
+            group1, group2, feat1, feat2 = params
+            interactions = []
+
+            cc_dist = euclidean_distance(group1.centroid, group2.centroid)
+            if self.is_within_boundary(cc_dist, "max_hb_dist", le):
+                params = {"dist_hbond_inter": cc_dist}
+                inter = InteractionType(group1, group2, "Hydrogen bond", params=params)
+                interactions.append(inter)
+            return interactions
+
+    Finally, we are ready to provide the function and custom parameters to `InteractionCalculator`.
+
+    >>> custom_conf = InteractionConf({"max_hb_dist": 3})
+    >>> custom_funcs = {("Donor", "Acceptor"): [custom_hbond_function]}
+    >>> ic = InteractionCalculator(inter_funcs=custom_funcs, inter_conf=custom_conf)
+
+    By doing so, we can now alter the new parameter or turn it off.
+
+    >>> ic.inter_conf.conf["max_hb_dist"] = 3.5
+    >>> del ic.inter_conf.conf["max_hb_dist"]
+
+    """
+
     def __init__(self, inter_conf=DefaultInteractionConf(), inter_filter=None, inter_funcs=None,
                  add_non_cov=True, add_cov=True, add_proximal=False, add_atom_atom=True,
-                 add_dependent_inter=False, add_h2o_pairs_with_no_target=False, strict_donor_rules=False,
+                 add_dependent_inter=False, add_h2o_pairs_with_no_target=False, strict_donor_rules=True,
                  strict_weak_donor_rules=True, lazy_comps_list=WATER_NAMES):
 
         if inter_conf is not None and isinstance(inter_conf, InteractionConf) is False:
@@ -154,6 +508,7 @@ class InteractionCalculator:
 
     @property
     def funcs(self):
+        """dict: The dict that defines functions to calculate interactions."""
         return self._inter_funcs
 
     @funcs.setter
@@ -161,6 +516,29 @@ class InteractionCalculator:
         self._inter_funcs = funcs
 
     def calc_interactions(self, trgt_atm_grps, nb_atm_grps=None):
+        """Calculate interactions established by atoms and atoms groups in ``trgt_atm_grps``
+        using methods available in ``funcs``.
+
+        The functions in ``funcs`` are chosen based on the features of each atom or atom group.
+        For example, consider that a pair of :class:`~luna.mol.groups.AtomGroup` objects have both the
+        features 'Hydrophobic'. Then, `calc_interactions` will call any
+        interaction function defined for the tuple ``("Hydrophobic", "Hydrophobic")`` in ``funcs``.
+        Consider now a pair of :class:`~luna.mol.groups.AtomGroup` objects whose features are
+        'Donor' and 'Hydrophobic'. Once again, `calc_interactions` will evaluate if there is any
+        function defined for the tuple ``("Donor", "Hydrophobic")`` (the order does not matter).
+        If there is none, nothing is done and the pair is skipped.
+
+        Parameters
+        ----------
+        trgt_atm_grps : iterable of :class:`~luna.mol.groups.AtomGroup`
+            Compute interactions involving these :class:`~luna.mol.groups.AtomGroup` objects.
+        nb_atm_grps : iterable of :class:`~luna.mol.groups.AtomGroup`
+            If defined, only compute interactions between :class:`~luna.mol.groups.AtomGroup` objects from ``trgt_atm_grps``
+            with :class:`~luna.mol.groups.AtomGroup` objects from ``nb_atm_grps``.
+            If not provided, set ``nb_atm_grps`` to be the same as ``trgt_atm_grps``,
+            which implies that interactions will be calculated using only pairs of :class:`~luna.mol.groups.AtomGroup` objects
+            from ``trgt_atm_grps``.
+        """
 
         # TODO: Water-bridged interaction with weak hydrogen bond
         # TODO: threshold for including slightly out of limit interactions. For example, a hydrogen bond not included for 0.01A.
@@ -176,8 +554,10 @@ class InteractionCalculator:
         computed_pairs = set()
         all_interactions = []
 
+        boundary_cutoff = self.inter_conf.boundary_cutoff or DefaultInteractionConf().boundary_cutoff
+
         for trgt_atm_grp in trgt_atm_grps:
-            for nb_atm_grp in ss.search(trgt_atm_grp.centroid, self.inter_conf.boundary_cutoff):
+            for nb_atm_grp in ss.search(trgt_atm_grp.centroid, boundary_cutoff):
 
                 # It will always ignore interactions involving the same atom groups.
                 # Loops in the graph is not permitted and does not make any sense.
@@ -198,7 +578,7 @@ class InteractionCalculator:
                 feat_pairs = filter(lambda x: self.is_feature_pair_valid(*x), feat_pairs)
 
                 # If the groups belongs to the same molecule (intramolecule interaction).
-                is_intramol_inter = self.is_intramol_inter(trgt_atm_grp, nb_atm_grp)
+                is_intramol_inter = self._is_intramol_inter(trgt_atm_grp, nb_atm_grp)
                 shortest_path_length = None
 
                 for pair in feat_pairs:
@@ -223,7 +603,7 @@ class InteractionCalculator:
                             continue
 
                     calc_inter_params = (trgt_atm_grp, nb_atm_grp) + pair
-                    interactions = self.resolve_interactions(*calc_inter_params)
+                    interactions = self._resolve_interactions(*calc_inter_params)
                     all_interactions.extend(interactions)
 
         if self.add_dependent_inter:
@@ -243,8 +623,8 @@ class InteractionCalculator:
 
         return InteractionsManager(all_interactions)
 
-    def resolve_interactions(self, group1, group2, feat1, feat2):
-        funcs = self.get_function(feat1.name, feat2.name)
+    def _resolve_interactions(self, group1, group2, feat1, feat2):
+        funcs = self.get_functions(feat1.name, feat2.name)
         if len(funcs) == 0:
             raise IllegalArgumentError("It does not exist a corresponding function to the features: '%s' and '%s'."
                                        % (feat1, feat2))
@@ -257,6 +637,16 @@ class InteractionCalculator:
         return interactions
 
     def find_dependent_interactions(self, interactions):
+        """ Compute interactions that depend on other interactions. Currently, only water-bridged
+        hydrogen bonds and salt bridges have a dependency on other interactions. The first, depends
+        on two or more hydrogen bonds, while the second depends on an ionic and a hydrogen bond.
+        The default value is False, which implies no dependent interaction will be computed.
+
+        Parameters
+        ----------
+        interactions : :class:`~luna.interaction.type.InteractionType`
+            Use these interactions to compute dependent interactions.
+        """
         hbond_set = set()
         ionic_set = set()
         h2o_pairs = defaultdict(dict)
@@ -289,10 +679,10 @@ class InteractionCalculator:
         for h2o_key in h2o_pairs:
             pairs = combinations(h2o_pairs[h2o_key].keys(), 2)
 
-            for (src_grp, trgt_grp) in pairs:
+            for src_grp, trgt_grp in pairs:
 
                 # It ignores intramolecular interactions.
-                if self.is_intramol_inter(src_grp, trgt_grp):
+                if self._is_intramol_inter(src_grp, trgt_grp):
                     pass
 
                 comp1 = next(iter(src_grp.compounds))
@@ -310,13 +700,13 @@ class InteractionCalculator:
         # It will try to match Hydrogen bonds and Ionic interactions involving the same chemical
         # groups to attribute salt bridges.
         sb_groups = set()
-        for (hbond, ionic) in product(hbond_set, ionic_set):
+        for hbond, ionic in product(hbond_set, ionic_set):
 
-            condA = (ionic.src_grp.has_atom(hbond.src_grp.atoms[0]) and
-                     ionic.trgt_grp.has_atom(hbond.trgt_grp.atoms[0]))
+            condA = (ionic.src_grp.has_atom(hbond.src_grp.atoms[0])
+                     and ionic.trgt_grp.has_atom(hbond.trgt_grp.atoms[0]))
 
-            condB = (ionic.src_grp.has_atom(hbond.trgt_grp.atoms[0]) and
-                     ionic.trgt_grp.has_atom(hbond.src_grp.atoms[0]))
+            condB = (ionic.src_grp.has_atom(hbond.trgt_grp.atoms[0])
+                     and ionic.trgt_grp.has_atom(hbond.src_grp.atoms[0]))
 
             # If an acceptor atom belongs to a negative group, and the donor to a positive group
             # (and vice-versa), it means that the interaction occurs between the same meioties.
@@ -342,7 +732,23 @@ class InteractionCalculator:
         return dependent_interactions
 
     def remove_inconsistencies(self, interactions):
+        """Remove conflicts between interactions in ``interactions``.
 
+        .. note::
+            By default, LUNA defines conflicts as any unfavorable dipole interaction involving an
+            atom establishing a hydrogen bond. Due to the strength of a hydrogen bond, atoms may
+            approximate more to each other, which sometimes may cause unfavorable interactions
+            involving dipoles to be detected. To avoid such conflicts, LUNA removes the
+            unfavorable interactions.
+
+            Also, it may occur that unfavorable dipole interactions are detected for
+            amide-aromatic stackings, in which the aromatic ring contains heteroatoms.
+            To avoid such conflicts, LUNA also removes those unfavorable interactions.
+
+        Parameters
+        ----------
+        interactions : :class:`~luna.interaction.type.InteractionType`
+        """
         amide_inconsistences = defaultdict(list)
         hbond_inconsistences = defaultdict(list)
         for inter in interactions:
@@ -351,15 +757,15 @@ class InteractionCalculator:
                 atm1 = inter.src_grp.atoms[0]
                 # If a nucleophile has 2 atoms, it will select the partially negative atom based on the electronegativity.
                 if len(inter.src_grp.atoms) == 2:
-                    atm1 = inter.src_grp.atoms[0] if (inter.src_grp.atoms[0].electronegativity >
-                                                      inter.src_grp.atoms[1].electronegativity) else inter.src_grp.atoms[1]
+                    atm1 = inter.src_grp.atoms[0] if (inter.src_grp.atoms[0].electronegativity
+                                                      > inter.src_grp.atoms[1].electronegativity) else inter.src_grp.atoms[1]
 
                 # A nucleophile may have only 1 atom (water oxygen).
                 atm2 = inter.trgt_grp.atoms[0]
                 # If a nucleophile has 2 atoms, it will select the partially negative atom based on the electronegativity.
                 if len(inter.trgt_grp.atoms) == 2:
-                    atm2 = inter.trgt_grp.atoms[0] if (inter.trgt_grp.atoms[0].electronegativity >
-                                                       inter.trgt_grp.atoms[1].electronegativity) else inter.trgt_grp.atoms[1]
+                    atm2 = inter.trgt_grp.atoms[0] if (inter.trgt_grp.atoms[0].electronegativity
+                                                       > inter.trgt_grp.atoms[1].electronegativity) else inter.trgt_grp.atoms[1]
                 key = (atm1, atm2)
                 if (atm2, atm1) in hbond_inconsistences:
                     key = (atm2, atm1)
@@ -370,8 +776,8 @@ class InteractionCalculator:
                 nucl_atm = nucl_grp.atoms[0]
                 # If a nucleophile has 2 atoms, it will select the partially negative atom based on the electronegativity.
                 if len(nucl_grp.atoms) == 2:
-                    nucl_atm = nucl_grp.atoms[0] if (nucl_grp.atoms[0].electronegativity >
-                                                     nucl_grp.atoms[1].electronegativity) else nucl_grp.atoms[1]
+                    nucl_atm = nucl_grp.atoms[0] if (nucl_grp.atoms[0].electronegativity
+                                                     > nucl_grp.atoms[1].electronegativity) else nucl_grp.atoms[1]
                 anion_grp = inter.get_partner(nucl_grp)
                 for anion_atm in anion_grp.atoms:
                     key = (nucl_atm, anion_atm)
@@ -397,8 +803,8 @@ class InteractionCalculator:
                 elect_atm = elect_grp.atoms[0]
                 # If a nucleophile has 2 atoms, it will select the partially negative atom based on the electronegativity.
                 if len(elect_grp.atoms) == 2:
-                    elect_atm = elect_grp.atoms[0] if (elect_grp.atoms[0].electronegativity >
-                                                       elect_grp.atoms[1].electronegativity) else elect_grp.atoms[1]
+                    elect_atm = elect_grp.atoms[0] if (elect_grp.atoms[0].electronegativity
+                                                       > elect_grp.atoms[1].electronegativity) else elect_grp.atoms[1]
 
                 cation_grp = inter.get_partner(elect_grp)
                 amide_inconsistences[(elect_atm, cation_grp)].append(inter)
@@ -419,6 +825,13 @@ class InteractionCalculator:
             inter.clear_refs()
 
     def remove_h2o_pairs_with_no_target(self, interactions):
+        """Remove interactions of water with atoms and atom groups that do not belong to the target
+        of LUNA's analysis, which are chains or molecules defined as an :class:`~luna.mol.entry.Entry` instance.
+
+        Parameters
+        ----------
+        interactions : :class:`~luna.interaction.type.InteractionType`
+        """
         valid_h2o_set = set()
         invalid_inters = defaultdict(set)
 
@@ -534,6 +947,22 @@ class InteractionCalculator:
 
     @staticmethod
     def calc_cation_pi(self, params):
+        """Default method to calculate cation-pi interactions.
+
+        Parameters
+        ----------
+        params : tuple of (:class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.features.ChemicalFeature`,\
+                           :class:`~luna.mol.features.ChemicalFeature`)
+            The tuple follows the order (:math:`A`, :math:`B`, :math:`A_f`, :math:`B_f`), where
+            :math:`A` and :math:`B` are two :class:`~luna.mol.groups.AtomGroup` objects, and
+            :math:`A_f` and :math:`B_f` are their features (:class:`~luna.mol.features.ChemicalFeature` objects), respectively.
+
+        Returns
+        -------
+         : list
+        """
         if not self.add_non_cov:
             return []
 
@@ -542,16 +971,32 @@ class InteractionCalculator:
 
         cc_dist = im.euclidean_distance(group1.centroid, group2.centroid)
 
-        if (self.is_within_boundary(cc_dist, "boundary_cutoff", le) and
-                self.is_within_boundary(cc_dist, "max_dist_cation_pi_inter", le)):
-                params = {"dist_cation_pi_inter": cc_dist}
-                inter = InteractionType(group1, group2, "Cation-pi", params=params)
+        if (self.is_within_boundary(cc_dist, "boundary_cutoff", le)
+                and self.is_within_boundary(cc_dist, "max_dist_cation_pi_inter", le)):
+            params = {"dist_cation_pi_inter": cc_dist}
+            inter = InteractionType(group1, group2, "Cation-pi", params=params)
 
-                interactions.append(inter)
+            interactions.append(inter)
         return interactions
 
     @staticmethod
     def calc_pi_pi(self, params):
+        """Default method to calculate aromatic stackings.
+
+        Parameters
+        ----------
+        params : tuple of (:class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.features.ChemicalFeature`,\
+                           :class:`~luna.mol.features.ChemicalFeature`)
+            The tuple follows the order (:math:`A`, :math:`B`, :math:`A_f`, :math:`B_f`), where
+            :math:`A` and :math:`B` are two :class:`~luna.mol.groups.AtomGroup` objects, and
+            :math:`A_f` and :math:`B_f` are their features (:class:`~luna.mol.features.ChemicalFeature` objects), respectively.
+
+        Returns
+        -------
+         : list
+        """
         if not self.add_non_cov:
             return []
 
@@ -560,8 +1005,8 @@ class InteractionCalculator:
 
         cc_dist = im.euclidean_distance(ring1.centroid, ring2.centroid)
 
-        if (self.is_within_boundary(cc_dist, "boundary_cutoff", le) and
-                self.is_within_boundary(cc_dist, "max_cc_dist_pi_pi_inter", le)):
+        if (self.is_within_boundary(cc_dist, "boundary_cutoff", le)
+                and self.is_within_boundary(cc_dist, "max_cc_dist_pi_pi_inter", le)):
 
             dihedral_angle = im.to_quad1(im.angle(ring1.normal, ring2.normal))
 
@@ -614,6 +1059,22 @@ class InteractionCalculator:
 
     @staticmethod
     def calc_amide_pi(self, params):
+        """Default method to calculate amide-pi stackings.
+
+        Parameters
+        ----------
+        params : tuple of (:class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.features.ChemicalFeature`,\
+                           :class:`~luna.mol.features.ChemicalFeature`)
+            The tuple follows the order (:math:`A`, :math:`B`, :math:`A_f`, :math:`B_f`), where
+            :math:`A` and :math:`B` are two :class:`~luna.mol.groups.AtomGroup` objects, and
+            :math:`A_f` and :math:`B_f` are their features (:class:`~luna.mol.features.ChemicalFeature` objects), respectively.
+
+        Returns
+        -------
+         : list
+        """
         if not self.add_non_cov:
             return []
 
@@ -634,15 +1095,15 @@ class InteractionCalculator:
         # Distance between the amide and ring centroids.
         cc_dist = im.euclidean_distance(ring_grp.centroid, amide_grp.centroid)
 
-        if (self.is_within_boundary(cc_dist, "boundary_cutoff", le) and
-                self.is_within_boundary(cc_dist, "max_cc_dist_amide_pi_inter", le)):
+        if (self.is_within_boundary(cc_dist, "boundary_cutoff", le)
+                and self.is_within_boundary(cc_dist, "max_cc_dist_amide_pi_inter", le)):
 
             dihedral_angle = im.to_quad1(im.angle(ring_grp.normal, amide_grp.normal))
             cc_vect = amide_grp.centroid - ring_grp.centroid
             disp_angle = im.to_quad1(im.angle(ring_grp.normal, cc_vect))
 
-            if (self.is_within_boundary(dihedral_angle, "max_dihed_ang_amide_pi_inter", le) and
-                    self.is_within_boundary(disp_angle, "max_disp_ang_pi_pi_inter", le)):
+            if (self.is_within_boundary(dihedral_angle, "max_dihed_ang_amide_pi_inter", le)
+                    and self.is_within_boundary(disp_angle, "max_disp_ang_pi_pi_inter", le)):
 
                 params = {"cc_dist_amide_pi_inter": cc_dist,
                           "dihed_ang_amide_pi_inter": dihedral_angle,
@@ -654,25 +1115,41 @@ class InteractionCalculator:
 
     @staticmethod
     def calc_hydrop(self, params):
+        """Default method to calculate hydrophobic interactons.
+
+        Parameters
+        ----------
+        params : tuple of (:class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.features.ChemicalFeature`,\
+                           :class:`~luna.mol.features.ChemicalFeature`)
+            The tuple follows the order (:math:`A`, :math:`B`, :math:`A_f`, :math:`B_f`), where
+            :math:`A` and :math:`B` are two :class:`~luna.mol.groups.AtomGroup` objects, and
+            :math:`A_f` and :math:`B_f` are their features (:class:`~luna.mol.features.ChemicalFeature` objects), respectively.
+
+        Returns
+        -------
+         : list
+        """
         if not self.add_non_cov:
             return []
 
         group1, group2, feat1, feat2 = params
         interactions = []
 
-        if ((feat1.name != "Hydrophobic" and feat1.name != "Hydrophobe") or
-                (feat2.name != "Hydrophobic" and feat2.name != "Hydrophobe")):
+        if ((feat1.name != "Hydrophobic" and feat1.name != "Hydrophobe")
+                or (feat2.name != "Hydrophobic" and feat2.name != "Hydrophobe")):
             logger.warning("Hydrophobic interactions require hydrophobic atoms or hydrophobes (group of hydrophobic atoms). "
                            "However, the informed groups have the features %s and %s." % (group1.feature_names, group2.feature_names))
             return []
 
         # Check if the interaction involves the same compound. For these cases, we ignore hydrophobic interactions.
-        if self.is_intramol_inter(group1, group2):
+        if self._is_intramol_inter(group1, group2):
             return []
 
         # Verify if the groups contain the required number of atoms to form a valid surface.
-        if (not self.is_within_boundary(len(group1.atoms), "min_surf_size", ge) or
-                not self.is_within_boundary(len(group2.atoms), "min_surf_size", ge)):
+        if (not self.is_within_boundary(len(group1.atoms), "min_surf_size", ge)
+                or not self.is_within_boundary(len(group2.atoms), "min_surf_size", ge)):
             return []
 
         interacting_atms_in_surf1 = set()
@@ -689,12 +1166,12 @@ class InteractionCalculator:
                     min_cc_dist = cc_dist
 
         # Verify if the number of interacting atoms attends the required number of interating atoms per surface.
-        if (not self.is_within_boundary(len(interacting_atms_in_surf1), "min_inter_atom_in_surf", ge) or
-                not self.is_within_boundary(len(interacting_atms_in_surf2), "min_inter_atom_in_surf", ge)):
+        if (not self.is_within_boundary(len(interacting_atms_in_surf1), "min_inter_atom_in_surf", ge)
+                or not self.is_within_boundary(len(interacting_atms_in_surf2), "min_inter_atom_in_surf", ge)):
             return []
 
-        if (self.is_within_boundary(min_cc_dist, "boundary_cutoff", le) and
-                self.is_within_boundary(min_cc_dist, "max_dist_hydrop_inter", le)):
+        if (self.is_within_boundary(min_cc_dist, "boundary_cutoff", le)
+                and self.is_within_boundary(min_cc_dist, "max_dist_hydrop_inter", le)):
 
             params = {"dist_hydrop_inter": min_cc_dist}
             inter = InteractionType(group1, group2, "Hydrophobic", params=params)
@@ -704,6 +1181,22 @@ class InteractionCalculator:
 
     @staticmethod
     def calc_ion_multipole(self, params):
+        """Default method to calculate favorable and unfavorable ion-dipole interactions.
+
+        Parameters
+        ----------
+        params : tuple of (:class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.features.ChemicalFeature`,\
+                           :class:`~luna.mol.features.ChemicalFeature`)
+            The tuple follows the order (:math:`A`, :math:`B`, :math:`A_f`, :math:`B_f`), where
+            :math:`A` and :math:`B` are two :class:`~luna.mol.groups.AtomGroup` objects, and
+            :math:`A_f` and :math:`B_f` are their features (:class:`~luna.mol.features.ChemicalFeature` objects), respectively.
+
+        Returns
+        -------
+         : list
+        """
         if not self.add_non_cov:
             return []
 
@@ -747,19 +1240,19 @@ class InteractionCalculator:
         part_charged_atm = dipole_grp.atoms[0]
         # If a nucleophile has 2 atoms, it will select the partially negative atom based on the electronegativity.
         if len(dipole_grp.atoms) == 2 and dipole_type == "Nucleophile":
-            part_charged_atm = dipole_grp.atoms[0] if (dipole_grp.atoms[0].electronegativity >
-                                                       dipole_grp.atoms[1].electronegativity) else dipole_grp.atoms[1]
+            part_charged_atm = dipole_grp.atoms[0] if (dipole_grp.atoms[0].electronegativity
+                                                       > dipole_grp.atoms[1].electronegativity) else dipole_grp.atoms[1]
 
         # If an electrophile has two atoms. It will select the partially negative atom based on the electronegativity.
         elif len(dipole_grp.atoms) == 2 and dipole_type == "Electrophile":
-            part_charged_atm = dipole_grp.atoms[0] if (dipole_grp.atoms[0].electronegativity <
-                                                       dipole_grp.atoms[1].electronegativity) else dipole_grp.atoms[1]
+            part_charged_atm = dipole_grp.atoms[0] if (dipole_grp.atoms[0].electronegativity
+                                                       < dipole_grp.atoms[1].electronegativity) else dipole_grp.atoms[1]
 
         # Distance between the ion and the dipole.
         id_dist = im.euclidean_distance(part_charged_atm.coord, ion_grp.centroid)
 
-        if (self.is_within_boundary(id_dist, "boundary_cutoff", le) and
-                self.is_within_boundary(id_dist, "max_id_dist_ion_multipole_inter", le)):
+        if (self.is_within_boundary(id_dist, "boundary_cutoff", le)
+                and self.is_within_boundary(id_dist, "max_id_dist_ion_multipole_inter", le)):
 
             idy_angle = -1
             if len(dipole_grp.atoms) == 2:
@@ -805,6 +1298,22 @@ class InteractionCalculator:
 
     @staticmethod
     def calc_multipolar(self, params):
+        """Default method to calculate favorable and unfavorable dipole-dipole interactions.
+
+        Parameters
+        ----------
+        params : tuple of (:class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.features.ChemicalFeature`,\
+                           :class:`~luna.mol.features.ChemicalFeature`)
+            The tuple follows the order (:math:`A`, :math:`B`, :math:`A_f`, :math:`B_f`), where
+            :math:`A` and :math:`B` are two :class:`~luna.mol.groups.AtomGroup` objects, and
+            :math:`A_f` and :math:`B_f` are their features (:class:`~luna.mol.features.ChemicalFeature` objects), respectively.
+
+        Returns
+        -------
+         : list
+        """
         if not self.add_non_cov:
             return []
 
@@ -820,7 +1329,7 @@ class InteractionCalculator:
         # The reference dipole will always be the second one, i.e., one of its atom will be the center in the angle NEY.
         #
         # Favorable interactions: in these cases, the Dipole 1 will always be the nucleophile and the Dipole 2 the
-        # electrophile what represents the nucleophile atack, i.e., the angles calculated using the dipole 2 as reference
+        # electrophile in order to represent the nucleophile atack, i.e., the angles calculated using the dipole 2 as reference
         # represents how the nucleophile aproximate the electrophile.
         if feat1.name == "Nucleophile" and feat2.name == "Electrophile":
             dipole_grp1, dipole_type1 = group1, feat1.name
@@ -858,12 +1367,12 @@ class InteractionCalculator:
         dipole_atm1 = dipole_grp1.atoms[0]
         # If it has 2 atoms, it will select the nucleophilic atom based on the electronegativity.
         if len(dipole_grp1.atoms) == 2 and dipole_type1 == "Nucleophile":
-            dipole_atm1 = dipole_grp1.atoms[0] if (dipole_grp1.atoms[0].electronegativity >
-                                                   dipole_grp1.atoms[1].electronegativity) else dipole_grp1.atoms[1]
+            dipole_atm1 = dipole_grp1.atoms[0] if (dipole_grp1.atoms[0].electronegativity
+                                                   > dipole_grp1.atoms[1].electronegativity) else dipole_grp1.atoms[1]
         # Or, it will select the nucleophilic atom based on the electronegativity.
         elif len(dipole_grp1.atoms) == 2 and dipole_type1 == "Electrophile":
-            dipole_atm1 = dipole_grp1.atoms[0] if (dipole_grp1.atoms[0].electronegativity <
-                                                   dipole_grp1.atoms[1].electronegativity) else dipole_grp1.atoms[1]
+            dipole_atm1 = dipole_grp1.atoms[0] if (dipole_grp1.atoms[0].electronegativity
+                                                   < dipole_grp1.atoms[1].electronegativity) else dipole_grp1.atoms[1]
 
         # Atom 2 => Dipole 2
         #
@@ -871,12 +1380,12 @@ class InteractionCalculator:
         dipole_atm2 = dipole_grp2.atoms[0]
         # If it has 2 atoms, it will select the nucleophilic atom based on the electronegativity.
         if len(dipole_grp2.atoms) == 2 and dipole_type2 == "Nucleophile":
-            dipole_atm2 = dipole_grp2.atoms[0] if (dipole_grp2.atoms[0].electronegativity >
-                                                   dipole_grp2.atoms[1].electronegativity) else dipole_grp2.atoms[1]
+            dipole_atm2 = dipole_grp2.atoms[0] if (dipole_grp2.atoms[0].electronegativity
+                                                   > dipole_grp2.atoms[1].electronegativity) else dipole_grp2.atoms[1]
         # Or, it will select the nucleophilic atom based on the electronegativity.
         elif len(dipole_grp2.atoms) == 2 and dipole_type2 == "Electrophile":
-            dipole_atm2 = dipole_grp2.atoms[0] if (dipole_grp2.atoms[0].electronegativity <
-                                                   dipole_grp2.atoms[1].electronegativity) else dipole_grp2.atoms[1]
+            dipole_atm2 = dipole_grp2.atoms[0] if (dipole_grp2.atoms[0].electronegativity
+                                                   < dipole_grp2.atoms[1].electronegativity) else dipole_grp2.atoms[1]
 
         # Model for favorable interactions: A-N ... E-Y
         # Model for unfavorable interactions: A-N ... N-A, Y-E ... E-Y.
@@ -887,8 +1396,8 @@ class InteractionCalculator:
         # Distance between the nucleophile and electrophile.
         ne_dist = im.euclidean_distance(dipole_atm1.coord, dipole_atm2.coord)
 
-        if (self.is_within_boundary(ne_dist, "boundary_cutoff", le) and
-                self.is_within_boundary(ne_dist, "max_ne_dist_multipolar_inter", le)):
+        if (self.is_within_boundary(ne_dist, "boundary_cutoff", le)
+                and self.is_within_boundary(ne_dist, "max_ne_dist_multipolar_inter", le)):
 
             # No angle can be calculated if the electrophile (dipole 2) has only one atom.
             if len(dipole_grp2.atoms) == 1:
@@ -922,8 +1431,8 @@ class InteractionCalculator:
                     ey_vect = y_atm.coord - dipole_atm2.coord
                     ney_angle = im.angle(en_vect, ey_vect)
 
-                    if (self.is_within_boundary(ney_angle, "min_ney_ang_multipolar_inter", ge) and
-                            self.is_within_boundary(ney_angle, "max_ney_ang_multipolar_inter", le)):
+                    if (self.is_within_boundary(ney_angle, "min_ney_ang_multipolar_inter", ge)
+                            and self.is_within_boundary(ney_angle, "max_ney_ang_multipolar_inter", le)):
 
                         elect_nb_coords = [nbi.coord for nbi in dipole_atm2.neighbors_info if nbi.atomic_num != 1]
                         elect_normal = im.calc_normal(elect_nb_coords + [dipole_atm2.coord])
@@ -954,8 +1463,8 @@ class InteractionCalculator:
                                         inter = InteractionType(dipole_grp1, dipole_grp2, "Antiparallel multipolar",
                                                                 directional=True, params=params)
                                         interactions.append(inter)
-                                    elif (self.is_within_boundary(an_ey_vect_angle, "min_an_ey_ang_ortho_multipolar_inter", ge) and
-                                            self.is_within_boundary(an_ey_vect_angle, "max_an_ey_ang_ortho_multipolar_inter", le)):
+                                    elif (self.is_within_boundary(an_ey_vect_angle, "min_an_ey_ang_ortho_multipolar_inter", ge)
+                                            and self.is_within_boundary(an_ey_vect_angle, "max_an_ey_ang_ortho_multipolar_inter", le)):
                                         inter = InteractionType(dipole_grp1, dipole_grp2, "Orthogonal multipolar",
                                                                 directional=True, params=params)
                                         interactions.append(inter)
@@ -984,6 +1493,22 @@ class InteractionCalculator:
 
     @staticmethod
     def calc_xbond_pi(self, params):
+        """Default method to calculate halogen bonds between halogens and aromatic rings.
+
+        Parameters
+        ----------
+        params : tuple of (:class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.features.ChemicalFeature`,\
+                           :class:`~luna.mol.features.ChemicalFeature`)
+            The tuple follows the order (:math:`A`, :math:`B`, :math:`A_f`, :math:`B_f`), where
+            :math:`A` and :math:`B` are two :class:`~luna.mol.groups.AtomGroup` objects, and
+            :math:`A_f` and :math:`B_f` are their features (:class:`~luna.mol.features.ChemicalFeature` objects), respectively.
+
+        Returns
+        -------
+         : list
+        """
         if not self.add_non_cov:
             return []
 
@@ -1004,8 +1529,8 @@ class InteractionCalculator:
         # Defining the XA distance, in which A is the ring center
         xa_dist = im.euclidean_distance(donor_grp.centroid, ring_grp.centroid)
 
-        if (self.is_within_boundary(xa_dist, "boundary_cutoff", le) and
-                self.is_within_boundary(xa_dist, "max_xc_dist_xbond_inter", le)):
+        if (self.is_within_boundary(xa_dist, "boundary_cutoff", le)
+                and self.is_within_boundary(xa_dist, "max_xc_dist_xbond_inter", le)):
 
             ax_vect = donor_grp.centroid - ring_grp.centroid
             disp_angle = im.to_quad1(im.angle(ring_grp.normal, ax_vect))
@@ -1035,6 +1560,22 @@ class InteractionCalculator:
 
     @staticmethod
     def calc_xbond(self, params):
+        """Default method to calculate halogen bonds.
+
+        Parameters
+        ----------
+        params : tuple of (:class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.features.ChemicalFeature`,\
+                           :class:`~luna.mol.features.ChemicalFeature`)
+            The tuple follows the order (:math:`A`, :math:`B`, :math:`A_f`, :math:`B_f`), where
+            :math:`A` and :math:`B` are two :class:`~luna.mol.groups.AtomGroup` objects, and
+            :math:`A_f` and :math:`B_f` are their features (:class:`~luna.mol.features.ChemicalFeature` objects), respectively.
+
+        Returns
+        -------
+         : list
+        """
         if not self.add_non_cov:
             return []
 
@@ -1061,8 +1602,8 @@ class InteractionCalculator:
         # Distance XA.
         xa_dist = im.euclidean_distance(donor_grp.centroid, acceptor_grp.centroid)
 
-        if (self.is_within_boundary(xa_dist, "boundary_cutoff", le) and
-                self.is_within_boundary(xa_dist, "max_xa_dist_xbond_inter", le)):
+        if (self.is_within_boundary(xa_dist, "boundary_cutoff", le)
+                and self.is_within_boundary(xa_dist, "max_xa_dist_xbond_inter", le)):
 
             # Interaction model: C-X ---- A-R
             # XA vector is always the same
@@ -1125,6 +1666,22 @@ class InteractionCalculator:
 
     @staticmethod
     def calc_chalc_bond(self, params):
+        """Default method to calculate chalcogen bonds.
+
+        Parameters
+        ----------
+        params : tuple of (:class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.features.ChemicalFeature`,\
+                           :class:`~luna.mol.features.ChemicalFeature`)
+            The tuple follows the order (:math:`A`, :math:`B`, :math:`A_f`, :math:`B_f`), where
+            :math:`A` and :math:`B` are two :class:`~luna.mol.groups.AtomGroup` objects, and
+            :math:`A_f` and :math:`B_f` are their features (:class:`~luna.mol.features.ChemicalFeature` objects), respectively.
+
+        Returns
+        -------
+         : list
+        """
         if not self.add_non_cov:
             return []
 
@@ -1151,8 +1708,8 @@ class InteractionCalculator:
         # Distance YA.
         ya_dist = im.euclidean_distance(donor_grp.centroid, acceptor_grp.centroid)
 
-        if (self.is_within_boundary(ya_dist, "boundary_cutoff", le) and
-                self.is_within_boundary(ya_dist, "max_ya_dist_ybond_inter", le)):
+        if (self.is_within_boundary(ya_dist, "boundary_cutoff", le)
+                and self.is_within_boundary(ya_dist, "max_ya_dist_ybond_inter", le)):
 
             # Interaction model: R-Y --- A-N
             # YA vector is always the same
@@ -1224,6 +1781,22 @@ class InteractionCalculator:
 
     @staticmethod
     def calc_chalc_bond_pi(self, params):
+        """Default method to calculate chalcogen bonds between chalcogens and aromatic rings.
+
+        Parameters
+        ----------
+        params : tuple of (:class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.features.ChemicalFeature`,\
+                           :class:`~luna.mol.features.ChemicalFeature`)
+            The tuple follows the order (:math:`A`, :math:`B`, :math:`A_f`, :math:`B_f`), where
+            :math:`A` and :math:`B` are two :class:`~luna.mol.groups.AtomGroup` objects, and
+            :math:`A_f` and :math:`B_f` are their features (:class:`~luna.mol.features.ChemicalFeature` objects), respectively.
+
+        Returns
+        -------
+         : list
+        """
         if not self.add_non_cov:
             return []
 
@@ -1244,8 +1817,8 @@ class InteractionCalculator:
         # Defining the YA distance.
         ya_dist = im.euclidean_distance(donor_grp.centroid, ring_grp.centroid)
 
-        if (self.is_within_boundary(ya_dist, "boundary_cutoff", le) and
-                self.is_within_boundary(ya_dist, "max_yc_dist_ybond_inter", le)):
+        if (self.is_within_boundary(ya_dist, "boundary_cutoff", le)
+                and self.is_within_boundary(ya_dist, "max_yc_dist_ybond_inter", le)):
 
             ay_vect = donor_grp.centroid - ring_grp.centroid
             disp_angle = im.to_quad1(im.angle(ring_grp.normal, ay_vect))
@@ -1286,6 +1859,22 @@ class InteractionCalculator:
 
     @staticmethod
     def calc_hbond(self, params):
+        """Default method to calculate hydrogen bonds.
+
+        Parameters
+        ----------
+        params : tuple of (:class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.features.ChemicalFeature`,\
+                           :class:`~luna.mol.features.ChemicalFeature`)
+            The tuple follows the order (:math:`A`, :math:`B`, :math:`A_f`, :math:`B_f`), where
+            :math:`A` and :math:`B` are two :class:`~luna.mol.groups.AtomGroup` objects, and
+            :math:`A_f` and :math:`B_f` are their features (:class:`~luna.mol.features.ChemicalFeature` objects), respectively.
+
+        Returns
+        -------
+         : list
+        """
         if not self.add_non_cov:
             return []
 
@@ -1311,8 +1900,8 @@ class InteractionCalculator:
         # DA distance
         da_dist = im.euclidean_distance(donor_grp.centroid, acceptor_grp.centroid)
 
-        if (self.is_within_boundary(da_dist, "boundary_cutoff", le) and
-                self.is_within_boundary(da_dist, "max_da_dist_hb_inter", le)):
+        if (self.is_within_boundary(da_dist, "boundary_cutoff", le)
+                and self.is_within_boundary(da_dist, "max_da_dist_hb_inter", le)):
 
             # Interaction model: D-H ---- A-R.
             # Recover only hydrogen coordinates bonded to the donor.
@@ -1331,9 +1920,9 @@ class InteractionCalculator:
             #
             # If the user has also defined a list of lazy compounds, we can skip the application of strict rules on
             # them as well. By default, the list contains only Water molecules.
-            if ((self.strict_donor_rules is False and (len(hydrog_coords) == 0 or
-                                                       len(hydrog_coords) == len(donor_atm.neighbors_info))) or
-                    (donor_atm.parent.resname in self.lazy_comps_list)):
+            if ((self.strict_donor_rules is False and (len(hydrog_coords) == 0
+                                                       or len(hydrog_coords) == len(donor_atm.neighbors_info)))
+                    or (donor_atm.parent.resname in self.lazy_comps_list)):
 
                 # When the position of the hydrogen cannot be defined, it assumes the hydrogen to be located 1A
                 # away from the donor in a line formed by the donor and the acceptor.
@@ -1390,8 +1979,8 @@ class InteractionCalculator:
                     ha_vect = acceptor_grp.centroid - h_coord
                     dha_angle = im.angle(hd_vect, ha_vect)
 
-                    if (self.is_within_boundary(ha_dist, "max_ha_dist_hb_inter", le) and
-                            self.is_within_boundary(dha_angle, "min_dha_ang_hb_inter", ge)):
+                    if (self.is_within_boundary(ha_dist, "max_ha_dist_hb_inter", le)
+                            and self.is_within_boundary(dha_angle, "min_dha_ang_hb_inter", ge)):
 
                         # If no heavy atom is bonded to the acceptor, it means that only hydrogens may be bound to it. Then, we do not
                         # calculate the angles because hydrogens are too dynamic, i.e., the acceptor could be ionized or not at a
@@ -1438,8 +2027,8 @@ class InteractionCalculator:
                                 lowest_har_angle = -1
                                 lowest_dar_angle = -1
 
-                            if (self.is_within_boundary(lowest_har_angle, "min_har_ang_hb_inter", ge) and
-                                    self.is_within_boundary(lowest_dar_angle, "min_dar_ang_hb_inter", ge)):
+                            if (self.is_within_boundary(lowest_har_angle, "min_har_ang_hb_inter", ge)
+                                    and self.is_within_boundary(lowest_dar_angle, "min_dar_ang_hb_inter", ge)):
 
                                 # Only the lowest D-A-R and H-A-R angles are provided.
                                 params = {"da_dist_hb_inter": da_dist,
@@ -1455,6 +2044,22 @@ class InteractionCalculator:
 
     @staticmethod
     def calc_weak_hbond(self, params):
+        """Default method to calculate weak hydrogen bonds.
+
+        Parameters
+        ----------
+        params : tuple of (:class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.features.ChemicalFeature`,\
+                           :class:`~luna.mol.features.ChemicalFeature`)
+            The tuple follows the order (:math:`A`, :math:`B`, :math:`A_f`, :math:`B_f`), where
+            :math:`A` and :math:`B` are two :class:`~luna.mol.groups.AtomGroup` objects, and
+            :math:`A_f` and :math:`B_f` are their features (:class:`~luna.mol.features.ChemicalFeature` objects), respectively.
+
+        Returns
+        -------
+         : list
+        """
         if not self.add_non_cov:
             return []
 
@@ -1481,8 +2086,8 @@ class InteractionCalculator:
         acceptor_atm = acceptor_grp.atoms[0]
 
         da_dist = im.euclidean_distance(donor_grp.centroid, acceptor_grp.centroid)
-        if (self.is_within_boundary(da_dist, "boundary_cutoff", le) and
-                self.is_within_boundary(da_dist, "max_da_dist_whb_inter", le)):
+        if (self.is_within_boundary(da_dist, "boundary_cutoff", le)
+                and self.is_within_boundary(da_dist, "max_da_dist_whb_inter", le)):
 
             # Interaction model: D-H ---- A-R.
             # Recover only hydrogen coordinates bonded to the donor.
@@ -1501,9 +2106,9 @@ class InteractionCalculator:
             #
             # If the user has also defined a list of lazy compounds, we can skip the application of strict rules on
             # them as well. By default, the list contains only Water molecules.
-            if ((self.strict_weak_donor_rules is False and (len(hydrog_coords) == 0 or
-                                                            len(hydrog_coords) == len(donor_atm.neighbors_info))) or
-                    (donor_atm.parent.resname in self.lazy_comps_list)):
+            if ((self.strict_weak_donor_rules is False and (len(hydrog_coords) == 0
+                                                            or len(hydrog_coords) == len(donor_atm.neighbors_info)))
+                    or (donor_atm.parent.resname in self.lazy_comps_list)):
 
                 # When the position of the hydrogen cannot be defined, it assumes the hydrogen to be located 1A
                 # away from the donor in a line formed by the donor and the acceptor.
@@ -1559,8 +2164,8 @@ class InteractionCalculator:
                     ha_vect = acceptor_grp.centroid - h_coord
                     dha_angle = im.angle(hd_vect, ha_vect)
 
-                    if (self.is_within_boundary(ha_dist, "max_ha_dist_whb_inter", le) and
-                            self.is_within_boundary(dha_angle, "min_dha_ang_whb_inter", ge)):
+                    if (self.is_within_boundary(ha_dist, "max_ha_dist_whb_inter", le)
+                            and self.is_within_boundary(dha_angle, "min_dha_ang_whb_inter", ge)):
 
                         # If no heavy atom is bonded to the acceptor, it means that only hydrogens may be bound to it. Then, we do not
                         # calculate the angles because hydrogens are too dynamic, i.e., the acceptor could be ionized or not at a
@@ -1608,8 +2213,8 @@ class InteractionCalculator:
                                 lowest_har_angle = -1
                                 lowest_dar_angle = -1
 
-                            if (self.is_within_boundary(lowest_har_angle, "min_har_ang_whb_inter", ge) and
-                                    self.is_within_boundary(lowest_dar_angle, "min_dar_ang_whb_inter", ge)):
+                            if (self.is_within_boundary(lowest_har_angle, "min_har_ang_whb_inter", ge)
+                                    and self.is_within_boundary(lowest_dar_angle, "min_dar_ang_whb_inter", ge)):
 
                                 # Only the lowest D-A-R and H-A-R angles are provided.
                                 params = {"da_dist_whb_inter": da_dist,
@@ -1625,6 +2230,22 @@ class InteractionCalculator:
 
     @staticmethod
     def calc_hbond_pi(self, params):
+        """Default method to calculate hydrogen bonds between (weak) donors and aromatic rings.
+
+        Parameters
+        ----------
+        params : tuple of (:class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.features.ChemicalFeature`,\
+                           :class:`~luna.mol.features.ChemicalFeature`)
+            The tuple follows the order (:math:`A`, :math:`B`, :math:`A_f`, :math:`B_f`), where
+            :math:`A` and :math:`B` are two :class:`~luna.mol.groups.AtomGroup` objects, and
+            :math:`A_f` and :math:`B_f` are their features (:class:`~luna.mol.features.ChemicalFeature` objects), respectively.
+
+        Returns
+        -------
+         : list
+        """
         if not self.add_non_cov:
             return []
 
@@ -1652,8 +2273,8 @@ class InteractionCalculator:
 
         # Interaction model: D-H ---- A, in which A is the ring center.
         da_dist = im.euclidean_distance(donor_grp.centroid, ring_grp.centroid)
-        if (self.is_within_boundary(da_dist, "boundary_cutoff", le) and
-                self.is_within_boundary(da_dist, "max_dc_dist_whb_inter", le)):
+        if (self.is_within_boundary(da_dist, "boundary_cutoff", le)
+                and self.is_within_boundary(da_dist, "max_dc_dist_whb_inter", le)):
 
             # Interaction model: D-H ---- A, in which A is the ring center.
             # Recover only hydrogen coordinates bonded to the donor.
@@ -1668,9 +2289,9 @@ class InteractionCalculator:
             #
             # If the user has also defined a list of lazy compounds, we can skip the application of strict rules on
             # them as well. By default, the list contains only Water molecules.
-            if ((self.strict_weak_donor_rules is False and (len(hydrog_coords) == 0 or
-                                                            len(hydrog_coords) == len(donor_atm.neighbors_info))) or
-                    (donor_atm.parent.resname in self.lazy_comps_list)):
+            if ((self.strict_weak_donor_rules is False and (len(hydrog_coords) == 0
+                                                            or len(hydrog_coords) == len(donor_atm.neighbors_info)))
+                    or (donor_atm.parent.resname in self.lazy_comps_list)):
 
                 # When the position of the hydrogen cannot be defined, it assumes the hydrogen to be located 1A
                 # away from the donor in a line formed by the donor and the acceptor.
@@ -1701,8 +2322,8 @@ class InteractionCalculator:
                     ha_vect = ring_grp.centroid - h_coord
                     dha_angle = im.angle(hd_vect, ha_vect)
 
-                    if (self.is_within_boundary(ha_dist, "max_hc_dist_whb_inter", le) and
-                            self.is_within_boundary(dha_angle, "min_dhc_ang_whb_inter", ge)):
+                    if (self.is_within_boundary(ha_dist, "max_hc_dist_whb_inter", le)
+                            and self.is_within_boundary(dha_angle, "min_dhc_ang_whb_inter", ge)):
 
                         # Interaction model: D-H ---- A, in which A is the ring center.
                         # Calculate the displacement angle formed between the ring normal and the vector Donor-Centroid.
@@ -1721,6 +2342,22 @@ class InteractionCalculator:
 
     @staticmethod
     def calc_ionic(self, params):
+        """Default method to calculate attractive ionic interactions.
+
+        Parameters
+        ----------
+        params : tuple of (:class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.features.ChemicalFeature`,\
+                           :class:`~luna.mol.features.ChemicalFeature`)
+            The tuple follows the order (:math:`A`, :math:`B`, :math:`A_f`, :math:`B_f`), where
+            :math:`A` and :math:`B` are two :class:`~luna.mol.groups.AtomGroup` objects, and
+            :math:`A_f` and :math:`B_f` are their features (:class:`~luna.mol.features.ChemicalFeature` objects), respectively.
+
+        Returns
+        -------
+         : list
+        """
         if not self.add_non_cov:
             return []
 
@@ -1728,8 +2365,8 @@ class InteractionCalculator:
         interactions = []
 
         cc_dist = im.euclidean_distance(group1.centroid, group2.centroid)
-        if (self.is_within_boundary(cc_dist, "boundary_cutoff", le) and
-                self.is_within_boundary(cc_dist, "max_dist_attract_inter", le)):
+        if (self.is_within_boundary(cc_dist, "boundary_cutoff", le)
+                and self.is_within_boundary(cc_dist, "max_dist_attract_inter", le)):
 
             params = {"dist_attract_inter": cc_dist}
             inter = InteractionType(group1, group2, "Ionic", params=params)
@@ -1739,6 +2376,22 @@ class InteractionCalculator:
 
     @staticmethod
     def calc_repulsive(self, params):
+        """Default method to calculate repulsive ionic interactions.
+
+        Parameters
+        ----------
+        params : tuple of (:class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.features.ChemicalFeature`,\
+                           :class:`~luna.mol.features.ChemicalFeature`)
+            The tuple follows the order (:math:`A`, :math:`B`, :math:`A_f`, :math:`B_f`), where
+            :math:`A` and :math:`B` are two :class:`~luna.mol.groups.AtomGroup` objects, and
+            :math:`A_f` and :math:`B_f` are their features (:class:`~luna.mol.features.ChemicalFeature` objects), respectively.
+
+        Returns
+        -------
+         : list
+        """
         if not self.add_non_cov:
             return []
 
@@ -1746,8 +2399,8 @@ class InteractionCalculator:
         interactions = []
 
         cc_dist = im.euclidean_distance(group1.centroid, group2.centroid)
-        if (self.is_within_boundary(cc_dist, "boundary_cutoff", le) and
-                self.is_within_boundary(cc_dist, "max_dist_repuls_inter", le)):
+        if (self.is_within_boundary(cc_dist, "boundary_cutoff", le)
+                and self.is_within_boundary(cc_dist, "max_dist_repuls_inter", le)):
 
             params = {"dist_repuls_inter": cc_dist}
             inter = InteractionType(group1, group2, "Repulsive", params=params)
@@ -1757,6 +2410,22 @@ class InteractionCalculator:
 
     @staticmethod
     def calc_proximal(self, params):
+        """Default method to calculate proximal interactions.
+
+        Parameters
+        ----------
+        params : tuple of (:class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.features.ChemicalFeature`,\
+                           :class:`~luna.mol.features.ChemicalFeature`)
+            The tuple follows the order (:math:`A`, :math:`B`, :math:`A_f`, :math:`B_f`), where
+            :math:`A` and :math:`B` are two :class:`~luna.mol.groups.AtomGroup` objects, and
+            :math:`A_f` and :math:`B_f` are their features (:class:`~luna.mol.features.ChemicalFeature` objects), respectively.
+
+        Returns
+        -------
+         : list
+        """
         if not self.add_proximal:
             return []
 
@@ -1764,8 +2433,8 @@ class InteractionCalculator:
         interactions = []
 
         cc_dist = im.euclidean_distance(group1.centroid, group2.centroid)
-        if (self.is_within_boundary(cc_dist, "min_dist_proximal", ge) and
-                self.is_within_boundary(cc_dist, "max_dist_proximal", le)):
+        if (self.is_within_boundary(cc_dist, "min_dist_proximal", ge)
+                and self.is_within_boundary(cc_dist, "max_dist_proximal", le)):
 
             params = {"dist_proximal": cc_dist}
             inter = InteractionType(group1, group2, "Proximal", params=params)
@@ -1775,6 +2444,33 @@ class InteractionCalculator:
 
     @staticmethod
     def calc_atom_atom(self, params):
+        """Default method to calculate atom-atom interactions, which include covalent bonds, Van der Waals,
+        Van der Waals clash, and atom overlap.
+
+        Note that covalent bonds are controlled by the flag ``add_cov``, while the other three interactions
+        are controlled by the flag ``add_atom_atom``.
+
+        .. note::
+            We opted to separate `Van der Waals` from other non-covalent interactions because LUNA may
+            generate an unnecessary number of additional interactions that are usually already represented
+            by other non-covalent interactions as weak hydrogen bonds, hydrophobic, or dipole-dipole
+            interactions. Thus, to give users a fine-grain control over which interactions to calculate,
+            we provided this additional flag to turn off the calculation of Van der Waals interactions.
+
+        Parameters
+        ----------
+        params : tuple of (:class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.groups.AtomGroup`,\
+                           :class:`~luna.mol.features.ChemicalFeature`,\
+                           :class:`~luna.mol.features.ChemicalFeature`)
+            The tuple follows the order (:math:`A`, :math:`B`, :math:`A_f`, :math:`B_f`), where
+            :math:`A` and :math:`B` are two :class:`~luna.mol.groups.AtomGroup` objects, and
+            :math:`A_f` and :math:`B_f` are their features (:class:`~luna.mol.features.ChemicalFeature` objects), respectively.
+
+        Returns
+        -------
+         : list
+        """
         group1, group2, feat1, feat2 = params
         interactions = []
 
@@ -1857,18 +2553,60 @@ class InteractionCalculator:
 
         return interactions
 
-    def is_intramol_inter(self, grp1, grp2):
+    def _is_intramol_inter(self, grp1, grp2):
         comps1 = grp1.compounds
         comps2 = grp2.compounds
         return len(comps1) == 1 and len(comps2) == 1 and comps1 == comps2
 
     def is_within_boundary(self, value, key, func):
+        """Check if a value is within the boundary defined for a given parameter.
+
+        .. note::
+            It will always return True if the parameter does not exist in ``inter_conf``.
+
+        Parameters
+        ----------
+        value : any
+            The value to be evaluated.
+        key :
+            A parameter defined in ``inter_conf``.
+        func : callable
+            The function that evaluates if ``value`` is within the
+            boundaries defined for the parameter ``key``.
+
+            Usually, the comparison functions (e.g., lt, le, ge, gt)
+            available in the Python module :py:mod:`operator` are enough for
+            number comparisons. If you need custom comparison functions,
+            just provide them here.
+
+        Returns
+        -------
+         : bool
+        """
         if key not in self.inter_conf.conf:
             return True
         else:
             return func(value, self.inter_conf.get_value(key))
 
     def is_feature_pair_valid(self, feat1, feat2):
+        """Check if the provided pair of features is valid or not.
+
+        It will be valid if the pair exists in ``funcs``, i.e., there is one or more
+        functions to calculate interactions defined for that given pair of features.
+
+        It also return False if non-covalent interactions is turned off (``add_non_cov = False``)
+        and at least one of the features is not `Atom`.
+        This is useful to save processing time as it skips pairs that have functions to
+        calculate non-covalent interactions right away.
+
+        Parameters
+        ----------
+        feat1, feat2: :class:`~luna.mol.features.ChemicalFeature`
+
+        Returns
+        -------
+         : bool
+        """
         if isinstance(feat1, ChemicalFeature):
             feat1 = feat1.name
         if isinstance(feat2, ChemicalFeature):
@@ -1878,10 +2616,21 @@ class InteractionCalculator:
             return False
 
         funcs = self.funcs
-        return (True if ((feat1, feat2) in funcs or
-                         (feat2, feat1) in funcs) else False)
+        return (True if ((feat1, feat2) in funcs
+                         or (feat2, feat1) in funcs) else False)
 
-    def get_function(self, feat1, feat2):
+    def get_functions(self, feat1, feat2):
+        """Get the functions to calculate interactions for the given features.
+
+        Parameters
+        ----------
+        feat1, feat2: :class:`~luna.mol.features.ChemicalFeature`
+
+        Returns
+        -------
+         : iterable of callable
+        """
+
         if isinstance(feat1, ChemicalFeature):
             feat1 = feat1.name
         if isinstance(feat2, ChemicalFeature):
@@ -1896,40 +2645,11 @@ class InteractionCalculator:
             return None
 
     def set_functions_to_pair(self, pair, funcs):
+        """Set functions to calculate interaction for the given pair of features.
+
+        Parameters
+        ----------
+        pair: tuple of (:class:`~luna.mol.features.ChemicalFeature`, :class:`~luna.mol.features.ChemicalFeature`)
+        funcs : iterable of callable
+        """
         self.funcs[pair] = funcs
-
-
-def apply_interaction_criteria(interactions, conf=DefaultInteractionConf(),
-                               inter_funcs=None):
-
-    # First, it does not use Ignore tests because the interest here is only to
-    # apply a filtering based on the defined interaction criteria
-    iFilter = InteractionFilter(use_ignore_tests=False,
-                                inter_conf=conf,
-                                funcs=inter_funcs)
-    filtered_inter = [i for i in interactions if iFilter.filter(i)]
-
-    aux_set = set(filtered_inter)
-    keep_inter = set()
-    remove_inter = set()
-    for i in filtered_inter:
-        if "depends_on" in i.params:
-            remove = False
-            for di in i.depends_on:
-                if di not in aux_set:
-                    remove = True
-                    break
-
-            if remove:
-                remove_inter.update(set(i.depends_on))
-                aux_set.remove(i)
-            else:
-                keep_inter.update(set(i.depends_on))
-
-    for i in remove_inter:
-        if i in aux_set and i not in keep_inter:
-            aux_set.remove(i)
-
-    filtered_inter = list(aux_set)
-
-    return filtered_inter

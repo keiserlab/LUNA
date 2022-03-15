@@ -2,7 +2,21 @@ import logging
 logger = logging.getLogger()
 
 
-class InteractionConf():
+class InteractionConf:
+
+    """Generic class to define parameters for interactions.
+
+    Parameters
+    ----------
+    conf : dict
+        A dict containing the parameters necessary for calculating interactions.
+
+    Examples
+    --------
+
+    >>> conf = {"max_ha_dist_hb_inter": 2.5}
+    >>> InteractionConf(conf)
+    """
 
     def __init__(self, conf):
         self._conf = conf
@@ -10,31 +24,36 @@ class InteractionConf():
 
     @property
     def conf(self):
+        """dict: The dict containing parameters for calculating interactions."""
         return self._conf
 
     @property
     def keys(self):
+        """list: Return all keys (parameters) in this configuration."""
         return [k for k in self._conf]
 
     def add(self, key, val):
+        """Add a new parameter and its value."""
         if key not in self._conf:
             self._conf[key] = val
             self.__dict__[key] = val
         else:
-            logger.info("Key '%s' already exists." % key)
+            logger.warning("Key '%s' already exists." % key)
 
     def alter(self, key, val):
+        """Alter the value of a given parameter."""
         if key in self._conf:
             self._conf[key] = val
             self.__dict__[key] = val
         else:
-            logger.info("Key '%s' does not exist." % key)
+            raise KeyError("Key '%s' does not exist." % key)
 
     def get_value(self, key):
+        """Get the value of a given parameter."""
         if key in self._conf:
             return self.conf[key]
         else:
-            logger.info("Key '%s' does not exist." % key)
+            raise KeyError("Key '%s' does not exist." % key)
 
     def _expand_dict(self):
         for key in self._conf:
@@ -44,8 +63,14 @@ class InteractionConf():
         if key in self._conf:
             return self._conf[key]
         else:
-            logger.info("Key '%s' does not exist." % key)
-            return None
+            raise KeyError("Key '%s' does not exist." % key)
+
+    def __delattr__(self, key):
+        if key in self._conf:
+            del self._conf[key]
+            del self.__dict__[key]
+        else:
+            raise KeyError("Key '%s' does not exist." % key)
 
     def __getstate__(self):
         return self.__dict__
@@ -55,6 +80,7 @@ class InteractionConf():
 
 
 class DefaultInteractionConf(InteractionConf):
+    """Default parameters for calculating interactions in LUNA."""
 
     def __init__(self):
 
