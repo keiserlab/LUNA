@@ -172,7 +172,7 @@ def get_entity_from_entry(entity, entry, model=0):
     ----------
     entity : :class:`~luna.MyBio.PDB.Entity.Entity`
         The PDB object to recover the target entry from.
-    entry : :class:`luna.entry.Entry`
+    entry : :class:`~luna.entry.Entry`
         The target entry.
     model : int
         The PDB model where the entry could be found. The default value is 0.
@@ -391,8 +391,8 @@ def biopython_entity_to_mol(entity, select=Select(), validate_mol=True, standard
                             break_metal_bonds=False, mol_obj_type="rdkit", wrapped=True,
                             openbabel=OPENBABEL, tmp_path=None, keep_tmp_files=False):
     """Convert an object :class:`~luna.MyBio.PDB.Entity.Entity` to a
-    molecular object (:class:`luna.wrappers.base.MolWrapper`,
-    :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`).
+    molecular object (:class:`~luna.wrappers.base.MolWrapper`,
+    :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`).
 
     Parameters
     ----------
@@ -415,7 +415,7 @@ def biopython_entity_to_mol(entity, select=Select(), validate_mol=True, standard
     break_metal_bonds : bool
         If True, remove covalent bonds between residues and metals and fix the residue bond order.
     mol_obj_type : {"rdkit", "openbabel"}
-        If "rdkit", parse the converted molecule with RDKit and return an instance of :class:`rdkit.Chem.Mol`.
+        If "rdkit", parse the converted molecule with RDKit and return an instance of :class:`rdkit.Chem.rdchem.Mol`.
         If "openbabel", parse the converted molecule with Open Babel and return an instance of
         :class:`openbabel.pybel.Molecule`.
         If ``wrapped`` is True, the molecular object will be wrapped with :class:`~luna.wrappers.base.MolWrapper`.
@@ -433,7 +433,7 @@ def biopython_entity_to_mol(entity, select=Select(), validate_mol=True, standard
 
     Returns
     -------
-    mol_obj : :class:`luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`
+    mol_obj : :class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`
         The converted molecule.
     ignored_atoms : list
         List of ignored atoms. Currently, ignored atoms may contain only metals.

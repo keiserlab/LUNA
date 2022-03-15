@@ -142,6 +142,7 @@ intersphinx_mapping = {
     'networkx': ('https://networkx.org/documentation/stable/', None),
     'biopython': ('https://biopython.org/docs/latest/api/', None),
     'rdkit': ('https://www.rdkit.org/docs/', None),
+    'openbabel': ('http://openbabel.org/docs/dev/', None),
     'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
 }
 

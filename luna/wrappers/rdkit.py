@@ -30,7 +30,7 @@ def read_mol_from_file(mol_file, mol_format, sanitize=True, removeHs=True):
 
     Returns
     -------
-     : :class:`rdkit.Chem.Mol` or None
+     : :class:`rdkit.Chem.rdchem.Mol` or None
         The parsed molecule or None in case the sanitization process fails.
 
     Raises
@@ -88,7 +88,7 @@ def new_mol_from_block(block, mol_format, sanitize=True, removeHs=True):
 
     Returns
     -------
-     : :class:`rdkit.Chem.Mol` or None
+     : :class:`rdkit.Chem.rdchem.Mol` or None
         The parsed molecule or None in case the sanitization process fails.
 
     Raises
@@ -146,7 +146,7 @@ def read_multimol_file(mol_file, targets=None, mol_format=None, sanitize=True, r
 
     Yields
     -------
-     : tuple of (:class:`rdkit.Chem.Mol`, int)
+     : tuple of (:class:`rdkit.Chem.rdchem.Mol`, int)
         A tuple containing the parsed molecule and its id.
 
     Raises

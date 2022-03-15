@@ -179,7 +179,7 @@ class ParallelJobs:
 
         Parameters
         ----------
-        args : iterable of iterables, :class:`.ArgsGenerator`
+        args : iterable of iterables, `ArgsGenerator`
             A sequence of arguments to be provided to the consumer function ``consumer_func``.
         consumer_func : function
             The function that will be executed for each set of arguments in ``args``.

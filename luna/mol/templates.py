@@ -15,16 +15,21 @@ class Template:
     """Standardize small molecules based on templates."""
 
     def assign_bond_order(self):
+        """Assign bond order to a molecular object. However, this method is not implemented by default.
+        Instead, you should use a class that inherits from `Template` and
+        implements :meth:`assign_bond_order`. An example is the class `LigandExpoTemplate` that assigns bonds
+        order based on ligands SMILES from `LigandExpo <http://ligand-expo.rcsb.org/>`_.
+        Therefore, you should define your own logic beyond :meth:`assign_bond_order` that meets your goals."""
         raise NotImplementedError("Subclasses should implement this.")
 
 
 class LigandExpoTemplate(Template):
-    """Standardize small molecules based on templates (SMILES) from LigandExpo.
+    """Standardize small molecules based on templates (SMILES) from `LigandExpo <http://ligand-expo.rcsb.org/>`_.
 
     Parameters
     ----------
     lig_expo_file : str
-        The LigandExpo file containing the SMILES and ligand ids.
+        The `LigandExpo <http://ligand-expo.rcsb.org/>`_ file containing the SMILES and ligand ids.
     """
 
     def __init__(self, lig_expo_file=LIGAND_EXPO_FILE):
@@ -34,15 +39,11 @@ class LigandExpoTemplate(Template):
 
     @property
     def data(self):
-        """:py:class:`pandas.DataFrame` : The LigandExpo data."""
+        """:py:class:`pandas.DataFrame` : The `LigandExpo <http://ligand-expo.rcsb.org/>`_ data."""
         if self._data is None:
             self._data = pd.read_csv(self.lig_expo_file, sep="\t+", na_filter=False,
                                      names=["smiles", "ligand_id"], usecols=[0, 1], engine='python').dropna()
         return self._data
-
-    def as_json(lig_expo_file, json_file):
-        ligands = {}
-        return ligands
 
     def get_ligand_smiles(self, lig_id):
         """Get SMILES for the ligand ``lig_id``.
@@ -50,7 +51,7 @@ class LigandExpoTemplate(Template):
         Parameters
         ----------
         lig_id : str
-            The ligand identifier (PDB id) in LigandExpo.
+            The ligand identifier (PDB id) in `LigandExpo <http://ligand-expo.rcsb.org/>`_.
 
         Returns
         ----------
@@ -64,18 +65,18 @@ class LigandExpoTemplate(Template):
         return data.values[0]
 
     def assign_bond_order(self, mol_obj, lig_id):
-        """Assign bond order to a molecular object based on its LigandExpo SMILES.
+        """Assign bond order to a molecular object based on its `LigandExpo <http://ligand-expo.rcsb.org/>`_ SMILES.
 
         Parameters
         ----------
-        mol_obj : :class:`luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`
+        mol_obj : :class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`
             A molecule to standardise.
         lig_id : str
-            The ligand identifier (PDB id) in LigandExpo.
+            The ligand identifier (PDB id) in `LigandExpo <http://ligand-expo.rcsb.org/>`_.
 
         Returns
         -------
-        new_mol : :class:`luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`
+        new_mol : :class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`
             A standardized molecular object of the same type as ``mol_obj``.
         """
 

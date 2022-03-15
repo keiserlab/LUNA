@@ -112,7 +112,7 @@ class ProgressTracker:
     ----------
     ntasks : int
         The number of tasks to be executed.
-    queue : Queue
+    queue : :py:class:`~multiprocessing.Queue`
         A queue to track the tasks' progress.
     task_name : str, optional
         A name to identify the set of tasks.
@@ -121,7 +121,7 @@ class ProgressTracker:
     ----------
     ntasks : int
         The number of tasks to be executed.
-    queue : Queue
+    queue : :py:class:`~multiprocessing.Queue`
         The queue to track the tasks' progress from.
     task_name : str, optional
         The name to identify the set of tasks.

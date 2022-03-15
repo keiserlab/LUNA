@@ -12,7 +12,7 @@ from Bio.Alphabet import generic_protein
 
 from luna.MyBio.util import parse_from_file, save_to_file
 from luna.util.exceptions import InvalidSuperpositionFileError
-from luna.util.file import is_directory_valid, is_file_valid
+from luna.util.file import is_directory_valid
 
 
 import logging
@@ -90,8 +90,6 @@ def align_structures(pdb_to_align, ref_pdb, output_path=None, tmalign=None):
     output = _run_tmalign(pdb_to_align, ref_pdb, output_path, tmalign)
 
     seq_pair, tm_score = get_seq_records(output, pdb_to_align, ref_pdb)
-
-    print(seq_pair)
 
     alignment = TMAlignment(tm_score, records=seq_pair, alphabet=generic_protein)
 

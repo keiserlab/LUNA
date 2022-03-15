@@ -62,16 +62,16 @@ class AtomWrapper:
 
     Parameters
     ----------
-    atm_obj : :class:`AtomWrapper`, :class:`rdkit.Chem.Atom`, or :class:`openbabel.OBAtom`
+    atm_obj : :class:`AtomWrapper`, :class:`rdkit.Chem.rdchem.Atom`, or :class:`openbabel.OBAtom`
         An atom to wrap.
-    mol_obj : `MolWrapper`, :class:`rdkit.Chem.Mol`, :class:`openbabel.pybel.Molecule`, or None
+    mol_obj : `MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, :class:`openbabel.pybel.Molecule`, or None
         The molecule that contains the atom ``atom``. If None, the molecule is recovered directly from the atom object.
 
     Raises
     ------
     AtomObjectTypeError
         If the atom object is not an instance
-            of `MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`.
+            of `MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`.
     """
 
     def __init__(self, atm_obj, mol_obj=None):
@@ -91,7 +91,7 @@ class AtomWrapper:
 
     @property
     def atm_obj(self):
-        """:class:`rdkit.Chem.Atom` or :class:`openbabel.OBAtom`: The wrapped atom object."""
+        """:class:`rdkit.Chem.rdchem.Atom` or :class:`openbabel.OBAtom`: The wrapped atom object."""
         return self._atm_obj
 
     @atm_obj.setter
@@ -104,7 +104,7 @@ class AtomWrapper:
 
     @property
     def parent(self):
-        """`MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`: The molecule that contains this atom."""
+        """`MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`: The molecule that contains this atom."""
         return self.get_parent()
 
     @parent.setter
@@ -144,7 +144,7 @@ class AtomWrapper:
 
         Returns
         -------
-         : `MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`
+         : `MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`
         """
         if self._parent is None:
             if self.is_rdkit_obj():
@@ -251,7 +251,7 @@ class AtomWrapper:
 
         Returns
         -------
-         : iterable of `AtomWrapper`, :py:class:`rdkit.Chem.Atom`, or :class:`openbabel.OBAtom`
+         : iterable of `AtomWrapper`, :py:class:`rdkit.Chem.rdchem.Atom`, or :class:`openbabel.OBAtom`
         """
         atoms = []
         if self.is_rdkit_obj():
@@ -307,7 +307,7 @@ class AtomWrapper:
 
         Returns
         -------
-         : iterable of `BondWrapper`, :class:`rdkit.Chem.Bond`, or :class:`openbabel.OBBond`
+         : iterable of `BondWrapper`, :class:`rdkit.Chem.rdchem.Bond`, or :class:`openbabel.OBBond`
         """
         bonds = []
         if self.is_rdkit_obj():
@@ -419,9 +419,10 @@ class AtomWrapper:
         in_ring : bool
         """
         if self.is_rdkit_obj():
-            logger.warning("Currently, there is no function in RDKit to define if an atom belongs to a ring or not.")
             # TODO
-            pass
+            raise NotImplementedError("Currently, there is no function in RDKit to define if an atom belongs to a ring or not. "
+                                      "Please, use Open Babel instead.")
+
         elif self.is_openbabel_obj():
             self._atm_obj.SetInRing(in_ring)
 
@@ -466,7 +467,8 @@ class AtomWrapper:
         """
         if self.is_rdkit_obj():
             # TODO: Implement
-            pass
+            raise NotImplementedError("Currently, matches_smarts() does not support RDKit objects. "
+                                      "Please, use Open Babel objects instead.")
 
         elif self.is_openbabel_obj():
             ob_smart = ob.OBSmartsPattern()
@@ -483,7 +485,7 @@ class AtomWrapper:
 
         Returns
         -------
-         : :class:`rdkit.Chem.Atom` or :class:`openbabel.OBAtom`
+         : :class:`rdkit.Chem.rdchem.Atom` or :class:`openbabel.OBAtom`
         """
         return self._atm_obj
 
@@ -509,14 +511,14 @@ class BondWrapper:
 
     Parameters
     ----------
-    bond_obj : `BondWrapper`, :py:class:`rdkit.Chem.Bond`, or :py:class:`openbabel.OBBond`
+    bond_obj : `BondWrapper`, :py:class:`rdkit.Chem.rdchem.Bond`, or :py:class:`openbabel.OBBond`
         A bond to wrap.
 
     Raises
     ------
     BondObjectTypeError
         If the bond object is not an instance
-            of `BondWrapper`, :class:`rdkit.Chem.Bond`, or :class:`openbabel.pybel.OBBond`.
+            of `BondWrapper`, :class:`rdkit.Chem.rdchem.Bond`, or :class:`openbabel.pybel.OBBond`.
     """
 
     def __init__(self, bond_obj):
@@ -531,7 +533,7 @@ class BondWrapper:
 
     @property
     def bond_obj(self):
-        """:class:`rdkit.Chem.Bond` or :class:`openbabel.OBBond`: The wrapped bond object."""
+        """:class:`rdkit.Chem.rdchem.Bond` or :class:`openbabel.OBBond`: The wrapped bond object."""
         return self._bond_obj
 
     @bond_obj.setter
@@ -547,14 +549,14 @@ class BondWrapper:
 
         Parameters
         ----------
-        atm : `AtomWrapper`, :py:class:`rdkit.Chem.Atom`, or :class:`openbabel.OBAtom`
+        atm : `AtomWrapper`, :py:class:`rdkit.Chem.rdchem.Atom`, or :class:`openbabel.OBAtom`
             Get the partner of this atom.
         wrapped : bool
             If True, wrap the partner atom with `AtomWrapper`.
 
         Returns
         -------
-         : `AtomWrapper`, :py:class:`rdkit.Chem.Atom`, or :class:`openbabel.OBAtom`
+         : `AtomWrapper`, :py:class:`rdkit.Chem.rdchem.Atom`, or :class:`openbabel.OBAtom`
         """
         if isinstance(atm, AtomWrapper):
             atm = atm.unwrap()
@@ -579,7 +581,7 @@ class BondWrapper:
 
         Returns
         -------
-         : `AtomWrapper`, :py:class:`rdkit.Chem.Atom`, or :class:`openbabel.OBAtom`
+         : `AtomWrapper`, :py:class:`rdkit.Chem.rdchem.Atom`, or :class:`openbabel.OBAtom`
         """
 
         # Both RDKit and Open Babel have the same function name.
@@ -597,7 +599,7 @@ class BondWrapper:
 
         Returns
         -------
-         : `AtomWrapper`, :py:class:`rdkit.Chem.Atom`, or :class:`openbabel.OBAtom`
+         : `AtomWrapper`, :py:class:`rdkit.Chem.rdchem.Atom`, or :class:`openbabel.OBAtom`
         """
 
         # Both RDKit and Open Babel have the same function name.
@@ -674,7 +676,7 @@ class BondWrapper:
 
         Returns
         -------
-         : :class:`rdkit.Chem.Bond` or :class:`openbabel.OBBond`
+         : :class:`rdkit.Chem.rdchem.Bond` or :class:`openbabel.OBBond`
         """
         return self._bond_obj
 
@@ -700,14 +702,14 @@ class MolWrapper:
 
     Parameters
     ----------
-    mol_obj : `MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`
+    mol_obj : `MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`
         A molecule to wrap.
 
     Raises
     ------
     MoleculeObjectTypeError
         If the molecular object is not an instance
-            of `MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`.
+            of `MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`.
     """
 
     def __init__(self, mol_obj):
@@ -792,7 +794,7 @@ class MolWrapper:
 
     @property
     def mol_obj(self):
-        """:class:`rdkit.Chem.Mol` or :class:`openbabel.pybel.Molecule`: The wrapped molecular object."""
+        """:class:`rdkit.Chem.rdchem.Mol` or :class:`openbabel.pybel.Molecule`: The wrapped molecular object."""
         return self._mol_obj
 
     @mol_obj.setter
@@ -848,7 +850,7 @@ class MolWrapper:
 
         Returns
         -------
-         : iterable of `AtomWrapper`, :py:class:`rdkit.Chem.Atom`, or :class:`openbabel.OBAtom`
+         : iterable of `AtomWrapper`, :py:class:`rdkit.Chem.rdchem.Atom`, or :class:`openbabel.OBAtom`
         """
         atoms = []
         if self.is_rdkit_obj():
@@ -870,7 +872,7 @@ class MolWrapper:
 
         Returns
         -------
-         : iterable of `BondWrapper`, :class:`rdkit.Chem.Bond`, or :class:`openbabel.OBBond`
+         : iterable of `BondWrapper`, :class:`rdkit.Chem.rdchem.Bond`, or :class:`openbabel.OBBond`
         """
         bonds = []
         if self.is_rdkit_obj():
@@ -954,7 +956,7 @@ class MolWrapper:
 
         Returns
         -------
-         : :class:`rdkit.Chem.Mol` or :class:`openbabel.pybel.Molecule`.
+         : :class:`rdkit.Chem.rdchem.Mol` or :class:`openbabel.pybel.Molecule`.
         """
         return self._mol_obj
 

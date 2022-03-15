@@ -83,12 +83,12 @@ class PharmacophoreDepiction:
 
         Parameters
         ----------
-        mol_obj : :class:`luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`
+        mol_obj : :class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`
             The molecule.
         output : str
             The output file where the molecule will be drawn.
-            If None, returns a drawing object (:class:`rdkit.Chem.Draw.MolDraw2DCairo` or
-            :class:`rdkit.Chem.Draw.MolDraw2DSVG`).
+            If None, returns a drawing object (:class:`~rdkit.Chem.Draw.rdMolDraw2D.MolDraw2DCairo` or
+            :class:`~rdkit.Chem.Draw.rdMolDraw2D.MolDraw2DSVG`).
         atm_types : dict or None
             A pre-annotated dictionary for mapping atoms and pharmacophoric properties.
             If None, try to perceive properties with ``feature_extractor``.
@@ -97,7 +97,8 @@ class PharmacophoreDepiction:
 
         Returns
         -------
-        drawer : None or a drawing object (:class:`rdkit.Chem.Draw.MolDraw2DCairo` or :class:`rdkit.Chem.Draw.MolDraw2DSVG`)
+        drawer : None or a drawing object (:class:`~rdkit.Chem.Draw.rdMolDraw2D.MolDraw2DCairo` or \
+        :class:`~rdkit.Chem.Draw.rdMolDraw2D.MolDraw2DSVG`)
         """
 
         rdmol = MolWrapper(mol_obj).as_rdkit()

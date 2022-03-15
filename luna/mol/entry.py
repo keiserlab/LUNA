@@ -588,7 +588,7 @@ class MolFileEntry(Entry):
         mol_id : str
             The ligand id.
             As the molecular object is already provided, the ligand id does not need to match the ligand name in the molecular object.
-        mol_obj : :class:`luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`
+        mol_obj : :class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`
             The molecular object.
         sep : str
             A separator character to format the entry string. The default value is ':'.
@@ -601,7 +601,7 @@ class MolFileEntry(Entry):
         ------
         MoleculeObjectTypeError
             If the molecular object is not an instance
-            of :class:`luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`.
+            of :class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`.
         IllegalArgumentError
             If ``entity`` is not a valid Biopython object.
 
@@ -672,7 +672,7 @@ class MolFileEntry(Entry):
             The molecular file format.
             If not provided, try to recover the molecular file extension directly from ``mol_file``.
         mol_obj_type : {'rdkit', 'openbabel'}
-            If "rdkit", parse the converted molecule with RDKit and return an instance of :class:`rdkit.Chem.Mol`.
+            If "rdkit", parse the converted molecule with RDKit and return an instance of :class:`rdkit.Chem.rdchem.Mol`.
             If "openbabel", parse the converted molecule with Open Babel and return an instance of
             :class:`openbabel.pybel.Molecule`. The default value is 'rdkit'.
         autoload : bool
@@ -767,7 +767,7 @@ class MolFileEntry(Entry):
             The molecular file format.
             If not provided, try to recover the molecular file extension directly from ``mol_file``.
         mol_obj_type : {'rdkit', 'openbabel'}
-            If "rdkit", parse the converted molecule with RDKit and return an instance of :class:`rdkit.Chem.Mol`.
+            If "rdkit", parse the converted molecule with RDKit and return an instance of :class:`rdkit.Chem.rdchem.Mol`.
             If "openbabel", parse the converted molecule with Open Babel and return an instance of
             :class:`openbabel.pybel.Molecule`. The default value is 'rdkit'.
         autoload : bool
@@ -824,7 +824,7 @@ class MolFileEntry(Entry):
 
     @property
     def mol_obj(self):
-        """:class:`luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`: The molecule."""
+        """:class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`: The molecule."""
         if self._mol_obj is None and self.mol_file is not None:
             self._load_mol_from_file()
         return self._mol_obj

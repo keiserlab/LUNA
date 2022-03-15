@@ -16,7 +16,7 @@ class Config:
     Attributes
     ----------
 
-    config : configparser.ConfigParser
+    config : `configparser.ConfigParser`
         The parsed configuration file.
     """
 

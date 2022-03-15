@@ -51,7 +51,7 @@ class MolValidator:
 
         Parameters
         ----------
-        mol_obj : :class:`luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`
+        mol_obj : :class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`
             The molecule.
 
         Returns
@@ -216,7 +216,7 @@ class RDKitValidator:
 
     Parameters
     ----------
-    sanitize_opts : :class:`rdkit.Chem.SanitizeFlags`
+    sanitize_opts : :class:`rdkit.Chem.rdchem.SanitizeFlags`
         Sanitization operations to be carried out.
     """
 
@@ -228,7 +228,7 @@ class RDKitValidator:
 
         Parameters
         ----------
-        rdk_mol : :class:`rdkit.Chem.Mol`
+        rdk_mol : :class:`rdkit.Chem.rdchem.Mol`
 
         Returns
         -------

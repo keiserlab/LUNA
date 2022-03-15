@@ -26,7 +26,7 @@ class OpenEyeModel(ChargeModel):
 
         Parameters
         ----------
-        atm_obj : :class:`luna.wrappers.base.AtomWrapper`
+        atm_obj : :class:`~luna.wrappers.base.AtomWrapper`
             The target atom.
 
         Examples

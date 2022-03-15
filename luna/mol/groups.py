@@ -762,7 +762,7 @@ class AtomGroupPerceiver():
     amend_mol : bool
         If True, apply validation and standardization of molecules read from a PDB file.
     mol_obj_type : {"rdkit", "openbabel"}
-        If "rdkit", parse the converted molecule with RDKit and return an instance of :class:`rdkit.Chem.Mol`.
+        If "rdkit", parse the converted molecule with RDKit and return an instance of :class:`rdkit.Chem.rdchem.Mol`.
         If "openbabel", parse the converted molecule with Open Babel and return an instance of
         :class:`openbabel.pybel.Molecule`.
     charge_model : class:`~luna.mol.charge_model.ChargeModel`
@@ -828,7 +828,7 @@ class AtomGroupPerceiver():
         compounds : iterable of :class:`~luna.MyBio.PDB.Residue.Residue`
             A sequence of molecules.
         mol_objs_dict : dict
-            Map a compound, represented by its id, to a molecular object (:class:`luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.Mol`,
+            Map a compound, represented by its id, to a molecular object (:class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`,
             or :class:`openbabel.pybel.Molecule`).
 
             This parameter can be used in cases where the ligand is read from a molecular file

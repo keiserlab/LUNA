@@ -88,7 +88,7 @@ class FeatureExtractor:
 
     Parameters
     ----------
-    feature_factory : :class:`rdkit.Chem.rdMolChemicalFeatures.MolChemicalFeatureFactory`
+    feature_factory : :class:`~rdkit.Chem.rdMolChemicalFeatures.MolChemicalFeatureFactory`
         An RDKit feature factory.
 
     Examples
@@ -99,7 +99,7 @@ class FeatureExtractor:
     >>> from luna.wrappers.base import MolWrapper
     >>> mol = MolWrapper.from_smiles("N[C@@H](CCC(N)=O)C(O)=O").unwrap()
 
-    Now, create a feature factory and instantiate a new FeatureExtractor object.
+    Now, create a feature factory and instantiate a new `FeatureExtractor` object.
 
     >>> from luna.util.default_values import ATOM_PROP_FILE
     >>> from rdkit.Chem import ChemicalFeatures
@@ -122,7 +122,7 @@ class FeatureExtractor:
 
         Parameters
         ----------
-        mol_obj : :class:`luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`
+        mol_obj : :class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`
             The molecule.
         atm_map : dict
             A dictionary to map an atom's index to a different value.
@@ -166,7 +166,7 @@ class FeatureExtractor:
 
         Parameters
         ----------
-        mol_obj : :class:`luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`
+        mol_obj : :class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`
             The molecule.
         atm_map : dict
             A dictionary to map an atom's index to a different value.

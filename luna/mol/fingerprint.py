@@ -22,7 +22,7 @@ class FingerprintGenerator():
 
     Parameters
     ----------
-    mol : :class:`luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`, optional
+    mol : :class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`, optional
         The molecule.
 
     Examples
@@ -58,7 +58,7 @@ class FingerprintGenerator():
 
     @property
     def mol(self):
-        """:class:`luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`: The molecule."""
+        """:class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`: The molecule."""
         return self._mol_obj
 
     @mol.setter
@@ -245,7 +245,7 @@ def generate_fp_for_mols(mols, fp_function=None, fp_opt=None, critical=False):
 
     Parameters
     ----------
-    mols : iterable of :class:`luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.Mol`, or :class:`openbabel.pybel.Molecule`
+    mols : iterable of :class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`
         A sequence of molecules.
     fp_function : str
         The fingerprint function to use. The default value is 'pharm2d_fp'.

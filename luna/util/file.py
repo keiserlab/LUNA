@@ -106,7 +106,7 @@ def generic_splitext(path, max_split=None):
 
 
 def generate_json_file(json_data, output_file, indent=4, sort_keys=True):
-    """Serialize ``json_data` to a JSON formatted ``str`` and save it at ``output_file``.
+    """Serialize ``json_data`` to a JSON formatted string and save it at ``output_file``.
 
     Parameters
     ----------
@@ -122,7 +122,7 @@ def generate_json_file(json_data, output_file, indent=4, sort_keys=True):
         The default value is 4.
 
     sort_keys : bool
-        If `sort_keys` is True, the output of dictionaries will be sorted by key.
+        If ``sort_keys`` is True, the output of dictionaries will be sorted by key.
     """
     try:
         import simplejson as json
@@ -318,7 +318,7 @@ def pickle_data(data, output_file, compressed=True):
     output_file : str
         The output file where the pickled representation will be saved.
     compressed : bool, optional
-        If True (the default), compress the pickled representation as a  gzip file (.gz).
+        If True (the default), compress the pickled representation as a gzip file (.gz).
 
     Raises
     -------
