@@ -15,6 +15,40 @@ REGEX_MOL_FILE = re.compile(r' (V2000|V3000)$')
 
 
 def read_mol_from_file(mol_file, mol_format, sanitize=True, removeHs=True):
+    """Read a molecule from ``mol_file`` using RDKit.
+
+    Parameters
+    ----------
+    mol_file : str
+        The pathname of the molecular file to be read.
+    mol_format : str
+        The molecular format of ``mol_file``.
+    sanitize : bool
+        If True (the default), sanitize the molecule.
+    removeHs : bool
+        If True (the default), remove explict hydrogens from the molecule.
+
+    Returns
+    -------
+     : :class:`rdkit.Chem.Mol` or None
+        The parsed molecule or None in case the sanitization process fails.
+
+    Raises
+    ------
+    IllegalArgumentError
+        If the provided molecular format is not accepted by RDKit.
+
+    Examples
+    --------
+
+    >>> from luna.util.default_values import LUNA_PATH
+    >>> from luna.wrappers.rdkit import read_mol_from_file
+    >>> rdk_mol = read_mol_from_file(mol_file=f"{LUNA_PATH}/tutorial/inputs/ZINC000007786517.mol",
+    ...                              mol_format="mol")
+    >>> print(rdk_mol.GetProp("_Name"))
+     ZINC000007786517
+    """
+
     if mol_format == "mol2":
         # First it creates the molecule without applying the sanitization function.
         rdk_mol = MolFromMol2File(mol_file, sanitize=False, removeHs=removeHs)
@@ -39,6 +73,40 @@ def read_mol_from_file(mol_file, mol_format, sanitize=True, removeHs=True):
 
 
 def new_mol_from_block(block, mol_format, sanitize=True, removeHs=True):
+    """Read a molecule from a string block using RDKit.
+
+    Parameters
+    ----------
+    block : str
+        The molecular string block.
+    mol_format : str
+        The molecular format of ``block``.
+    sanitize : bool
+        If True (the default), sanitize the molecule.
+    removeHs : bool
+        If True (the default), remove explict hydrogens from the molecule.
+
+    Returns
+    -------
+     : :class:`rdkit.Chem.Mol` or None
+        The parsed molecule or None in case the sanitization process fails.
+
+    Raises
+    ------
+    IllegalArgumentError
+        If the provided molecular format is not accepted by RDKit.
+
+    Examples
+    --------
+    >>> from luna.util.default_values import LUNA_PATH
+    >>> from luna.wrappers.rdkit import new_mol_from_block
+    >>> with open(f"{LUNA_PATH}/tutorial/inputs/GLY.sdf", "r") as IN:
+    ...           mol_block = IN.read()
+    >>> rdk_mol = new_mol_from_block(block=mol_block, mol_format="sdf")
+    >>> print(rdk_mol.GetProp("_Name"))
+    GLY
+    """
+
     if mol_format == "mol2":
         # First it creates the molecule without applying the sanitization function.
         rdk_mol = MolFromMol2Block(block, sanitize=False, removeHs=removeHs)
@@ -60,6 +128,57 @@ def new_mol_from_block(block, mol_format, sanitize=True, removeHs=True):
 
 
 def read_multimol_file(mol_file, targets=None, mol_format=None, sanitize=True, removeHs=True):
+    """Read molecules from a multimolecular file using RDKit.
+
+    Parameters
+    ----------
+    mol_file : str
+        The pathname of the molecular file to be read.
+    targets : iterable of str
+        Only parses molecules, given by their ids, defined in ``targets``.
+    mol_format : str, optional
+        The molecular format of ``mol_file``.
+        If not provided, the format will be defined by the file extension.
+    sanitize : bool
+        If True (the default), sanitize the molecule.
+    removeHs : bool
+        If True (the default), remove explict hydrogens from the molecule.
+
+    Yields
+    -------
+     : tuple of (:class:`rdkit.Chem.Mol`, int)
+        A tuple containing the parsed molecule and its id.
+
+    Raises
+    ------
+    IllegalArgumentError
+        If the provided or identified molecular format is not accepted by RDKit.
+
+    Examples
+    --------
+
+    In this first example, we will read all molecules from a multimolecular file.
+
+    >>> from luna.util.default_values import LUNA_PATH
+    >>> from luna.wrappers.rdkit import read_multimol_file
+    >>> for mol_tuple in read_multimol_file(mol_file=f"{LUNA_PATH}/tutorial/inputs/ligands.mol2"):
+    ...     print(mol_tuple[0].GetProp("_Name"))
+     ZINC000343043015
+     ZINC000065293174
+     ZINC000575033470
+     ZINC000096459890
+     ZINC000012442563
+
+    Now, we will only read two molecules (ZINC000065293174, ZINC000096459890) from the same multimolecular file.
+
+    >>> from luna.util.default_values import LUNA_PATH
+    >>> from luna.wrappers.rdkit import read_multimol_file
+    >>> for mol_tuple in read_multimol_file(mol_file=f"{LUNA_PATH}/tutorial/inputs/ligands.mol2",
+    ...                                     targets=["ZINC000065293174", "ZINC000096459890"]):
+    ...     print(mol_tuple[0].GetProp("_Name"))
+     ZINC000065293174
+     ZINC000096459890
+    """
 
     def apply_mol_format(lines):
         # Check if the MOL file contains a valid header comprising a Title line, Program/file timestamp line, and a Comment line.

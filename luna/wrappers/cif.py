@@ -2,6 +2,16 @@ import re
 
 
 def get_atom_names_by_id(cif_file):
+    """Read a single-molecule CIF file and return the molecule's atom names.
+
+    In the current version, if applied on multi-molecular CIF files,
+    only the first molecule's atom names are returned.
+
+    Returns
+    -------
+     : dict
+    """
+
     regex = re.compile(' {1,}')
 
     atom_names = {}
@@ -14,10 +24,10 @@ def get_atom_names_by_id(cif_file):
 
         last_line = -1
 
-        for (i, line) in enumerate(IN.readlines()):
+        for i, line in enumerate(IN.readlines()):
             line = line.strip()
 
-            if (line.startswith("loop_")):
+            if line.startswith("loop_"):
                 loop_read = True
             else:
                 if line.startswith("_chem_comp_atom.comp_id"):
