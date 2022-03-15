@@ -14,18 +14,18 @@ from rdkit.Chem import MolFromPDBBlock, MolFromSmiles
 
 # Local modules
 from luna.mol.depiction import PharmacophoreDepiction
-from luna.mol.clustering import cluster_fps_butina
+from luna.mol.clustering import cluster_fps
 from luna.mol.features import FeatureExtractor
 from luna.mol.fingerprint import generate_fp_for_mols
-from luna.mol.entry import Entry, MolEntry
+from luna.mol.entry import Entry, MolFileEntry
 from luna.mol.groups import AtomGroupPerceiver
-from luna.mol.interaction.contact import get_contacts_for_entity
-from luna.mol.interaction.calc import InteractionCalculator
-from luna.mol.interaction.conf import InteractionConf
-from luna.mol.interaction.view import InteractionViewer
-from luna.mol.interaction.fp.shell import ShellGenerator
-from luna.mol.interaction.fp.type import IFPType
-from luna.mol.wrappers.base import MolWrapper
+from luna.interaction.contact import get_contacts_with
+from luna.interaction.calc import InteractionCalculator
+from luna.interaction.conf import InteractionConf
+from luna.interaction.view import InteractionViewer
+from luna.interaction.fp.shell import ShellGenerator
+from luna.interaction.fp.type import IFPType
+from luna.wrappers.base import MolWrapper
 from luna.util.default_values import *
 from luna.util.exceptions import *
 from luna.util.file import *
@@ -34,8 +34,9 @@ from luna.util.multiprocessing_logging import start_mp_handler, MultiProcessingH
 from luna.util.jobs import ArgsGenerator, ParallelJobs
 
 from luna.MyBio.PDB.PDBParser import PDBParser
+from luna.MyBio.PDB.FTMapParser import FTMapParser
 from luna.MyBio.selector import ResidueSelector
-from luna.MyBio.util import download_pdb, entity_to_string, get_entity_from_entry
+from luna.MyBio.util import download_pdb, save_to_file, entity_to_string, get_entity_from_entry
 from luna.version import __version__, has_version_compatibility
 
 from sys import setrecursionlimit
@@ -56,8 +57,35 @@ MAX_NPROCS = mp.cpu_count() - 1
 
 class EntryResults:
 
-    def __init__(self, entry, atm_grps_mngr, interactions_mngr, ifp=None, mfp=None):
+    """Store entry results.
 
+    Parameters
+    ----------
+    entry: :class:`~luna.mol.entry.Entry`
+        An :class:`~luna.mol.entry.Entry` object that represents a molecule or an entire chain.
+    atm_grps_mngr: :class:`~luna.mol.groups.AtomGroupsManager`
+        An :class:`~luna.mol.groups.AtomGroupsManager` object that stores the perceived atoms and
+        atom groups in the vicinity given by ``entry``.
+    interactions_mngr: :class:`~luna.interaction.calc.InteractionsManager`
+        An :class:`~luna.interaction.calc.InteractionsManager` object that interactions in the vicinity
+        given by ``entry``.
+    ifp: :class:`~luna.interaction.fp.fingerprint.Fingerprint`, optional
+        An interaction fingerprint (IFP) generated for ``entry``.
+    mfp: RDKit :class:`~rdkit.DataStructs.cDataStructs.ExplicitBitVect` or :class:`~rdkit.DataStructs.cDataStructs.SparseBitVect`, optional
+        A molecular fingerprint generated for ``entry``.
+
+    Attributes
+    ----------
+    entry: :class:`~luna.mol.entry.Entry`
+    atm_grps_mngr: :class:`~luna.mol.groups.AtomGroupsManager`
+    interactions_mngr: :class:`~luna.interaction.calc.InteractionsManager`
+    ifp: :class:`~luna.interaction.fp.fingerprint.Fingerprint`
+    mfp: RDKit :class:`~rdkit.DataStructs.cDataStructs.ExplicitBitVect` or :class:`~rdkit.DataStructs.cDataStructs.SparseBitVect`
+    version : str
+        The LUNA's version with which results were generated.
+    """
+
+    def __init__(self, entry, atm_grps_mngr, interactions_mngr, ifp=None, mfp=None):
         self.entry = entry
         self.atm_grps_mngr = atm_grps_mngr
         self.interactions_mngr = interactions_mngr
@@ -66,14 +94,181 @@ class EntryResults:
         self.version = __version__
 
     def save(self, output_file, compressed=True):
+        """Write the pickled representation of this object to the file ``output_file``.
+
+        Parameters
+        ----------
+        output_file : str
+            The output file where the pickled representation will be saved.
+        compressed : bool, optional
+            If True (the default), compress the pickled representation as a  gzip file (.gz).
+
+        Raises
+        -------
+        FileNotCreated
+            If the file could not be created.
+        """
         pickle_data(self, output_file, compressed)
 
     @staticmethod
     def load(input_file):
+        """Read the pickled representation of an `EntryResults` object from the file
+        ``input_file`` and return the reconstituted object hierarchy specified therein.
+        ``input_file`` can be a gzip-compressed file.
+
+        Raises
+        -------
+        PKLNotReadError
+            If the file could not be loaded.
+        """
         return unpickle_data(input_file)
 
 
 class Project:
+
+    """Define a LUNA project.
+
+    .. note::
+        This class is not intended to be used directly because :meth:`run` is not implemented by default.
+        Instead, you should use a class that inherits from `Project` and implements :meth:`run`.
+        An example is the class :class:`LocalProject` that implements a custom :meth:`run` that saves results
+        as local files.
+
+    Parameters
+    ----------
+    entries : iterable of :class:`~luna.mol.entry.Entry`
+        Entries determine the target molecule to which interactions and other properties
+        will be calculated. They can be ligands, chains, etc, and can be defined in a number of ways.
+        Each entry has an associated PDB file that may contain macromolecules (protein, RNA, DNA) and
+        other small molecules, water, and ions. Refer to :class:`~luna.mol.entry.Entry` for more information.
+    working_path : str
+        Where project results will be saved.
+    pdb_path : str
+        Path containing local PDB files or to where the PDB files will be downloaded.
+        PDB filenames must match that defined for the entries.
+        If not provided, the default PDB path will be used.
+    overwrite_path : bool
+        If True, allow LUNA to overwrite any existing directory, which may remove files from a previous project.
+        The default value is False.
+    add_h : bool
+        Define if you need to add hydrogens or not. The default value is True.
+
+        .. note::
+            To be cautious, it does not add hydrogens to NMR-solved structures and ligands initialized from molecular files
+            (:class:`~luna.mol.entry.MolFileEntry` objects) as they usually already contain hydrogens.
+    ph : float
+        Control the pH and how the hydrogens are going to be added. The default value is 7.4.
+
+        .. note::
+            To be cautious, it does not modify the protonation of molecular files defined by a
+            :class:`~luna.mol.entry.MolFileEntry` object.
+    amend_mol : bool
+        If True (the default), try to fix atomic charges, valence, and bond types for small molecules and residues at PDB files.
+        Only molecules at PDB files are validated because they do not contain charge, valence, and bond types, which may
+        cause molecules to be incorrectly perceived. More information :ref:`here <Ligands in PDB files>`.
+
+        .. note::
+            Molecules from external files (:class:`~luna.mol.entry.MolFileEntry` objects) will not be modified.
+    mol_obj_type : {'rdkit', 'openbabel'}
+        Define which library (RDKit or Open Babel) to use to parse molecules.
+        The default value is 'rdkit'.
+    atom_prop_file : str
+        A feature definition file (FDef) containing all information needed to define a set of
+        chemical or pharmacophoric features. The default value is 'LUNA.fdef', which contains
+        default LUNA features definition.
+    inter_calc : :class:`~luna.interaction.calc.InteractionCalculator`
+        Define which and how interactions are calculated.
+    binding_mode_filter : :class:`~luna.interaction.filter.BindingModeFilter`
+        Define how to filter interactions based on binding modes.
+    calc_mfp : bool
+        If True, generate ECFP4 fingerprints for each entry in ``entries``. The default value is False.
+    mfp_output : str
+        If ``calc_mfp`` is True, save ECFP4 fingerprints to file ``mfp_output``.
+        If not provided, fingerprints are saved at <``working_path``>/results/fingerprints/mfp.csv.
+    calc_ifp : bool
+        If True (the default), generate LUNA interaction fingerprints (IFPs) for each entry in ``entries``.
+    ifp_num_levels : int
+        The maximum number of iterations for fingerprint generation. The default value is 2.
+    ifp_radius_step : float
+        The multiplier used to increase shell size at each iteration.
+        At iteration 0, shell radius is 0 * ``radius_step``, at iteration 1, radius is
+        1 * ``radius_step``, etc. The default value is 5.73171.
+    ifp_length : int
+        The fingerprint length (total number of bits). The default value is 4096.
+    ifp_count : bool
+        If True (the default), create a count fingerprint (:class:`~luna.interaction.fp.fingerprint.CountFingerprint`).
+        Otherwise, return a bit fingerprint (:class:`~luna.interaction.fp.fingerprint.Fingerprint`).
+    ifp_diff_comp_classes :
+        If True (the default), include differentiation between compound classes.
+        That means structural information originated from :class:`~luna.mol.groups.AtomGroup` objects
+        belonging to residues, nucleotides,  ligands, or water molecules will be considered different
+        even if their structural information are the same.
+        This is useful for example to differentiate protein-ligand interactions from residue-residue ones.
+    ifp_type : :class:`~luna.interaction.fp.type.IFPType`
+        The fingerprint type (EIFP, FIFP, or HIFP). The default value is EIFP.
+    ifp_output : str
+        If ``calc_ifp`` is True, save LUNA interaction fingerprints (IFPs) to file ``ifp_output``.
+        If not provided, fingerprints are saved at <``working_path``>/results/fingerprints/ifp.csv.
+    out_pse : bool
+        If True, depict interactions save them as Pymol sessions (PSE file).
+        The default value is False. PSE files are saved at <``working_path``>/results/pse.
+    out_ifp_sim_matrix : bool
+        If True, compute Tanimoto similarity between interaction fingerprints (IFPs)
+        and save the similarity matrix to <``working_path``>/results/fingerprints/ifp_sim_matrix.csv
+    append_mode : bool
+        If True, skip entries from processing if a result for them already exists in ``working_path``.
+        This can save processing time in case additional entries are to be added to an existing project.
+    verbosity : int
+        Verbosity level. The higher the verbosity level the more information is displayed.
+        Valid values are:
+
+            * 4: DEBUG messages;
+            * 3: INFO messages (the default);
+            * 2: WARNING messages;
+            * 1: ERROR messages;
+            * 0: CRITICAL messages.
+    logging_enabled : bool
+        If True (the default), enable the logging system.
+    nproc : int
+        The number of CPUs to use. The default value is the ``maximum number of CPUs - 1``.
+        If ``nproc`` is smaller than 1 or greater than the maximum amount of available CPUs at your PC,
+        then ``nproc`` is set to its default value. If you set it to None, LUNA will be run serially.
+
+
+    Attributes
+    ----------
+    entries : iterable of :class:`~luna.mol.entry.Entry`
+    working_path : str
+    pdb_path : str
+    overwrite_path : bool
+    add_h : bool
+    ph : float
+    amend_mol : bool
+    mol_obj_type : {'rdkit', 'openbabel'}
+    atom_prop_file : str
+    inter_calc : :class:`~luna.interaction.calc.InteractionCalculator`
+    binding_mode_filter : :class:`~luna.interaction.filter.BindingModeFilter`
+    calc_mfp : bool
+    mfp_output : str
+    calc_ifp : bool
+    ifp_num_levels : int
+    ifp_radius_step : float
+    ifp_length : int
+    ifp_count : bool
+    ifp_diff_comp_classes : bool
+    ifp_type : :class:`~luna.interaction.fp.type.IFPType`
+    ifp_output : str
+    out_pse : bool
+    out_ifp_sim_matrix : bool
+    append_mode : bool
+    logging_file : str
+        The file to where logging messages are saved.
+    version : str
+        The LUNA's version with which results were generated.
+    errors : list of tuple
+        Any errors found during the processing of an entry.
+        Each tuple contains the input and the exception raised during the execution of a task with that input.
+    """
 
     def __init__(self,
                  entries,
@@ -81,17 +276,16 @@ class Project:
                  pdb_path=PDB_PATH,
                  overwrite_path=False,
 
-                 try_h_addition=True,
+                 add_h=True,
                  ph=7.4,
                  amend_mol=True,
                  mol_obj_type='rdkit',
                  atom_prop_file=ATOM_PROP_FILE,
-                 inter_conf=INTERACTION_CONF,
+
                  inter_calc=None,
                  binding_mode_filter=None,
 
                  calc_mfp=False,
-                 mfp_opts=None,
                  mfp_output=None,
 
                  calc_ifp=True,
@@ -105,9 +299,6 @@ class Project:
 
                  out_pse=False,
                  out_ifp_sim_matrix=False,
-
-                 similarity_func="BulkTanimotoSimilarity",
-                 butina_cutoff=0.2,
 
                  append_mode=False,
                  verbosity=3,
@@ -124,12 +315,6 @@ class Project:
 
         self._log("info", "LUNA version: %s." % __version__)
 
-        if inter_conf is None:
-            self._log("info", "No interaction configuration was set and the default will be used instead")
-        elif inter_conf is not None and isinstance(inter_conf, InteractionConf) is False:
-            raise IllegalArgumentError("The informed interaction configuration must be an instance of %s."
-                                       % ".".join([InteractionConf.__module__, InteractionConf.__name__]))
-
         if inter_calc is not None and isinstance(inter_calc, InteractionCalculator) is False:
             raise IllegalArgumentError("The informed interaction configuration must be an instance of %s."
                                        % ".".join([InteractionCalculator.__module__, InteractionCalculator.__name__]))
@@ -137,7 +322,7 @@ class Project:
             self._log("info", "No interaction calculator object was defined and the default will be used instead.")
 
         if append_mode:
-            self._log("warning", "Append mode set ON, entries with already existing results will skip the entries processing.")
+            self._log("warning", "Append mode set ON, entries with existing results will be skipped from the entries processing.")
 
         if pdb_path is None or not is_directory_valid(pdb_path):
             new_pdb_path = "%s/pdbs/" % working_path
@@ -153,20 +338,16 @@ class Project:
         self.ph = ph
         self.amend_mol = amend_mol
         self.mol_obj_type = mol_obj_type
-        self.try_h_addition = try_h_addition
-
-        # Interaction calculator parameters.
-        self.inter_conf = inter_conf
+        self.add_h = add_h
 
         if inter_calc is None:
-            inter_calc = InteractionCalculator(inter_conf=self.inter_conf)
+            inter_calc = InteractionCalculator(inter_conf=INTERACTION_CONF)
         self.inter_calc = inter_calc
 
         self.binding_mode_filter = binding_mode_filter
 
         # Fingerprint parameters.
         self.calc_mfp = calc_mfp
-        self.mfp_opts = mfp_opts
         self.mfp_output = mfp_output
 
         self.calc_ifp = calc_ifp
@@ -181,10 +362,6 @@ class Project:
         self.out_pse = out_pse
         self.out_ifp_sim_matrix = out_ifp_sim_matrix
 
-        self.similarity_func = similarity_func
-        self.butina_cutoff = butina_cutoff
-
-        self.step_controls = {}
         self.append_mode = append_mode
 
         self._loaded_logging_file = False
@@ -203,10 +380,12 @@ class Project:
 
     @property
     def project_file(self):
+        """str: Where the pickled representation of the LUNA project is saved."""
         return "%s/project_v%s.pkl.gz" % (self.working_path, __version__)
 
     @property
     def results(self):
+        """iterable of `EntryResults`: LUNA results for each entry."""
         for entry in self.entries:
             results = self.get_entry_results(entry)
             if results:
@@ -214,6 +393,8 @@ class Project:
 
     @property
     def interactions_mngrs(self):
+        """iterable of :class:`~luna.interaction.calc.InteractionsManager`: \
+            An :class:`~luna.interaction.calc.InteractionsManager` object for each entry."""
         for entry in self.entries:
             results = self.get_entry_results(entry)
             if results:
@@ -221,6 +402,8 @@ class Project:
 
     @property
     def atm_grps_mngrs(self):
+        """iterable of :class:`~luna.mol.groups.AtomGroupsManager`: \
+            An :class:`~luna.mol.groups.AtomGroupsManager` object for each entry."""
         for entry in self.entries:
             results = self.get_entry_results(entry)
             if results:
@@ -228,6 +411,8 @@ class Project:
 
     @property
     def ifps(self):
+        """iterable of :class:`~luna.interaction.fp.fingerprint.Fingerprint`: \
+            An interaction fingerprint (IFP) for each entry."""
         for entry in self.entries:
             results = self.get_entry_results(entry)
             if results:
@@ -235,6 +420,9 @@ class Project:
 
     @property
     def mfps(self):
+        """iterable of RDKit :class:`~rdkit.DataStructs.cDataStructs.ExplicitBitVect` \
+            or :class:`~rdkit.DataStructs.cDataStructs.SparseBitVect`: \
+                A molecular fingerprint for each entry."""
         for entry in self.entries:
             results = self.get_entry_results(entry)
             if results:
@@ -242,6 +430,7 @@ class Project:
 
     @property
     def nproc(self):
+        """int: The number of CPUs to use."""
         return self._nproc
 
     @nproc.setter
@@ -271,6 +460,7 @@ class Project:
 
     @property
     def logging_enabled(self):
+        """bool: If the logging system is enable or not."""
         return self._logging_enabled
 
     @logging_enabled.setter
@@ -286,6 +476,7 @@ class Project:
 
     @property
     def verbosity(self):
+        """int: Verbosity level."""
         return self._verbosity
 
     @verbosity.setter
@@ -301,10 +492,20 @@ class Project:
 
         # If the logging file has already been loaded, it is necessary to update the logging verbosity level.
         if self._loaded_logging_file:
-            self.init_logging_file(self.logging_file)
+            self._init_logging_file(self.logging_file)
 
     def get_entry_results(self, entry):
+        """Get results for a given entry.
 
+        Parameters
+        ----------
+        entry : :class:`~luna.mol.entry.Entry`
+            An entry from ``entries``.
+
+        Returns
+        -------
+         : `EntryResults`
+        """
         if isinstance(entry, Entry):
             entry = entry.to_string()
 
@@ -331,10 +532,10 @@ class Project:
                 params.append("\t\t\t-- %s = %s" % (key, str(self.__dict__[key])))
         self._log("debug", "Preferences:\n%s" % "\n".join(params))
 
-    def init_logging_file(self, logging_filename=None, use_mp_handler=True):
+    def _init_logging_file(self, logging_filename=None, use_mp_handler=True):
         if self.logging_enabled:
             if not logging_filename:
-                logging_filename = get_unique_filename(TMP_FILES)
+                logging_filename = new_unique_filename(TMP_FILES)
 
             try:
                 new_logging_file(logging_filename, logging_level=self.verbosity)
@@ -351,7 +552,7 @@ class Project:
                 self._log("exception", e)
                 raise FileNotCreated("Logging file '%s' could not be created." % logging_filename)
 
-    def close_logging_file(self):
+    def _close_logging_file(self):
         try:
             for handler in logger.handlers:
                 if isinstance(handler, MultiProcessingHandler):
@@ -361,7 +562,7 @@ class Project:
         except Exception:
             pass
 
-    def prepare_project_path(self, subdirs=None):
+    def _prepare_project_path(self, subdirs=None):
         self._log("info", "Preparing project directory '%s'." % self.working_path)
 
         if subdirs is None:
@@ -375,11 +576,12 @@ class Project:
 
         self._log("info", "Project directory '%s' created successfully." % self.working_path)
 
-    def remove_empty_paths(self):
+    def _remove_empty_paths(self):
         for path in self._paths:
-            clear_directory("%s/%s" % (self.working_path, path), only_empty_paths=True)
+            remove_directory("%s/%s" % (self.working_path, path), only_empty_paths=True)
 
     def remove_duplicate_entries(self):
+        """Search and remove duplicate entries from ``entries``."""
         entries = {}
         for entry in self.entries:
             if entry.to_string() not in entries:
@@ -389,14 +591,15 @@ class Project:
                           "be removed." % (entry.to_string(), entry))
 
         self._log("info", "The remotion of duplicate entries was finished. %d entrie(s) were removed." % (len(self.entries) - len(entries)))
-
         self.entries = list(entries.values())
 
-    def validate_entry_format(self, entry):
+    def _validate_entry_format(self, entry):
         if not entry.is_valid():
             raise InvalidEntry("Entry '%s' does not match a LUNA's entry format." % entry.to_string())
 
     def verify_pdb_files_existence(self):
+        """Verify if a local PDB file exists for each entry in ``entries``.
+            If it does not find a given PDB file, then LUNA will try to download it from RCSB."""
         all_pdb_ids = set()
         to_download = set()
         for entry in self.entries:
@@ -413,7 +616,7 @@ class Project:
         if to_download:
             args = [(pdb_id, self.pdb_path) for pdb_id in to_download]
             pj = ParallelJobs(self.nproc)
-            job_results = pj.run_jobs(args_list=args, consumer_func=download_pdb, job_name="Download PDBs")
+            job_results = pj.run_jobs(args=args, consumer_func=download_pdb, job_name="Download PDBs")
             errors = job_results.errors
 
             # Warn the users for any errors found during the entries processing.
@@ -422,8 +625,8 @@ class Project:
                           % len(errors))
                 self._log("debug", "PDBs that failed: %s." % ", ".join([e[0][0] for e in errors]))
 
-    def decide_hydrogen_addition(self, pdb_header, entry):
-        if self.try_h_addition:
+    def _decide_hydrogen_addition(self, pdb_header, entry):
+        if self.add_h:
             if "structure_method" in pdb_header:
                 method = pdb_header["structure_method"]
                 # If the method is not a NMR type does not add hydrogen as it usually already has hydrogens.
@@ -434,7 +637,7 @@ class Project:
             return True
         return False
 
-    def perceive_chemical_groups(self, entry, entity, ligand, add_h=False):
+    def _perceive_chemical_groups(self, entry, entity, ligand, add_h=False):
         self._log("debug", "Starting pharmacophore perception for entry '%s'" % entry.to_string())
 
         feature_factory = ChemicalFeatures.BuildFeatureFactory(self.atom_prop_file)
@@ -443,11 +646,14 @@ class Project:
         perceiver = AtomGroupPerceiver(feature_extractor, add_h=add_h, ph=self.ph, amend_mol=self.amend_mol,
                                        mol_obj_type=self.mol_obj_type, tmp_path="%s/tmp" % self.working_path)
 
-        radius = self.inter_conf.boundary_cutoff or BOUNDARY_CONF.boundary_cutoff
-        nb_compounds = get_contacts_for_entity(entity, ligand, level='R', radius=radius)
+        if "boundary_cutoff" in self.inter_calc.inter_conf.conf:
+            radius = self.inter_calc.inter_conf.conf["boundary_cutoff"]
+        else:
+            radius = BOUNDARY_CONF.boundary_cutoff
+        nb_compounds = get_contacts_with(entity, ligand, level='R', radius=radius)
 
         mol_objs_dict = {}
-        if isinstance(entry, MolEntry):
+        if isinstance(entry, MolFileEntry):
             mol_objs_dict[entry.get_biopython_key()] = entry.mol_obj
 
         atm_grps_mngr = perceiver.perceive_atom_groups(set([x[1] for x in nb_compounds]), mol_objs_dict=mol_objs_dict)
@@ -456,50 +662,27 @@ class Project:
 
         return atm_grps_mngr
 
-    def get_rdkit_mol(self, entity, target, mol_name="Mol0"):
-        target_sel = ResidueSelector({target})
-        pdb_block = entity_to_string(entity, target_sel, write_conects=False)
-        rdmol = MolFromPDBBlock(pdb_block)
-        rdmol.SetProp("_Name", mol_name)
-        return rdmol
-
-    def generate_ligand_figure(self, rdmol, group_types):
-        atm_types = defaultdict(set)
-        atm_map = {}
-        for atm in rdmol.GetAtoms():
-            atm_map[atm.GetPDBResidueInfo().GetSerialNumber()] = atm.GetIdx()
-
-        for grp in group_types.atm_grps:
-            for atm in grp.atoms:
-                atm_id = atm_map[atm.serial_number]
-                atm_types[atm_id].update(set(grp.chemicalFeatures))
-
-        output = "%s/figures/%s.svg" % (self.working_path, rdmol.GetProp("_Name"))
-
-        # TODO: Adapt it to use the PharmacophoreDepiction
-
-        # ligand_pharm_figure(rdmol, atm_types, output, ATOM_TYPES_COLOR)
-
-    def create_mfp(self, entry):
-        if isinstance(entry, MolEntry):
+    def _create_mfp(self, entry):
+        if isinstance(entry, MolFileEntry):
             rdmol_lig = MolFromSmiles(MolWrapper(entry.mol_obj).to_smiles())
             rdmol_lig.SetProp("_Name", entry.mol_id)
 
             return generate_fp_for_mols([rdmol_lig], "morgan_fp")[0]["fp"]
         else:
+            # TODO: implement support for other entries.
             self._log("warning", "Currently, it cannot generate molecular fingerprints for "
                       "instances of %s." % entry.__class__.__name__)
 
-    def create_ifp(self, atm_grps_mngr):
+    def _create_ifp(self, atm_grps_mngr):
         sg = ShellGenerator(self.ifp_num_levels, self.ifp_radius_step,
                             diff_comp_classes=self.ifp_diff_comp_classes,
                             ifp_type=self.ifp_type)
         sm = sg.create_shells(atm_grps_mngr)
 
         unique_shells = not self.ifp_count
-        return sm.to_fingerprint(fold_to_size=self.ifp_length, unique_shells=unique_shells, count_fp=self.ifp_count)
+        return sm.to_fingerprint(fold_to_length=self.ifp_length, unique_shells=unique_shells, count_fp=self.ifp_count)
 
-    def create_ifp_file(self):
+    def _create_ifp_file(self):
         ifp_output = self.ifp_output or "%s/results/fingerprints/ifp.csv" % self.working_path
         with open(ifp_output, "w") as OUT:
             if self.ifp_count:
@@ -516,7 +699,7 @@ class Project:
                     fp_bits_str = "\t".join([str(x) for x in ifp.get_on_bits()])
                     OUT.write("%s,%s\n" % (entry.to_string(), fp_bits_str))
 
-    def create_mfp_file(self):
+    def _create_mfp_file(self):
         self.mfp_output = self.mfp_output or "%s/results/fingerprints/mfp.csv" % self.working_path
         with open(self.mfp_output, "w") as OUT:
             OUT.write("ligand_id,smiles,on_bits\n")
@@ -527,55 +710,89 @@ class Project:
     def _calc_similarity(self, res1, res2):
         return "%s,%s,%s" % (res1.entry.to_string(), res2.entry.to_string(), str(res1.ifp.calc_similarity(res2.ifp)))
 
-    def generate_similarity_matrix(self, output_file):
-        n_args = int(comb(len(self.entries), 2))
-        args = ArgsGenerator(itertools.combinations(self.results, 2), n_args)
+    def _generate_similarity_matrix(self, output_file):
+        nargs = int(comb(len(self.entries), 2))
+        args = ArgsGenerator(itertools.combinations(self.results, 2), nargs)
 
         header = "entry1,entry2,similarity"
         pj = ParallelJobs(self.nproc)
-        return pj.run_jobs(args_list=args, consumer_func=self._calc_similarity, output_file=output_file,
+        return pj.run_jobs(args=args, consumer_func=self._calc_similarity, output_file=output_file,
                            output_header=header, job_name="Calculate similarities")
 
-    def clusterize_ligands(self, fingerprints):
-        fps_only = [x["fp"] for x in fingerprints]
-
-        try:
-            clusters = cluster_fps_butina(fps_only, cutoff=self.butina_cutoff, similarity_func=self.similarity_func)
-        except Exception:
-            raise ProcessingFailed("Clustering step failed.")
-
-        lig_clusters = {}
-        for i, cluster in enumerate(clusters):
-            for mol_id in cluster:
-                lig_clusters[fingerprints[mol_id]["mol"]] = i
-
-        return lig_clusters
-
     def run(self):
+        """Run LUNA. However, this method is not implemented by default.
+        Instead, you should use a class that inherits from `Project` and implements :meth:`run`.
+        An example is the class :class:`LocalProject` that implements a custom :meth:`run` that saves results
+        as local files.
+        """
         self()
 
     def save(self, output_file, compressed=True):
+        """Write the pickled representation of this project to the file ``output_file``.
+
+        Parameters
+        ----------
+        output_file : str
+            The output file where the pickled representation will be saved.
+        compressed : bool, optional
+            If True (the default), compress the pickled representation as a  gzip file (.gz).
+
+        Raises
+        -------
+        FileNotCreated
+            If the file could not be created.
+        """
         pickle_data(self, output_file, compressed)
 
     @staticmethod
-    def load(input_path, verbosity=3, logging_enabled=True):
+    def load(pathname, verbosity=3, logging_enabled=True):
+        """Read the pickled representation of a `Project` object from a file or project path \
+         and return the reconstituted object hierarchy specified therein. \
+        The ``pathname`` can be a gzip-compressed file.
+
+        Parameters
+        ----------
+        pathname : str
+            A file containing the pickled representation of a `Project` object
+            or the project path (``working_path``) from where the pickled representation will be recovered.
+        verbosity : int
+            Verbosity level. The higher the verbosity level the more information is displayed.
+            Valid values are:
+
+                * 4: DEBUG messages;
+                * 3: INFO messages (the default);
+                * 2: WARNING messages;
+                * 1: ERROR messages;
+                * 0: CRITICAL messages.
+        logging_enabled : bool
+            If True (the default), enable the logging system.
+
+        Raises
+        -------
+        CompatibilityError
+            If the project version is not compatible with the current LUNA version.
+        PKLNotReadError
+            If the file could not be loaded.
+        IllegalArgumentError
+            If the provided pathname does not exist or is an invalid file/directory.
+        """
 
         #
         # Check if the provided input path is a valid file or a directory containing saved projects.
         #
-        if is_file_valid(input_path):
-            input_file = input_path
-        elif is_directory_valid(input_path):
-            project_files = glob.glob("%s/project_v*.pkl.gz" % input_path)
+        if is_file_valid(pathname):
+            input_file = pathname
+        elif is_directory_valid(pathname):
+            project_files = glob.glob("%s/project_v*.pkl.gz" % pathname)
             if len(project_files) == 1:
                 input_file = project_files[0]
             elif len(project_files) == 0:
-                raise PKLNotReadError("In the provided working path '%s', there is no saved project." % input_path)
+                raise PKLNotReadError("In the provided working path '%s', there is no saved project." % pathname)
             else:
                 raise PKLNotReadError("In the provided working path '%s', there are multiple saved projects. "
-                                      "Please, specify which one you want to load." % input_path)
+                                      "Please, specify which one you want to load." % pathname)
         else:
-            raise IllegalArgumentError("The provided path '%s' does not exist or is an invalid file/directory." % input_path)
+            raise IllegalArgumentError("The provided path '%s' does not exist or is an invalid file/directory." % pathname)
 
         if not logging_enabled:
             logger.disabled = True
@@ -605,6 +822,11 @@ class Project:
 
 class LocalProject(Project):
 
+    """Define a local LUNA project, i.e., results are saved locally and not to a database.
+
+        This class inherits from `Project` and implements :meth:`run`.
+    """
+
     def __init__(self, entries, working_path, **kwargs):
         super().__init__(entries=entries, working_path=working_path, **kwargs)
 
@@ -617,8 +839,8 @@ class LocalProject(Project):
         try:
             # Check if the entry is in the correct format.
             # It also accepts entries whose pdb_id is defined by the filename.
-            if isinstance(entry, MolEntry) is False:
-                self.validate_entry_format(entry)
+            if isinstance(entry, MolFileEntry) is False:
+                self._validate_entry_format(entry)
 
             # Entry results will be saved here.
             pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
@@ -631,11 +853,21 @@ class LocalProject(Project):
             pdb_file = "%s/%s.pdb" % (self.pdb_path, entry.pdb_id)
             entry.pdb_file = pdb_file
 
-            pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True, FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=False)
-            structure = pdb_parser.get_structure(entry.pdb_id, pdb_file)
-            add_hydrogen = self.decide_hydrogen_addition(pdb_parser.get_header(), entry)
+            pdb_parser = entry.parser
+            if pdb_parser is None:
+                pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True, FIX_EMPTY_CHAINS=True,
+                                       FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=False)
 
-            if isinstance(entry, MolEntry):
+            if isinstance(pdb_parser, FTMapParser):
+                structure = pdb_parser.get_structure(entry.pdb_id, pdb_file, only_compounds=[entry.get_biopython_key(full_id=True)])
+                pdb_file = "%s/pdbs/%s.pdb" % (self.working_path, entry.to_string())
+                save_to_file(structure, pdb_file)
+                entry.pdb_file = pdb_file
+            else:
+                structure = pdb_parser.get_structure(entry.pdb_id, pdb_file)
+            add_h = self._decide_hydrogen_addition(pdb_parser.get_header(), entry)
+
+            if isinstance(entry, MolFileEntry):
                 structure = entry.get_biopython_structure(structure, pdb_parser)
 
             ligand = get_entity_from_entry(structure, entry)
@@ -644,7 +876,7 @@ class LocalProject(Project):
             #
             # Perceive pharmacophoric properties
             #
-            atm_grps_mngr = self.perceive_chemical_groups(entry, structure[0], ligand, add_hydrogen)
+            atm_grps_mngr = self._perceive_chemical_groups(entry, structure[0], ligand, add_h)
             atm_grps_mngr.entry = entry
 
             #
@@ -662,12 +894,12 @@ class LocalProject(Project):
             # Generate IFP (Interaction fingerprint)
             ifp = None
             if self.calc_ifp:
-                ifp = self.create_ifp(atm_grps_mngr)
+                ifp = self._create_ifp(atm_grps_mngr)
 
             # Generate MFP (Molecular fingerprint)
             mfp = None
             if self.calc_mfp:
-                mfp = self.create_mfp()
+                mfp = self._create_mfp()
 
             # Saving entry results.
             entry_results = EntryResults(entry, atm_grps_mngr, interactions_mngr, ifp, mfp)
@@ -681,7 +913,7 @@ class LocalProject(Project):
             if self.out_pse:
                 pse_file = "%s/results/pse/%s.pse" % (self.working_path, entry.to_string())
                 piv = InteractionViewer(add_directional_arrows=False)
-                piv.new_session([(entry, interactions_mngr, self.pdb_path)], pse_file)
+                piv.new_session([(entry, interactions_mngr, entry.pdb_file)], pse_file)
 
             self._log("debug", "Processing of entry '%s' finished successfully." % entry.to_string())
 
@@ -707,7 +939,7 @@ class LocalProject(Project):
                 atm_grps_mngr = entry_results.atm_grps_mngr
 
                 # Generate a new IFP.
-                ifp = self.create_ifp(atm_grps_mngr)
+                ifp = self._create_ifp(atm_grps_mngr)
 
                 # Substitute old IFP by the new version and save the project.
                 entry_results.ifp = ifp
@@ -731,8 +963,8 @@ class LocalProject(Project):
 
         start = time.time()
 
-        self.prepare_project_path()
-        self.init_logging_file(self.logging_file)
+        self._prepare_project_path()
+        self._init_logging_file(self.logging_file)
 
         self.remove_duplicate_entries()
 
@@ -744,7 +976,7 @@ class LocalProject(Project):
 
         # Run jobs either in Parallel or Sequentially (nproc = None).
         pj = ParallelJobs(self.nproc)
-        job_results = pj.run_jobs(args_list=self.entries, consumer_func=self._process_entry, job_name="Entries processing")
+        job_results = pj.run_jobs(args=self.entries, consumer_func=self._process_entry, job_name="Entries processing")
         self.errors = job_results.errors
 
         # Remove failed entries.
@@ -766,20 +998,20 @@ class LocalProject(Project):
 
             # Generate IFP/MFP files
             if self.calc_ifp:
-                self.create_ifp_file()
+                self._create_ifp_file()
             if self.calc_mfp:
-                self.create_mfp_file()
+                self._create_mfp_file()
 
             if self.out_ifp_sim_matrix and len(self.entries) > 1:
                 self._log("info", "Calculating the Tanimoto similarity between fingerprints.")
                 output_file = "%s/results/fingerprints/ifp_sim_matrix.csv" % self.working_path
-                self.generate_similarity_matrix(output_file)
+                self._generate_similarity_matrix(output_file)
 
         # Save the whole project information.
         self.save(self.project_file)
 
         # Remove unnecessary paths.
-        self.remove_empty_paths()
+        self._remove_empty_paths()
 
         end = time.time()
         self._log("info", "Project creation completed!!!")
@@ -788,9 +1020,17 @@ class LocalProject(Project):
         self._log("info", "You can reload your project from %s.\n\n" % self.project_file)
 
         # Properly close any filehandlers.
-        self.close_logging_file()
+        self._close_logging_file()
 
     def generate_ifps(self):
+        """Generate LUNA interaction fingerprints (IFPs).
+
+        This function can be used to generate new IFPs after a project is run.
+        Thus, you can reload your project, vary IFP parameters (``ifp_num_levels``, ``ifp_radius_step``,
+        ``ifp_length``, ``ifp_count``, ``ifp_diff_comp_classes``, ``ifp_type``,
+        ``ifp_output``), and call `generate_ifps` to create new IFPs without having to
+        run the project from the scratch.
+        """
 
         if len(self.entries) == 0:
             warnings.warn("There is nothing to be done as no entry was informed.")
@@ -802,20 +1042,20 @@ class LocalProject(Project):
         self.overwrite_path = False
 
         if self.ifp_output is None:
-            self.prepare_project_path(subdirs=["results", "results/fingerprints"])
+            self._prepare_project_path(subdirs=["results", "results/fingerprints"])
 
         # Create a new directory for logs.
         if self.logging_enabled:
             if not exists("%s/logs/" % self.working_path):
-                self.prepare_project_path(subdirs=["logs"])
-            self.init_logging_file(self.logging_file)
+                self._prepare_project_path(subdirs=["logs"])
+            self._init_logging_file(self.logging_file)
 
         self._log("info", "Fingerprint generation will start. Number of entries to be processed is: %d." % len(self.entries))
         self._log("info", "The number of processes was set to: %s." % str(self.nproc))
 
         # Run jobs either in Parallel or Sequentially (nproc = None).
         pj = ParallelJobs(self.nproc)
-        job_results = pj.run_jobs(args_list=self.entries, consumer_func=self._process_ifps, job_name="Fingerprint generation")
+        job_results = pj.run_jobs(args=self.entries, consumer_func=self._process_ifps, job_name="Fingerprint generation")
         self.errors = job_results.errors
 
         tmp_entries = self.entries
@@ -838,21 +1078,21 @@ class LocalProject(Project):
 
             # Generate IFP/MFP files
             if self.calc_ifp:
-                self.create_ifp_file()
+                self._create_ifp_file()
             if self.calc_mfp:
-                self.create_mfp_file()
+                self._create_mfp_file()
 
             if self.out_ifp_sim_matrix and len(self.entries) > 1:
                 self._log("info", "Calculating the Tanimoto similarity between fingerprints.")
                 output_file = "%s/results/fingerprints/ifp_sim_matrix.csv" % self.working_path
-                self.generate_similarity_matrix(output_file)
+                self._generate_similarity_matrix(output_file)
 
         # Remove unnecessary paths.
-        self.remove_empty_paths()
+        self._remove_empty_paths()
 
         end = time.time()
         self._log("info", "Total processing time: %.2fs." % (end - start))
         self._log("info", "Results were saved at %s.\n\n" % self.working_path)
 
         # Properly close any filehandlers.
-        self.close_logging_file()
+        self._close_logging_file()
