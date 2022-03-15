@@ -1,19 +1,21 @@
 from os import path
 
-from luna.mol.interaction.conf import DefaultInteractionConf, InteractionConf
+from luna.interaction.conf import DefaultInteractionConf, InteractionConf
 from luna.util import ColorPallete
 
 
 ENTRY_SEPARATOR = ":"
 
-LUNA_PATH = path.abspath(path.join(path.realpath(__file__), '../../../', 'tmp/LUNA'))
-PDB_PATH = "%s/public/pdb" % LUNA_PATH
-TMP_FILES = "%s/public/tmp" % LUNA_PATH
+LUNA_PATH = path.abspath(path.join(path.realpath(__file__), '../../../'))
+OUTPUT_PATH = "%s/output/public" % LUNA_PATH
+PDB_PATH = "%s/pdb" % OUTPUT_PATH
+TMP_FILES = "%s/tmp" % OUTPUT_PATH
 
 CONF_PATH = path.abspath(path.join(path.realpath(__file__), '../../', 'data'))
 DB_CONF_FILE = "%s/mysql.ini" % CONF_PATH
 ATOM_PROP_FILE = "%s/LUNA.fdef" % CONF_PATH
 LIGAND_EXPO_FILE = "%s/ligand_expo.tsv" % CONF_PATH
+MIN_FDEF_FILE = '%s/MinimalFeatures.fdef' % CONF_PATH
 
 INTERACTION_CONF = DefaultInteractionConf()
 BOUNDARY_CONF = InteractionConf({"boundary_cutoff": 6.2})
@@ -260,3 +262,6 @@ PYMOL_INTERACTION_COLOR_AS_RGB = ColorPallete({
     "Aromatic bond": (0.0, 0.0, 0.0),
     "Other bond": (0.0, 0.0, 0.0),
 }, (1.0, 1.0, 1.0))
+
+
+ARTIFACTS_LIST = ["ACE", "ACT", "BME", "CSD", "CSW", "EDO", "FMT", "GOL", "MSE", "NAG", "NO3", "PO4", "SGM", "SO4", "TPO"]
