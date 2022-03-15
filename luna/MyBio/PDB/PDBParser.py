@@ -76,6 +76,7 @@ class PDBParser(object):
     def __init__(self, PERMISSIVE=True, get_header=False,
                  structure_builder=None, QUIET=False,
                  FIX_ATOM_NAME_CONFLICT=False,
+                 FIX_EMPTY_CHAINS=False,
                  FIX_OBABEL_FLAGS=False,
                  FIX_ALL_OBABEL_ERRORS=False):
         """Create a PDBParser object.
@@ -115,6 +116,9 @@ class PDBParser(object):
         # MODBY: Alexandre Fassio
         # Correct conflicts in atom names.
         self.FIX_ATOM_NAME_CONFLICT = FIX_ATOM_NAME_CONFLICT
+        # MODBY: Alexandre Fassio
+        # Fix empty chains.
+        self.FIX_EMPTY_CHAINS = FIX_EMPTY_CHAINS
         # MODBY: Alexandre Fassio
         # Correct flags that were incorrectly set by OpenBabel.
         self.FIX_OBABEL_FLAGS = FIX_OBABEL_FLAGS
@@ -269,7 +273,7 @@ class PDBParser(object):
 
                 # MODBY: Alexandre Fassio
                 # Replace empty chains for a default value.
-                if chainid.strip() == "":
+                if chainid.strip() == "" and self.FIX_EMPTY_CHAINS:
                     chainid = DEFAULT_CHAIN_ID
 
                 try:
@@ -433,11 +437,15 @@ class PDBParser(object):
 
         conects = {}
         local_line_counter = 0
+
         for i in range(0, len(trailer)):
             line = trailer[i].rstrip('\n')
             record_type = line[0:6]
 
             global_line_counter = self.line_counter + local_line_counter + 1
+            structure_builder.set_line_counter(global_line_counter)
+
+            local_line_counter += 1
 
             if record_type == "CONECT":
                 serial_numbers = [line[6:11], line[11:16], line[16:21],
@@ -496,7 +504,6 @@ class PDBParser(object):
                     orig_bonded_atoms += bonded_atoms
                     conects[orig_serial_number] = orig_bonded_atoms
 
-            local_line_counter += 1
         return conects
 
     def _handle_PDB_exception(self, message, line_counter):
