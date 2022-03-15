@@ -1,0 +1,22 @@
+name: luna-env
+channels:
+  - anaconda
+  - schrodinger
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.7.6
+  - rdkit
+  - seaborn
+  - openbabel
+  - pip
+  - biopython=1.72
+  - sqlalchemy
+  - ipykernel
+  - pymol
+  - xopen
+  - colorlog
+  - networkx
+  - pip:
+    - babel==2.8.0
+    - mmh3==2.5.1
