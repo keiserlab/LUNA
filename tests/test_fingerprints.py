@@ -10,11 +10,11 @@ sys.path.append(luna_path)
 
 from luna import LocalProject
 from luna.mol.entry import *
-from luna.mol.interaction.filter import InteractionFilter
-from luna.mol.interaction.calc import InteractionCalculator
+from luna.interaction.filter import InteractionFilter
+from luna.interaction.calc import InteractionCalculator
+from luna.interaction.fp.shell import ShellGenerator
+from luna.interaction.fp.type import IFPType
 from luna.util.file import create_directory, remove_files
-from luna.mol.interaction.fp.shell import ShellGenerator
-from luna.mol.interaction.fp.type import IFPType
 from luna.version import __version__ as version
 
 
@@ -27,6 +27,7 @@ ifp_path = f"{results_path}/results/fingerprints/"
 test_ligs = ["ZINC000012442563", "ZINC000343043015"]
 expected_entries = set(["protein:%s" % lig_id for lig_id in test_ligs])
 
+
 class FingerprintTest(unittest.TestCase):
 
     def _get_project_results(self):
@@ -35,10 +36,9 @@ class FingerprintTest(unittest.TestCase):
         if not exists(proj_pkl_file):
             print(u"\u25a8 Project not found locally. It will be recreated at: '%s'...\n" % results_path)
 
-            entries = [MolEntry.from_mol_file("protein", lig_id, mol_file=lig_file,
-                                              is_multimol_file=True, autoload=True) for lig_id in test_ligs]
+            entries = [MolFileEntry.from_mol_file("protein", lig_id, mol_file=lig_file,
+                                                  is_multimol_file=True, autoload=True) for lig_id in test_ligs]
 
-            # pdb_path = os.path.dirname(os.path.realpath(args.pdb_file))
             ic = InteractionCalculator(inter_filter=InteractionFilter.new_pli_filter(), strict_donor_rules=True, strict_weak_donor_rules=True)
 
             opt = {}
@@ -48,7 +48,7 @@ class FingerprintTest(unittest.TestCase):
             opt["overwrite_path"] = True
             opt["inter_calc"] = ic
             opt["mol_obj_type"] = 'rdkit'
-            opt["try_h_addition"] = True
+            opt["add_h"] = True
             opt["amend_mol"] = True
             opt["calc_ifp"] = False
             opt["verbosity"] = 1
@@ -65,7 +65,7 @@ class FingerprintTest(unittest.TestCase):
     def _generate_manual_ifp(self, agm, ifp_num_levels=2, ifp_radius_step=5.73171):
         shells = ShellGenerator(ifp_num_levels, ifp_radius_step, diff_comp_classes=True, ifp_type=IFPType.EIFP)
         sm = shells.create_shells(agm)
-        ifp = sm.to_fingerprint(count_fp=True, unique_shells=False, fold_to_size=4096)
+        ifp = sm.to_fingerprint(count_fp=True, unique_shells=False, fold_to_length=4096)
         ifp_bits_str = "\t".join([str(idx) for idx in ifp.counts.keys()])
         ifp_count_str = "\t".join([str(count) for count in ifp.counts.values()])
 

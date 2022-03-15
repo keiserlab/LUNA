@@ -6,9 +6,7 @@ from os.path import dirname, abspath
 sys.path.append(dirname(dirname(abspath(__file__))))
 
 from luna.mol.entry import *
-from luna.util.file import new_filename
 from luna.util.exceptions import InvalidEntry, IllegalArgumentError, MoleculeObjectError, MoleculeObjectTypeError, MoleculeNotFoundError
-
 
 
 class EntryTest(unittest.TestCase):
@@ -40,13 +38,6 @@ class EntryTest(unittest.TestCase):
 
         # Long filename.
         self.assertRaises(InvalidEntry, Entry, "4Q411SM6ZMPI6CBUKZSX10IA9M2923PUIHY88URUWC0R1ZOLQLJKXK9VATXRI3CM9W7RU409M19CG6S55TQ5L8L03HIKKL2HSEBTJ2VT7Y4G2JTUB558JOG2F3H9O524MMSYM0M3A347Q2JN77XG4MLAR3XI3EULR6WMVZ6U6NMASHPSUBE28ETOB0S1M0PTDX4KW45KLYC0JL5E77HKLAQK97NNOVB15B4SGVEVSZ90HZ3IMWZLF361AM0M0NSS", "B")
-        # Prohibited file names in Windows.
-        self.assertRaises(InvalidEntry, Entry, "con", "B")
-        self.assertRaises(InvalidEntry, Entry, "com9", "B")
-        self.assertRaises(InvalidEntry, Entry, "COM9", "B")
-        self.assertRaises(InvalidEntry, Entry, "nul", "B")
-        self.assertRaises(InvalidEntry, Entry, "prn", "B")
-        self.assertRaises(InvalidEntry, Entry, "aux", "B")
 
         # Valid compound entries.
         self.assertEqual(Entry("3QL8", "A", comp_name="X02", comp_num=100).to_string(), "3QL8:A:X02:100")
@@ -133,13 +124,6 @@ class EntryTest(unittest.TestCase):
 
         # Long filename.
         self.assertRaises(InvalidEntry, Entry.from_string, "4Q411SM6ZMPI6CBUKZSX10IA9M2923PUIHY88URUWC0R1ZOLQLJKXK9VATXRI3CM9W7RU409M19CG6S55TQ5L8L03HIKKL2HSEBTJ2VT7Y4G2JTUB558JOG2F3H9O524MMSYM0M3A347Q2JN77XG4MLAR3XI3EULR6WMVZ6U6NMASHPSUBE28ETOB0S1M0PTDX4KW45KLYC0JL5E77HKLAQK97NNOVB15B4SGVEVSZ90HZ3IMWZLF361AM0M0NSS:B")
-        # Prohibited file names in Windows.
-        self.assertRaises(InvalidEntry, Entry.from_string, "con:B")
-        self.assertRaises(InvalidEntry, Entry.from_string, "com9:B")
-        self.assertRaises(InvalidEntry, Entry.from_string, "COM9:B")
-        self.assertRaises(InvalidEntry, Entry.from_string, "nul:B")
-        self.assertRaises(InvalidEntry, Entry.from_string, "prn:B")
-        self.assertRaises(InvalidEntry, Entry.from_string, "aux:B")
 
         # Valid compound entries.
         self.assertEqual(Entry.from_string("3QL8:A:X02:100").to_string(), "3QL8:A:X02:100")
@@ -199,6 +183,7 @@ class EntryTest(unittest.TestCase):
 
         entry = Entry("3QL8", "A", "WAT", 104, is_hetatm=False)
         self.assertEqual(entry.get_biopython_key(), ("W", 104, " "))
+
 
 if __name__ == '__main__':
     unittest.main()
