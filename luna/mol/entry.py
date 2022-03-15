@@ -317,7 +317,7 @@ class Entry:
         full_id : bool
             If True, return the full id of a chain or ligand.
             For chains, it consists of a tuple containing the PDB and the chain id.
-            For ligandsm it consists of a tuple containing the PDB, the chain, and the ligand id.
+            For ligands, it consists of a tuple containing the PDB, the chain, and the ligand id.
             The default value is False.
 
         Returns

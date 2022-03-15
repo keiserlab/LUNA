@@ -5,6 +5,21 @@ logger = logging.getLogger()
 
 
 class Config:
+    """
+    Parser for configuration files.
+
+    Parameters
+    ----------
+    conf_file : str
+        The pathname for the configuration file.
+
+    Attributes
+    ----------
+
+    config : configparser.ConfigParser
+        The parsed configuration file.
+    """
+
     def __init__(self, conf_file):
         self.config = configparser.ConfigParser(allow_no_value=True)
         try:
@@ -14,6 +29,9 @@ class Config:
             raise IOError('Configuration file %s not read.' % conf_file)
 
     def get_section_map(self, section):
+        """
+        Try to access the section ``section`` from the parsed configuration file.
+        """
         section_map = {}
         options = self.config.options(section)
         for option in options:
