@@ -90,6 +90,10 @@ class AtomObjectTypeError(TypeError):
     pass
 
 
+class BondObjectTypeError(TypeError):
+    pass
+
+
 class MoleculeObjectTypeError(TypeError):
     pass
 

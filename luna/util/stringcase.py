@@ -1,5 +1,5 @@
 """
-String convert functions
+Functions to convert strings.
 """
 
 import re
@@ -8,12 +8,15 @@ import re
 def camelcase(string):
     """ Convert string into camel case.
 
-    Args:
-        string: String to convert.
+    Parameters
+    ----------
+        string : str
+            String to convert.
 
-    Returns:
-        string: Camel case string.
-
+    Returns
+    -------
+        string : str
+            Camel case string.
     """
 
     string = re.sub(r"\w[\s\W]+\w", '', str(string))
@@ -26,14 +29,24 @@ def capitalcase(string):
     """Convert string into capital case.
     First letters will be uppercase.
 
-    Args:
-        string: String to convert.
+    Parameters
+    ----------
+        string : str
+            String to convert.
 
-    Returns:
-        string: Capital case string.
+    Returns
+    -------
+        string : str
+            Capital case string.
+
+    Examples
+    --------
+    >>> import luna.util.stringcase as sc
+    >>> new_str = sc.camelcase("This is an interesting example.")
+    >>> print(new_str)
+    'this is an interesting example.'
 
     """
-
     string = str(string)
     if not string:
         return string
@@ -44,12 +57,15 @@ def constcase(string):
     """Convert string into upper snake case.
     Join punctuation with underscore and convert letters into uppercase.
 
-    Args:
-        string: String to convert.
+    Parameters
+    ----------
+        string : str
+            String to convert.
 
-    Returns:
-        string: Const cased string.
-
+    Returns
+    -------
+        string : str
+            Const cased string.
     """
 
     return uppercase(snakecase(string))
@@ -58,12 +74,22 @@ def constcase(string):
 def lowercase(string):
     """Convert string into lower case.
 
-    Args:
-        string: String to convert.
+    Parameters
+    ----------
+        string : str
+            String to convert.
 
-    Returns:
-        string: Lowercase case string.
+    Returns
+    -------
+        string : str
+            Lowercase case string.
 
+    Examples
+    --------
+    >>> import luna.util.stringcase as sc
+    >>> new_str = sc.camelcase("This is an Interesting EXAMPLE.")
+    >>> print(new_str)
+    'this is an interesting example.'
     """
 
     return str(string).lower()
@@ -72,12 +98,15 @@ def lowercase(string):
 def pascalcase(string):
     """Convert string into pascal case.
 
-    Args:
-        string: String to convert.
+    Parameters
+    ----------
+        string : str
+            String to convert.
 
-    Returns:
-        string: Pascal case string.
-
+    Returns
+    -------
+        string : str
+            Pascal case string.
     """
 
     return capitalcase(camelcase(string))
@@ -87,12 +116,15 @@ def pathcase(string):
     """Convert string into path case.
     Join punctuation with slash.
 
-    Args:
-        string: String to convert.
+    Parameters
+    ----------
+        string : str
+            String to convert.
 
-    Returns:
-        string: Path cased string.
-
+    Returns
+    -------
+        string : str
+            Path cased string.
     """
     string = snakecase(string)
     if not string:
@@ -104,12 +136,15 @@ def backslashcase(string):
     """Convert string into spinal case.
     Join punctuation with backslash.
 
-    Args:
-        string: String to convert.
+    Parameters
+    ----------
+        string : str
+            String to convert.
 
-    Returns:
-        string: Spinal cased string.
-
+    Returns
+    -------
+        string : str
+            Spinal cased string.
     """
     str1 = re.sub(r"_", r"\\", snakecase(string))
 
@@ -121,12 +156,15 @@ def sentencecase(string):
     """Convert string into sentence case.
     First letter capped and each punctuations are joined with space.
 
-    Args:
-        string: String to convert.
+    Parameters
+    ----------
+        string : str
+            String to convert.
 
-    Returns:
-        string: Sentence cased string.
-
+    Returns
+    -------
+        string : str
+            Sentence cased string.
     """
     joiner = ' '
     string = re.sub(r"[\-_\.\s]", joiner, str(string))
@@ -140,14 +178,17 @@ def sentencecase(string):
 
 def snakecase(string):
     """Convert string into snake case.
-    Join punctuation with underscore
+    Join punctuation with underscore.
 
-    Args:
-        string: String to convert.
+    Parameters
+    ----------
+        string : str
+            String to convert.
 
-    Returns:
-        string: Snake cased string.
-
+    Returns
+    -------
+        string : str
+            Snake cased string.
     """
 
     string = re.sub(r"[\-\.\s]", '_', str(string))
@@ -160,28 +201,33 @@ def spinalcase(string):
     """Convert string into spinal case.
     Join punctuation with hyphen.
 
-    Args:
-        string: String to convert.
+    Parameters
+    ----------
+        string : str
+            String to convert.
 
-    Returns:
-        string: Spinal cased string.
-
+    Returns
+    -------
+        string : str
+            Spinal cased string.
     """
 
     return re.sub(r"_", "-", snakecase(string))
 
 
 def dotcase(string):
-    
     """Convert string into dot case.
     Join punctuation with dot.
 
-    Args:
-        string: String to convert.
+    Parameters
+    ----------
+        string : str
+            String to convert.
 
-    Returns:
-        string: Dot cased string.
-
+    Returns
+    -------
+        string : str
+            Dot cased string.
     """
 
     return re.sub(r"_", ".", snakecase(string))
@@ -192,12 +238,15 @@ def titlecase(string):
     First letter capped while each punctuations is capitalsed
     and joined with space.
 
-    Args:
-        string: String to convert.
+    Parameters
+    ----------
+        string : str
+            String to convert.
 
-    Returns:
-        string: Title cased string.
-
+    Returns
+    -------
+        string : str
+            Title cased string.
     """
 
     return ' '.join(
@@ -208,27 +257,46 @@ def titlecase(string):
 def trimcase(string):
     """Convert string into trimmed string.
 
-    Args:
-        string: String to convert.
+    Parameters
+    ----------
+        string : str
+            String to convert.
 
-    Returns:
-        string: Trimmed case string
+    Returns
+    -------
+        string : str
+            Trimmed case string.
+
+    Examples
+    --------
+    >>> import luna.util.stringcase as sc
+    >>> new_str = sc.camelcase("      This is an Interesting EXAMPLE.     ")
+    >>> print(new_str)
+    'This is an Interesting EXAMPLE.'
     """
-
     return str(string).strip()
 
 
 def uppercase(string):
     """Convert string into upper case.
 
-    Args:
-        string: String to convert.
+    Parameters
+    ----------
+        string : str
+            String to convert.
 
-    Returns:
-        string: Uppercase case string.
+    Returns
+    -------
+        string : str
+            Uppercase case string.
 
+    Examples
+    --------
+    >>> import luna.util.stringcase as sc
+    >>> new_str = sc.camelcase("This is an Interesting EXAMPLE.")
+    >>> print(new_str)
+    'THIS IS AN INTERESTING EXAMPLE.'
     """
-
     return str(string).upper()
 
 
@@ -236,12 +304,15 @@ def alphanumcase(string):
     """Cuts all non-alphanumeric symbols,
     i.e. cuts all expect except 0-9, a-z and A-Z.
 
-    Args:
-        string: String to convert.
+    Parameters
+    ----------
+        string : str
+            String to convert.
 
-    Returns:
-        string: String with cutted non-alphanumeric symbols.
-
+    Returns
+    -------
+        string : str
+            String with cutted non-alphanumeric symbols.
     """
     # return filter(str.isalnum, str(string))
     return re.sub("\W+", "", string)

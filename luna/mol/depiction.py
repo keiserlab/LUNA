@@ -4,40 +4,104 @@ from rdkit import Chem
 from rdkit.Chem.Draw import rdMolDraw2D
 from rdkit.Chem.AllChem import Compute2DCoords
 
-from luna.mol.wrappers.base import MolWrapper
+from luna.wrappers.base import MolWrapper
 from luna.util.default_values import ATOM_TYPES_COLOR
 
 
 class PharmacophoreDepiction:
+    """Draw molecules and depict pharmacophoric properties as colored circles.
 
-    def __init__(self, feature_extractor=None, colors=ATOM_TYPES_COLOR, fig_ext="png",
+    Parameters
+    ----------
+    feature_extractor : :class:`~luna.mol.features.FeatureExtractor`
+        Perceive pharmacophoric properties from molecules.
+    colors : :class:`~luna.util.ColorPallete`
+        Color scheme for pharmacophoric properties perceived by ``feature_extractor``.
+        The default value is :const:`~luna.util.default_values.ATOM_TYPES_COLOR`.
+    format : {'png', 'svg'}
+        The output file format. The default value is 'png'.
+    figsize : tuple of (float, float)
+        Width and height in inches. The default value is (800, 800).
+    font_size : float
+        The font size. The units are, roughly, pixels. The default value is 0.5.
+    circle_dist : float
+        Distance between circles (pharmacophoric properties). The default value is 0.2.
+    circle_radius :
+        Circles' radius size of pharmacophoric properties. The default value is 0.3.
+    use_bw_atom_palette : bool
+        Use a black & white palette for atoms and bonds.
+
+    Examples
+    --------
+
+    First, let's read a molecule (glutamine).
+
+    >>> from luna.wrappers.base import MolWrapper
+    >>> mol = MolWrapper.from_smiles("N[C@@H](CCC(N)=O)C(O)=O")
+
+    Now, create a feature factory and instantiate a new FeatureExtractor object.
+
+    >>> from luna.util.default_values import ATOM_PROP_FILE
+    >>> from rdkit.Chem import ChemicalFeatures
+    >>> from luna.mol.features import FeatureExtractor
+    >>> feature_factory = ChemicalFeatures.BuildFeatureFactory(ATOM_PROP_FILE)
+    >>> feature_extractor = FeatureExtractor(feature_factory)
+
+    Instantiate a new PharmacophoreDepiction object with the desired configuration.
+    For example, you can provide a color scheme for pharmacophoric properties, the image size, and its format.
+
+    >>> from luna.util.default_values import ATOM_TYPES_COLOR
+    >>> from luna.mol.depiction import PharmacophoreDepiction
+    pd = PharmacophoreDepiction(feature_extractor=feature_extractor, colors=ATOM_TYPES_COLOR,
+                                fig_size=(500, 500), format="svg")
+
+    Finally, you can draw the molecule with annotated pharmacophoric properties.
+
+    >>> pd.plot_fig(mol, "output.svg")
+    """
+
+    def __init__(self, feature_extractor=None, colors=ATOM_TYPES_COLOR, format="png",
                  fig_size=(800, 800), font_size=0.5, circle_dist=0.2, circle_radius=0.3,
-                 use_bw_atom_palette=True, svg_opts=None):
+                 use_bw_atom_palette=True):
 
         self.feature_extractor = feature_extractor
         self.colors = colors
-        self.fig_ext = fig_ext
+        self.format = format
         self.fig_size = fig_size
         self.font_size = font_size
         self.circle_dist = circle_dist
         self.circle_radius = circle_radius
         self.use_bw_atom_palette = use_bw_atom_palette
 
-        if svg_opts is None:
-            svg_opts = {
-                "flagCloseContactsDist": -1000,
-                "legendFontSize": 20,
-                "padding": 0.2
-            }
-        self.svg_opts = svg_opts or {}
-
     def _perceive_atm_types(self, rdmol):
         if self.feature_extractor is not None:
             return self.feature_extractor.get_features_by_atoms(rdmol)
         return {}
 
-    def plot_fig(self, mol, output=None, atm_types=None, legend=None):
-        rdmol = MolWrapper(mol).as_rdkit()
+    def plot_fig(self, mol_obj, output=None, atm_types=None, legend=None):
+        """Draw the molecule ``mol_obj`` and depict its pharmacophoric properties.
+
+        Parameters
+        ----------
+        mol_obj : :class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`
+            The molecule.
+        output : str
+            The output file where the molecule will be drawn.
+            If None, returns a drawing object (:class:`~rdkit.Chem.Draw.rdMolDraw2D.MolDraw2DCairo` or
+            :class:`~rdkit.Chem.Draw.rdMolDraw2D.MolDraw2DSVG`).
+        atm_types : dict or None
+            A pre-annotated dictionary for mapping atoms and pharmacophoric properties.
+            If None, try to perceive properties with ``feature_extractor``.
+        legend : str
+            A title for the figure.
+
+        Returns
+        -------
+        drawer : None or a drawing object (:class:`~rdkit.Chem.Draw.rdMolDraw2D.MolDraw2DCairo` or \
+        :class:`~rdkit.Chem.Draw.rdMolDraw2D.MolDraw2DSVG`)
+        """
+
+        rdmol = MolWrapper(mol_obj).as_rdkit()
 
         # Make a copy of the molecule
         rwm = Chem.RWMol(rdmol)
@@ -46,9 +110,9 @@ class PharmacophoreDepiction:
         if atm_types is None:
             atm_types = self._perceive_atm_types(rdmol)
 
-        if self.fig_ext == "png":
+        if self.format == "png":
             drawer = rdMolDraw2D.MolDraw2DCairo(*self.fig_size)
-        elif self.fig_ext == "svg":
+        elif self.format == "svg":
             drawer = rdMolDraw2D.MolDraw2DSVG(*self.fig_size)
         else:
             # raise
@@ -80,10 +144,6 @@ class PharmacophoreDepiction:
         atoms = [x for x in highlight]
         radius = {a: self.circle_radius for a in atoms}
 
-        # if self.svg_opts:
-        #     for k, v in self.svg_opts:
-        #     opts = **self.svg_opts
-
         opts.flagCloseContactsDist = -1000
         opts.legendFontSize = 20
         opts.padding = 0.02
@@ -93,8 +153,7 @@ class PharmacophoreDepiction:
         else:
             opts.useDefaultAtomPalette()
 
-        if legend is None:
-            legend = ""
+        legend = legend or ""
 
         drawer.SetFontSize(self.font_size)
         drawer.DrawMolecule(rwm, highlightAtoms=atoms, highlightAtomColors=highlight,
@@ -102,9 +161,9 @@ class PharmacophoreDepiction:
         drawer.FinishDrawing()
 
         if output:
-            if self.fig_ext == "png":
+            if self.format == "png":
                 drawer.WriteDrawingText(output)
-            elif self.fig_ext == "svg":
+            elif self.format == "svg":
                 svg = drawer.GetDrawingText().replace('svg:', '')
                 with open(output, "w") as fh:
                     fh.write(svg)

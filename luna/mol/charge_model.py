@@ -1,4 +1,4 @@
-from luna.mol.wrappers.base import AtomWrapper
+from luna.wrappers.base import AtomWrapper
 
 import logging
 logger = logging.getLogger()
@@ -7,9 +7,46 @@ logger = logging.getLogger()
 # TODO: implement this other model: https://github.com/openbabel/openbabel/blob/master/src/formats/mdlvalence.h
 
 
-class OpenEyeModel:
+class ChargeModel:
+    """Implementation of a charge model."""
+
+    def get_charge(self):
+        raise NotImplementedError("Subclasses should implement this.")
+
+
+class OpenEyeModel(ChargeModel):
+    """Implementation of OpenEye charge model."""
 
     def get_charge(self, atm_obj):
+        """Get the formal charge for atom ``atom_obj``.
+
+        Currently, only formal charges for the elements Hydrogen, Carbon, Nitrogen, Oxygen, Phosphorus,
+        Sulfur, Chlorine, Fluorine, Bromine, Iodine, Magnesium, Calcium, Zinc, Lithium, Sodium,
+        Potassium, and Boron can be recovered.
+
+        Parameters
+        ----------
+        atm_obj : :class:`~luna.wrappers.base.AtomWrapper`
+            The target atom.
+
+        Examples
+        --------
+        >>> from luna.mol.charge_model import OpenEyeModel
+        >>> from luna.wrappers.base import MolWrapper
+        >>> cm = OpenEyeModel()
+        >>> mol_obj = MolWrapper.from_smiles("[NH3+]CC([O-])=O")
+        >>> for atm_obj in mol_obj.get_atoms():
+        >>>     formal_charge = cm.get_charge(atm_obj)
+        >>>     print("Charge for atom #%d (%s): %d" % (atm_obj.get_idx(),
+        ...                                             atm_obj.get_symbol(),
+        ...                                             formal_charge))
+        Charge for atom #0 (N): 1.
+        Charge for atom #1 (C): 0.
+        Charge for atom #2 (C): 0.
+        Charge for atom #3 (O): -1.
+        Charge for atom #4 (O): 0.
+
+        """
         formal_charge = None
 
         atm_num = atm_obj.get_atomic_num()

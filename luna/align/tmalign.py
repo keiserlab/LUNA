@@ -12,7 +12,7 @@ from Bio.Alphabet import generic_protein
 
 from luna.MyBio.util import parse_from_file, save_to_file
 from luna.util.exceptions import InvalidSuperpositionFileError
-from luna.util.file import is_directory_valid, is_file_valid
+from luna.util.file import is_directory_valid
 
 
 import logging
@@ -24,12 +24,81 @@ TMALIGN = "/bin/tmalign"
 
 class TMAlignment(MultipleSeqAlignment):
 
-    def __init__(self, score, **kwargs):
+    """ Store TM-align results, including sequence alignment and TM-score.
+
+    Parameters
+    ----------
+    score : float
+        TM-score.
+    records : iterable of :class:`Bio.SeqRecord.SeqRecord`
+        Same length protein sequences. This may be an empty list.
+    **kwargs : dict, optional
+        Extra arguments to `TMAlignment`.
+        Refer to :class:`Bio.Align.MultipleSeqAlignment` documentation for a
+        list of all possible arguments.
+    """
+
+    def __init__(self, score, records, **kwargs):
         self.score = score
-        super().__init__(**kwargs)
+        super().__init__(records, **kwargs)
 
 
-def run_tmalign(file1, file2, output_path, tmalign):
+def align_structures(pdb_to_align, ref_pdb, output_path=None, tmalign=None):
+    """Align two PDB files with TM-align.
+
+    .. warning::
+
+        TM-align performs pair-wise structural alignments.
+        Therefore, if your PDB file contains multiple structures, it is recommended
+        you extract the chains first and align them separately, otherwise the alignment
+        may not produce the expected results.
+
+        To extract chains you can use :class:`~luna.MyBio.extractor.Extractor`.
+
+    Parameters
+    ----------
+    pdb_to_align : str
+        The PDB structure that will be aligned to ``ref_pdb``.
+    ref_pdb : str
+        Reference PDB file, i.e., align ``pdb_to_align`` to ``ref_pdb``.
+    output_path : str
+        Where to save TM-align output structures.
+    tmalign : str
+        Pathname to TM-align binary. The default value is '/bin/tmalign'.
+
+    Returns
+    -------
+     : `TMAlignment`
+     Results of TM-align, including sequence alignment and TM-score.
+
+    Examples
+    --------
+
+    >>> from luna.util.default_values import LUNA_PATH
+    >>> from luna.align.tmalign import align_structures
+    >>> pdb1 = "{LUNA_PATH}/tutorial/inputs/3QQF.pdb"
+    >>> pdb2 = "{LUNA_PATH}/tutorial/inputs/3QQK.pdb"
+    >>> alignment = align_structures(pdb1, pdb2, "./", tmalign="/media/data/Workspace/Softwares/TMalignc/TMalign")
+    >>> print(alignment.score)
+    0.98582
+    """
+
+    tmalign = tmalign or TMALIGN
+
+    logger.info("TM-align will try to align the files %s and %s." % (pdb_to_align, ref_pdb))
+
+    output = _run_tmalign(pdb_to_align, ref_pdb, output_path, tmalign)
+
+    seq_pair, tm_score = get_seq_records(output, pdb_to_align, ref_pdb)
+
+    alignment = TMAlignment(tm_score, records=seq_pair, alphabet=generic_protein)
+
+    logger.info("TM-align finished successfully. %s." % alignment[0].description)
+
+    return alignment
+
+
+def _run_tmalign(file1, file2, output_path, tmalign):
 
     logger.debug("It will try to execute the command: '%s %s %s'." % (tmalign, file1, file2))
 
@@ -59,9 +128,18 @@ def run_tmalign(file1, file2, output_path, tmalign):
     return output.decode()
 
 
-def get_seq_records(tm_output, ref_id, eqv_id):
-    """Create a pair of SeqRecords from TMalign output."""
+def get_seq_records(tm_output, aligned_pdb_id, ref_pdb_id):
+    """Create a pair of :class:`Bio.SeqRecord.SeqRecord` from a TM-align output.
 
+    Parameters
+    ----------
+    tm_output : str
+        The output produced by TM-align.
+    aligned_pdb_id : str
+        An identifier for the aligned PDB file.
+    ref_pdb_id : str
+        An identifier for the reference PDB file.
+    """
     logger.debug("Parsing the TMalign output.")
 
     lines = tm_output.splitlines()
@@ -84,53 +162,40 @@ def get_seq_records(tm_output, ref_id, eqv_id):
 
     tm_score = math.fsum(tm_scores) / len(tm_scores)
     # Extract the sequence alignment
-    lastLines = lines[-7:]
+    last_lines = lines[-7:]
 
-    assert lastLines[0].startswith('(":"')  # (":" denotes the residues pairs
-    assert lastLines[-1].startswith('Total running time is')
+    assert last_lines[0].startswith('(":"')  # (":" denotes the residues pairs
+    assert last_lines[-1].startswith('Total running time is')
 
-    refSeq, eqvSeq = lastLines[1].strip(), lastLines[3].strip()
+    aligned_seq, ref_seq = last_lines[1].strip(), last_lines[3].strip()
 
-    return (SeqRecord(Seq(refSeq), id=ref_id, description="TM-score=%f" % tm_score),
-            SeqRecord(Seq(eqvSeq), id=eqv_id, description="TM-score=%f" % tm_score)), tm_score
-
-
-def align_2struct(file1, file2, output_path=None, tmalign=None):
-
-    tmalign = tmalign or TMALIGN
-
-    logger.info("TMAlign will try to align the files %s and %s." % (file1, file2))
-
-    output = run_tmalign(file1, file2, output_path, tmalign)
-
-    seq_pair, tm_score = get_seq_records(output, file1, file2)
-
-    alignment = TMAlignment(tm_score, records=seq_pair, alphabet=generic_protein)
-
-    logger.info("TMAlign finished successfully. %s." % alignment[0].description)
-
-    return alignment
+    return (SeqRecord(Seq(aligned_seq), id=aligned_pdb_id, description="TM-score=%f" % tm_score),
+            SeqRecord(Seq(ref_seq), id=ref_pdb_id, description="TM-score=%f" % tm_score)), tm_score
 
 
-def extract_chain_from_sup(sup_file, extract_chain, new_chain_id, output_file, QUIET=False):
-    """ Extract a chain from the superposition file generated with TMAlign.
-        TMAlign modifies the name of the chains, so it is highly
-        recommended to rename a chain's name before to create the output file.
+def extract_chain_from_sup(sup_file, extract_chain, output_file, new_chain_id=None, QUIET=True):
+    """ Extract a chain from the superposition file generated by TM-align.
 
-        @param sup_file: a superposition file generated with TMAlign.
-        @type sup_file: string
+        .. warning::
+            TM-align modifies the id of the original chains, so it is highly
+            recommended to rename it to match the original chain id.
+            To do so, use the parameter ``new_chain_id``.
 
-        @param extract_chain: target chain to be extracted.
-        @type extract_chain: string
-
-        @param new_chain_id: the new name to the extracted chain.
-        @type new_chain_id: string
-
-        @param output_file: the name to the extracted PDB file.
-        @type  output_file: string
-
-        @param QUIET: mutes warning messages generated by Biopython.
-        @type QUIET: boolean
+        Parameters
+        ----------
+        sup_file: str
+            A superposition file generated by TM-align.
+        extract_chain: {'A', 'B'}
+            Target chain id to be extracted. TM-align performs pair-wise structural alignment,
+            so the output file will always contain two chains 'A' and 'B',
+            where 'A' and 'B' are the aligned and reference structures, respectively.
+        output_file: str
+            Save the extracted chain to this file.
+        new_chain_id: str, optional
+            The new chain id of the extracted chain.
+            If not provided, the chain ids will be maintained as it is in the TM-align output.
+        QUIET: bool
+            If True (the default), mute warning messages generated by Biopython.
     """
     if QUIET:
         try:
@@ -139,39 +204,36 @@ def extract_chain_from_sup(sup_file, extract_chain, new_chain_id, output_file, Q
         except Exception:
             logger.warning("Quiet mode could not be activated.")
 
+    if extract_chain not in ["A", "B"]:
+        raise ValueError("Valid values for 'extract_chain' are 'A' and 'B'.")
+
     try:
-        if is_file_valid(sup_file):
-            logger.debug("Trying to parse the file '%s'." % sup_file)
+        logger.debug("Trying to parse the file '%s'." % sup_file)
 
-            structure = parse_from_file("SUP", sup_file)
+        structure = parse_from_file("SUP", sup_file)
 
-            model = structure[0]
-            if (len(model.child_list) != 2):
-                raise InvalidSuperpositionFileError("This structure has %d chains. The file generated "
-                                                    "by TMAlign must have 2 chains." % len(model.child_list))
+        model = structure[0]
+        if (len(model.child_list) != 2):
+            raise InvalidSuperpositionFileError("This structure has %d chains. The file generated "
+                                                "by TM-align must have 2 chains." % len(model.child_list))
 
-            chainToRemove = 'B' if (extract_chain == "A") else "A"
-            model.detach_child(chainToRemove)
-            if (extract_chain != new_chain_id):
-                model[extract_chain].id = new_chain_id
+        chain_to_remove = 'B' if extract_chain == "A" else "A"
+        model.detach_child(chain_to_remove)
+
+        if new_chain_id is not None and extract_chain != new_chain_id:
+            model[extract_chain].id = new_chain_id
             logger.debug("Modifications completed.")
 
-            logger.debug("Now, it will try to parse the file '%s'." % sup_file)
+        save_to_file(structure, output_file)
 
-            save_to_file(structure, output_file)
-
-            logger.debug("File '%s' created successfully." % output_file)
+        logger.debug("File '%s' created successfully." % output_file)
     except Exception as e:
         logger.exception(e)
         raise
 
 
 def remove_sup_files(path):
-    """ Remove all superposition files created by TMAlign at a defined directory.
-
-        @param path: a path to remove superposition files.
-        @type path: string
-    """
+    """ Remove all superposition files created by TM-align at a defined directory ``path``."""
     try:
         if (is_directory_valid(path)):
             targets = ['*.sup', '*.sup_atm', '*.sup_all', '*.sup_all_atm', '*.sup_all_atm_lig']

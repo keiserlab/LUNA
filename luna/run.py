@@ -10,10 +10,10 @@ sys.path.append(scripts)
 from luna import LocalProject
 from luna.version import __version__ as version
 
-from luna.mol.entry import MolEntry
-from luna.mol.interaction.filter import InteractionFilter, BindingModeFilter
-from luna.mol.interaction.calc import InteractionCalculator
-from luna.mol.interaction.fp.type import IFPType
+from luna.mol.entry import MolFileEntry
+from luna.interaction.filter import InteractionFilter, BindingModeFilter
+from luna.interaction.calc import InteractionCalculator
+from luna.interaction.fp.type import IFPType
 from luna.util.file import get_filename, create_directory
 
 
@@ -36,7 +36,7 @@ def get_entries(args):
         target_id = get_filename(args.pdb_file)
 
         for ligand_id in entry_ids:
-            yield MolEntry.from_mol_file(target_id, ligand_id, mol_file=args.ligand_file, is_multimol_file=True)
+            yield MolFileEntry.from_mol_file(target_id, ligand_id, mol_file=args.ligand_file)
 
 
 def main():
@@ -99,25 +99,25 @@ def main():
         pdb_path = os.path.dirname(os.path.realpath(args.pdb_file))
         ic = InteractionCalculator(inter_filter=InteractionFilter.new_pli_filter(), strict_donor_rules=True, strict_weak_donor_rules=True)
 
-        opt = {}
-        opt["working_path"] = args.working_path
-        opt["pdb_path"] = pdb_path
-        opt["entries"] = entries
-        opt["overwrite_path"] = args.overwrite
-        opt["inter_calc"] = ic
-        opt["mol_obj_type"] = 'rdkit'
-        opt["try_h_addition"] = True
-        opt["amend_mol"] = True
-        opt["calc_ifp"] = False
-        opt["out_pse"] = args.out_pse
+        opts = {}
+        opts["working_path"] = args.working_path
+        opts["pdb_path"] = pdb_path
+        opts["entries"] = entries
+        opts["overwrite_path"] = args.overwrite
+        opts["inter_calc"] = ic
+        opts["mol_obj_type"] = 'rdkit'
+        opts["try_h_addition"] = True
+        opts["amend_mol"] = True
+        opts["calc_ifp"] = False
+        opts["out_pse"] = args.out_pse
 
         if args.nproc:
-            opt["nproc"] = args.nproc
+            opts["nproc"] = args.nproc
 
         if args.binding_modes_file:
-            opt["binding_mode_filter"] = BindingModeFilter.from_config_file(args.binding_modes_file)
+            opts["binding_mode_filter"] = BindingModeFilter.from_config_file(args.binding_modes_file)
 
-        pli_obj = LocalProject(**opt)
+        pli_obj = LocalProject(**opts)
         pli_obj.run()
     else:
         print(u"\u25a8 Reloading existing project: '%s'...\n" % args.working_path)
@@ -142,4 +142,4 @@ def main():
 
 if __name__ == '__main__':
     print()
-    proj = main()
+    main()
