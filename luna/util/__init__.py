@@ -1,6 +1,26 @@
-import logging
+import string
+import random
 
+import logging
 logger = logging.getLogger()
+
+
+def new_random_string(size=32, chars=string.ascii_uppercase + string.digits):
+    """Generate a new random string of size ``size`` containing only the characters provided in ``chars``.
+
+    Parameters
+    ----------
+    size : int, optional
+            The size of the new string. The default value is 32.
+    chars : iterable, optional
+            A sequence of characters to choose from. The default value is 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.
+
+    Returns
+    -------
+    random_string : str
+            The new random string.
+    """
+    return ('').join((random.choice(chars) for i in range(size)))
 
 
 def rgb2hex(r, g, b):
