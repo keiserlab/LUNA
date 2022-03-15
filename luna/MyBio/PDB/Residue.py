@@ -56,7 +56,7 @@ _atom_name_dict["O"] = 4
 class Residue(Entity):
     """Represents a residue. A Residue object stores atoms."""
 
-    def __init__(self, id, resname, segid, idx):
+    def __init__(self, id, resname, segid, idx, at_line=None):
         self.level = "R"
         self.disordered = 0
         self.resname = resname
@@ -67,8 +67,14 @@ class Residue(Entity):
         self.idx = idx
 
         # MODBY: Alexandre Fassio
+        # This optional property stores the line number in the PDB file where this residue starts.
+        self.at_line = at_line
+
+        # MODBY: Alexandre Fassio
         # By default: no residue is a target for any calculations.
         self._is_target = False
+
+        self.cluster_id = None
 
         Entity.__init__(self, id)
 
@@ -213,6 +219,11 @@ class Residue(Entity):
         for a in self:
             yield a
 
+    def get_flag(self):
+        if self.get_id()[0].startswith("H_"):
+            return "H"
+        return self.get_id()[0]
+
     # MODBY: Alexandre Fassio
     # Define if the residue is a target or not.
     def set_as_target(self, is_target=True):
@@ -233,7 +244,7 @@ class Residue(Entity):
         return {"chain": self.parent.id,
                 "name": self.resname,
                 "number": self.id[1],
-                "icode": self.id[2].strip(),
+                "icode": self.id[2],
                 "repr": comp_repr}
 
 

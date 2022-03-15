@@ -175,7 +175,7 @@ class StructureBuilder(object):
                         # present DisorderedResidue
                         # MODBY: Alexandre Fassio
                         # Create a new residue with the new property (idx) added to the Residue class.
-                        new_residue = Residue(res_id, resname, self.segid, len(self.chain.child_list))
+                        new_residue = Residue(res_id, resname, self.segid, len(self.chain.child_list), self.line_counter)
                         duplicate_residue.disordered_add(new_residue)
                         self.residue = duplicate_residue
                         return
@@ -201,7 +201,7 @@ class StructureBuilder(object):
 
                     # MODBY: Alexandre Fassio
                     # Create a new residue with the new property (idx) added to the Residue class.
-                    new_residue = Residue(res_id, resname, self.segid, len(self.chain.child_list))
+                    new_residue = Residue(res_id, resname, self.segid, len(self.chain.child_list), self.line_counter)
                     disordered_residue = DisorderedResidue(res_id)
                     self.chain.add(disordered_residue)
                     disordered_residue.disordered_add(duplicate_residue)
@@ -229,7 +229,7 @@ class StructureBuilder(object):
 
         # MODBY: Alexandre Fassio
         # Create a new residue with the new property (idx) added to the Residue class.
-        self.residue = Residue(res_id, resname, self.segid, len(self.chain.child_list))
+        self.residue = Residue(res_id, resname, self.segid, len(self.chain.child_list), self.line_counter)
         self.chain.add(self.residue)
 
     def init_atom(self, name, coord, b_factor, occupancy, altloc, fullname,
