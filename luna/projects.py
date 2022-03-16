@@ -1,5 +1,4 @@
 from os.path import exists, abspath, dirname
-from collections import defaultdict
 import time
 import logging
 import glob
@@ -10,18 +9,15 @@ import itertools
 
 # Open Babel and RDKit libraries
 from rdkit.Chem import ChemicalFeatures
-from rdkit.Chem import MolFromPDBBlock, MolFromSmiles
+from rdkit.Chem import MolFromSmiles
 
 # Local modules
-from luna.mol.depiction import PharmacophoreDepiction
-from luna.mol.clustering import cluster_fps
 from luna.mol.features import FeatureExtractor
 from luna.mol.fingerprint import generate_fp_for_mols
 from luna.mol.entry import Entry, MolFileEntry
 from luna.mol.groups import AtomGroupPerceiver
 from luna.interaction.contact import get_contacts_with
 from luna.interaction.calc import InteractionCalculator
-from luna.interaction.conf import InteractionConf
 from luna.interaction.view import InteractionViewer
 from luna.interaction.fp.shell import ShellGenerator
 from luna.interaction.fp.type import IFPType
@@ -35,8 +31,7 @@ from luna.util.jobs import ArgsGenerator, ParallelJobs
 
 from luna.MyBio.PDB.PDBParser import PDBParser
 from luna.MyBio.PDB.FTMapParser import FTMapParser
-from luna.MyBio.selector import ResidueSelector
-from luna.MyBio.util import download_pdb, save_to_file, entity_to_string, get_entity_from_entry
+from luna.MyBio.util import download_pdb, save_to_file, get_entity_from_entry
 from luna.version import __version__, has_version_compatibility
 
 from sys import setrecursionlimit
@@ -76,7 +71,7 @@ class EntryResults:
 
     Attributes
     ----------
-    entry: :class:`~luna.mol.entry.Entry`
+    entry : :class:`~luna.mol.entry.Entry`
     atm_grps_mngr: :class:`~luna.mol.groups.AtomGroupsManager`
     interactions_mngr: :class:`~luna.interaction.calc.InteractionsManager`
     ifp: :class:`~luna.interaction.fp.fingerprint.Fingerprint`
@@ -824,7 +819,34 @@ class LocalProject(Project):
 
     """Define a local LUNA project, i.e., results are saved locally and not to a database.
 
-        This class inherits from `Project` and implements :meth:`run`.
+        This class inherits from `Project` and implements :meth:`~luna.projects.Project.run`.
+
+    Examples
+    --------
+
+    In this minimum example, we will calculate protein-ligand interactions for dopamine D4 complexes.
+
+    First, we should define the ligand entries and initialize a new :class:`~luna.interaction.calc.InteractionCalculator`
+    object.
+
+    >>> from luna.util.default_values import LUNA_PATH
+    >>> from luna.interaction.calc import InteractionCalculator
+    >>> entries = list(MolFileEntry.from_file(input_file=f"{LUNA_PATH}/tutorial/inputs/MolEntries.txt",
+    ...                                       pdb_id="D4", mol_file=f"{LUNA_PATH}/tutorial/inputs/ligands.mol2"))
+    >>> ic = InteractionCalculator(inter_filter=InteractionFilter.new_pli_filter())
+
+    Finally, just create the new LUNA project with desired parameters and call :meth:`~luna.projects.Project.run`.
+    Here, we opted to define the parameters first as a dict, and then we pass it as an argument to `LocalProject`.
+
+    >>> from luna import LocalProject
+    >>> opts = {}
+    >>> opts["working_path"] = "%s/Results/Test3" % main_path
+    >>> opts["pdb_path"] = f"{LUNA_PATH}/tutorial/inputs/"
+    >>> opts["entries"] = entries
+    >>> opts["inter_calc"] = ic
+    >>> proj_obj = LocalProject(**opts)
+    >>> proj_obj.run()
+
     """
 
     def __init__(self, entries, working_path, **kwargs):
@@ -1030,6 +1052,19 @@ class LocalProject(Project):
         ``ifp_length``, ``ifp_count``, ``ifp_diff_comp_classes``, ``ifp_type``,
         ``ifp_output``), and call `generate_ifps` to create new IFPs without having to
         run the project from the scratch.
+
+        Examples
+        --------
+
+        In the below example, we will assume a LUNA project object named ``proj_obj`` already exists.
+
+        >>> from luna.interaction.fp.type import IFPType
+        >>> proj_obj.ifp_num_levels = 5
+        >>> proj_obj.ifp_radius_step = 1
+        >>> proj_obj.ifp_length = 4096
+        >>> proj_obj.ifp_type = IFPType.EIFP
+        >>> proj_obj.ifp_output = "EIFP-4096__length-5__radius-1.csv"
+        >>> proj_obj.generate_ifps()
         """
 
         if len(self.entries) == 0:
