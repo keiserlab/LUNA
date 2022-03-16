@@ -25,7 +25,7 @@ from luna.wrappers.base import MolWrapper
 from luna.util.default_values import *
 from luna.util.exceptions import *
 from luna.util.file import *
-from luna.util.logging import new_logging_file, load_default_logging_conf
+from luna.util.logging import new_logging_file, load_default_logging_config
 from luna.util.multiprocessing_logging import start_mp_handler, MultiProcessingHandler
 from luna.util.jobs import ArgsGenerator, ParallelJobs
 
@@ -39,7 +39,7 @@ from sys import setrecursionlimit
 # Set a recursion limit to avoid RecursionError with the library pickle.
 setrecursionlimit(RECURSION_LIMIT)
 
-logger = load_default_logging_conf()
+logger = load_default_logging_config()
 
 VERBOSITY_LEVEL = {4: logging.DEBUG,
                    3: logging.INFO,
@@ -336,7 +336,7 @@ class Project:
         self.add_h = add_h
 
         if inter_calc is None:
-            inter_calc = InteractionCalculator(inter_conf=INTERACTION_CONF)
+            inter_calc = InteractionCalculator(inter_config=INTERACTION_CONFIG)
         self.inter_calc = inter_calc
 
         self.binding_mode_filter = binding_mode_filter
@@ -641,10 +641,7 @@ class Project:
         perceiver = AtomGroupPerceiver(feature_extractor, add_h=add_h, ph=self.ph, amend_mol=self.amend_mol,
                                        mol_obj_type=self.mol_obj_type, tmp_path="%s/tmp" % self.working_path)
 
-        if "boundary_cutoff" in self.inter_calc.inter_conf.conf:
-            radius = self.inter_calc.inter_conf.conf["boundary_cutoff"]
-        else:
-            radius = BOUNDARY_CONF.boundary_cutoff
+        radius = self.inter_calc.inter_config.get("boundary_cutoff", BOUNDARY_CONFIG["boundary_cutoff"])
         nb_compounds = get_contacts_with(entity, ligand, level='R', radius=radius)
 
         mol_objs_dict = {}
