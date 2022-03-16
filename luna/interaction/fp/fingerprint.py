@@ -1,6 +1,6 @@
 import numpy as np
-from rdkit.DataStructs.cDataStructs import (ExplicitBitVect, SparseBitVect)
-from scipy.sparse import (issparse, csr_matrix)
+from rdkit.DataStructs.cDataStructs import ExplicitBitVect, SparseBitVect
+from scipy.sparse import issparse, csr_matrix
 from collections import defaultdict
 from rdkit import DataStructs
 
