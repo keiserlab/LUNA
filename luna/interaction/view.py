@@ -16,6 +16,14 @@ class InteractionViewer(PymolSessionManager):
     they should be aligned first. This can be achieved with :func:`luna.align.tmalign.align_2struct`
     or any other tool of your preference.
 
+    Parameters
+    ----------
+    show_hydrop_surface : bool
+        If True, highlight hydrophobic surfaces. The default value is False
+    **kwargs : dict, optional
+        Extra arguments to `InteractionViewer`. Refer to :class:`~luna.wrappers.pymol.PymolSessionManager`
+        documentation for a list of all possible arguments.
+
     Examples
     --------
 
@@ -86,7 +94,11 @@ class InteractionViewer(PymolSessionManager):
     or any other tool of your preference.
     """
 
-    def set_view(self, inter_tuples, show_hydrop_surface=False):
+    def __init__(self, show_hydrop_surface=False, **kwargs):
+        self.show_hydrop_surface = show_hydrop_surface
+        super().__init__(**kwargs)
+
+    def set_view(self, inter_tuples):
         """Depict interactions into the current Pymol session.
 
         Parameters
@@ -95,8 +107,6 @@ class InteractionViewer(PymolSessionManager):
             Each tuple must contain three items: an :class:`~luna.mol.entry.Entry` instance,
             an iterable of :class:`~luna.interaction.type.InteractionType` or an :class:`~luna.interaction.calc.InteractionsManager`,
             and a PDB file or the directory where the PDB file is located.
-        show_hydrop_surface : bool
-            If True, highlight hydrophobic surfaces.
         """
 
         if not isinstance(self.wrapper, PymolWrapper):
@@ -127,7 +137,7 @@ class InteractionViewer(PymolSessionManager):
             if interacting_residue_sels:
                 self.wrapper.select(name="%s.inter_residues" % main_grp, selection=" or ".join(interacting_residue_sels))
 
-            if show_hydrop_surface:
+            if self.show_hydrop_surface:
                 self.wrapper.color([("white", "%s and !name PS*" % main_grp)])
 
                 # It will display all hydrophobic groups if an AtomGroupsManager is available.
