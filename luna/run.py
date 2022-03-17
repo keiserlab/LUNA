@@ -33,10 +33,10 @@ def get_entries(args):
                 continue
             entry_ids.add(row)
 
-        target_id = get_filename(args.pdb_file)
+        pdb_id = get_filename(args.pdb_file)
 
         for ligand_id in entry_ids:
-            yield MolFileEntry.from_mol_file(target_id, ligand_id, mol_file=args.ligand_file)
+            yield MolFileEntry.from_mol_file(pdb_id, ligand_id, mol_file=args.ligand_file, is_multimol_file=True)
 
 
 def main():
@@ -106,7 +106,7 @@ def main():
         opts["overwrite_path"] = args.overwrite
         opts["inter_calc"] = ic
         opts["mol_obj_type"] = 'rdkit'
-        opts["try_h_addition"] = True
+        opts["add_h"] = True
         opts["amend_mol"] = True
         opts["calc_ifp"] = False
         opts["out_pse"] = args.out_pse

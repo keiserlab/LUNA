@@ -908,7 +908,7 @@ class LocalProject(Project):
             atm_grps_mngr.merge_hydrophobic_atoms(interactions_mngr)
 
             if self.binding_mode_filter is not None:
-                interactions_mngr.filter_by_binding_mode(self.binding_mode_filter)
+                interactions_mngr.filter_out_by_binding_mode(self.binding_mode_filter)
 
             # Generate IFP (Interaction fingerprint)
             ifp = None
