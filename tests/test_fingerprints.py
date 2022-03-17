@@ -1,5 +1,4 @@
 import unittest
-
 import sys
 from os.path import dirname, abspath, exists
 from io import StringIO
@@ -15,13 +14,15 @@ from luna.interaction.calc import InteractionCalculator
 from luna.interaction.fp.shell import ShellGenerator
 from luna.interaction.fp.type import IFPType
 from luna.util.file import create_directory, remove_files
+from luna.util.default_values import LUNA_PATH
 from luna.version import __version__ as version
 
 
-example_path = f"{luna_path}/example"
-results_path = f"{example_path}/project"
+example_path = f"{LUNA_PATH}/example"
 inputs_path = f"{example_path}/inputs"
 lig_file = f"{inputs_path}/ligands.mol2"
+
+results_path = f"{LUNA_PATH}/tests/project"
 ifp_path = f"{results_path}/results/fingerprints/"
 
 test_ligs = ["ZINC000012442563", "ZINC000343043015"]
@@ -39,7 +40,7 @@ class FingerprintTest(unittest.TestCase):
             entries = [MolFileEntry.from_mol_file("protein", lig_id, mol_file=lig_file,
                                                   is_multimol_file=True, autoload=True) for lig_id in test_ligs]
 
-            ic = InteractionCalculator(inter_filter=InteractionFilter.new_pli_filter(), strict_donor_rules=True, strict_weak_donor_rules=True)
+            ic = InteractionCalculator(inter_filter=InteractionFilter.new_pli_filter())
 
             opt = {}
             opt["working_path"] = results_path
