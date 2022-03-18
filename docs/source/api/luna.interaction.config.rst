@@ -1,7 +1,7 @@
-luna\.interaction\.conf module
+luna\.interaction\.config module
 ================================
 
-.. automodule:: luna.interaction.conf
+.. automodule:: luna.interaction.config
     :members:
     :undoc-members:
     :show-inheritance:
