@@ -67,6 +67,13 @@ class InteractionsManager:
         """int, read-only: The number of interactions."""
         return len(self._interactions)
 
+    def get_all_atm_grps(self):
+        atm_grps = set()
+        for inter in self.interactions:
+            atm_grps.add(inter.src_grp)
+            atm_grps.add(inter.trgt_grp)
+        return atm_grps
+
     def count_interations(self, must_have_target=False):
         """Count the number of each type of interaction in ``interactions``.
 
