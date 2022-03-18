@@ -7,7 +7,7 @@ Submodules
 .. toctree::
 
    luna.interaction.calc
-   luna.interaction.conf
+   luna.interaction.config
    luna.interaction.contact
    luna.interaction.filter
    luna.interaction.type

@@ -1,6 +1,6 @@
 from itertools import product
 
-from luna.util.default_values import COV_SEARCH_RADIUS, BOUNDARY_CONF
+from luna.util.default_values import COV_SEARCH_RADIUS, BOUNDARY_CONFIG
 from luna.util.exceptions import EntityLevelError, IllegalArgumentError
 from luna.MyBio.util import ENTITY_LEVEL_NAME, is_covalently_bound
 from luna.MyBio.PDB.NeighborSearch import NeighborSearch
@@ -12,7 +12,7 @@ import logging
 logger = logging.getLogger()
 
 
-def get_all_contacts(entity, radius=BOUNDARY_CONF.boundary_cutoff, level='A'):
+def get_all_contacts(entity, radius=BOUNDARY_CONFIG["boundary_cutoff"], level='A'):
     """Recover all residue-residue or atom-atom contacts in ``entity``.
 
     Parameters
@@ -76,7 +76,7 @@ def get_all_contacts(entity, radius=BOUNDARY_CONF.boundary_cutoff, level='A'):
         raise
 
 
-def get_contacts_with(entity, source, target=None, radius=BOUNDARY_CONF.boundary_cutoff, level='A'):
+def get_contacts_with(entity, source, target=None, radius=BOUNDARY_CONFIG["boundary_cutoff"], level='A'):
     """Recover atoms or residues in contact with ``source``.
 
     Parameters

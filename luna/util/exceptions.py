@@ -1,3 +1,11 @@
+class LUNAError(Exception):
+    """Base class for LUNA-specific errors.
+
+       This class is provided for future LUNA-specific functionality.
+    """
+    pass
+
+
 class CompatibilityError(RuntimeError):
     pass
 

@@ -79,14 +79,14 @@ def new_logging_file(filename, logging_level=logging.INFO, logger_name=None, pro
     logger.addHandler(ch)
 
 
-def load_default_logging_conf():
+def load_default_logging_config():
     logger = logging.getLogger()
 
     # Remove the existing file handlers
     for hdlr in logger.handlers[:]:
         logger.removeHandler(hdlr)
 
-    LOGGING_CONF = os.path.join(os.path.dirname(__file__), "logging.ini")
-    logging.config.fileConfig(LOGGING_CONF)
+    LOGGING_CONFIG = os.path.join(os.path.dirname(__file__), "logging.ini")
+    logging.config.fileConfig(LOGGING_CONFIG)
 
     return logger

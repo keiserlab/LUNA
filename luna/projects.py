@@ -1,5 +1,4 @@
 from os.path import exists, abspath, dirname
-from collections import defaultdict
 import time
 import logging
 import glob
@@ -10,18 +9,15 @@ import itertools
 
 # Open Babel and RDKit libraries
 from rdkit.Chem import ChemicalFeatures
-from rdkit.Chem import MolFromPDBBlock, MolFromSmiles
+from rdkit.Chem import MolFromSmiles
 
 # Local modules
-from luna.mol.depiction import PharmacophoreDepiction
-from luna.mol.clustering import cluster_fps
 from luna.mol.features import FeatureExtractor
 from luna.mol.fingerprint import generate_fp_for_mols
 from luna.mol.entry import Entry, MolFileEntry
 from luna.mol.groups import AtomGroupPerceiver
 from luna.interaction.contact import get_contacts_with
 from luna.interaction.calc import InteractionCalculator
-from luna.interaction.conf import InteractionConf
 from luna.interaction.view import InteractionViewer
 from luna.interaction.fp.shell import ShellGenerator
 from luna.interaction.fp.type import IFPType
@@ -29,14 +25,13 @@ from luna.wrappers.base import MolWrapper
 from luna.util.default_values import *
 from luna.util.exceptions import *
 from luna.util.file import *
-from luna.util.logging import new_logging_file, load_default_logging_conf
+from luna.util.logging import new_logging_file, load_default_logging_config
 from luna.util.multiprocessing_logging import start_mp_handler, MultiProcessingHandler
 from luna.util.jobs import ArgsGenerator, ParallelJobs
 
 from luna.MyBio.PDB.PDBParser import PDBParser
 from luna.MyBio.PDB.FTMapParser import FTMapParser
-from luna.MyBio.selector import ResidueSelector
-from luna.MyBio.util import download_pdb, save_to_file, entity_to_string, get_entity_from_entry
+from luna.MyBio.util import download_pdb, save_to_file, get_entity_from_entry
 from luna.version import __version__, has_version_compatibility
 
 from sys import setrecursionlimit
@@ -44,7 +39,7 @@ from sys import setrecursionlimit
 # Set a recursion limit to avoid RecursionError with the library pickle.
 setrecursionlimit(RECURSION_LIMIT)
 
-logger = load_default_logging_conf()
+logger = load_default_logging_config()
 
 VERBOSITY_LEVEL = {4: logging.DEBUG,
                    3: logging.INFO,
@@ -76,7 +71,7 @@ class EntryResults:
 
     Attributes
     ----------
-    entry: :class:`~luna.mol.entry.Entry`
+    entry : :class:`~luna.mol.entry.Entry`
     atm_grps_mngr: :class:`~luna.mol.groups.AtomGroupsManager`
     interactions_mngr: :class:`~luna.interaction.calc.InteractionsManager`
     ifp: :class:`~luna.interaction.fp.fingerprint.Fingerprint`
@@ -209,12 +204,12 @@ class Project:
     ifp_output : str
         If ``calc_ifp`` is True, save LUNA interaction fingerprints (IFPs) to file ``ifp_output``.
         If not provided, fingerprints are saved at <``working_path``>/results/fingerprints/ifp.csv.
+    ifp_sim_matrix_output : str, optional
+        If provided, compute Tanimoto similarity between interaction fingerprints (IFPs)
+        and save the similarity matrix to ``ifp_sim_matrix_output``.
     out_pse : bool
         If True, depict interactions save them as Pymol sessions (PSE file).
         The default value is False. PSE files are saved at <``working_path``>/results/pse.
-    out_ifp_sim_matrix : bool
-        If True, compute Tanimoto similarity between interaction fingerprints (IFPs)
-        and save the similarity matrix to <``working_path``>/results/fingerprints/ifp_sim_matrix.csv
     append_mode : bool
         If True, skip entries from processing if a result for them already exists in ``working_path``.
         This can save processing time in case additional entries are to be added to an existing project.
@@ -296,9 +291,9 @@ class Project:
                  ifp_diff_comp_classes=True,
                  ifp_type=IFPType.EIFP,
                  ifp_output=None,
+                 ifp_sim_matrix_output=None,
 
                  out_pse=False,
-                 out_ifp_sim_matrix=False,
 
                  append_mode=False,
                  verbosity=3,
@@ -341,7 +336,7 @@ class Project:
         self.add_h = add_h
 
         if inter_calc is None:
-            inter_calc = InteractionCalculator(inter_conf=INTERACTION_CONF)
+            inter_calc = InteractionCalculator(inter_config=INTERACTION_CONFIG)
         self.inter_calc = inter_calc
 
         self.binding_mode_filter = binding_mode_filter
@@ -358,9 +353,9 @@ class Project:
         self.ifp_diff_comp_classes = ifp_diff_comp_classes
         self.ifp_type = ifp_type
         self.ifp_output = ifp_output
+        self.ifp_sim_matrix_output = ifp_sim_matrix_output
 
         self.out_pse = out_pse
-        self.out_ifp_sim_matrix = out_ifp_sim_matrix
 
         self.append_mode = append_mode
 
@@ -646,10 +641,7 @@ class Project:
         perceiver = AtomGroupPerceiver(feature_extractor, add_h=add_h, ph=self.ph, amend_mol=self.amend_mol,
                                        mol_obj_type=self.mol_obj_type, tmp_path="%s/tmp" % self.working_path)
 
-        if "boundary_cutoff" in self.inter_calc.inter_conf.conf:
-            radius = self.inter_calc.inter_conf.conf["boundary_cutoff"]
-        else:
-            radius = BOUNDARY_CONF.boundary_cutoff
+        radius = self.inter_calc.inter_config.get("boundary_cutoff", BOUNDARY_CONFIG["boundary_cutoff"])
         nb_compounds = get_contacts_with(entity, ligand, level='R', radius=radius)
 
         mol_objs_dict = {}
@@ -824,7 +816,34 @@ class LocalProject(Project):
 
     """Define a local LUNA project, i.e., results are saved locally and not to a database.
 
-        This class inherits from `Project` and implements :meth:`run`.
+        This class inherits from `Project` and implements :meth:`~luna.projects.Project.run`.
+
+    Examples
+    --------
+
+    In this minimum example, we will calculate protein-ligand interactions for dopamine D4 complexes.
+
+    First, we should define the ligand entries and initialize a new :class:`~luna.interaction.calc.InteractionCalculator`
+    object.
+
+    >>> from luna.util.default_values import LUNA_PATH
+    >>> from luna.interaction.calc import InteractionCalculator
+    >>> entries = list(MolFileEntry.from_file(input_file=f"{LUNA_PATH}/tutorial/inputs/MolEntries.txt",
+    ...                                       pdb_id="D4", mol_file=f"{LUNA_PATH}/tutorial/inputs/ligands.mol2"))
+    >>> ic = InteractionCalculator(inter_filter=InteractionFilter.new_pli_filter())
+
+    Finally, just create the new LUNA project with desired parameters and call :meth:`~luna.projects.Project.run`.
+    Here, we opted to define the parameters first as a dict, and then we pass it as an argument to `LocalProject`.
+
+    >>> from luna import LocalProject
+    >>> opts = {}
+    >>> opts["working_path"] = "%s/Results/Test3" % main_path
+    >>> opts["pdb_path"] = f"{LUNA_PATH}/tutorial/inputs/"
+    >>> opts["entries"] = entries
+    >>> opts["inter_calc"] = ic
+    >>> proj_obj = LocalProject(**opts)
+    >>> proj_obj.run()
+
     """
 
     def __init__(self, entries, working_path, **kwargs):
@@ -889,7 +908,7 @@ class LocalProject(Project):
             atm_grps_mngr.merge_hydrophobic_atoms(interactions_mngr)
 
             if self.binding_mode_filter is not None:
-                interactions_mngr.filter_by_binding_mode(self.binding_mode_filter)
+                interactions_mngr.filter_out_by_binding_mode(self.binding_mode_filter)
 
             # Generate IFP (Interaction fingerprint)
             ifp = None
@@ -1002,10 +1021,9 @@ class LocalProject(Project):
             if self.calc_mfp:
                 self._create_mfp_file()
 
-            if self.out_ifp_sim_matrix and len(self.entries) > 1:
+            if self.ifp_sim_matrix_output and len(self.entries) > 1:
                 self._log("info", "Calculating the Tanimoto similarity between fingerprints.")
-                output_file = "%s/results/fingerprints/ifp_sim_matrix.csv" % self.working_path
-                self._generate_similarity_matrix(output_file)
+                self._generate_similarity_matrix(self.ifp_sim_matrix_output)
 
         # Save the whole project information.
         self.save(self.project_file)
@@ -1030,6 +1048,19 @@ class LocalProject(Project):
         ``ifp_length``, ``ifp_count``, ``ifp_diff_comp_classes``, ``ifp_type``,
         ``ifp_output``), and call `generate_ifps` to create new IFPs without having to
         run the project from the scratch.
+
+        Examples
+        --------
+
+        In the below example, we will assume a LUNA project object named ``proj_obj`` already exists.
+
+        >>> from luna.interaction.fp.type import IFPType
+        >>> proj_obj.ifp_num_levels = 5
+        >>> proj_obj.ifp_radius_step = 1
+        >>> proj_obj.ifp_length = 4096
+        >>> proj_obj.ifp_type = IFPType.EIFP
+        >>> proj_obj.ifp_output = "EIFP-4096__length-5__radius-1.csv"
+        >>> proj_obj.generate_ifps()
         """
 
         if len(self.entries) == 0:
@@ -1082,10 +1113,9 @@ class LocalProject(Project):
             if self.calc_mfp:
                 self._create_mfp_file()
 
-            if self.out_ifp_sim_matrix and len(self.entries) > 1:
+            if self.ifp_sim_matrix_output and len(self.entries) > 1:
                 self._log("info", "Calculating the Tanimoto similarity between fingerprints.")
-                output_file = "%s/results/fingerprints/ifp_sim_matrix.csv" % self.working_path
-                self._generate_similarity_matrix(output_file)
+                self._generate_similarity_matrix(self.ifp_sim_matrix_output)
 
         # Remove unnecessary paths.
         self._remove_empty_paths()

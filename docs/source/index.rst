@@ -14,8 +14,9 @@ Contents
    :maxdepth: 2
 
    overview
+   install
+   usage/index
    dev/index
    api/index
 
-.. install
 .. usage/index

@@ -1,6 +1,6 @@
 from os import path
 
-from luna.interaction.conf import DefaultInteractionConf, InteractionConf
+from luna.interaction.config import DefaultInteractionConfig, InteractionConfig
 from luna.util import ColorPallete
 
 
@@ -11,14 +11,14 @@ OUTPUT_PATH = "%s/output/public" % LUNA_PATH
 PDB_PATH = "%s/pdb" % OUTPUT_PATH
 TMP_FILES = "%s/tmp" % OUTPUT_PATH
 
-CONF_PATH = path.abspath(path.join(path.realpath(__file__), '../../', 'data'))
-DB_CONF_FILE = "%s/mysql.ini" % CONF_PATH
-ATOM_PROP_FILE = "%s/LUNA.fdef" % CONF_PATH
-LIGAND_EXPO_FILE = "%s/ligand_expo.tsv" % CONF_PATH
-MIN_FDEF_FILE = '%s/MinimalFeatures.fdef' % CONF_PATH
+CONFIG_PATH = path.abspath(path.join(path.realpath(__file__), '../../', 'data'))
+DB_CONFIG_FILE = "%s/mysql.ini" % CONFIG_PATH
+ATOM_PROP_FILE = "%s/LUNA.fdef" % CONFIG_PATH
+LIGAND_EXPO_FILE = "%s/ligand_expo.tsv" % CONFIG_PATH
+MIN_FDEF_FILE = '%s/MinimalFeatures.fdef' % CONFIG_PATH
 
-INTERACTION_CONF = DefaultInteractionConf()
-BOUNDARY_CONF = InteractionConf({"boundary_cutoff": 6.2})
+INTERACTION_CONFIG = DefaultInteractionConfig()
+BOUNDARY_CONFIG = InteractionConfig({"boundary_cutoff": 6.2})
 
 NMR_METHODS = ["SOLID-STATE NMR", "SOLUTION NMR"]
 

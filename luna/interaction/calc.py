@@ -4,13 +4,14 @@ from itertools import combinations, product
 from collections import defaultdict
 import json
 
-from luna.interaction.conf import DefaultInteractionConf, InteractionConf
+from luna.interaction.config import DefaultInteractionConfig, InteractionConfig
 from luna.interaction.filter import InteractionFilter
 from luna.interaction.type import InteractionType
 from luna.mol.features import ChemicalFeature
 from luna.wrappers.base import BondType
 from luna.analysis.summary import count_interaction_types
 import luna.util.math as im
+from luna.util.default_values import BOUNDARY_CONFIG
 from luna.util.exceptions import IllegalArgumentError
 from luna.mol.groups import AtomGroupNeighborhood
 from luna.util.file import pickle_data, unpickle_data
@@ -65,6 +66,13 @@ class InteractionsManager:
     def size(self):
         """int, read-only: The number of interactions."""
         return len(self._interactions)
+
+    def get_all_atm_grps(self):
+        atm_grps = set()
+        for inter in self.interactions:
+            atm_grps.add(inter.src_grp)
+            atm_grps.add(inter.trgt_grp)
+        return atm_grps
 
     def count_interations(self, must_have_target=False):
         """Count the number of each type of interaction in ``interactions``.
@@ -243,11 +251,11 @@ class InteractionCalculator:
 
     Parameters
     ----------
-    inter_conf : :class:`~luna.interaction.conf.InteractionConf`
-        An :class:`~luna.interaction.conf.InteractionConf` object with all parameters and cutoffs necessary
+    inter_config : :class:`~luna.interaction.config.InteractionConfig`
+        An :class:`~luna.interaction.config.InteractionConfig` object with all parameters and cutoffs necessary
         to compute interactions defined in ``inter_funcs``.
         If not provided, the default LUNA configuration will be used instead \
-        (:class:`~luna.interaction.conf.DefaultInteractionConf`).
+        (:class:`~luna.interaction.config.DefaultInteractionConfig`).
     inter_filter : :class:`~luna.interaction.filter.InteractionFilter`, optional
         An :class:`~luna.interaction.filter.InteractionFilter` object to filter out interactions on-the-fly.
         The default value is None, which implies no interaction will be filtered out.
@@ -381,39 +389,39 @@ class InteractionCalculator:
     **Example 2)** How to modify parameters to calculate interactions:
 
     If you just want to modify specific values from the default configuration,
-    you can create a new :class:`~luna.interaction.conf.DefaultInteractionConf`,
+    you can create a new :class:`~luna.interaction.config.DefaultInteractionConfig`,
     alter parameters, and pass it to `InteractionCalculator`.
 
     >>> from luna.interaction.calc import InteractionCalculator
-    >>> from luna.interaction.conf import DefaultInteractionConf
-    >>> custom_conf = DefaultInteractionConf()
-    >>> custom_conf.conf["min_dha_ang_hb_inter"] = 120
-    >>> ic = InteractionCalculator(inter_conf=custom_conf)
+    >>> from luna.interaction.config import DefaultInteractionConfig
+    >>> custom_config = DefaultInteractionConfig()
+    >>> custom_config.config["min_dha_ang_hb_inter"] = 120
+    >>> ic = InteractionCalculator(inter_config=custom_config)
 
     Alternatively, you can initiate a new `InteractionCalculator` without providing an
-    :class:`~luna.interaction.conf.InteractionConf` object, which will cause
+    :class:`~luna.interaction.config.InteractionConfig` object, which will cause
     `InteractionCalculator` to initiate the default configuration.
     Then, you can modify it directly as we did before.
 
     >>> from luna.interaction.calc import InteractionCalculator
     >>> ic = InteractionCalculator()
-    >>> print(ic.inter_conf.conf["min_dha_ang_hb_inter"])
+    >>> print(ic.inter_config["min_dha_ang_hb_inter"])
     90
-    >>> ic.inter_conf.conf["min_dha_ang_hb_inter"] = 120
+    >>> ic.inter_config["min_dha_ang_hb_inter"] = 120
+    >>> print(ic.inter_config["min_dha_ang_hb_inter"])
     120
-    >>> print(ic.inter_conf.conf["min_dha_ang_hb_inter"])
 
     Finally, if you want to define a custom configuration that will be used in your custom functions,
     you first need to define the parameters as a dict and then initiate a new
-    :class:`~luna.interaction.conf.InteractionConf`. See below:
+    :class:`~luna.interaction.config.InteractionConfig`. See below:
 
-    >>> from luna.interaction.conf import InteractionConf
-    >>> conf = {"param1": 2.5, "param2": 90}
-    >>> custom_conf = InteractionConf(conf)
-    >>> ic = InteractionCalculator(inter_conf=custom_conf)
-    >>> print(ic.inter_conf.conf["param1"])
+    >>> from luna.interaction.config import InteractionConfig
+    >>> config = {"param1": 2.5, "param2": 90}
+    >>> custom_config = InteractionConfig(config)
+    >>> ic = InteractionCalculator(inter_config=custom_config)
+    >>> print(ic.inter_config["param1"])
     2.5
-    >>> print(ic.inter_conf.conf["param2"])
+    >>> print(ic.inter_config["param2"])
     90
 
     **Example 3)** How to disable specific parameters and how to enable
@@ -421,23 +429,23 @@ class InteractionCalculator:
 
     To automatically disable, for instance, verification of angles during the
     calculation of interactions using LUNA's default functions, we just need to remove
-    the parameters related to angles from ``inter_conf``. Let's see an example where
+    the parameters related to angles from ``inter_config``. Let's see an example where
     we disable angles from hydrogen bonds:
 
     >>> ic = InteractionCalculator()
-    >>> del ic.inter_conf.conf["min_dha_ang_hb_inter"]
-    >>> del ic.inter_conf.conf["min_har_ang_hb_inter"]
-    >>> del ic.inter_conf.conf["min_dar_ang_hb_inter"]
+    >>> del ic.inter_config["min_dha_ang_hb_inter"]
+    >>> del ic.inter_config["min_har_ang_hb_inter"]
+    >>> del ic.inter_config["min_dar_ang_hb_inter"]
 
     This simple behavior is possible thanks to the function `is_within_boundary`,
-    which always returns True if the parameter does not exist in ``inter_conf``.
+    which always returns True if the parameter does not exist in ``inter_config``.
     Thus, you can take advantage of this system when implementing custom functions
     so others will also have the possibility to turn off specific parameters without
     modifying the code directly. Let's see that in practice.
 
     First, let's start importing the classes and the function we will use.
 
-    >>> from luna.interaction.conf import InteractionConf
+    >>> from luna.interaction.config import InteractionConfig
     >>> from luna.interaction.type import InteractionType
     >>> from luna.interaction.calc import InteractionCalculator
     >>> from luna.util.math import euclidean_distance
@@ -468,29 +476,29 @@ class InteractionCalculator:
 
     Finally, we are ready to provide the function and custom parameters to `InteractionCalculator`.
 
-    >>> custom_conf = InteractionConf({"max_hb_dist": 3})
+    >>> custom_config = InteractionConfig({"max_hb_dist": 3})
     >>> custom_funcs = {("Donor", "Acceptor"): [custom_hbond_function]}
-    >>> ic = InteractionCalculator(inter_funcs=custom_funcs, inter_conf=custom_conf)
+    >>> ic = InteractionCalculator(inter_funcs=custom_funcs, inter_config=custom_config)
 
     By doing so, we can now alter the new parameter or turn it off.
 
-    >>> ic.inter_conf.conf["max_hb_dist"] = 3.5
-    >>> del ic.inter_conf.conf["max_hb_dist"]
+    >>> ic.inter_config["max_hb_dist"] = 3.5
+    >>> del ic.inter_config["max_hb_dist"]
 
     """
 
-    def __init__(self, inter_conf=DefaultInteractionConf(), inter_filter=None, inter_funcs=None,
+    def __init__(self, inter_config=DefaultInteractionConfig(), inter_filter=None, inter_funcs=None,
                  add_non_cov=True, add_cov=True, add_proximal=False, add_atom_atom=True,
                  add_dependent_inter=False, add_h2o_pairs_with_no_target=False, strict_donor_rules=True,
                  strict_weak_donor_rules=True, lazy_comps_list=WATER_NAMES):
 
-        if inter_conf is not None and isinstance(inter_conf, InteractionConf) is False:
-            raise IllegalArgumentError("The informed interaction configuration must be an instance of '%s'." % InteractionConf)
+        if inter_config is not None and isinstance(inter_config, InteractionConfig) is False:
+            raise IllegalArgumentError("The informed interaction configuration must be an instance of '%s'." % InteractionConfig)
 
         if inter_filter is not None and isinstance(inter_filter, InteractionFilter) is False:
             raise IllegalArgumentError("The informed interaction filter must be an instance of '%s'." % InteractionFilter)
 
-        self.inter_conf = inter_conf
+        self.inter_config = inter_config
         self.inter_filter = inter_filter
         self._inter_funcs = inter_funcs or self._default_functions()
 
@@ -554,7 +562,7 @@ class InteractionCalculator:
         computed_pairs = set()
         all_interactions = []
 
-        boundary_cutoff = self.inter_conf.boundary_cutoff or DefaultInteractionConf().boundary_cutoff
+        boundary_cutoff = self.inter_config.get("boundary_cutoff", BOUNDARY_CONFIG["boundary_cutoff"])
 
         for trgt_atm_grp in trgt_atm_grps:
             for nb_atm_grp in ss.search(trgt_atm_grp.centroid, boundary_cutoff):
@@ -594,7 +602,7 @@ class InteractionCalculator:
                             # By providing a cutoff, it will force the algorithm to return paths only for groups connected by
                             # less than or equal N paths. So, if two groups return INF, it means they are a valid combination as they
                             # match the minimum bond separation.
-                            cutoff = self.inter_conf.conf.get("min_bond_separation", 0)
+                            cutoff = self.inter_config.get("min_bond_separation", 0)
                             shortest_path_length = trgt_atm_grp.get_shortest_path_length(nb_atm_grp, cutoff)
 
                         # If get_shortest_path_length() returns any value that is not infinite (INF), it means these two groups
@@ -1024,7 +1032,7 @@ class InteractionCalculator:
 
             # If the angle criterion were not defined, a specific Pi-stacking definition is not possible as it depends on
             # angle criterion. Therefore, a more general classification is used instead, i.e., all interactions will be Pi-stacking.
-            if any([c not in self.inter_conf.conf for c in criteria]):
+            if any([c not in self.inter_config for c in criteria]):
                 inter_type = "Pi-stacking"
             elif self.is_within_boundary(min_disp_angle, "min_disp_ang_offset_pi_pi_inter", le):
                 if self.is_within_boundary(dihedral_angle, "min_dihed_ang_slope_pi_pi_inter", le):
@@ -2517,14 +2525,14 @@ class InteractionCalculator:
                 # r1 + r2 - d < 0 => no clash
                 # r1 + r2 - d = 0 => in the limit, i.e., spheres are touching.
                 # r1 + r2 - d > 0 => clash.
-                if (rdw1 + rdw2 - cc_dist) >= self.inter_conf.conf.get("vdw_clash_tolerance", 0):
+                if (rdw1 + rdw2 - cc_dist) >= self.inter_config.get("vdw_clash_tolerance", 0):
                     # Ignore Van der Waals and clashes for atoms separated from each other by only N bonds.
                     # Covalent bonds keep atoms very tightly, producing distances lower than their sum of Van der Waals radius.
                     # As a consequence the algorithm will find a lot of false clashes and Van der Waals interactions.
                     #
                     # It is better to keep this function inside the IFs to avoid the Dijkstra processing for pairs of atoms
                     # that wouldn't enter inside the IF.
-                    shortest_path_length = group1.get_shortest_path_length(group2, self.inter_conf.conf.get("min_bond_separation", 0))
+                    shortest_path_length = group1.get_shortest_path_length(group2, self.inter_config.get("min_bond_separation", 0))
 
                     # If get_shortest_path_length() returns any value that is not infinite (INF), it means these two groups
                     # contain a path with at less than or equal to the cutoff 'min_bond_separation'. Therefore, ignore them.
@@ -2534,14 +2542,14 @@ class InteractionCalculator:
                     inter = InteractionType(group1, group2, "Van der Waals clash", params=params)
                     interactions.append(inter)
 
-                elif cc_dist <= rdw1 + rdw2 + self.inter_conf.conf.get("vdw_tolerance", 0):
+                elif cc_dist <= rdw1 + rdw2 + self.inter_config.get("vdw_tolerance", 0):
                     # Ignore Van der Waals and clashes for atoms separated from each other by only N bonds.
                     # Covalent bonds keep atoms very tightly, producing distances lower than their sum of Van der Waals radius.
                     # As a consequence the algorithm will find a lot of false clashes and Van der Waals interactions.
                     #
                     # It is better to keep this function inside the IFs to avoid the Dijkstra processing for pairs of atoms
                     # that wouldn't enter inside the IF.
-                    shortest_path_length = group1.get_shortest_path_length(group2, self.inter_conf.conf.get("min_bond_separation", 0))
+                    shortest_path_length = group1.get_shortest_path_length(group2, self.inter_config.get("min_bond_separation", 0))
 
                     # If get_shortest_path_length() returns any value that is not infinite (INF), it means these two groups
                     # contain a path with at less than or equal to the cutoff 'min_bond_separation'. Therefore, ignore them.
@@ -2562,14 +2570,14 @@ class InteractionCalculator:
         """Check if a value is within the boundary defined for a given parameter.
 
         .. note::
-            It will always return True if the parameter does not exist in ``inter_conf``.
+            It will always return True if the parameter does not exist in ``inter_config``.
 
         Parameters
         ----------
         value : any
             The value to be evaluated.
         key :
-            A parameter defined in ``inter_conf``.
+            A parameter defined in ``inter_config``.
         func : callable
             The function that evaluates if ``value`` is within the
             boundaries defined for the parameter ``key``.
@@ -2583,10 +2591,9 @@ class InteractionCalculator:
         -------
          : bool
         """
-        if key not in self.inter_conf.conf:
+        if key not in self.inter_config:
             return True
-        else:
-            return func(value, self.inter_conf.get_value(key))
+        return func(value, self.inter_config[key])
 
     def is_feature_pair_valid(self, feat1, feat2):
         """Check if the provided pair of features is valid or not.
