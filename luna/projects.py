@@ -204,12 +204,12 @@ class Project:
     ifp_output : str
         If ``calc_ifp`` is True, save LUNA interaction fingerprints (IFPs) to file ``ifp_output``.
         If not provided, fingerprints are saved at <``working_path``>/results/fingerprints/ifp.csv.
+    ifp_sim_matrix_output : str, optional
+        If provided, compute Tanimoto similarity between interaction fingerprints (IFPs)
+        and save the similarity matrix to ``ifp_sim_matrix_output``.
     out_pse : bool
         If True, depict interactions save them as Pymol sessions (PSE file).
         The default value is False. PSE files are saved at <``working_path``>/results/pse.
-    out_ifp_sim_matrix : bool
-        If True, compute Tanimoto similarity between interaction fingerprints (IFPs)
-        and save the similarity matrix to <``working_path``>/results/fingerprints/ifp_sim_matrix.csv
     append_mode : bool
         If True, skip entries from processing if a result for them already exists in ``working_path``.
         This can save processing time in case additional entries are to be added to an existing project.
@@ -291,9 +291,9 @@ class Project:
                  ifp_diff_comp_classes=True,
                  ifp_type=IFPType.EIFP,
                  ifp_output=None,
+                 ifp_sim_matrix_output=None,
 
                  out_pse=False,
-                 out_ifp_sim_matrix=False,
 
                  append_mode=False,
                  verbosity=3,
@@ -353,9 +353,9 @@ class Project:
         self.ifp_diff_comp_classes = ifp_diff_comp_classes
         self.ifp_type = ifp_type
         self.ifp_output = ifp_output
+        self.ifp_sim_matrix_output = ifp_sim_matrix_output
 
         self.out_pse = out_pse
-        self.out_ifp_sim_matrix = out_ifp_sim_matrix
 
         self.append_mode = append_mode
 
@@ -1021,10 +1021,9 @@ class LocalProject(Project):
             if self.calc_mfp:
                 self._create_mfp_file()
 
-            if self.out_ifp_sim_matrix and len(self.entries) > 1:
+            if self.ifp_sim_matrix_output and len(self.entries) > 1:
                 self._log("info", "Calculating the Tanimoto similarity between fingerprints.")
-                output_file = "%s/results/fingerprints/ifp_sim_matrix.csv" % self.working_path
-                self._generate_similarity_matrix(output_file)
+                self._generate_similarity_matrix(self.ifp_sim_matrix_output)
 
         # Save the whole project information.
         self.save(self.project_file)
@@ -1114,10 +1113,9 @@ class LocalProject(Project):
             if self.calc_mfp:
                 self._create_mfp_file()
 
-            if self.out_ifp_sim_matrix and len(self.entries) > 1:
+            if self.ifp_sim_matrix_output and len(self.entries) > 1:
                 self._log("info", "Calculating the Tanimoto similarity between fingerprints.")
-                output_file = "%s/results/fingerprints/ifp_sim_matrix.csv" % self.working_path
-                self._generate_similarity_matrix(output_file)
+                self._generate_similarity_matrix(self.ifp_sim_matrix_output)
 
         # Remove unnecessary paths.
         self._remove_empty_paths()
