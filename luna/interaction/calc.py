@@ -68,6 +68,12 @@ class InteractionsManager:
         return len(self._interactions)
 
     def get_all_atm_grps(self):
+        """Get all atom groups establishing interactions.
+
+        Returns
+        -------
+         : set of :class:`~luna.mol.groups.AtomGroup`
+        """
         atm_grps = set()
         for inter in self.interactions:
             atm_grps.add(inter.src_grp)

@@ -1,0 +1,4 @@
+include LICENSE
+recursive-include luna/data *
+recursive-include luna/util *.ini
+recursive-exclude * __pycache__
