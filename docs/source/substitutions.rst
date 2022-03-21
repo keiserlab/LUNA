@@ -6,6 +6,15 @@
 .. _NumPy: https://www.numpy.org
 .. _SciPy: https://www.scipy.org
 .. _mmh3: https://pypi.python.org/pypi/mmh3
+.. _NetworkX: https://networkx.org/
+.. _pandas: https://pandas.pydata.org/
+.. _Seaborn: https://seaborn.pydata.org/
+.. _Matplotlib: https://matplotlib.org/
+.. _colorlog: https://pypi.org/project/colorlog/
+.. _Biopython: https://biopython.org/
+.. _Open Babel: http://openbabel.org/wiki/Main_Page
+.. _Pymol: https://pymol.org/
+.. _xopen: https://pypi.org/project/xopen/
 .. _Anaconda distribution: https://docs.continuum.io/anaconda
 .. _Anaconda: https://anaconda.org/keiserlab/LUNA
 .. _repository: https://github.com/keiserlab/LUNA
