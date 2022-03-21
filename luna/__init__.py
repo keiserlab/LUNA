@@ -1,5 +1,4 @@
 
-# All project classes are available now.
-from luna.projects import *
+from luna.projects import Project, LocalProject
 
-from luna.version import __version__
+from luna.version import version
