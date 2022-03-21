@@ -14,7 +14,7 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath('../..'))
 
-from luna import __version__ as luna_version
+from luna import version as luna_version
 
 
 # -- Project information -----------------------------------------------------
@@ -150,5 +150,7 @@ intersphinx_mapping = {
     'rdkit': ('https://www.rdkit.org/docs/', None),
     'openbabel': ('http://openbabel.org/docs/dev/', None),
     'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
+    'seaborn': ('https://seaborn.pydata.org/', None),
+    'matplotlib': ('https://matplotlib.org/3.5.1/', None),
 }
 
