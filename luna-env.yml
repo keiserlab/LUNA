@@ -1,4 +1,3 @@
-name: luna-env
 channels:
   - anaconda
   - schrodinger
@@ -11,12 +10,9 @@ dependencies:
   - openbabel
   - pip
   - biopython=1.72
-  - sqlalchemy
-  - ipykernel
   - pymol
   - xopen
   - colorlog
   - networkx
   - pip:
-    - babel==2.8.0
     - mmh3==2.5.1
