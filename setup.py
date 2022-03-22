@@ -15,7 +15,7 @@ with::
 For more in-depth instructions, see the installation section of the
 Biopython manual, linked to from:
 
-http://luna.readthedocs.io
+http://luna-toolkit.readthedocs.io
 
 Contributions, feature requests, and bug reports are greatly appreciated.
 Please consult the issue tracker:

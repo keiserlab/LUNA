@@ -90,7 +90,7 @@ Documentation
 
 In general, it is best to document the rationale and basic usage of a module,
 class, or method in its docstring instead of in a separate documentation file.
-See, for example, the docstring for `luna.interaction.calc.InteractionCalculator`.
+See, for example, the docstring for `~luna.interaction.calc.InteractionCalculator`.
 We use a variety of tools to ensure that our documentation is always
 up-to-date. The official documentation is hosted on ReadtheDocs_ and is
 automatically generated when new code is committed to the repository.

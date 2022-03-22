@@ -20,7 +20,7 @@
 .. _repository: https://github.com/keiserlab/LUNA
 .. _paper repository: https://github.com/keiserlab/luna-paper
 .. _issue tracker: https://github.com/keiserlab/LUNA/issues
-.. _ReadTheDocs: http://luna.readthedocs.io
+.. _ReadTheDocs: http://luna-toolkit.readthedocs.io
 .. _Keiser Lab: http://www.keiserlab.org
 .. _UCSF: https://www.ucsf.edu
 

@@ -13,7 +13,7 @@ Documentation is hosted by ReadTheDocs_, and development occurs on GitHub_.
 Installation and Usage
 ----------------------
 
-For installation and usage instructions, see the `documentation <http://luna.readthedocs.io>`_.
+For installation and usage instructions, see the `documentation <http://luna-toolkit.readthedocs.io>`_.
 
 See the LUNA `paper repository`_ for an application of LUNA and all code used for the LUNA paper [1]_.
 
@@ -41,7 +41,7 @@ References
 .. _RDKit: http://www.rdkit.org
 .. _GitHub: https://github.com/keiserlab/LUNA
 .. _paper repository: https://github.com/keiserlab/luna-paper
-.. _ReadTheDocs: http://luna.readthedocs.io
+.. _ReadTheDocs: http://luna-toolkit.readthedocs.io
 .. |afassio2022| replace:: TO BE DEFINED (2022).
 .. |axen2017_doi| image:: https://img.shields.io/badge/doi-10.1021/acs.jmedchem.7b00696-blue.svg
     :target: http://dx.doi.org/10.1021/acs.jmedchem.7b00696
@@ -55,7 +55,7 @@ References
    :target: https://travis-ci.org/keiserlab/luna
    :alt: Build Status
 .. |Docs Status| image:: http://readthedocs.org/projects/luna/badge/?version=latest
-   :target: http://luna.readthedocs.io/en/latest/?badge=latest
+   :target: http://luna-toolkit.readthedocs.io/en/latest/?badge=latest
    :alt: Documentation Status
 .. |Coveralls Status| image:: https://coveralls.io/repos/github/keiserlab/luna/badge.svg?branch=master
    :target: https://coveralls.io/github/keiserlab/luna?branch=master
