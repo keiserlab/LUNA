@@ -18,7 +18,6 @@ from luna.mol.entry import Entry, MolFileEntry
 from luna.mol.groups import AtomGroupPerceiver
 from luna.interaction.contact import get_contacts_with
 from luna.interaction.calc import InteractionCalculator
-from luna.interaction.view import InteractionViewer
 from luna.interaction.fp.shell import ShellGenerator
 from luna.interaction.fp.type import IFPType
 from luna.wrappers.base import MolWrapper
@@ -930,6 +929,8 @@ class LocalProject(Project):
 
             # Saving interactions into a Pymol session.
             if self.out_pse:
+                from luna.interaction.view import InteractionViewer
+
                 pse_file = "%s/results/pse/%s.pse" % (self.working_path, entry.to_string())
                 piv = InteractionViewer(add_directional_arrows=False)
                 piv.new_session([(entry, interactions_mngr, entry.pdb_file)], pse_file)
