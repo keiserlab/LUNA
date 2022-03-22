@@ -1,4 +1,4 @@
-.. image:: docs/source/_static/luna.svg
+.. image:: https://github.com/keiserlab/LUNA/blob/master/docs/source/_static/luna.svg
 
 
 |Docs Status| |Build Status| |Coveralls Status| |PyPi Version| |Conda Version| |License|

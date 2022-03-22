@@ -10,7 +10,7 @@ for the simplest installation just type the command::
 However, you would normally install the latest Biopython release from the PyPI archive
 with::
 
-    pip install biopython
+    pip install luna
 
 For more in-depth instructions, see the installation section of the
 Biopython manual, linked to from:
