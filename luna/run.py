@@ -2,7 +2,7 @@ import argparse
 import os
 import shutil
 
-from luna import LocalProject
+from luna.projects import LocalProject
 from luna.version import __version__ as version
 
 from luna.mol.entry import MolFileEntry
