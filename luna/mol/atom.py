@@ -16,6 +16,8 @@ class AtomData:
         Atomic coordinates (x, y, z).
     bond_type : int
         Bond type.
+    full_id : tuple
+        The atom' full id as in :class:`~luna.MyBio.PDB.Atom.Atom`.
     serial_number : int, optional
         Atom serial number.
 
@@ -25,15 +27,18 @@ class AtomData:
         The atomic number.
     bond_type : int
         The bond type.
+    full_id : tuple
+        The atom' full id
     serial_number : int or None
         The atom serial number.
     """
 
-    def __init__(self, atomic_num, coord, bond_type, serial_number=None):
+    def __init__(self, atomic_num, coord, bond_type, full_id=None, serial_number=None):
         self.atomic_num = atomic_num
         # Standardize all coordinate data to the same Numpy data type for consistence.
         self._coord = np.array(coord, "f")
         self.bond_type = bond_type
+        self.full_id = full_id
         self.serial_number = serial_number
 
     @property
@@ -62,14 +67,23 @@ class AtomData:
         self._coord = np.array(xyz, "f")
 
     def __repr__(self):
+        full_atom_name = "%s/%s/%s" % self.full_id[0:3]
+        res_name = "%d%s" % (self.full_id[3][1], self.full_id[3][2].strip())
+        atom_name = "%s" % self.full_id[4][0]
+
+        if self.full_id[4][1] != " ":
+            atom_name += "-%s" % self.full_id[4][1]
+        full_atom_name += "/%s/%s" % (res_name, atom_name)
+
         return ("<ExtendedAtomData: atomic number=%d, coord=(%.3f, %.3f, %.3f), serial number=%s>"
-                % (self.atomic_num, self.x, self.y, self.z, str(self.serial_number)))
+                % (self.atomic_num, self.x, self.y, self.z, full_atom_name, str(self.serial_number)))
 
     def __eq__(self, other):
         """Overrides the default implementation"""
         if isinstance(self, other.__class__):
             return (self.atomic_num == other.atomic_num
                     and np.all(self._coord == other._coord)
+                    and self.full_id == other.full_id
                     and self.serial_number == other.serial_number)
         return False
 
@@ -79,7 +93,7 @@ class AtomData:
 
     def __hash__(self):
         """Overrides the default implementation"""
-        return hash((self.atomic_num, tuple(self._coord), self.serial_number))
+        return hash((self.atomic_num, tuple(self._coord), self.serial_number, self.serial_number))
 
 
 class ExtendedAtom:
@@ -178,12 +192,12 @@ class ExtendedAtom:
     def get_neighbor_info(self, atom):
         """Get information from a covalently bound atom."""
         for info in self._nb_info:
-            if atom.serial_number == info.serial_number:
+            if atom.get_full_id() == info.full_id:
                 return info
 
     def is_neighbor(self, atom):
         """Check if a given atom is covalently bound to it."""
-        return atom.serial_number in [i.serial_number for i in self._nb_info]
+        return atom.get_full_id() in [i.full_id for i in self._nb_info]
 
     def as_json(self):
         """Represent the atom as a dict containing the structure id, model id,

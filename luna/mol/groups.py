@@ -235,7 +235,7 @@ class AtomGroupsManager():
         # Hydrophobic islands dictionary. Keys are integer values and items are defined by a set of atom groups.
         hydrop_islands = defaultdict(set)
 
-        # It stores a mapping of an atom (represented by its serial number) and a hydrophobic island (defined by its keys).
+        # It stores a mapping of an atom (represented by its full id) and a hydrophobic island (defined by its keys).
         atm_mapping = {}
 
         island_id = 0
@@ -244,7 +244,7 @@ class AtomGroupsManager():
             atm = atm_grp.atoms[0]
 
             # Recover the groups of all neighbors of this atom (it will merge all existing islands).
-            nb_grps = set([atm_mapping[nbi.serial_number] for nbi in atm.neighbors_info if nbi.serial_number in atm_mapping])
+            nb_grps = set([atm_mapping[nbi.full_id] for nbi in atm.neighbors_info if nbi.full_id in atm_mapping])
 
             # Already there are hydrophobic islands formed by the neighbors of this atom.
             if nb_grps:
@@ -258,9 +258,9 @@ class AtomGroupsManager():
                         atm_mapping[k] = island_id
 
                 hydrop_islands[island_id] = new_island
-                atm_mapping[atm.serial_number] = island_id
+                atm_mapping[atm.get_full_id()] = island_id
             else:
-                atm_mapping[atm.serial_number] = island_id
+                atm_mapping[atm.get_full_id()] = island_id
                 hydrop_islands[island_id].add(atm)
             island_id += 1
 
@@ -278,7 +278,7 @@ class AtomGroupsManager():
             trgt_atm = inter.trgt_grp.atoms[0]
 
             # The two island ids are used as key.
-            key = tuple(sorted([atm_mapping[src_atm.serial_number], atm_mapping[trgt_atm.serial_number]]))
+            key = tuple(sorted([atm_mapping[src_atm.get_full_id()], atm_mapping[trgt_atm.get_full_id()]]))
 
             island_island_inter[key].add(inter)
 
@@ -289,8 +289,8 @@ class AtomGroupsManager():
                 src_atm = inter.src_grp.atoms[0]
                 trgt_atm = inter.trgt_grp.atoms[0]
 
-                island_atms[atm_mapping[src_atm.serial_number]].add(src_atm)
-                island_atms[atm_mapping[trgt_atm.serial_number]].add(trgt_atm)
+                island_atms[atm_mapping[src_atm.get_full_id()]].add(src_atm)
+                island_atms[atm_mapping[trgt_atm.get_full_id()]].add(trgt_atm)
 
             centroid1 = im.centroid(im.atom_coordinates(island_atms[k[0]]))
             centroid2 = im.centroid(im.atom_coordinates(island_atms[k[1]]))
@@ -919,14 +919,14 @@ class AtomGroupPerceiver():
         atm_map = {}
         trgt_atms = {}
         for i, atm_obj in enumerate(atm_obj_list):
-            atm_map[atm_obj.get_idx()] = target_atoms[i].serial_number
+            atm_map[atm_obj.get_idx()] = target_atoms[i].get_full_id()
 
-            trgt_atms[target_atoms[i].serial_number] = self._new_extended_atom(target_atoms[i])
+            trgt_atms[target_atoms[i].get_full_id()] = self._new_extended_atom(target_atoms[i])
 
             # Invariants are still None, so it means a new ExtendedAtom has just been created.
-            if trgt_atms[target_atoms[i].serial_number].invariants is None:
+            if trgt_atms[target_atoms[i].get_full_id()].invariants is None:
                 # Update atomic invariants for new ExtendedAtoms created.
-                trgt_atms[target_atoms[i].serial_number].invariants = atm_obj.get_atomic_invariants()
+                trgt_atms[target_atoms[i].get_full_id()].invariants = atm_obj.get_atomic_invariants()
 
             # The current atom already has its invariants updated, which means the atom was created previously
             # by another target compound.
@@ -942,9 +942,9 @@ class AtomGroupPerceiver():
                 # However, we need to highlight that the main goal of selecting atoms using COV_SEARCH_RADIUS is to find atoms
                 # covalently bonded to the current compound. Therefore, atoms in the border of nearby molecules are not important
                 # right now and they will be updated in their own time.
-                if trgt_atms[target_atoms[i].serial_number].parent == target_compound:
+                if trgt_atms[target_atoms[i].get_full_id()].parent == target_compound:
                     # Update the atomic invariants for an ExtendedAtom.
-                    trgt_atms[target_atoms[i].serial_number].invariants = atm_obj.get_atomic_invariants()
+                    trgt_atms[target_atoms[i].get_full_id()].invariants = atm_obj.get_atomic_invariants()
 
         # Set all neighbors, i.e., covalently bonded atoms.
         for bond_obj in mol_obj.get_bonds():
@@ -958,9 +958,9 @@ class AtomGroupPerceiver():
                     # If the current bgn_atm_obj consists of an atom from the current target compound, we can update its information.
                     # Other compounds are ignored for now as they will have their own time to update its information.
                     if trgt_atms[atm_map[bgn_atm_obj.get_idx()]].parent == target_compound:
-                        serial_number = atm_map.get(end_atm_obj.get_idx())
+                        full_id = atm_map.get(end_atm_obj.get_idx())
                         coord = mol_obj.get_atom_coord_by_id(end_atm_obj.get_id())
-                        atom_info = AtomData(end_atm_obj.get_atomic_num(), coord, bond_obj.get_bond_type(), serial_number)
+                        atom_info = AtomData(end_atm_obj.get_atomic_num(), coord, bond_obj.get_bond_type(), full_id)
                         trgt_atms[atm_map[bgn_atm_obj.get_idx()]].add_nb_info([atom_info])
 
                 # If the atom 2 is not a hydrogen, add atom 1 to its neighbor list.
@@ -968,9 +968,9 @@ class AtomGroupPerceiver():
                     # If the current end_atm_obj consists of an atom from the current target compound, we can update its information.
                     # Other compounds are ignored for now as they will have their own time to update its information.
                     if trgt_atms[atm_map[end_atm_obj.get_idx()]].parent == target_compound:
-                        serial_number = atm_map.get(bgn_atm_obj.get_idx())
+                        full_id = atm_map.get(bgn_atm_obj.get_idx())
                         coord = mol_obj.get_atom_coord_by_id(bgn_atm_obj.get_id())
-                        atom_info = AtomData(bgn_atm_obj.get_atomic_num(), coord, bond_obj.get_bond_type(), serial_number)
+                        atom_info = AtomData(bgn_atm_obj.get_atomic_num(), coord, bond_obj.get_bond_type(), full_id)
                         trgt_atms[atm_map[end_atm_obj.get_idx()]].add_nb_info([atom_info])
 
         group_features = self.feature_extractor.get_features_by_groups(mol_obj, atm_map)
@@ -986,13 +986,12 @@ class AtomGroupPerceiver():
 
         # Update the graph in the AtomGroupsManager object with the current compound information.
         for mybio_atm in target_compound.get_atoms():
-            if mybio_atm.serial_number in trgt_atms and mybio_atm.parent == target_compound:
-                atm = trgt_atms[mybio_atm.serial_number]
+            if mybio_atm.get_full_id() in trgt_atms and mybio_atm.parent == target_compound:
+                atm = trgt_atms[mybio_atm.get_full_id()]
 
                 for nb_info in atm.neighbors_info:
-                    if nb_info.serial_number in trgt_atms:
-                        self.atm_grps_mngr.graph.add_edge(atm, trgt_atms[nb_info.serial_number], weight=1)
-
+                    if nb_info.full_id in trgt_atms:
+                        self.atm_grps_mngr.graph.add_edge(atm, trgt_atms[nb_info.full_id], weight=1)
         return True
 
     def _new_extended_atom(self, atm, invariants=None):
