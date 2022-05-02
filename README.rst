@@ -1,7 +1,7 @@
 .. image:: https://github.com/keiserlab/LUNA/blob/master/docs/source/_static/luna.svg
 
 
-|Docs Status| |Build Status| |Coveralls Status| |PyPi Version| |Conda Version| |License|
+|Docs Status| |Build Status| |Coveralls Status| |PyPi Version| |License|
 
 LUNA [1]_ is an object-oriented Python 3 toolkit for drug design that makes it easy to analyze very large data sets of 3D molecular structures and complexes, and that allows identifying, filtering, and visualizing atomic interactions.
 
@@ -63,9 +63,6 @@ References
 .. |PyPi Version| image:: https://img.shields.io/pypi/v/luna.svg
    :target: https://pypi.python.org/pypi/luna
    :alt: Package on PyPi
-.. |Conda Version| image:: https://img.shields.io/conda/v/keiserlab/luna.svg
-   :target: https://anaconda.org/keiserlab/luna
-   :alt: Package on Anaconda
 .. |License| image:: https://img.shields.io/badge/License-MIT-yellow.svg
    :target: https://github.com/keiserlab/LUNA/blob/master/LICENSE
 .. |F1000 recommended| image:: http://cdn.f1000.com.s3.amazonaws.com/images/badges/badgef1000.gif

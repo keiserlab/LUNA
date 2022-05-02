@@ -30,20 +30,9 @@ Installation
 ------------
 
 The following installation approaches are listed in order of recommendation.
-All but the first of these approaches requires a prior installation of `Open Babel`_, Pymol_, and RDKit_.
+These approaches require a prior installation of the dependencies listed above.
 
-Option 1: Conda
-~~~~~~~~~~~~~~~
-
-To install with Conda, run:
-
-.. code:: bash
-
-    conda create -c conda-forge --name luna-env luna
-    conda activate luna-env
-
-
-Option 2: Pip
+Option 1: Pip
 ~~~~~~~~~~~~~
 
 To install with pip, run:
@@ -54,7 +43,7 @@ To install with pip, run:
 
 We recommend using a virtual environment for this.
 
-Option 3: Build from source
+Option 2: Build from source
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 1. Download LUNA repository to your machine.
@@ -78,7 +67,5 @@ Option 3: Build from source
 
 
 We recommend using a virtual environment for this.
-
-
 
 .. include:: substitutions.rst
