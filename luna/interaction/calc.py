@@ -32,6 +32,7 @@ COV_BONDS_MAPPING = {
 }
 
 WATER_NAMES = ['HOH', 'DOD', 'WAT', 'H2O', 'OH2']
+DEFAULT_SOLVENTS = WATER_NAMES + ["NH3", "NH4"]
 
 
 class InteractionsManager:
@@ -331,8 +332,8 @@ class InteractionCalculator:
         The same exceptions described for ``strict_donor_rules`` apply here.
     lazy_comps_list : iterable
          A sequence of molecule names to ignore explicit hydrogen position during the calculation of hydrogen bonds and weak hydrogen bonds.
-         The default list is ['HOH', 'DOD', 'WAT', 'H2O', 'OH2'], which only contains water molecule names,
-         including variations used by different programs.
+         The default list is ['HOH', 'DOD', 'WAT', 'H2O', 'OH2', 'NH3', 'NH4'], which only contains water, ammonia, and ammonium ion, 
+         including water name variations used by different programs.
 
 
     Examples
@@ -496,7 +497,7 @@ class InteractionCalculator:
     def __init__(self, inter_config=DefaultInteractionConfig(), inter_filter=None, inter_funcs=None,
                  add_non_cov=True, add_cov=True, add_proximal=False, add_atom_atom=True,
                  add_dependent_inter=False, add_h2o_pairs_with_no_target=False, strict_donor_rules=True,
-                 strict_weak_donor_rules=True, lazy_comps_list=WATER_NAMES):
+                 strict_weak_donor_rules=True, lazy_comps_list=DEFAULT_SOLVENTS):
 
         if inter_config is not None and isinstance(inter_config, InteractionConfig) is False:
             raise IllegalArgumentError("The informed interaction configuration must be an instance of '%s'." % InteractionConfig)
@@ -2111,15 +2112,13 @@ class InteractionCalculator:
             # R coordinates, in which R is a heavy atom.
             r_coords = [nbi.coord for nbi in acceptor_atm.neighbors_info if nbi.atomic_num != 1]
 
-            # Firstly, it checks if it is not necessary to apply a strict hbond rule, i.e.,
+            # Firstly, it checks if it is not necessary to apply a strict rule, i.e.,
             # hydrogens must exist and all geometrical criteria should be evaluated.
             # Then it checks if no hydrogen is bonded to the donor, or if the donor has hydrogens
-            # and only hydrogens as neighbours (water, solvents, ammonia, SH2). In the latter case, the
-            # hydrogens can be positioned in many different set of ways, and each run of a tool like
-            # OpenBabel would vary the hydrogen bond list when one applies this algorithm.
+            # and only hydrogens as neighbours. 
             #
             # If the user has also defined a list of lazy compounds, we can skip the application of strict rules on
-            # them as well. By default, the list contains only Water molecules.
+            # them as well. By default, the list contains only water, ammonia, and ammonium ion.
             if ((self.strict_weak_donor_rules is False and (len(hydrog_coords) == 0
                                                             or len(hydrog_coords) == len(donor_atm.neighbors_info)))
                     or (donor_atm.parent.resname in self.lazy_comps_list)):
@@ -2302,7 +2301,7 @@ class InteractionCalculator:
             # OpenBabel would vary the hydrogen bond list when one applies this algorithm.
             #
             # If the user has also defined a list of lazy compounds, we can skip the application of strict rules on
-            # them as well. By default, the list contains only Water molecules.
+            # them as well. By default, the list contains only water, ammonia, and ammonium ion.
             if ((self.strict_weak_donor_rules is False and (len(hydrog_coords) == 0
                                                             or len(hydrog_coords) == len(donor_atm.neighbors_info)))
                     or (donor_atm.parent.resname in self.lazy_comps_list)):
