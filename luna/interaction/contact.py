@@ -161,10 +161,12 @@ def get_contacts_with(entity, source, target=None, radius=BOUNDARY_CONFIG["bound
     """
     try:
         if level == 'S' or level == 'M' or level == 'C':
-            raise EntityLevelError("Maximum entity level to be chosen is: R (residues) or A (atoms)")
+            raise EntityLevelError("Maximum entity level to be chosen is: "
+                                   "R (residues) or A (atoms)")
 
         if level not in ENTITY_LEVEL_NAME:
-            raise EntityLevelError("The defined level '%s' does not exist" % level)
+            raise EntityLevelError("The defined level '%s' does not exist"
+                                   % level)
 
         source_atoms = Selection.unfold_entities([source], 'A')
         target_atoms = []
@@ -181,7 +183,8 @@ def get_contacts_with(entity, source, target=None, radius=BOUNDARY_CONFIG["bound
             pairs = set(product([entity], nb_entities))
             entities.update(pairs)
 
-        logger.debug("Number of nearby %s(s) found: %d." % (ENTITY_LEVEL_NAME[level].lower(), len(entities)))
+        logger.debug("Number of nearby %s(s) found: %d."
+                     % (ENTITY_LEVEL_NAME[level].lower(), len(entities)))
         return entities
     except Exception as e:
         logger.exception(e)

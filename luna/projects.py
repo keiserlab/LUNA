@@ -25,7 +25,8 @@ from luna.util.default_values import *
 from luna.util.exceptions import *
 from luna.util.file import *
 from luna.util.logging import new_logging_file, load_default_logging_config
-from luna.util.multiprocessing_logging import start_mp_handler, MultiProcessingHandler
+from luna.util.multiprocessing_logging import (start_mp_handler,
+                                               MultiProcessingHandler)
 from luna.util.jobs import ArgsGenerator, ParallelJobs
 
 from luna.MyBio.PDB.PDBParser import PDBParser

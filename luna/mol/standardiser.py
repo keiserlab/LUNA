@@ -8,9 +8,11 @@ import logging
 logger = logging.getLogger()
 
 
-METALS = ["Li", "Na", "K", "Rb", "Cs", "Fr", "Be", "Mg", "Ca", "Sr", "Ba", "Ra", "Sc", "Ti", "V", "Cr", "Mn", "Fe",
-          "Co", "Ni", "Cu", "Zn", "Al", "Ga", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn", "Hf",
-          "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi"]
+METALS = ["Li", "Na", "K", "Rb", "Cs", "Fr", "Be", "Mg", "Ca", "Sr", "Ba",
+          "Ra", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn",
+          "Al", "Ga", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag",
+          "Cd", "In", "Sn", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au",
+          "Hg", "Tl", "Pb", "Bi"]
 METAL_ATOM = "[%s]" % ",".join(METALS)
 
 

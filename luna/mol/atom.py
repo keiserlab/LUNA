@@ -67,15 +67,18 @@ class AtomData:
         self._coord = np.array(xyz, "f")
 
     def __repr__(self):
-        full_atom_name = "%s/%s/%s" % self.full_id[0:3]
-        res_name = "%d%s" % (self.full_id[3][1], self.full_id[3][2].strip())
-        atom_name = "%s" % self.full_id[4][0]
+        full_atom_name = ""
+        if self.full_id is not None:
+            full_atom_name = "%s/%s/%s" % self.full_id[0:3]
+            res_name = "%d%s" % (self.full_id[3][1],
+                                 self.full_id[3][2].strip())
+            atom_name = "%s" % self.full_id[4][0]
 
-        if self.full_id[4][1] != " ":
-            atom_name += "-%s" % self.full_id[4][1]
-        full_atom_name += "/%s/%s" % (res_name, atom_name)
+            if self.full_id[4][1] != " ":
+                atom_name += "-%s" % self.full_id[4][1]
+            full_atom_name += "/%s/%s" % (res_name, atom_name)
 
-        return ("<ExtendedAtomData: atomic number=%d, coord=(%.3f, %.3f, %.3f), serial number=%s>"
+        return ("<ExtendedAtomData: atomic number=%d, coord=(%.3f, %.3f, %.3f), atom='%s', serial number=%s>"
                 % (self.atomic_num, self.x, self.y, self.z, full_atom_name, str(self.serial_number)))
 
     def __eq__(self, other):
@@ -93,7 +96,9 @@ class AtomData:
 
     def __hash__(self):
         """Overrides the default implementation"""
-        return hash((self.atomic_num, tuple(self._coord), self.serial_number, self.serial_number))
+        return hash((self.atomic_num, tuple(self._coord),
+                     self.full_id, self.bond_type,
+                     self.serial_number))
 
 
 class ExtendedAtom:
@@ -147,6 +152,11 @@ class ExtendedAtom:
     @invariants.setter
     def invariants(self, invariants):
         self._invariants = invariants
+
+    @property
+    def atomic_num(self):
+        """int, read-only: This atom's atomic number. This information is obtained from Open Babel."""
+        return ob.GetAtomicNum(self.element)
 
     @property
     def electronegativity(self):

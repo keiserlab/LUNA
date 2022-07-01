@@ -3,14 +3,16 @@ from rdkit.Chem import Atom as RDAtom
 from rdkit.Chem import Mol as RDMol
 from rdkit.Chem import Bond as RDBond
 from rdkit.Chem import BondType as RDBondType
-from rdkit.Chem import MolFromSmiles, MolToSmiles, MolToPDBBlock, MolToMolBlock, GetPeriodicTable
+from rdkit.Chem import (MolFromSmiles, MolToSmiles, MolToPDBBlock,
+                        MolToMolBlock, GetPeriodicTable)
 from openbabel import openbabel as ob
 from openbabel.pybel import Molecule as PybelMol
 from openbabel.pybel import readstring
 
 from luna.wrappers.rdkit import new_mol_from_block
-from luna.util.exceptions import (AtomObjectTypeError, BondObjectTypeError, MoleculeObjectTypeError,
-                                  IllegalArgumentError, MoleculeObjectError)
+from luna.util.exceptions import (AtomObjectTypeError, BondObjectTypeError,
+                                  IllegalArgumentError, MoleculeObjectError,
+                                  MoleculeObjectTypeError)
 
 import logging
 
@@ -165,7 +167,9 @@ class AtomWrapper:
         -------
          : int
         """
-        return self._atm_obj.GetAtomicNum()  # Both RDKit and Open Babel have the same function name.
+        
+        # Both RDKit and Open Babel have the same function name.
+        return self._atm_obj.GetAtomicNum()
 
     def get_symbol(self):
         """Get the element symbol of this atom.

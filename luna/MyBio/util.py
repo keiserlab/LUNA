@@ -301,7 +301,7 @@ def get_residue_neighbors(residue, select=Select()):
                 if is_covalently_bound(trgt_res_atms["N"], prev_res_atms["C"]):
                     neighbors["previous"] = prev_res
                 else:
-                    logger.debug("The first residue before %s is too distant to fulfill the covalent thresholds. "
+                    logger.debug("The first residue before %s is too distant to fulfill the covalent bond threshold. "
                                  "It may be an indication of bad atom positioning or that there are missing residues." % residue)
             elif "C" not in prev_res_atms:
                 logger.debug("There is a missing C in %s, the first residue before %s in the chain list. "
@@ -386,10 +386,11 @@ def get_residue_neighbors(residue, select=Select()):
     return {}
 
 
-def biopython_entity_to_mol(entity, select=Select(), validate_mol=True, standardize_mol=True,
-                            template=None, add_h=False, ph=None,
-                            break_metal_bonds=False, mol_obj_type="rdkit", wrapped=True,
-                            openbabel=OPENBABEL, tmp_path=None, keep_tmp_files=False):
+def biopython_entity_to_mol(entity, select=Select(), validate_mol=True,
+                            standardize_mol=True, template=None, add_h=False, ph=None,
+                            break_metal_bonds=False, mol_obj_type="rdkit",
+                            wrapped=True, openbabel=OPENBABEL, tmp_path=None,
+                            keep_tmp_files=False):
     """Convert an object :class:`~luna.MyBio.PDB.Entity.Entity` to a
     molecular object (:class:`~luna.wrappers.base.MolWrapper`,
     :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`).
@@ -451,7 +452,7 @@ def biopython_entity_to_mol(entity, select=Select(), validate_mol=True, standard
     filename = new_unique_filename(tmp_path)
     pdb_file = '%s_pdb-file.pdb' % filename
 
-    logger.debug("First: try to create a new PDB file (%s) from the provided entity." % pdb_file)
+    logger.debug("First: it will try to create a new PDB file (%s) from the provided entity." % pdb_file)
     # Apparently, Open Babel creates a bug when it tries to parse a file with CONECTS containing serial numbers with more than 4 digits.
     # E.g.: 1OZH:A:HE3:1406, line CONECT162811627916282. By setting preserve_atom_numbering to False, it solves the problem.
     save_to_file(entity, pdb_file, select, preserve_atom_numbering=False)
@@ -474,7 +475,7 @@ def biopython_entity_to_mol(entity, select=Select(), validate_mol=True, standard
     # Convert the PDB file to Mol file with the proper protonation and hydrogen addition if required.
     mol_file = '%s_mol-file.mol' % filename
     ob_opt = {"error-level": 5}
-    logger.debug("Next: try to convert the PDB file to .mol using Open Babel.")
+    logger.debug("Next: it will try to convert the PDB file to .mol using Open Babel.")
     if add_h:
         logger.debug("Hydrogens will be added to the molecule.")
         if ph is not None:
