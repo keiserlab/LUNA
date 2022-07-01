@@ -11,13 +11,13 @@ from Bio.KDTree import KDTree
 from luna.MyBio.selector import Selector, AtomSelector
 from luna.MyBio.util import biopython_entity_to_mol
 from luna.interaction.contact import get_proximal_compounds
+from luna.interaction.type import InteractionType
 from luna.mol.atom import ExtendedAtom, AtomData
 from luna.mol.charge_model import OpenEyeModel
-from luna.wrappers.base import MolWrapper
 from luna.mol.features import ChemicalFeature
+from luna.wrappers.base import MolWrapper
 from luna.util.exceptions import MoleculeSizeError, IllegalArgumentError
 from luna.util.default_values import ACCEPTED_MOL_OBJ_TYPES, COV_SEARCH_RADIUS
-from luna.interaction.type import InteractionType
 from luna.util import math as im
 from luna.util.file import pickle_data, unpickle_data
 from luna.version import __version__
@@ -761,15 +761,12 @@ class AtomGroupPerceiver():
         If not None, add hydrogens appropriate for pH ``ph``.
     amend_mol : bool
         If True, apply validation and standardization of molecules read from a PDB file.
+    charge_model : class:`~luna.mol.charge_model.ChargeModel`
+        A charge model object. By default, the implementation of OpenEye charge model is used.
     mol_obj_type : {"rdkit", "openbabel"}
         If "rdkit", parse the converted molecule with RDKit and return an instance of :class:`rdkit.Chem.rdchem.Mol`.
         If "openbabel", parse the converted molecule with Open Babel and return an instance of
         :class:`openbabel.pybel.Molecule`.
-    charge_model : class:`~luna.mol.charge_model.ChargeModel`
-        A charge model object. By default, the implementation of OpenEye charge model is used.
-    tmp_path : str, optional
-        A temporary directory to where temporary files will be saved.
-        If not provided, the system's default temporary directory will be used instead.
     expand_selection : bool
         If True (the default), perceive features for a given molecule considering all nearby molecules.
         The goal is to identify any covalently bonded molecules that may alter the
@@ -784,6 +781,9 @@ class AtomGroupPerceiver():
     radius : float
         If ``expand_selection`` is True, select all molecules up to a maximum of ``radius`` away (measured in Å).
         The default value is 2.2, which comprises covalent bond distances.
+    tmp_path : str, optional
+        A temporary directory to where temporary files will be saved.
+        If not provided, the system's default temporary directory will be used instead.
     critical : bool
         If False, ignore any errors during the processing a molecule and continue to the next one.
         The default value is True, which implies that any errors will raise an exception.
@@ -794,9 +794,10 @@ class AtomGroupPerceiver():
         If ``mol_obj_type`` is not either 'rdkit' nor 'openbabel'.
     """
 
-    def __init__(self, feature_extractor, add_h=False, ph=None, amend_mol=True, mol_obj_type="rdkit",
-                 charge_model=OpenEyeModel(), tmp_path=None, expand_selection=True, radius=COV_SEARCH_RADIUS,
-                 critical=True):
+    def __init__(self, feature_extractor, add_h=False, ph=None, amend_mol=True,
+                 charge_model=OpenEyeModel(), mol_obj_type="rdkit",
+                 expand_selection=True, radius=COV_SEARCH_RADIUS,
+                 tmp_path=None, critical=True):
 
         if mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES:
             raise IllegalArgumentError("Objects of type '%s' are not currently accepted. "
@@ -806,18 +807,19 @@ class AtomGroupPerceiver():
 
         self.add_h = add_h
         self.ph = ph
-        # If the user decided not to add hydrogens it will try to use the existing ones.
+        # If the user decided not to add hydrogens, 
+        # it will try to use the existing ones.
         self.keep_hydrog = not self.add_h
 
         self.amend_mol = amend_mol
-        self.mol_obj_type = mol_obj_type
         self.charge_model = charge_model
-        self.tmp_path = tmp_path
+        self.mol_obj_type = mol_obj_type
         self.expand_selection = expand_selection
         self.radius = radius
+        self.tmp_path = tmp_path
 
-        # If the pharmacophoric perception is critical, any exception during the processing of
-        # a molecule will stop the whole processing.
+        # If the pharmacophoric perception is critical, any exception during
+        # the processing of a molecule will stop the whole processing.
         self.critical = critical
 
     def perceive_atom_groups(self, compounds, mol_objs_dict=None):
@@ -843,11 +845,11 @@ class AtomGroupPerceiver():
         mol_objs_dict = mol_objs_dict or {}
 
         self.atm_grps_mngr = AtomGroupsManager()
-
         self.atm_mapping = {}
 
         compounds = set(compounds)
-        # Controls which compounds are allowed to expand when this option is set ON.
+        # Controls which compounds are allowed to expand
+        # when 'expand_selection' is set ON.
         pruned_comps = set()
         # Create a queue of compounds to be processed.
         comp_queue = set(compounds)
