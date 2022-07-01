@@ -53,6 +53,15 @@ _atom_name_dict["C"] = 3
 _atom_name_dict["O"] = 4
 
 
+# PDB ids for the following atoms were not found: Fr, Ra, Sc, Nb, Tc, Sn, Hf
+METALS = ["LI", "NA", "K", "RB", "CS", "MG", "CA", "SR", "BA", "V", "CR",
+          "MN", "MN3", "FE2", "FE", "CO", "3CO", "NI", "3NI", "CU1", "CU",
+          "CU3", "ZN", "AL", "GA", "ZR", "MO", "4MO", "6MO", "RU", "RH",
+          "RH3", "PD", "AG", "CD", "IN", "W", "RE", "OS", "OS4", "IR",
+          "IR3", "PT", "PT4", "AU", "AU3", "HG", "TL", "PB", "BS3", "0BE",
+          "4TI", "Y1", "YT3", "TA0"]
+
+
 class Residue(Entity):
     """Represents a residue. A Residue object stores atoms."""
 
@@ -126,6 +135,13 @@ class Residue(Entity):
 
     # Public methods
 
+    @property
+    def full_name(self):
+        full_name = "%s/%s/%s" % self.get_full_id()[0:3]
+        res_name = "%s/%d%s" % (self.resname, self.id[1], self.id[2].strip())
+        full_name += "/%s" % res_name
+        return full_name
+
     def add(self, atom):
         """Add an Atom object.
 
@@ -160,6 +176,10 @@ class Residue(Entity):
     def is_hetatm(self):
         """Return True if the residue is an hetero group."""
         return self.get_id()[0].startswith("H_")
+
+    def is_metal(self):
+        """Return True if the residue is a metal."""
+        return self.is_hetatm() and self.resname in METALS
 
     # MODBY: Alexandre Fassio
     # Check if a residue is an amino acid.
