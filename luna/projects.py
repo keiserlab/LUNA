@@ -6,12 +6,14 @@ import warnings
 import multiprocessing as mp
 from scipy.special import comb
 import itertools
+import networkx as nx
 
 # Open Babel and RDKit libraries
 from rdkit.Chem import ChemicalFeatures
 from rdkit.Chem import MolFromSmiles
 
 # Local modules
+from luna.config.params import ProjectParams
 from luna.mol.features import FeatureExtractor
 from luna.mol.fingerprint import generate_fp_for_mols
 from luna.mol.entry import Entry, MolFileEntry
@@ -48,6 +50,19 @@ VERBOSITY_LEVEL = {4: logging.DEBUG,
                    0: logging.CRITICAL}
 
 MAX_NPROCS = mp.cpu_count() - 1
+
+
+class StructureCache:
+
+    def __init__(self, compounds, atm_grps_mngr):
+        self.compounds = compounds
+        self.atm_grps_mngr = atm_grps_mngr
+
+        self._compounds_name = set([c.full_name
+                                    for c in self.compounds])
+
+    def is_compound_cached(self, comp):
+        return comp.full_name in self._compounds_name
 
 
 class EntryResults:
@@ -295,6 +310,7 @@ class Project:
 
                  out_pse=False,
 
+                 use_cache=False,
                  append_mode=False,
                  verbosity=3,
                  logging_enabled=True,
@@ -341,10 +357,11 @@ class Project:
 
         self.binding_mode_filter = binding_mode_filter
 
-        # Fingerprint parameters.
+        # Molecular fingerprint parameters.
         self.calc_mfp = calc_mfp
         self.mfp_output = mfp_output
 
+        # Interaction fingerprint parameters.
         self.calc_ifp = calc_ifp
         self.ifp_num_levels = ifp_num_levels
         self.ifp_radius_step = ifp_radius_step
@@ -355,23 +372,28 @@ class Project:
         self.ifp_output = ifp_output
         self.ifp_sim_matrix_output = ifp_sim_matrix_output
 
+        # General parameters.
         self.out_pse = out_pse
-
+        self.use_cache = use_cache
         self.append_mode = append_mode
+        self.nproc = nproc
 
         self._loaded_logging_file = False
         self.logging_file = "%s/logs/project.log" % self.working_path
         self.verbosity = verbosity
 
-        self.nproc = nproc
-
         self.version = __version__
 
-        self._paths = ["chunks", "figures", "logs", "pdbs", "results/interactions", "results/fingerprints", "results/pse", "results", "tmp"]
+        self._paths = ["chunks", "figures", "logs", "pdbs",
+                       "results/interactions", "results/fingerprints",
+                       "results/pse", "results", "tmp"]
         self.errors = []
 
+        self.cache = None
+
     def __call__(self):
-        raise NotImplementedError("This class is not callable. Use a class that implements this method.")
+        raise NotImplementedError("This class is not callable. Use a class "
+                                  "that implements this method.")
 
     @property
     def project_file(self):
@@ -481,11 +503,14 @@ class Project:
                                        % (repr(verbosity), ", ".join(["%d (%s)" % (k, logging.getLevelName(v))
                                                                       for k, v in sorted(VERBOSITY_LEVEL.items())])))
         else:
-            self._log("info", "Verbosity set to: %d (%s)." % (verbosity, logging.getLevelName(VERBOSITY_LEVEL[verbosity])))
+            self._log("info", "Verbosity set to: %d (%s)."
+                      % (verbosity,
+                         logging.getLevelName(VERBOSITY_LEVEL[verbosity])))
 
         self._verbosity = VERBOSITY_LEVEL[verbosity]
 
-        # If the logging file has already been loaded, it is necessary to update the logging verbosity level.
+        # If the logging file has already been loaded, it is necessary
+        # to update the logging verbosity level.
         if self._loaded_logging_file:
             self._init_logging_file(self.logging_file)
 
@@ -558,7 +583,8 @@ class Project:
             pass
 
     def _prepare_project_path(self, subdirs=None):
-        self._log("info", "Preparing project directory '%s'." % self.working_path)
+        self._log("info",
+                  "Preparing project directory '%s'." % self.working_path)
 
         if subdirs is None:
             subdirs = self._paths
@@ -569,11 +595,13 @@ class Project:
         for path in subdirs:
             create_directory("%s/%s" % (self.working_path, path))
 
-        self._log("info", "Project directory '%s' created successfully." % self.working_path)
+        self._log("info", "Project directory '%s' created successfully."
+                  % self.working_path)
 
     def _remove_empty_paths(self):
         for path in self._paths:
-            remove_directory("%s/%s" % (self.working_path, path), only_empty_paths=True)
+            remove_directory("%s/%s" % (self.working_path, path),
+                             only_empty_paths=True)
 
     def remove_duplicate_entries(self):
         """Search and remove duplicate entries from ``entries``."""
@@ -632,23 +660,108 @@ class Project:
             return True
         return False
 
-    def _perceive_chemical_groups(self, entry, entity, ligand, add_h=False):
-        self._log("debug", "Starting pharmacophore perception for entry '%s'" % entry.to_string())
+    def _parse_complex(self, entry):
 
-        feature_factory = ChemicalFeatures.BuildFeatureFactory(self.atom_prop_file)
+        pdb_file = "%s/%s.pdb" % (self.pdb_path, entry.pdb_id)
+        entry.pdb_file = pdb_file
+
+        pdb_parser = entry.parser
+        if pdb_parser is None:
+            pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True,
+                                   FIX_EMPTY_CHAINS=True,
+                                   FIX_ATOM_NAME_CONFLICT=True,
+                                   FIX_OBABEL_FLAGS=False)
+
+        if isinstance(pdb_parser, FTMapParser):
+            only_compounds = [entry.get_biopython_key(full_id=True)]
+            structure = pdb_parser.get_structure(entry.pdb_id,
+                                                 pdb_file,
+                                                 only_compounds=only_compounds)
+            pdb_file = "%s/pdbs/%s.pdb" % (self.working_path,
+                                           entry.to_string())
+            save_to_file(structure, pdb_file)
+            entry.pdb_file = pdb_file
+        else:
+            structure = pdb_parser.get_structure(entry.pdb_id, pdb_file)
+
+        if isinstance(entry, MolFileEntry):
+            structure = entry.get_biopython_structure(structure, pdb_parser)
+
+        ligand = get_entity_from_entry(structure, entry)
+        ligand.set_as_target(is_target=True)
+
+        return pdb_parser, structure, ligand
+
+    def _get_perceiver(self, add_h, cache=None):
+        feats_factory_func = ChemicalFeatures.BuildFeatureFactory
+        feature_factory = feats_factory_func(self.atom_prop_file)
         feature_extractor = FeatureExtractor(feature_factory)
 
-        perceiver = AtomGroupPerceiver(feature_extractor, add_h=add_h, ph=self.ph, amend_mol=self.amend_mol,
-                                       mol_obj_type=self.mol_obj_type, tmp_path="%s/tmp" % self.working_path)
+        perceiver = AtomGroupPerceiver(feature_extractor, add_h=add_h,
+                                       ph=self.ph, amend_mol=self.amend_mol,
+                                       mol_obj_type=self.mol_obj_type,
+                                       cache=cache,
+                                       tmp_path="%s/tmp" % self.working_path)
 
-        radius = self.inter_calc.inter_config.get("boundary_cutoff", BOUNDARY_CONFIG["boundary_cutoff"])
-        nb_compounds = get_contacts_with(entity, ligand, level='R', radius=radius)
+        return perceiver
+
+    def cache_protein_properties(self, entry):
+        self._log("info",
+                  "Cache memory activated. Residue information will be "
+                  "stored and reutilized for all ligands.")
+
+        pdb_parser, structure, ligand = self._parse_complex(entry)
+        add_h = self._decide_hydrogen_addition(pdb_parser.get_header(), entry)
+
+        inter_config = self.inter_calc.inter_config
+        radius = inter_config.get("cache_cutoff",
+                                  BOUNDARY_CONFIG["cache_cutoff"])
+        nb_pairs = get_contacts_with(structure[0], ligand,
+                                     level='R', radius=radius)
+        nb_compounds = set([p[1] for p in nb_pairs
+                            if not p[1].is_target()])
+
+        perceiver = self._get_perceiver(add_h)
+        atm_grps_mngr = perceiver.perceive_atom_groups(nb_compounds)
+
+        # Remove any edges involving the ligand.
+        valid_edges = set()
+        for edge in atm_grps_mngr.graph.edges:
+            if any([atm.parent.is_target() for atm in edge]) is False:
+                valid_edges.add(edge)
+        atm_grps_mngr.graph = nx.Graph()
+        atm_grps_mngr.graph.add_edges_from(valid_edges)
+
+        # Remove dummy chain if the ligand comes from an
+        # external molecular file.
+        if isinstance(entry, MolFileEntry):
+            chain = ligand.parent
+            chain.detach_child(ligand.id)
+
+            if len(chain.child_list) == 0:
+                chain.parent.detach_child(chain.id)
+
+        self.cache = StructureCache(nb_compounds, atm_grps_mngr)
+
+    def _perceive_chemical_groups(self, entry, entity, ligand,
+                                  add_h=False, cache=None):
+        self._log("debug", "Starting pharmacophore perception "
+                  "for entry '%s'" % entry.to_string())
+
+        inter_config = self.inter_calc.inter_config
+        radius = inter_config.get("bsite_cutoff",
+                                  BOUNDARY_CONFIG["bsite_cutoff"])
+        nb_pairs = get_contacts_with(entity, ligand, level='R', radius=radius)
 
         mol_objs_dict = {}
         if isinstance(entry, MolFileEntry):
             mol_objs_dict[entry.get_biopython_key()] = entry.mol_obj
 
-        atm_grps_mngr = perceiver.perceive_atom_groups(set([x[1] for x in nb_compounds]), mol_objs_dict=mol_objs_dict)
+        nb_compounds = set([x[1] for x in nb_pairs])
+
+        perceiver = self._get_perceiver(add_h, cache)
+        atm_grps_mngr = perceiver.perceive_atom_groups(nb_compounds,
+                                                       mol_objs_dict=mol_objs_dict)
 
         self._log("debug", "Pharmacophore perception for entry '%s' has finished." % entry.to_string())
 
@@ -811,6 +924,16 @@ class Project:
             raise CompatibilityError("The project loaded from '%s' has a version (%s) not compatible with the "
                                      "current %s's version (%s)." % (input_file, proj_obj.version, __package__.upper(), __version__))
 
+    @classmethod
+    def from_config_file(cls, config_file=None):
+
+        if config_file is not None and not exists(config_file):
+            raise OSError("File '%s' does not exist." % config_file)
+
+        proj_params = ProjectParams(config_file)
+
+        return cls(**proj_params.params)
+
 
 class LocalProject(Project):
 
@@ -853,7 +976,8 @@ class LocalProject(Project):
 
         start = time.time()
 
-        self._log("debug", "Starting entry processing: %s." % entry.to_string())
+        self._log("debug", "Starting entry processing: %s."
+                  % entry.to_string())
 
         try:
             # Check if the entry is in the correct format.
@@ -862,53 +986,41 @@ class LocalProject(Project):
                 self._validate_entry_format(entry)
 
             # Entry results will be saved here.
-            pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
+            pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path,
+                                                entry.to_string())
             if self.append_mode and exists(pkl_file):
-                self._log("debug", "Since append mode is set ON, it will skip entry '%s' because a result for "
-                          "this entry already exists in the working path." % entry.to_string())
+                self._log("debug", "Since append mode is set ON, it will "
+                          "skip entry '%s' because a result for this entry "
+                          " already exists in the working path."
+                          % entry.to_string())
                 return
 
-            # TODO: allow the user to pass a pdb_file through entries.
-            pdb_file = "%s/%s.pdb" % (self.pdb_path, entry.pdb_id)
-            entry.pdb_file = pdb_file
-
-            pdb_parser = entry.parser
-            if pdb_parser is None:
-                pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True, FIX_EMPTY_CHAINS=True,
-                                       FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=False)
-
-            if isinstance(pdb_parser, FTMapParser):
-                structure = pdb_parser.get_structure(entry.pdb_id, pdb_file, only_compounds=[entry.get_biopython_key(full_id=True)])
-                pdb_file = "%s/pdbs/%s.pdb" % (self.working_path, entry.to_string())
-                save_to_file(structure, pdb_file)
-                entry.pdb_file = pdb_file
-            else:
-                structure = pdb_parser.get_structure(entry.pdb_id, pdb_file)
-            add_h = self._decide_hydrogen_addition(pdb_parser.get_header(), entry)
-
-            if isinstance(entry, MolFileEntry):
-                structure = entry.get_biopython_structure(structure, pdb_parser)
-
-            ligand = get_entity_from_entry(structure, entry)
-            ligand.set_as_target(is_target=True)
+            pdb_parser, structure, ligand = self._parse_complex(entry)
+            add_h = self._decide_hydrogen_addition(pdb_parser.get_header(),
+                                                   entry)
 
             #
             # Perceive pharmacophoric properties
             #
-            atm_grps_mngr = self._perceive_chemical_groups(entry, structure[0], ligand, add_h)
+            atm_grps_mngr = self._perceive_chemical_groups(entry,
+                                                           structure[0],
+                                                           ligand, add_h,
+                                                           self.cache)
             atm_grps_mngr.entry = entry
 
             #
             # Calculate interactions
             #
-            interactions_mngr = self.inter_calc.calc_interactions(atm_grps_mngr.atm_grps)
+            calc_func = self.inter_calc.calc_interactions
+            interactions_mngr = calc_func(atm_grps_mngr.atm_grps)
             interactions_mngr.entry = entry
 
             # Create hydrophobic islands.
             atm_grps_mngr.merge_hydrophobic_atoms(interactions_mngr)
 
             if self.binding_mode_filter is not None:
-                interactions_mngr.filter_out_by_binding_mode(self.binding_mode_filter)
+                bm_filter_func = interactions_mngr.filter_out_by_binding_mode
+                bm_filter_func(self.binding_mode_filter)
 
             # Generate IFP (Interaction fingerprint)
             ifp = None
@@ -946,7 +1058,6 @@ class LocalProject(Project):
         self._log("debug", "Processing of entry '%s' took %.2fs." % (entry.to_string(), proc_time))
 
     def _process_ifps(self, entry):
-
         start = time.time()
 
         self._log("debug", "Starting IFP processing for entry '%s'." % entry.to_string())
@@ -970,16 +1081,19 @@ class LocalProject(Project):
                                         "data file '%s' was not found." % (entry.to_string(), pkl_file))
 
         except Exception:
-            self._log("debug", "IFP processing for entry '%s' failed. Check the logs for more information." % entry.to_string())
+            self._log("debug", "IFP processing for entry '%s' failed. Check "
+                      "the logs for more information." % entry.to_string())
             raise
 
         proc_time = time.time() - start
-        self._log("debug", "IFP processing for entry '%s' took %.2fs." % (entry.to_string(), proc_time))
+        self._log("debug", "IFP processing for entry '%s' took %.2fs." %
+                  (entry.to_string(), proc_time))
 
     def __call__(self):
 
         if len(self.entries) == 0:
-            warnings.warn("There is nothing to be done as no entry was informed.")
+            warnings.warn("There is nothing to be done as no "
+                          "entry was informed.")
             return
 
         start = time.time()
@@ -989,21 +1103,31 @@ class LocalProject(Project):
 
         self.remove_duplicate_entries()
 
-        self._log("info", "It will verify the existence of PDB files and download them as necessary.")
+        self._log("info", "It will verify the existence of PDB files and "
+                  "download them as necessary.")
         self.verify_pdb_files_existence()
 
-        self._log("info", "Entries processing will start. Number of entries to be processed is: %d." % len(self.entries))
-        self._log("info", "The number of processes was set to: %s." % str(self.nproc))
+        self._log("info", "Entries processing will start. Number of entries "
+                  "to be processed is: %d." % len(self.entries))
+        self._log("info", "The number of processes was set to: %s."
+                  % str(self.nproc))
+
+        if self.use_cache:
+            entry = self.entries[0]
+            self.cache_protein_properties(entry)
 
         # Run jobs either in Parallel or Sequentially (nproc = None).
         pj = ParallelJobs(self.nproc)
-        job_results = pj.run_jobs(args=self.entries, consumer_func=self._process_entry, job_name="Entries processing")
+        job_results = pj.run_jobs(args=self.entries,
+                                  consumer_func=self._process_entry,
+                                  job_name="Entries processing")
         self.errors = job_results.errors
 
         # Remove failed entries.
         if self.errors:
             entries_with_error = set([e[0].to_string() for e in self.errors])
-            self.entries = [e for e in self.entries if e.to_string() not in entries_with_error]
+            self.entries = [e for e in self.entries
+                            if e.to_string() not in entries_with_error]
 
         # If all molecules failed, it won't try to create fingerprints.
         if len(self.entries) == 0:
@@ -1011,7 +1135,8 @@ class LocalProject(Project):
         else:
             self._log("info", "Entries processing finished successfully.")
 
-            # Warn the users for any errors found during the entries processing.
+            # Warn the users for any errors found
+            # during the entries processing.
             if self.errors:
                 self._log("warning", "Number of entries with errors: %d. Check the log file to see the complete list of entries that failed."
                           % len(entries_with_error))

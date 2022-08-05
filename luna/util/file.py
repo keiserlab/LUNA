@@ -156,7 +156,8 @@ def parse_json_file(json_file):
         import simplejson as json
         logger.warning("Module 'simplejson' imported.")
     except ImportError:
-        logger.warning("Module 'simplejson' not available. Built-in module 'json' will be imported.")
+        logger.warning("Module 'simplejson' not available. "
+                       "Built-in module 'json' will be imported.")
         import json
 
     try:
@@ -181,10 +182,12 @@ def create_directory(path, clear=False):
         if not exists(path):
             makedirs(path)
         elif clear:
-            logger.info("The directory '%s' already exists, and it will be cleared before the program continues." % path)
+            logger.info("The directory '%s' already exists, and it will be "
+                        "cleared before the program continues." % path)
             remove_directory(path)
         else:
-            logger.info("The directory '%s' already exists, but it will not be cleared." % path)
+            logger.info("The directory '%s' already exists, but it will not "
+                        "be cleared." % path)
     except OSError as e:
         logger.exception(e)
         raise

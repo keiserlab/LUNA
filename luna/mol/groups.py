@@ -58,6 +58,8 @@ class AtomGroupsManager():
 
         self.version = __version__
 
+        self._compounds = set()
+
         self.add_atm_grps(atm_grps)
 
     @property
@@ -65,6 +67,12 @@ class AtomGroupsManager():
         """iterable of `AtomGroup`, read-only: The sequence of `AtomGroup` objects.\
         Additional objects should be added using the method :py:meth:`add_atm_grps`."""
         return self._atm_grps
+
+    @property
+    def compounds(self):
+        """set of :class:`~luna.MyBio.PDB.Residue.Residue`, read-only:
+        Compounds comprising the ``atm_grps``."""
+        return self._compounds
 
     @property
     def child_dict(self):
@@ -159,6 +167,7 @@ class AtomGroupsManager():
 
         for atm_grp in atm_grps:
             self.child_dict[tuple(sorted(atm_grp.atoms))] = atm_grp
+            self._compounds.update(atm_grp.compounds)
             atm_grp.manager = self
 
     def remove_atm_grps(self, atm_grps):
@@ -262,6 +271,7 @@ class AtomGroupsManager():
             else:
                 atm_mapping[atm.get_full_id()] = island_id
                 hydrop_islands[island_id].add(atm)
+
             island_id += 1
 
         # Create AtomGroup objects for the hydrophobic islands
@@ -797,17 +807,20 @@ class AtomGroupPerceiver():
     def __init__(self, feature_extractor, add_h=False, ph=None, amend_mol=True,
                  charge_model=OpenEyeModel(), mol_obj_type="rdkit",
                  expand_selection=True, radius=COV_SEARCH_RADIUS,
-                 tmp_path=None, critical=True):
+                 cache=None, tmp_path=None, critical=True):
 
         if mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES:
-            raise IllegalArgumentError("Objects of type '%s' are not currently accepted. "
-                                       "The available options are: %s." % (mol_obj_type, ", ".join(ACCEPTED_MOL_OBJ_TYPES)))
+            acc_mol_obj_types = ", ".join(ACCEPTED_MOL_OBJ_TYPES)
+            raise IllegalArgumentError("Objects of type '%s' are not currently"
+                                       "accepted. The available options are: "
+                                       "%s." % (mol_obj_type,
+                                                acc_mol_obj_types))
 
         self.feature_extractor = feature_extractor
 
         self.add_h = add_h
         self.ph = ph
-        # If the user decided not to add hydrogens, 
+        # If the user decided not to add hydrogens,
         # it will try to use the existing ones.
         self.keep_hydrog = not self.add_h
 
@@ -816,6 +829,8 @@ class AtomGroupPerceiver():
         self.mol_obj_type = mol_obj_type
         self.expand_selection = expand_selection
         self.radius = radius
+
+        self.cache = cache
         self.tmp_path = tmp_path
 
         # If the pharmacophoric perception is critical, any exception during
@@ -848,6 +863,13 @@ class AtomGroupPerceiver():
         self.atm_mapping = {}
 
         compounds = set(compounds)
+        init_comps_set = set(compounds)
+
+        if self.cache:
+            cached_compounds = set([c for c in compounds
+                                    if self.cache.is_compound_cached(c)])
+            compounds = compounds - cached_compounds
+
         # Controls which compounds are allowed to expand
         # when 'expand_selection' is set ON.
         pruned_comps = set()
@@ -858,45 +880,121 @@ class AtomGroupPerceiver():
             try:
                 comp = comp_queue.pop()
 
-                logger.debug("It will try to perceive the features of the compound %s as no predefined properties "
-                             "was provided." % comp)
+                logger.debug("It will try to perceive the features of the "
+                             "compound '%s' as no predefined properties "
+                             "were provided." % comp.full_name)
 
                 mol_obj = mol_objs_dict.get(comp.id, None)
 
-                # If no OBMol object was defined and expand_selection was set ON and it is not a border compound,
-                # it will get all compounds around the target and create a new OBMol object with them.
+                # If no OBMol object was defined and expand_selection
+                # was set ON and it is not a border compound, it will
+                # get all compounds around the target and create a new
+                # OBMol object with them.
                 if mol_obj is None and self.expand_selection:
                     comp_list = get_proximal_compounds(comp)
 
-                    # Expands the queue of compounds with any new border compound.
+                    # Expands the queue of compounds
+                    # with any new border compound.
                     if comp not in pruned_comps:
                         border_comps = set(comp_list) - compounds
                         pruned_comps |= border_comps
                         comp_queue |= border_comps
 
-                # Otherwise, the compound list will be composed only by the target compound.
+                # Otherwise, the compound list will be composed
+                # only by the target compound.
                 else:
                     comp_list = [comp]
 
                 # Recover all atoms from the previous selected compounds.
-                selector = Selector(keep_altloc=False, keep_hydrog=self.keep_hydrog)
-                atoms = tuple([a for r in comp_list for a in r.get_unpacked_list() if selector.accept_atom(a)])
+                selector = Selector(keep_altloc=False,
+                                    keep_hydrog=self.keep_hydrog)
+                atoms = tuple([a for r in comp_list
+                               for a in r.get_unpacked_list()
+                               if selector.accept_atom(a)])
 
                 self._assign_properties(comp, atoms, mol_obj)
             except Exception:
-                logger.debug("Features for the compound '%s' were not correctly perceived." % comp)
+                logger.debug("Features for the compound '%s' were "
+                             "not correctly perceived." % comp)
 
                 if self.critical:
                     raise
 
-        # Remove atom groups not comprising the provided compound list (parameter 'compounds').
+        if self.cache and cached_compounds:
+            self._apply_cache(cached_compounds, comp.get_parent_by_level("M"))
+
+        # Remove atom groups not comprising the provided
+        # compound list (parameter 'compounds').
         remove_atm_grps = []
         for atm_grp in self.atm_grps_mngr:
-            if any([c in compounds for c in atm_grp.compounds]) is False:
+            if any([c in init_comps_set for c in atm_grp.compounds]) is False:
                 remove_atm_grps.append(atm_grp)
         self.atm_grps_mngr.remove_atm_grps(remove_atm_grps)
 
         return self.atm_grps_mngr
+
+    def _apply_cache(self, compounds, model):
+
+        def copy_atom(ref_atm, force_update=False):
+            ref_res = ref_atm.parent
+            ref_chain = ref_res.parent
+
+            # Recover current structure entities.
+            chain = model[ref_chain.id]
+            res = chain[ref_res.id]
+            atm = res[ref_atm.id]
+
+            # If an ExtendedAtom already exists, return it.
+            if not force_update and atm in self.atm_mapping:
+                return self.atm_mapping[atm]
+
+            # Define a new ExtendedAtom.
+            ext_atm = self._new_extended_atom(atm)
+
+            # Set its atomic invariants.
+            ext_atm.invariants = ref_atm.invariants
+
+            # Add neighbors' information to the new ExtendedAtom.
+            for nbi in ref_atm.neighbors_info:
+                atom_info = AtomData(nbi.atomic_num,
+                                     nbi.coord, nbi.bond_type,
+                                     nbi.full_id)
+                ext_atm.add_nb_info([atom_info])
+
+            return ext_atm
+
+        comp_names = set([c.full_name for c in compounds])
+
+        for atm_grp in sorted(self.cache.atm_grps_mngr):
+            if any([c.full_name in comp_names for c in atm_grp.compounds]):
+                atoms = []
+                for atm in atm_grp.atoms:
+                    # Copy extended atom, i.e., create a new extended
+                    # atom or recover an existing one and set invariants
+                    # and neighbors' information when necessary.
+                    ext_atm = copy_atom(atm, force_update=True)
+                    atoms.append(ext_atm)
+
+                # Create the new atom group.
+                features = atm_grp.features
+                self.atm_grps_mngr.new_atm_grp(atoms, features)
+
+        for edge in sorted(self.cache.atm_grps_mngr.graph.edges):
+            # Skip already existing edges.
+            if edge in self.atm_grps_mngr.graph.edges:
+                continue
+
+            atoms = []
+            for atm in edge:
+                # Copy extended atom, i.e., create a new
+                # extended atom or recover an existing one
+                # and set invariants and neighbors' information
+                # if necessary.
+                ext_atm = copy_atom(atm)
+                atoms.append(ext_atm)
+
+            # Update the AtomGroupsManager object with a new edge.
+            self.atm_grps_mngr.graph.add_edge(atoms[0], atoms[1], weight=1)
 
     def _assign_properties(self, target_compound, target_atoms, mol_obj=None):
 

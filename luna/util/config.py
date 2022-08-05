@@ -1,4 +1,5 @@
 import configparser
+import ast
 import logging
 
 logger = logging.getLogger()
@@ -10,7 +11,7 @@ class Config:
 
     Parameters
     ----------
-    conf_file : str
+    config_file : str
         The pathname for the configuration file.
 
     Attributes
@@ -20,13 +21,17 @@ class Config:
         The parsed configuration file.
     """
 
-    def __init__(self, conf_file):
+    def __init__(self, config_file):
         self.config = configparser.ConfigParser(allow_no_value=True)
         try:
-            self.config.read(conf_file)
+            self.config.read(config_file)
         except Exception as e:
             logger.exception(e)
-            raise IOError('Configuration file %s not read.' % conf_file)
+            raise IOError('Configuration file %s not read.' % config_file)
+
+    def parse_value(self, section, property_name):
+        value = self.config.get(section, property_name)
+        return ast.literal_eval(value)
 
     def get_section_map(self, section):
         """
@@ -46,4 +51,6 @@ class Config:
         if hasattr(self.config, attr):
             return getattr(self.config, attr)
         else:
-            raise AttributeError("The attribute '%s' does not exist in the class %s." % (attr, self.__class__.__name__))
+            raise AttributeError("The attribute '%s' does not exist in the "
+                                 "class %s." % (attr,
+                                                self.__class__.__name__))

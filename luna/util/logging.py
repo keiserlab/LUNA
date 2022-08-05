@@ -86,7 +86,7 @@ def load_default_logging_config():
     for hdlr in logger.handlers[:]:
         logger.removeHandler(hdlr)
 
-    LOGGING_CONFIG = os.path.join(os.path.dirname(__file__), "logging.ini")
+    LOGGING_CONFIG = os.path.join(os.path.dirname(__file__), "logging.cfg")
     logging.config.fileConfig(LOGGING_CONFIG)
 
     return logger

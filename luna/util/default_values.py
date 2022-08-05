@@ -18,7 +18,8 @@ LIGAND_EXPO_FILE = "%s/ligand_expo.tsv" % CONFIG_PATH
 MIN_FDEF_FILE = '%s/MinimalFeatures.fdef' % CONFIG_PATH
 
 INTERACTION_CONFIG = DefaultInteractionConfig()
-BOUNDARY_CONFIG = InteractionConfig({"boundary_cutoff": 6.2})
+BOUNDARY_CONFIG = InteractionConfig({"bsite_cutoff": 6.2,
+                                     "cache_cutoff": 10})
 
 NMR_METHODS = ["SOLID-STATE NMR", "SOLUTION NMR"]
 

@@ -138,20 +138,22 @@ EndFeature
 #
 #
 # Sigma-holes exist when an electronegative atom is bound to Carbon/Sulfur.
+#
 # Clark T. σ-Holes. Wiley Interdisciplinary Reviews: Computational Molecular Science. 2013;3:13–20.
 # Beno BR, Yeung K-S, Bartberger MD, Pennington LD, Meanwell NA. A Survey of the Role of Noncovalent Sulfur Interactions in Drug Design. Journal of Medicinal Chemistry. 2015;58:4383–438.
 #
 # It should be noted that the recognized chalcogen bonds mainly involve divalent chalcogens.
+#
 # Mahmudov, Kamran T., Maximilian N. Kopylovich, M. Fátima C. Guedes da Silva, and Armando J. L. Pombeiro. 2017. “Chalcogen Bonding in Synthesis, Catalysis and Design of Materials.” Dalton Transactions 46 (31): 10121–38. https://doi.org/10.1039/C7DT01685A.
 #
-DefineFeature YDonor [$([#16,#34,#52;v2;H0](-,:[#6,#16])-,:[#6,#16]),$([#16,#34,#52;v2;H1][#6,#16])]
+DefineFeature YDonor [$([#16,#34,#52;v2;H0](-,:[#6,#16])-,:[#6,#16])]
   Family ChalcogenDonor
   Weights 1.0
 EndFeature
 
 #
 # Isothiazole-like molecules: n-y-c, where y is a chalcogen aromatic atom. Is it too generic?
-# Isothiazoles contain only one sigma-hole. In this case, only one chalcogen bond should be recogned.
+# Isothiazoles contain only one sigma-hole. In this case, only one chalcogen bond should be recognized.
 #
 # Beno, Brett R., Kap-Sun Yeung, Michael D. Bartberger, Lewis D. Pennington, and Nicholas A. Meanwell. 2015. “A Survey of the Role of Noncovalent Sulfur Interactions in Drug Design.” Journal of Medicinal Chemistry 58 (11): 4383–4438. https://doi.org/10.1021/jm501853m.
 # Thomas, Sajesh P., K. Satheeshkumar, Govindasamy Mugesh, and T. N. Guru Row. 2015. “Unusually Short Chalcogen Bonds Involving Organoselenium: Insights into the Se-N Bond Cleavage Mechanism of the Antioxidant Ebselen and Analogues.” Chemistry (Weinheim an Der Bergstrasse, Germany) 21 (18): 6793–6800.

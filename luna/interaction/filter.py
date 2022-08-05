@@ -1,3 +1,4 @@
+from os import path
 from ast import literal_eval
 
 from luna.mol.entry import REGEX_RESNUM_ICODE
@@ -5,9 +6,16 @@ from luna.util.config import Config
 from luna.util.exceptions import IllegalArgumentError
 
 
-AROMATIC_STACKINGS = ["pi-stacking", "face-to-face pi-stacking", "face-to-edge pi-stacking", "face-to-slope pi-stacking",
-                      "edge-to-edge pi-stacking", "edge-to-face pi-stacking", "edge-to-slope pi-stacking", "displaced face-to-face pi-stacking",
-                      "displaced face-to-edge pi-stacking", "displaced face-to-slope pi-stacking"]
+AROMATIC_STACKINGS = ["pi-stacking",
+                      "face-to-face pi-stacking",
+                      "face-to-edge pi-stacking",
+                      "face-to-slope pi-stacking",
+                      "edge-to-edge pi-stacking",
+                      "edge-to-face pi-stacking",
+                      "edge-to-slope pi-stacking",
+                      "displaced face-to-face pi-stacking",
+                      "displaced face-to-edge pi-stacking",
+                      "displaced face-to-slope pi-stacking"]
 
 
 class InteractionFilter:
@@ -206,7 +214,8 @@ class InteractionFilter:
 
         # It ignores nucleic acid-ligand interactions if required.
         is_nucl_hetatm = ((src_grp.is_nucleotide() and trgt_grp.is_hetatm())
-                          or (src_grp.is_hetatm() and trgt_grp.is_nucleotide()))
+                          or (src_grp.is_hetatm()
+                              and trgt_grp.is_nucleotide()))
         if self.ignore_nucl_hetatm and is_nucl_hetatm:
             return False
 
@@ -223,13 +232,63 @@ class InteractionFilter:
             return False
 
         # It ignores interactions involving two waters if required.
-        # if on, it will produce water-bridged interactions of multiple levels
-        # Eg: residue -- h2o -- h2o -- ligand, residue -- residue -- h2o -- h2o -- ligand.
+        # If ON, it will produce water-bridged interactions of multiple levels
+        # E.g.: residue -- h2o -- h2o -- ligand
+        #       residue -- residue -- h2o -- h2o -- ligand.
         is_h2o_h2o = (src_grp.is_water() and trgt_grp.is_water())
         if self.ignore_h2o_h2o and is_h2o_h2o:
             return False
 
         return True
+
+    @classmethod
+    def from_config_file(cls, config_file):
+
+        if not path.exists(config_file):
+            raise OSError("File '%s' does not exist." % config_file)
+
+        params = Config(config_file)
+
+        inter_filter = None
+        if "default" in params.sections():
+            params_dict = params.get_section_map("default")
+            filter_type = params_dict.pop("type", None)
+
+            if filter_type is not None:
+                filter_type = filter_type.upper()
+
+                available_filters = ["PLI", "PPI", "PNI", "NNI", "NLI"]
+                if filter_type not in available_filters:
+                    raise KeyError("The accepted default filter types are: "
+                                   "%s." % ", ".join(available_filters))
+
+                if filter_type == "PLI":
+                    inter_filter = cls.new_pli_filter()
+
+                elif filter_type == "PPI":
+                    inter_filter = cls.new_ppi_filter()
+
+                elif filter_type == "PNI":
+                    inter_filter = cls.new_pni_filter()
+
+                elif filter_type == "NNI":
+                    inter_filter = cls.new_nni_filter()
+
+                elif filter_type == "NLI":
+                    inter_filter = cls.new_nli_filter()
+
+        if "ignore" in params.sections():
+            params_dict = params.get_section_map("ignore")
+            params_dict = {"ignore_" + k: v
+                           for k, v in params_dict.items()}
+
+            if inter_filter:
+                for prop, val in params_dict.items():
+                    setattr(inter_filter, prop, val)
+            else:
+                inter_filter = cls(**params_dict)
+
+        return inter_filter
 
 
 class BindingModeCondition:
@@ -455,6 +514,9 @@ class BindingModeFilter:
             accept_all=False
         """
 
+        if not path.exists(config_file):
+            raise OSError("File '%s' does not exist." % config_file)
+
         filtering_config = {}
 
         config = Config(config_file)
@@ -478,7 +540,8 @@ class BindingModeFilter:
                 if "*" in values:
                     values = ["*"]
 
-            conditions = [BindingModeCondition(condition) for condition in values]
+            conditions = [BindingModeCondition(condition)
+                          for condition in values]
             filtering_config[inter_type] = conditions
 
         return cls(filtering_config)
@@ -491,7 +554,8 @@ class BindingModeFilter:
         if inter.type.lower() in self.config:
             inter_type = inter.type.lower()
 
-        elif "aromatic stacking" in self.config and inter.type.lower() in AROMATIC_STACKINGS:
+        elif ("aromatic stacking" in self.config
+                and inter.type.lower() in AROMATIC_STACKINGS):
             inter_type = "aromatic stacking"
 
         elif "*" in self.config:

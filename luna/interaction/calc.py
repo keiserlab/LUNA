@@ -332,7 +332,7 @@ class InteractionCalculator:
         The same exceptions described for ``strict_donor_rules`` apply here.
     lazy_comps_list : iterable
          A sequence of molecule names to ignore explicit hydrogen position during the calculation of hydrogen bonds and weak hydrogen bonds.
-         The default list is ['HOH', 'DOD', 'WAT', 'H2O', 'OH2', 'NH3', 'NH4'], which only contains water, ammonia, and ammonium ion, 
+         The default list is ['HOH', 'DOD', 'WAT', 'H2O', 'OH2', 'NH3', 'NH4'], which only contains water, ammonia, and ammonium ion,
          including water name variations used by different programs.
 
 
@@ -494,16 +494,26 @@ class InteractionCalculator:
 
     """
 
-    def __init__(self, inter_config=DefaultInteractionConfig(), inter_filter=None, inter_funcs=None,
-                 add_non_cov=True, add_cov=True, add_proximal=False, add_atom_atom=True,
-                 add_dependent_inter=False, add_h2o_pairs_with_no_target=False, strict_donor_rules=True,
-                 strict_weak_donor_rules=True, lazy_comps_list=DEFAULT_SOLVENTS):
+    def __init__(self, inter_config=DefaultInteractionConfig(),
+                 inter_filter=None, inter_funcs=None, add_non_cov=True,
+                 add_cov=True, add_proximal=False, add_atom_atom=True,
+                 add_dependent_inter=False,
+                 add_h2o_pairs_with_no_target=False,
+                 strict_donor_rules=True,
+                 strict_weak_donor_rules=True,
+                 lazy_comps_list=DEFAULT_SOLVENTS):
 
-        if inter_config is not None and isinstance(inter_config, InteractionConfig) is False:
-            raise IllegalArgumentError("The informed interaction configuration must be an instance of '%s'." % InteractionConfig)
+        if (inter_config is not None
+                and isinstance(inter_config, InteractionConfig) is False):
+            msg = ("The informed interaction configuration "
+                   "must be an instance of '%s'." % InteractionConfig)
+            raise IllegalArgumentError(msg)
 
-        if inter_filter is not None and isinstance(inter_filter, InteractionFilter) is False:
-            raise IllegalArgumentError("The informed interaction filter must be an instance of '%s'." % InteractionFilter)
+        if (inter_filter is not None
+                and isinstance(inter_filter, InteractionFilter) is False):
+            msg = ("The informed interaction filter must be "
+                   "an instance of '%s'." % InteractionFilter)
+            raise IllegalArgumentError(msg)
 
         self.inter_config = inter_config
         self.inter_filter = inter_filter
@@ -569,10 +579,12 @@ class InteractionCalculator:
         computed_pairs = set()
         all_interactions = []
 
-        boundary_cutoff = self.inter_config.get("boundary_cutoff", BOUNDARY_CONFIG["boundary_cutoff"])
+        bsite_param = "bsite_cutoff"
+        bsite_cutoff = self.inter_config.get(bsite_param,
+                                             BOUNDARY_CONFIG[bsite_param])
 
         for trgt_atm_grp in trgt_atm_grps:
-            for nb_atm_grp in ss.search(trgt_atm_grp.centroid, boundary_cutoff):
+            for nb_atm_grp in ss.search(trgt_atm_grp.centroid, bsite_cutoff):
 
                 # It will always ignore interactions involving the same atom groups.
                 # Loops in the graph is not permitted and does not make any sense.
@@ -628,21 +640,24 @@ class InteractionCalculator:
         # Get only unique interactions.
         all_interactions = set(all_interactions)
 
-        # Remove potential inconsistences. For example: a hydrogen bond and an unfavorable interation between the same atoms.
+        # Remove potential inconsistences. For example: a hydrogen bond and
+        # an unfavorable interation between the same atoms.
         self.remove_inconsistencies(all_interactions)
 
         if not self.add_h2o_pairs_with_no_target:
             self.remove_h2o_pairs_with_no_target(all_interactions)
 
-        logger.debug("Number of potential interactions found: %d" % len(all_interactions))
+        logger.debug("Number of potential interactions found: %d"
+                     % len(all_interactions))
 
         return InteractionsManager(all_interactions)
 
     def _resolve_interactions(self, group1, group2, feat1, feat2):
         funcs = self.get_functions(feat1.name, feat2.name)
         if len(funcs) == 0:
-            raise IllegalArgumentError("It does not exist a corresponding function to the features: '%s' and '%s'."
-                                       % (feat1, feat2))
+            raise IllegalArgumentError("It does not exist a corresponding "
+                                       "function to the features: '%s' and "
+                                       "'%s'." % (feat1, feat2))
 
         interactions = []
         for func in funcs:
@@ -707,13 +722,16 @@ class InteractionCalculator:
                     if not self.inter_filter.is_valid_pair(src_grp, trgt_grp):
                         continue
 
-                params = {"depends_on": [h2o_pairs[h2o_key][src_grp], h2o_pairs[h2o_key][trgt_grp]]}
+                params = {"depends_on": [h2o_pairs[h2o_key][src_grp],
+                                         h2o_pairs[h2o_key][trgt_grp]]}
 
-                inter = InteractionType(src_grp, trgt_grp, "Water-bridged hydrogen bond", directional=True, params=params)
+                inter = InteractionType(src_grp, trgt_grp,
+                                        "Water-bridged hydrogen bond",
+                                        directional=True, params=params)
                 dependent_interactions.add(inter)
 
-        # It will try to match Hydrogen bonds and Ionic interactions involving the same chemical
-        # groups to attribute salt bridges.
+        # It will try to match Hydrogen bonds and Ionic interactions
+        # involving the same chemical groups to attribute salt bridges.
         sb_groups = set()
         for hbond, ionic in product(hbond_set, ionic_set):
 
@@ -848,25 +866,34 @@ class InteractionCalculator:
         interactions : :class:`~luna.interaction.type.InteractionType`
         """
         valid_h2o_set = set()
-        invalid_inters = defaultdict(set)
-
+        h2o_interactions = set()
         for inter in interactions:
-            if inter.src_grp.is_water() and not inter.trgt_grp.has_target() and inter.src_grp not in valid_h2o_set:
-                invalid_inters[inter.src_grp].add(inter)
-            elif inter.trgt_grp.is_water() and not inter.src_grp.has_target() and inter.trgt_grp not in valid_h2o_set:
-                invalid_inters[inter.trgt_grp].add(inter)
-            else:
+
+            if inter.src_grp.is_water() or inter.trgt_grp.is_water():
+                h2o_interactions.add(inter)
+
+                # If a water is interacting with the ligand.
                 if inter.src_grp.is_water() and inter.trgt_grp.has_target():
                     valid_h2o_set.add(inter.src_grp)
-                    if inter.src_grp in invalid_inters:
-                        del invalid_inters[inter.src_grp]
 
                 if inter.trgt_grp.is_water() and inter.src_grp.has_target():
                     valid_h2o_set.add(inter.trgt_grp)
-                    if inter.trgt_grp in invalid_inters:
-                        del invalid_inters[inter.trgt_grp]
 
-        inters_to_remove = set([i for k in invalid_inters for i in invalid_inters[k]])
+        inters_to_remove = set()
+        for inter in h2o_interactions:
+            if inter.src_grp.is_water() and inter.trgt_grp.is_water():
+                if (inter.src_grp not in valid_h2o_set
+                        or inter.trgt_grp not in valid_h2o_set):
+                    inters_to_remove.add(inter)
+            else:
+                if (inter.src_grp.is_water()
+                        and inter.src_grp not in valid_h2o_set):
+                    inters_to_remove.add(inter)
+
+                if (inter.trgt_grp.is_water()
+                        and inter.trgt_grp not in valid_h2o_set):
+                    inters_to_remove.add(inter)
+
         interactions -= inters_to_remove
 
         # Clear the references of each interaction from the AtomGroup objects.
@@ -894,7 +921,6 @@ class InteractionCalculator:
 
                     # Chalcogen bond
                     ("ChalcogenDonor", "Acceptor"): [self.calc_chalc_bond],
-                    ("ChalcogenDonor", "WeakAcceptor"): [self.calc_chalc_bond],
                     ("ChalcogenDonor", "Aromatic"): [self.calc_chalc_bond_pi],
 
                     # Stackings
@@ -905,13 +931,16 @@ class InteractionCalculator:
                     ("PositivelyIonizable", "Aromatic"): [self.calc_cation_pi],
 
                     # Ionic interaction
-                    ("NegativelyIonizable", "PositivelyIonizable"): [self.calc_ionic],
+                    ("NegativelyIonizable",
+                     "PositivelyIonizable"): [self.calc_ionic],
                     ("NegIonizable", "PosIonizable"): [self.calc_ionic],
                     ("Negative", "Positive"): [self.calc_ionic],
 
                     # Repulsive interaction
-                    ("NegativelyIonizable", "NegativelyIonizable"): [self.calc_repulsive],
-                    ("PositivelyIonizable", "PositivelyIonizable"): [self.calc_repulsive],
+                    ("NegativelyIonizable",
+                     "NegativelyIonizable"): [self.calc_repulsive],
+                    ("PositivelyIonizable",
+                     "PositivelyIonizable"): [self.calc_repulsive],
                     ("NegIonizable", "NegIonizable"): [self.calc_repulsive],
                     ("PosIonizable", "PosIonizable"): [self.calc_repulsive],
                     ("Negative", "Negative"): [self.calc_repulsive],
@@ -925,20 +954,32 @@ class InteractionCalculator:
                     ("Electrophile", "Electrophile"): [self.calc_multipolar],
 
                     # Favorable ion-dipole interactions
-                    ("Nucleophile", "PositivelyIonizable"): [self.calc_ion_multipole],
-                    ("Nucleophile", "PosIonizable"): [self.calc_ion_multipole],
-                    ("Nucleophile", "Positive"): [self.calc_ion_multipole],
-                    ("Electrophile", "NegativelyIonizable"): [self.calc_ion_multipole],
-                    ("Electrophile", "NegIonizable"): [self.calc_ion_multipole],
-                    ("Electrophile", "Negative"): [self.calc_ion_multipole],
+                    ("Nucleophile",
+                     "PositivelyIonizable"): [self.calc_ion_multipole],
+                    ("Nucleophile",
+                     "PosIonizable"): [self.calc_ion_multipole],
+                    ("Nucleophile",
+                     "Positive"): [self.calc_ion_multipole],
+                    ("Electrophile",
+                     "NegativelyIonizable"): [self.calc_ion_multipole],
+                    ("Electrophile",
+                     "NegIonizable"): [self.calc_ion_multipole],
+                    ("Electrophile",
+                     "Negative"): [self.calc_ion_multipole],
 
                     # Unfavorable ion-dipole interactions
-                    ("Nucleophile", "NegativelyIonizable"): [self.calc_ion_multipole],
-                    ("Nucleophile", "NegIonizable"): [self.calc_ion_multipole],
-                    ("Nucleophile", "Negative"): [self.calc_ion_multipole],
-                    ("Electrophile", "PositivelyIonizable"): [self.calc_ion_multipole],
-                    ("Electrophile", "PosIonizable"): [self.calc_ion_multipole],
-                    ("Electrophile", "Positive"): [self.calc_ion_multipole],
+                    ("Nucleophile",
+                     "NegativelyIonizable"): [self.calc_ion_multipole],
+                    ("Nucleophile",
+                     "NegIonizable"): [self.calc_ion_multipole],
+                    ("Nucleophile",
+                     "Negative"): [self.calc_ion_multipole],
+                    ("Electrophile",
+                     "PositivelyIonizable"): [self.calc_ion_multipole],
+                    ("Electrophile",
+                     "PosIonizable"): [self.calc_ion_multipole],
+                    ("Electrophile",
+                     "Positive"): [self.calc_ion_multipole],
 
                     # Proximal, covalent, vdw, clash
                     ("Atom", "Atom"): [self.calc_atom_atom, self.calc_proximal]
@@ -986,7 +1027,7 @@ class InteractionCalculator:
 
         cc_dist = im.euclidean_distance(group1.centroid, group2.centroid)
 
-        if (self.is_within_boundary(cc_dist, "boundary_cutoff", le)
+        if (self.is_within_boundary(cc_dist, "bsite_cutoff", le)
                 and self.is_within_boundary(cc_dist, "max_dist_cation_pi_inter", le)):
             params = {"dist_cation_pi_inter": cc_dist}
             inter = InteractionType(group1, group2, "Cation-pi", params=params)
@@ -1020,7 +1061,7 @@ class InteractionCalculator:
 
         cc_dist = im.euclidean_distance(ring1.centroid, ring2.centroid)
 
-        if (self.is_within_boundary(cc_dist, "boundary_cutoff", le)
+        if (self.is_within_boundary(cc_dist, "bsite_cutoff", le)
                 and self.is_within_boundary(cc_dist, "max_cc_dist_pi_pi_inter", le)):
 
             dihedral_angle = im.to_quad1(im.angle(ring1.normal, ring2.normal))
@@ -1110,7 +1151,7 @@ class InteractionCalculator:
         # Distance between the amide and ring centroids.
         cc_dist = im.euclidean_distance(ring_grp.centroid, amide_grp.centroid)
 
-        if (self.is_within_boundary(cc_dist, "boundary_cutoff", le)
+        if (self.is_within_boundary(cc_dist, "bsite_cutoff", le)
                 and self.is_within_boundary(cc_dist, "max_cc_dist_amide_pi_inter", le)):
 
             dihedral_angle = im.to_quad1(im.angle(ring_grp.normal, amide_grp.normal))
@@ -1185,7 +1226,7 @@ class InteractionCalculator:
                 or not self.is_within_boundary(len(interacting_atms_in_surf2), "min_inter_atom_in_surf", ge)):
             return []
 
-        if (self.is_within_boundary(min_cc_dist, "boundary_cutoff", le)
+        if (self.is_within_boundary(min_cc_dist, "bsite_cutoff", le)
                 and self.is_within_boundary(min_cc_dist, "max_dist_hydrop_inter", le)):
 
             params = {"dist_hydrop_inter": min_cc_dist}
@@ -1266,7 +1307,7 @@ class InteractionCalculator:
         # Distance between the ion and the dipole.
         id_dist = im.euclidean_distance(part_charged_atm.coord, ion_grp.centroid)
 
-        if (self.is_within_boundary(id_dist, "boundary_cutoff", le)
+        if (self.is_within_boundary(id_dist, "bsite_cutoff", le)
                 and self.is_within_boundary(id_dist, "max_id_dist_ion_multipole_inter", le)):
 
             idy_angle = -1
@@ -1411,7 +1452,7 @@ class InteractionCalculator:
         # Distance between the nucleophile and electrophile.
         ne_dist = im.euclidean_distance(dipole_atm1.coord, dipole_atm2.coord)
 
-        if (self.is_within_boundary(ne_dist, "boundary_cutoff", le)
+        if (self.is_within_boundary(ne_dist, "bsite_cutoff", le)
                 and self.is_within_boundary(ne_dist, "max_ne_dist_multipolar_inter", le)):
 
             # No angle can be calculated if the electrophile (dipole 2) has only one atom.
@@ -1544,7 +1585,7 @@ class InteractionCalculator:
         # Defining the XA distance, in which A is the ring center
         xa_dist = im.euclidean_distance(donor_grp.centroid, ring_grp.centroid)
 
-        if (self.is_within_boundary(xa_dist, "boundary_cutoff", le)
+        if (self.is_within_boundary(xa_dist, "bsite_cutoff", le)
                 and self.is_within_boundary(xa_dist, "max_xc_dist_xbond_inter", le)):
 
             ax_vect = donor_grp.centroid - ring_grp.centroid
@@ -1617,7 +1658,7 @@ class InteractionCalculator:
         # Distance XA.
         xa_dist = im.euclidean_distance(donor_grp.centroid, acceptor_grp.centroid)
 
-        if (self.is_within_boundary(xa_dist, "boundary_cutoff", le)
+        if (self.is_within_boundary(xa_dist, "bsite_cutoff", le)
                 and self.is_within_boundary(xa_dist, "max_xa_dist_xbond_inter", le)):
 
             # Interaction model: C-X ---- A-R
@@ -1704,8 +1745,10 @@ class InteractionCalculator:
         interactions = []
 
         if len(group1.atoms) != 1 or len(group2.atoms) != 1:
-            logger.warning("One or more invalid atom groups were informed: %s and %s. In chalcogen bonds, chalcogen donor "
-                           "and acceptor groups should always contain only one atom." % (group1, group2))
+            logger.warning("One or more invalid atom groups were informed: "
+                           " %s and %s. In chalcogen bonds, chalcogen donor "
+                           "and acceptor groups should always contain "
+                           "only one atom." % (group1, group2))
             return []
 
         if (feat1.name == "Acceptor" and feat2.name == "ChalcogenDonor"):
@@ -1721,9 +1764,10 @@ class InteractionCalculator:
 
         # Interaction model: R-Y --- A-N
         # Distance YA.
-        ya_dist = im.euclidean_distance(donor_grp.centroid, acceptor_grp.centroid)
+        ya_dist = im.euclidean_distance(donor_grp.centroid,
+                                        acceptor_grp.centroid)
 
-        if (self.is_within_boundary(ya_dist, "boundary_cutoff", le)
+        if (self.is_within_boundary(ya_dist, "bsite_cutoff", le)
                 and self.is_within_boundary(ya_dist, "max_ya_dist_ybond_inter", le)):
 
             # Interaction model: R-Y --- A-N
@@ -1734,9 +1778,10 @@ class InteractionCalculator:
             r_atms = [nbi for nbi in donor_atm.neighbors_info if nbi.atomic_num != 1]
             r_elems = sorted([nbi.atomic_num for nbi in donor_atm.neighbors_info if nbi.atomic_num != 1])
 
-            # Isothiazoles have only one sigma-hole located on the oposite site of the N.
-            # Therefore, we should only evaluate this sigma-hole by ignoring the angle formed with the carbon.
-            # Beno et al (2015). DOI: https://doi.org/10.1021/jm501853m.
+            # Isothiazoles have only one sigma-hole located on the oposite
+            # site of the N. Therefore, we should only evaluate this
+            # sigma-hole by ignoring the angle formed with the carbon.
+            # Ref: https://doi.org/10.1021/jm501853m.
             ignore_carbon = False
             if len(r_elems) == 2 and r_elems[0] == 6 and r_elems[1] == 7:
                 ignore_carbon = True
@@ -1746,8 +1791,9 @@ class InteractionCalculator:
             n_coords = [nbi.coord for nbi in acceptor_atm.neighbors_info if nbi.atomic_num != 1]
 
             for r_atm in r_atms:
-                # Isothiazoles have only one sigma-hole located on the oposite site of the N.
-                # So, we must ignore the Carbon. Beno et al (2015). DOI: https://doi.org/10.1021/jm501853m.
+                # Isothiazoles have only one sigma-hole located on the oposite
+                # site of the N. So, we must ignore the Carbon.
+                # Ref: https://doi.org/10.1021/jm501853m.
                 if r_atm.atomic_num == 6 and ignore_carbon is True:
                     continue
 
@@ -1832,7 +1878,7 @@ class InteractionCalculator:
         # Defining the YA distance.
         ya_dist = im.euclidean_distance(donor_grp.centroid, ring_grp.centroid)
 
-        if (self.is_within_boundary(ya_dist, "boundary_cutoff", le)
+        if (self.is_within_boundary(ya_dist, "bsite_cutoff", le)
                 and self.is_within_boundary(ya_dist, "max_yc_dist_ybond_inter", le)):
 
             ay_vect = donor_grp.centroid - ring_grp.centroid
@@ -1915,7 +1961,7 @@ class InteractionCalculator:
         # DA distance
         da_dist = im.euclidean_distance(donor_grp.centroid, acceptor_grp.centroid)
 
-        if (self.is_within_boundary(da_dist, "boundary_cutoff", le)
+        if (self.is_within_boundary(da_dist, "bsite_cutoff", le)
                 and self.is_within_boundary(da_dist, "max_da_dist_hb_inter", le)):
 
             # Interaction model: D-H ---- A-R.
@@ -2101,7 +2147,7 @@ class InteractionCalculator:
         acceptor_atm = acceptor_grp.atoms[0]
 
         da_dist = im.euclidean_distance(donor_grp.centroid, acceptor_grp.centroid)
-        if (self.is_within_boundary(da_dist, "boundary_cutoff", le)
+        if (self.is_within_boundary(da_dist, "bsite_cutoff", le)
                 and self.is_within_boundary(da_dist, "max_da_dist_whb_inter", le)):
 
             # Interaction model: D-H ---- A-R.
@@ -2115,7 +2161,7 @@ class InteractionCalculator:
             # Firstly, it checks if it is not necessary to apply a strict rule, i.e.,
             # hydrogens must exist and all geometrical criteria should be evaluated.
             # Then it checks if no hydrogen is bonded to the donor, or if the donor has hydrogens
-            # and only hydrogens as neighbours. 
+            # and only hydrogens as neighbours.
             #
             # If the user has also defined a list of lazy compounds, we can skip the application of strict rules on
             # them as well. By default, the list contains only water, ammonia, and ammonium ion.
@@ -2286,7 +2332,7 @@ class InteractionCalculator:
 
         # Interaction model: D-H ---- A, in which A is the ring center.
         da_dist = im.euclidean_distance(donor_grp.centroid, ring_grp.centroid)
-        if (self.is_within_boundary(da_dist, "boundary_cutoff", le)
+        if (self.is_within_boundary(da_dist, "bsite_cutoff", le)
                 and self.is_within_boundary(da_dist, "max_dc_dist_whb_inter", le)):
 
             # Interaction model: D-H ---- A, in which A is the ring center.
@@ -2378,7 +2424,7 @@ class InteractionCalculator:
         interactions = []
 
         cc_dist = im.euclidean_distance(group1.centroid, group2.centroid)
-        if (self.is_within_boundary(cc_dist, "boundary_cutoff", le)
+        if (self.is_within_boundary(cc_dist, "bsite_cutoff", le)
                 and self.is_within_boundary(cc_dist, "max_dist_attract_inter", le)):
 
             params = {"dist_attract_inter": cc_dist}
@@ -2412,7 +2458,7 @@ class InteractionCalculator:
         interactions = []
 
         cc_dist = im.euclidean_distance(group1.centroid, group2.centroid)
-        if (self.is_within_boundary(cc_dist, "boundary_cutoff", le)
+        if (self.is_within_boundary(cc_dist, "bsite_cutoff", le)
                 and self.is_within_boundary(cc_dist, "max_dist_repuls_inter", le)):
 
             params = {"dist_repuls_inter": cc_dist}

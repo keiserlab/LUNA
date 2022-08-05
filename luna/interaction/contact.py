@@ -12,7 +12,8 @@ import logging
 logger = logging.getLogger()
 
 
-def get_all_contacts(entity, radius=BOUNDARY_CONFIG["boundary_cutoff"], level='A'):
+def get_all_contacts(entity, radius=BOUNDARY_CONFIG["bsite_cutoff"],
+                     level='A'):
     """Recover all residue-residue or atom-atom contacts in ``entity``.
 
     Parameters
@@ -76,7 +77,8 @@ def get_all_contacts(entity, radius=BOUNDARY_CONFIG["boundary_cutoff"], level='A
         raise
 
 
-def get_contacts_with(entity, source, target=None, radius=BOUNDARY_CONFIG["boundary_cutoff"], level='A'):
+def get_contacts_with(entity, source, target=None,
+                      radius=BOUNDARY_CONFIG["bsite_cutoff"], level='A'):
     """Recover atoms or residues in contact with ``source``.
 
     Parameters

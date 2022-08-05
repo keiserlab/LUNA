@@ -3,6 +3,7 @@ import logging
 from operator import xor
 from os.path import exists
 from collections import defaultdict
+import ast
 
 from rdkit.Chem import Mol as RDMol
 from openbabel import OBMol
@@ -96,11 +97,13 @@ class Entry:
     <Entry: 3QL8/A/X01/300>
     """
 
-    def __init__(self, pdb_id, chain_id, comp_name=None, comp_num=None, comp_icode=None,
+    def __init__(self, pdb_id, chain_id, comp_name=None,
+                 comp_num=None, comp_icode=None,
                  is_hetatm=True, sep=ENTRY_SEPARATOR, parser=None):
 
         if xor(comp_name is None, comp_num is None):
-            raise IllegalArgumentError("You tried to define a compound, so you must inform its name and number.")
+            raise IllegalArgumentError("You tried to define a compound, so "
+                                       "you must inform its name and number.")
 
         if comp_num is not None:
             try:
@@ -208,12 +211,85 @@ class Entry:
                 raise IllegalArgumentError("The compound number and its insertion code (if applicable) '%s' is invalid. "
                                            "It must be an integer followed by one insertion code character when applicable."
                                            % entries[3])
-            return cls(*entries, is_hetatm=is_hetatm, sep=sep)
 
+            return cls(*entries, is_hetatm=is_hetatm, sep=sep)
         else:
             raise IllegalArgumentError("The number of fields in the informed string '%s' is incorrect. A valid string must contain "
                                        "two obligatory fields (PDB and chain id) and it may contain two optional fields (compound name "
                                        "and compound number followed by its insertion code when applicable)." % entry_str)
+
+    @classmethod
+    def from_file(cls, input_file, pdb_id=None, mol_file=None,
+                  entries_sep=":", fields_sep=",", **kwargs):
+        #     """Initialize from a list of strings representing compounds.
+
+        #     Parameters
+        #     ----------
+        #     input_file : str
+        #         The file from where the list of strings (one per line) will be read from.
+        #     sep : str
+        #         The separator character used in ``input_file``. The default value is ':'.
+        #         For example: if entries from ``input_file`` use '|' as the separator, then ``sep`` should be defined as '|'.
+
+        if not exists(input_file):
+            raise OSError("File '%s' does not exist." % input_file)
+
+        with open(input_file, "r") as IN:
+            c = 1
+            for row in IN:
+                row = row.strip()
+                if row == "":
+                    continue
+
+                args = row.split(fields_sep)
+
+                has_error = False
+                if len(args) == 1:
+                    args = row.split(entries_sep)
+
+                    if len(args) == 1:
+                        if pdb_id is None or mol_file is None:
+                            msg = ("It seems a molecule name was provided "
+                                   f"in line #{c}. In these cases, "
+                                   "'pdb_id' and 'mol_file' are mandatory.")
+                            raise IllegalArgumentError(msg)
+
+                        yield MolFileEntry.from_mol_file(pdb_id, args[0],
+                                                         mol_file,
+                                                         is_multimol_file=True,
+                                                         **kwargs)
+
+                    elif len(args) == 2:
+                        yield ChainEntry.from_string(row, sep=entries_sep)
+
+                    elif len(args) == 4:
+                        yield MolEntry.from_string(row, sep=entries_sep)
+
+                    else:
+                        has_error = True
+
+                elif len(args) == 4:
+                    (curr_pdb_id, curr_mol_id,
+                        curr_mol_file, is_multimol) = args
+                    is_multimol = ast.literal_eval(is_multimol)
+
+                    cls = MolFileEntry
+                    yield cls.from_mol_file(curr_pdb_id, curr_mol_id,
+                                            curr_mol_file,
+                                            is_multimol_file=is_multimol,
+                                            **kwargs)
+                else:
+                    has_error = True
+
+                if has_error:
+                    msg = (f"Invalid number of arguments found in line #{c}. "
+                           "You should provide either one or four arguments. "
+                           "If only one argument is provided, it can be an "
+                           "entry string (e.g., 3QQK:A:X02:497) or a "
+                           "molecule name.")
+                    raise IllegalArgumentError(msg)
+
+                c += 1
 
     @property
     def pdb_id(self):
@@ -474,8 +550,11 @@ class MolEntry(Entry):
 
     """
 
-    def __init__(self, pdb_id, chain_id, comp_name, comp_num, comp_icode=None, sep=ENTRY_SEPARATOR, parser=None):
-        super().__init__(pdb_id, chain_id, comp_name, comp_num, comp_icode, is_hetatm=True, sep=sep, parser=parser)
+    def __init__(self, pdb_id, chain_id, comp_name, comp_num,
+                 comp_icode=None, sep=ENTRY_SEPARATOR, parser=None):
+
+        super().__init__(pdb_id, chain_id, comp_name, comp_num, comp_icode,
+                         is_hetatm=True, sep=sep, parser=parser)
 
     @classmethod
     def from_string(cls, entry_str, sep=ENTRY_SEPARATOR):
@@ -495,31 +574,6 @@ class MolEntry(Entry):
             raise IllegalArgumentError("The number of fields in the informed string '%s' is incorrect. A valid compound entry must contain "
                                        "four obligatory fields: PDB, chain id, compound name, and compound number followed by its "
                                        "insertion code when applicable." % entry_str)
-
-    @classmethod
-    def from_file(cls, input_file, sep=":"):
-        """Initialize from a list of strings representing compounds.
-
-        Parameters
-        ----------
-        input_file : str
-            The file from where the list of strings (one per line) will be read from.
-        sep : str
-            The separator character used in ``input_file``. The default value is ':'.
-            For example: if entries from ``input_file`` use '|' as the separator, then ``sep`` should be defined as '|'.
-
-        Yields
-        ------
-        `MolEntry`
-            An entry recovered from ``input_file``.
-        """
-        with open(input_file, "r") as IN:
-            for row in IN:
-                entry_str = row.strip()
-                if entry_str == "":
-                    continue
-
-                yield cls.from_string(entry_str)
 
 
 class MolFileEntry(Entry):
@@ -572,7 +626,8 @@ class MolFileEntry(Entry):
         self.overwrite_mol_name = None
         self.is_multimol_file = None
 
-        super().__init__(pdb_id, DEFAULT_CHAIN_ID, "LIG", 9999, is_hetatm=True, sep=sep)
+        super().__init__(pdb_id, DEFAULT_CHAIN_ID, "LIG", 9999,
+                         is_hetatm=True, sep=sep)
 
     @classmethod
     def from_mol_obj(cls, pdb_id, mol_id, mol_obj, sep=ENTRY_SEPARATOR):
@@ -636,8 +691,11 @@ class MolFileEntry(Entry):
             elif isinstance(mol_obj, OBMol):
                 mol_obj_type = "openbabel"
             else:
-                logger.exception("Objects of type '%s' are not currently accepted." % mol_obj.__class__)
-                raise MoleculeObjectTypeError("Objects of type '%s' are not currently accepted." % mol_obj.__class__)
+                logger.exception("Objects of type '%s' are not currently "
+                                 "accepted." % mol_obj.__class__)
+                raise MoleculeObjectTypeError("Objects of type '%s' are not "
+                                              "currently accepted."
+                                              % mol_obj.__class__)
         else:
             if mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES:
                 raise IllegalArgumentError("Objects of type '%s' are not currently accepted. "
@@ -653,8 +711,10 @@ class MolFileEntry(Entry):
         return entry
 
     @classmethod
-    def from_mol_file(cls, pdb_id, mol_id, mol_file, is_multimol_file, mol_file_ext=None, mol_obj_type='rdkit',
-                      autoload=False, overwrite_mol_name=False, sep=ENTRY_SEPARATOR):
+    def from_mol_file(cls, pdb_id, mol_id, mol_file, is_multimol_file,
+                      mol_file_ext=None, mol_obj_type='rdkit',
+                      autoload=False, overwrite_mol_name=False,
+                      sep=ENTRY_SEPARATOR):
         """Initialize from a molecular file.
 
         Parameters
@@ -752,70 +812,48 @@ class MolFileEntry(Entry):
         return entry
 
     @classmethod
-    def from_file(cls, input_file, pdb_id, mol_file, **kwargs):
-        """Initialize from a list of ligand names.
+    def from_file(cls, input_file, pdb_id=None, mol_file=None,
+                  fields_sep=",", **kwargs):
 
-        Parameters
-        ----------
-        input_file : str
-            The file from where the list of ligand names (one per line) will be read from.
-        pdb_id : str
-            A 4-symbols structure id from PDB or a local PDB filename. Example: '3QL8' or 'file1'.
-        mol_file : str
-            Pathname of a multi-molecular file.
-        mol_file_ext : str, optional
-            The molecular file format.
-            If not provided, try to recover the molecular file extension directly from ``mol_file``.
-        mol_obj_type : {'rdkit', 'openbabel'}
-            If "rdkit", parse the converted molecule with RDKit and return an instance of :class:`rdkit.Chem.rdchem.Mol`.
-            If "openbabel", parse the converted molecule with Open Babel and return an instance of
-            :class:`openbabel.pybel.Molecule`. The default value is 'rdkit'.
-        autoload : bool
-            If True, parse the ligand from the molecular file during the entry initialization.
-            Otherwise, only load the ligand when first used.
-        sep : str
-            A separator character to format the entry string. The default value is ':'.
+        if not exists(input_file):
+            raise OSError("File '%s' does not exist." % input_file)
 
-        Yields
-        ------
-        `MolFileEntry`
-            An entry recovered from ``input_file``.
-
-        Raises
-        ------
-        FileNotFoundError
-            If ``mol_file`` does not exist.
-        IllegalArgumentError
-            If ``mol_obj_type`` is not either 'rdkit' nor 'openbabel'.
-        MoleculeObjectError
-            If any errors occur while parsing the molecular file.
-            Detailed information about the errors can be found in the logging outputs.
-        MoleculeNotFoundError
-            If some ligand from ``input_file`` was not found in ``mol_file``.
-
-        Examples
-        --------
-
-        >>> from luna.mol.entry import MolFileEntry
-        >>> entries = MolFileEntry.from_file(input_file="tutorial/inputs/MolEntries.txt",
-        ...                                  pdb_id="D4", mol_file="tutorial/inputs/ligands.mol2",
-        ...                                  mol_obj_type="openbabel", autoload=True)
-        >>> for e in entries:
-        >>>     print(e)
-        <MolFileEntry: D4:ZINC000012442563>
-        <MolFileEntry: D4:ZINC000065293174>
-        <MolFileEntry: D4:ZINC000096459890>
-        <MolFileEntry: D4:ZINC000343043015>
-        <MolFileEntry: D4:ZINC000575033470>
-        """
         with open(input_file, "r") as IN:
+            c = 1
             for row in IN:
-                ligand_id = row.strip()
-                if ligand_id == "":
+                row = row.strip()
+                if row == "":
                     continue
 
-                yield cls.from_mol_file(pdb_id, ligand_id, mol_file,
-                                        is_multimol_file=True, overwrite_mol_name=False, **kwargs)
+                args = row.split(fields_sep)
+
+                if len(args) == 1:
+                    if pdb_id is None or mol_file is None:
+                        msg = (f"Only one field was found in line #{c}. "
+                               "In these cases, 'pdb_id' and 'mol_file' "
+                               "are mandatory.")
+                        raise IllegalArgumentError(msg)
+
+                    curr_pdb_id = pdb_id
+                    curr_mol_id = args[0]
+                    curr_mol_file = mol_file
+                    is_multimol_file = True
+
+                elif len(args) == 4:
+                    (curr_pdb_id, curr_mol_id,
+                        curr_mol_file, is_multimol_file) = args
+                    is_multimol_file = ast.literal_eval(is_multimol_file)
+
+                else:
+                    msg = (f"Invalid number of arguments found in line #{c}. "
+                           "You should provide either one or four arguments.")
+                    raise IllegalArgumentError(msg)
+
+                yield cls.from_mol_file(curr_pdb_id, curr_mol_id,
+                                        curr_mol_file,
+                                        is_multimol_file=is_multimol_file,
+                                        **kwargs)
+                c += 1
 
     @property
     def full_id(self):
