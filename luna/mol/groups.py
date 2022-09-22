@@ -891,7 +891,10 @@ class AtomGroupPerceiver():
                 # get all compounds around the target and create a new
                 # OBMol object with them.
                 if mol_obj is None and self.expand_selection:
-                    comp_list = get_proximal_compounds(comp)
+                    # Remove the ligand from the list when
+                    # it was provided as an OBMol object.
+                    comp_list = [c for c in get_proximal_compounds(comp)
+                                 if c.id not in mol_objs_dict]
 
                     # Expands the queue of compounds
                     # with any new border compound.
