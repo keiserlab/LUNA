@@ -8,6 +8,12 @@ import gzip
 FILE_FORMAT = '[%(asctime)s]    %(levelname)-8s %(filename)16s:%(lineno)-10d %(processName)-20s %(message)s'
 CONSOLE_FORMAT = '[%(asctime)s]    %(log_color)s%(levelname)-10s %(reset)s%(filename)16s:%(lineno)-10d %(message)s'
 
+VERBOSITY_LEVEL = {4: logging.DEBUG,
+                   3: logging.INFO,
+                   2: logging.WARNING,
+                   1: logging.ERROR,
+                   0: logging.CRITICAL}
+
 
 class CompressedRotatingFileHandler(logging.handlers.RotatingFileHandler):
 
@@ -46,7 +52,9 @@ class CompressedRotatingFileHandler(logging.handlers.RotatingFileHandler):
         self.stream = self._open()
 
 
-def new_logging_file(filename, logging_level=logging.INFO, logger_name=None, propagate=True, log_format=None, mode='a'):
+def new_logging_file(filename, logging_level=logging.INFO, 
+                     logger_name=None, propagate=True,
+                     log_format=None, mode='a'):
     # Set the LOG file at the working path
     fh = CompressedRotatingFileHandler(filename, mode, 5 * 1024 * 1024, 20)
     file_format = log_format or FILE_FORMAT

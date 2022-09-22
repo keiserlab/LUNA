@@ -139,7 +139,8 @@ class ProgressTracker:
 
         self.queue = queue   # used to communicate progress to the thread
         self._event = Event()    # used to tell the thread when to finish
-        self._progress_bar = Thread(target=self._print_progress, args=(self._event, self.queue))
+        self._progress_bar = Thread(target=self._print_progress,
+                                    args=(self._event, self.queue))
         self._progress_bar.daemon = True
 
         # Save results and any errors found during the task processing.

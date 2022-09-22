@@ -127,7 +127,8 @@ class Entry:
         self.parser = parser
 
         if not self.is_valid():
-            raise InvalidEntry("Entry '%s' does not match the PDB format." % self.to_string())
+            raise InvalidEntry("Entry '%s' does not match the PDB format."
+                               % self.to_string())
 
     @classmethod
     def from_string(cls, entry_str, is_hetatm=True, sep=ENTRY_SEPARATOR):
@@ -250,7 +251,7 @@ class Entry:
                     if len(args) == 1:
                         if pdb_id is None or mol_file is None:
                             msg = ("It seems a molecule name was provided "
-                                   f"in line #{c}. In these cases, "
+                                   f"in line #{c}. In this case, "
                                    "'pdb_id' and 'mol_file' are mandatory.")
                             raise IllegalArgumentError(msg)
 

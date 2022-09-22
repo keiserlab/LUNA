@@ -176,7 +176,8 @@ def create_directory(path, clear=False):
     path : str
         The directory pathname to be created.
     clear : bool
-        If True, clear the directory if already exists. The default value is False.
+        If True, clear the directory if already exists.
+        The default value is False.
     """
     try:
         if not exists(path):

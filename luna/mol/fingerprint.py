@@ -124,7 +124,7 @@ class FingerprintGenerator():
             logger.exception(e)
             raise FingerprintNotCreated("Fingerprint could not be created.")
 
-    def morgan_fp(self, radius=2, length=2048, features=False, type=2):
+    def morgan_fp(self, radius=2, length=2048, features=False, type=1):
         """Generate a Morgan fingerprint for the molecule ``mol``.
 
         Parameters
@@ -155,13 +155,21 @@ class FingerprintGenerator():
         """
         try:
             if type == 1:
-                return AllChem.GetMorganFingerprintAsBitVect(self._rdmol, radius=radius, nBits=length, useFeatures=features)
+                func = AllChem.GetMorganFingerprintAsBitVect
+                return func(self._rdmol, radius=radius,
+                            nBits=length, useFeatures=features)
             elif type == 2:
-                return AllChem.GetHashedMorganFingerprint(self._rdmol, radius=radius, nBits=length, useFeatures=features)
+                func = AllChem.GetHashedMorganFingerprint
+                return func(self._rdmol, radius=radius,
+                            nBits=length, useFeatures=features)
             elif type == 3:
-                return AllChem.GetMorganFingerprint(self._rdmol, radius=radius, useFeatures=features)
+                func = AllChem.GetMorganFingerprint
+                return func(self._rdmol, radius=radius,
+                            useFeatures=features)
             else:
-                raise IllegalArgumentError("Informed type '%s' is invalid. Available options are 1, 2, or 3." % str(type))
+                raise IllegalArgumentError("Informed type '%s' is invalid. "
+                                           "Available options are 1, 2, or 3."
+                                           % str(type))
         except Exception as e:
             logger.exception(e)
             raise FingerprintNotCreated("Fingerprint could not be created.")
@@ -223,7 +231,8 @@ def _prepare_pharm2d_fp(fp_opt=None):
         sig_factory = fp_opt["sigFactory"]
     else:
         feat_factory = ChemicalFeatures.BuildFeatureFactory(MIN_FDEF_FILE)
-        sig_factory = SigFactory(feat_factory, minPointCount=2, maxPointCount=3, trianglePruneBins=False)
+        sig_factory = SigFactory(feat_factory, minPointCount=2,
+                                 maxPointCount=3, trianglePruneBins=False)
         sig_factory.SetBins([(0, 2), (2, 5), (5, 8)])
         sig_factory.Init()
 
@@ -300,13 +309,17 @@ def generate_fp_for_mols(mols, fp_function=None, fp_opt=None, critical=False):
 
     funcs = available_fp_functions()
     if fp_function not in funcs:
-        raise IllegalArgumentError("The fingerprint function is not available.")
+        raise IllegalArgumentError("The fingerprint function is "
+                                   "not available.")
 
     if fp_function is None:
         fp_function = "pharm2d_fp"
-        logger.debug("No fingerprint function was defined. So, the default fingerprint type will be used: 2D Pharmacophore fingerprint.")
+        logger.debug("No fingerprint function was defined. So, the default "
+                     "fingerprint type will be used: 2D Pharmacophore "
+                     "fingerprint.")
 
-    logger.debug("Generating molecular fingerprints for %d molecules." % len(mols))
+    logger.debug("Generating molecular fingerprints for %d molecules."
+                 % len(mols))
 
     params = _prepare_fp_params(fp_function, fp_opt)
     fpg = FingerprintGenerator()
@@ -318,7 +331,8 @@ def generate_fp_for_mols(mols, fp_function=None, fp_opt=None, critical=False):
             fp = getattr(fpg, fp_function)(**params)
             fp_mols.append({"fp": fp, "mol": mol.GetProp("_Name")})
         except Exception as e:
-            logger.error("Molecule at position %d failed. Name: %s" % (idx, mol.GetProp("_Name")))
+            logger.error("Molecule at position %d failed. Name: %s"
+                         % (idx, mol.GetProp("_Name")))
             logger.exception(e)
 
             if critical:
