@@ -1,4 +1,5 @@
 from os import path
+from collections import defaultdict
 
 from luna.util.config import Config
 
@@ -26,8 +27,9 @@ class InteractionConfig(dict):
     3
     """
 
-    def __init__(self, config=None):
+    def __init__(self, config=None, names_map=None):
         config = config or {}
+        self.names_map = names_map or {}
         super().__init__(config)
 
     @property
@@ -37,19 +39,34 @@ class InteractionConfig(dict):
 
     @classmethod
     def from_config_file(cls, config_file):
-
         if not path.exists(config_file):
             raise OSError("File '%s' does not exist." % config_file)
 
         config = {}
         params = Config(config_file)
+        names_map = {}
+
         for section in params.sections():
             params_dict = params.get_section_map(section)
             params_dict = {prop: params.parse_value(section, prop)
                            for prop in params_dict}
+            names_map.update({k: section for k in params_dict})
             config.update(params_dict)
 
-        return cls(config)
+        return cls(config, names_map)
+
+    def save_config_file(self, config_file):
+        args_by_section = defaultdict(list)
+        for k, v in self.items():
+            section = self.names_map.get(k, "Other")
+            args_by_section[section].append((k, v))
+
+        with open(config_file, "w") as OUT:
+            for section in sorted(args_by_section):
+                OUT.write("[%s]\n" % section)
+                for arg, val in sorted(args_by_section[section]):
+                    OUT.write("%s = %s\n" % (arg, val))
+                OUT.write("\n")
 
 
 class DefaultInteractionConfig(InteractionConfig):

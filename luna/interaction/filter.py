@@ -1,5 +1,6 @@
 from os import path
 from ast import literal_eval
+from collections import defaultdict
 
 from luna.mol.entry import REGEX_RESNUM_ICODE
 from luna.util.config import Config
@@ -53,10 +54,13 @@ class InteractionFilter:
         (e.g. residues and ligands bound by a covalent bond).
     """
 
-    def __init__(self, ignore_self_inter=True, ignore_intra_chain=True, ignore_inter_chain=True,
-                 ignore_res_res=True, ignore_res_nucl=True, ignore_res_hetatm=True,
-                 ignore_nucl_nucl=True, ignore_nucl_hetatm=True, ignore_hetatm_hetatm=True,
-                 ignore_h2o_h2o=True, ignore_any_h2o=False, ignore_multi_comps=False, ignore_mixed_class=False):
+    def __init__(self, ignore_self_inter=True, ignore_intra_chain=True,
+                 ignore_inter_chain=True, ignore_res_res=True,
+                 ignore_res_nucl=True, ignore_res_hetatm=True,
+                 ignore_nucl_nucl=True, ignore_nucl_hetatm=True,
+                 ignore_hetatm_hetatm=True, ignore_h2o_h2o=True,
+                 ignore_any_h2o=False, ignore_multi_comps=False,
+                 ignore_mixed_class=False):
 
         self.ignore_self_inter = ignore_self_inter
         self.ignore_intra_chain = ignore_intra_chain
@@ -73,18 +77,23 @@ class InteractionFilter:
         self.ignore_mixed_class = ignore_mixed_class
 
     @classmethod
-    def new_pli_filter(cls, ignore_res_hetatm=False, ignore_hetatm_hetatm=False, ignore_any_h2o=False, ignore_self_inter=False, **kwargs):
+    def new_pli_filter(cls, ignore_res_hetatm=False,
+                       ignore_hetatm_hetatm=False, ignore_any_h2o=False,
+                       ignore_self_inter=False, **kwargs):
         """Initialize the default filter for protein-ligand interactions.
 
         Returns
         -------
          : `InteractionFilter`
         """
-        return cls(ignore_res_hetatm=ignore_res_hetatm, ignore_hetatm_hetatm=ignore_hetatm_hetatm, ignore_any_h2o=ignore_any_h2o,
+        return cls(ignore_res_hetatm=ignore_res_hetatm,
+                   ignore_hetatm_hetatm=ignore_hetatm_hetatm,
+                   ignore_any_h2o=ignore_any_h2o,
                    ignore_self_inter=ignore_self_inter, **kwargs)
 
     @classmethod
-    def new_ppi_filter(cls, ignore_res_res=False, ignore_inter_chain=False, ignore_intra_chain=False, ignore_any_h2o=False,
+    def new_ppi_filter(cls, ignore_res_res=False, ignore_inter_chain=False,
+                       ignore_intra_chain=False, ignore_any_h2o=False,
                        ignore_self_inter=False, **kwargs):
         """Initialize the default filter for protein-protein interactions.
 
@@ -92,11 +101,15 @@ class InteractionFilter:
         -------
          : `InteractionFilter`
         """
-        return cls(ignore_res_res=ignore_res_res, ignore_inter_chain=ignore_inter_chain, ignore_intra_chain=ignore_intra_chain,
-                   ignore_any_h2o=ignore_any_h2o, ignore_self_inter=ignore_self_inter, **kwargs)
+        return cls(ignore_res_res=ignore_res_res,
+                   ignore_inter_chain=ignore_inter_chain,
+                   ignore_intra_chain=ignore_intra_chain,
+                   ignore_any_h2o=ignore_any_h2o,
+                   ignore_self_inter=ignore_self_inter, **kwargs)
 
     @classmethod
-    def new_pni_filter(cls, ignore_res_nucl=False, ignore_inter_chain=False, ignore_intra_chain=False, ignore_any_h2o=False,
+    def new_pni_filter(cls, ignore_res_nucl=False, ignore_inter_chain=False,
+                       ignore_intra_chain=False, ignore_any_h2o=False,
                        ignore_self_inter=False, **kwargs):
         """Initialize the default filter for protein-nucleotide interactions.
 
@@ -104,30 +117,41 @@ class InteractionFilter:
         -------
          : `InteractionFilter`
         """
-        return cls(ignore_res_nucl=ignore_res_nucl, ignore_inter_chain=ignore_inter_chain, ignore_intra_chain=ignore_intra_chain,
-                   ignore_any_h2o=ignore_any_h2o, ignore_self_inter=ignore_self_inter, **kwargs)
+        return cls(ignore_res_nucl=ignore_res_nucl,
+                   ignore_inter_chain=ignore_inter_chain,
+                   ignore_intra_chain=ignore_intra_chain,
+                   ignore_any_h2o=ignore_any_h2o,
+                   ignore_self_inter=ignore_self_inter, **kwargs)
 
     @classmethod
-    def new_nni_filter(cls, ignore_nucl_nucl=False, ignore_inter_chain=False, ignore_intra_chain=False,
-                       ignore_any_h2o=False, ignore_self_inter=False, **kwargs):
+    def new_nni_filter(cls, ignore_nucl_nucl=False, ignore_inter_chain=False,
+                       ignore_intra_chain=False, ignore_any_h2o=False,
+                       ignore_self_inter=False, **kwargs):
         """Initialize the default filter for nucleotide-nucleotide interactions.
 
         Returns
         -------
          : `InteractionFilter`
         """
-        return cls(ignore_nucl_nucl=ignore_nucl_nucl, ignore_inter_chain=ignore_inter_chain, ignore_intra_chain=ignore_intra_chain,
-                   ignore_any_h2o=ignore_any_h2o, ignore_self_inter=ignore_self_inter, **kwargs)
+        return cls(ignore_nucl_nucl=ignore_nucl_nucl,
+                   ignore_inter_chain=ignore_inter_chain,
+                   ignore_intra_chain=ignore_intra_chain,
+                   ignore_any_h2o=ignore_any_h2o,
+                   ignore_self_inter=ignore_self_inter, **kwargs)
 
     @classmethod
-    def new_nli_filter(cls, ignore_nucl_hetatm=False, ignore_hetatm_hetatm=False, ignore_any_h2o=False, ignore_self_inter=False, **kwargs):
+    def new_nli_filter(cls, ignore_nucl_hetatm=False,
+                       ignore_hetatm_hetatm=False, ignore_any_h2o=False,
+                       ignore_self_inter=False, **kwargs):
         """Initialize the default filter for nucleotide-ligand interactions.
 
         Returns
         -------
          : `InteractionFilter`
         """
-        return cls(ignore_nucl_hetatm=ignore_nucl_hetatm, ignore_hetatm_hetatm=ignore_hetatm_hetatm, ignore_any_h2o=ignore_any_h2o,
+        return cls(ignore_nucl_hetatm=ignore_nucl_hetatm,
+                   ignore_hetatm_hetatm=ignore_hetatm_hetatm,
+                   ignore_any_h2o=ignore_any_h2o,
                    ignore_self_inter=ignore_self_inter, **kwargs)
 
     def is_valid_pair(self, src_grp, trgt_grp):
@@ -141,9 +165,10 @@ class InteractionFilter:
         if src_grp == trgt_grp:
             return False
 
-        # It will always ignore interactions involving atoms and the group to which they belong to.
-        # For example, the centroid of an aromatic ring cannot interact with an atom
-        # that belongs to the ring. It is a type of Loop.
+        # It will always ignore interactions involving atoms and the group
+        # to which they belong to. For example, the centroid of an aromatic
+        # ring cannot interact with an atom that belongs to the ring.
+        # It is a type of Loop.
         if src_grp.contain_group(trgt_grp) or trgt_grp.contain_group(src_grp):
             return False
 
@@ -152,27 +177,34 @@ class InteractionFilter:
         if self.ignore_multi_comps and has_multi_comps:
             return False
 
-        # If one of the groups contain compounds from different classes as, for instance, residue and ligand.
-        # It means that compounds from different classes are covalently bonded to each other.
+        # If one of the groups contain compounds from different classes as,
+        # for instance, residue and ligand. It means that compounds from
+        # different classes are covalently bonded to each other.
         has_any_mixed = (src_grp.is_mixed() or trgt_grp.is_mixed())
         if self.ignore_mixed_class and has_any_mixed:
             return False
 
         # It ignores interactions involving the same compounds if required.
-        # As each group may have atoms from different compounds, we can check if there is at least
-        # one common compound between the two groups. Remember that if two or more compounds exist in a group,
-        # it means that these compounds are covalently bonded and should be considered the same compound.
-        # For example: a carbohydrate can be expressed in a PDB as its subparts:
+        # As each group may have atoms from different compounds, we can check
+        # if there is at least one common compound between the two groups.
+        # Remember that if two or more compounds exist in a group, it means
+        # that these compounds are covalently bonded and should be considered
+        # the same compound.
+        # For example: a carbohydrate can be expressed in a PDB as its
+        # subparts:
         #      E.g.: GLC + GLC = CBI
-        # The same applies to any group formed after covalently bonding a residue to a hetatm (ligand or non-standard amino acid
+        # The same applies to any group formed after covalently bonding a
+        # residue to a hetatm (ligand or non-standard amino acid
         # represented as hetatm)
         is_same_compounds = len(src_grp.compounds.intersection(trgt_grp.compounds)) >= 1
         if self.ignore_self_inter and is_same_compounds:
             return False
 
-        # Check if two groups contain the same chains and if both of them contain only one chain. The second condition removes
-        # groups containing residues of different chains as may occur due to disulfide bonds.
-        # Note, however, that this flag will be used only as a filter for intra-interactions in protein/RNA/DNA chains.
+        # Check if two groups contain the same chains and if both of them
+        # contain only one chain. The second condition removes groups
+        # containing residues of different chains as may occur due to
+        # disulfide bonds. Note, however, that this flag will be used only
+        # as a filter for intra-interactions in protein/RNA/DNA chains.
         is_same_chain = src_grp.get_chains() == trgt_grp.get_chains() and len(src_grp.get_chains()) == 1
 
         # Filters for residue-residue interactions if required.
@@ -205,10 +237,12 @@ class InteractionFilter:
             # Ignore all nucleic acid-nucleic acid interactions
             if self.ignore_nucl_nucl:
                 return False
-            # Ignore all intra-chain interactions involving two nucleic acids (RNA/DNA chains).
+            # Ignore all intra-chain interactions involving
+            # two nucleic acids (RNA/DNA chains).
             elif self.ignore_intra_chain and is_same_chain:
                 return False
-            # Ignore all inter-chain interactions involving two nucleic acids (RNA/DNA chains).
+            # Ignore all inter-chain interactions involving
+            # two nucleic acids (RNA/DNA chains).
             elif self.ignore_inter_chain and not is_same_chain:
                 return False
 
@@ -290,6 +324,23 @@ class InteractionFilter:
 
         return inter_filter
 
+    def save_config_file(self, config_file):
+        with open(config_file, "w") as OUT:
+            OUT.write("[ignore]\n")
+            OUT.write("self_inter = %s\n" % self.ignore_self_inter)
+            OUT.write("intra_chain = %s\n" % self.ignore_intra_chain)
+            OUT.write("inter_chain = %s\n" % self.ignore_inter_chain)
+            OUT.write("res_res = %s\n" % self.ignore_res_res)
+            OUT.write("res_nucl = %s\n" % self.ignore_res_nucl)
+            OUT.write("res_hetatm = %s\n" % self.ignore_res_hetatm)
+            OUT.write("nucl_nucl = %s\n" % self.ignore_nucl_nucl)
+            OUT.write("nucl_hetatm = %s\n" % self.ignore_nucl_hetatm)
+            OUT.write("hetatm_hetatm = %s\n" % self.ignore_hetatm_hetatm)
+            OUT.write("h2o_h2o = %s\n" % self.ignore_h2o_h2o)
+            OUT.write("any_h2o = %s\n" % self.ignore_any_h2o)
+            OUT.write("multi_comps = %s\n" % self.ignore_multi_comps)
+            OUT.write("mixed_class = %s\n" % self.ignore_mixed_class)
+
 
 class BindingModeCondition:
 
@@ -348,7 +399,8 @@ class BindingModeCondition:
 
         self._condition_repr = condition
 
-        self._parse_condition(condition.upper())
+        if condition is not None:
+            self._parse_condition(condition.upper())
 
     def _parse_condition(self, condition):
         # Accept everything.
@@ -382,9 +434,11 @@ class BindingModeCondition:
 
                     icode = None if matched.group(2) == "" else matched.group(2)
                 else:
-                    raise IllegalArgumentError("The compound number and its insertion code (if applicable) '%s' is invalid. "
-                                               "It must be an integer followed by one insertion code character when applicable."
-                                               % comp_num)
+                    error_msg = ("The compound number and its insertion code "
+                                 "(if applicable) '%s' is invalid. It must be "
+                                 "an integer followed by one insertion code "
+                                 "character when applicable." % comp_num)
+                    raise IllegalArgumentError(error_msg)
 
                 self.comp_num = comp_num
                 self.comp_icode = icode
@@ -439,13 +493,14 @@ class BindingModeCondition:
                 elif self.atom == atm.name:
                     is_atom_valid = True
 
-            if is_chain_valid and is_comp_valid and is_comp_num_valid and is_atom_valid:
+            if (is_chain_valid and is_comp_valid
+                    and is_comp_num_valid and is_atom_valid):
                 return True
 
         return False
 
     def __repr__(self):
-        return "<BindingModeCondition: %s" % self._condition_repr
+        return "<BindingModeCondition: %s>" % self._condition_repr
 
 
 class BindingModeFilter:
@@ -459,8 +514,9 @@ class BindingModeFilter:
         Each key represents an interaction type and values are an iterable of `BindingModeCondition` instances.
     """
 
-    def __init__(self, config):
+    def __init__(self, config, names_map=None):
         self.config = config
+        self.names_map = names_map or {}
 
     @classmethod
     def from_config_file(cls, config_file):
@@ -491,48 +547,50 @@ class BindingModeFilter:
             ;               "B/HIS/*/N*" represents all histidines' nitrogens from chain B.
 
             [Hydrogen bond]
-            accept_only=["A/LYS/245/*", "*/HIS/*/*"]
+            accept_only = ["A/LYS/245/*", "*/HIS/*/*"]
 
             [Hydrophobic]
-            accept_all=True
+            accept_all = True
 
             [Cation-pi]
-            accept_only=["*"]
-            accept_all=False
+            accept_only = ["*"]
+            accept_all = True
 
             [Weak hydrogen bond]
-            accept_all=False
-            accept_only=["*/THR/434/O*"]
+            accept_all = False
+            accept_only = ["*/THR/434/O*"]
 
             [Face-to-edge pi-stacking]
-            accept_all=False
+            accept_only = ["*"]
 
             [Aromatic stacking]
-            accept_all=True
+            accept_all = True
 
             [*]
-            accept_all=False
+            accept_all = False
         """
 
         if not path.exists(config_file):
             raise OSError("File '%s' does not exist." % config_file)
 
         filtering_config = {}
+        names_mapping = {}
 
         config = Config(config_file)
-
         for inter_type in config.sections():
             params = config.get_section_map(inter_type)
 
+            ori_name = inter_type
             inter_type = inter_type.lower()
 
             accept_all = False
-
             values = []
             if "accept_all" in params:
                 accept_all = literal_eval(params["accept_all"])
                 if accept_all is True:
                     values = ["*"]
+                else:
+                    values = [None]
 
             elif "accept_only" in params and not accept_all:
                 values = literal_eval(params["accept_only"])
@@ -542,9 +600,11 @@ class BindingModeFilter:
 
             conditions = [BindingModeCondition(condition)
                           for condition in values]
-            filtering_config[inter_type] = conditions
 
-        return cls(filtering_config)
+            filtering_config[inter_type] = conditions
+            names_mapping[inter_type] = ori_name
+
+        return cls(filtering_config, names_mapping)
 
     def is_valid(self, inter):
         """Check if an interaction is valid or not based on this binding mode configuration.
@@ -572,3 +632,32 @@ class BindingModeFilter:
                 return True
 
         return False
+
+    def save_config_file(self, config_file):
+        args_by_section = defaultdict(list)
+
+        for inter, conditions in self.config.items():
+            section_name = self.names_map.get(inter, inter)
+
+            multi_conditions = []
+            for condition in conditions:
+                if (condition.accept_all is False
+                        and condition._condition_repr is None):
+                    args_by_section[section_name].append(("accept_all", False))
+
+                elif condition.accept_all is True:
+                    args_by_section[section_name].append(("accept_all", True))
+
+                else:
+                    multi_conditions.append(condition._condition_repr)
+
+            if multi_conditions:
+                args_by_section[section_name].append(("accept_only",
+                                                      str(multi_conditions)))
+
+        with open(config_file, "w") as OUT:
+            for k in args_by_section:
+                OUT.write("[%s]\n" % k)
+                for arg, val in args_by_section[k]:
+                    OUT.write("%s = %s\n" % (arg, val))
+                OUT.write("\n")

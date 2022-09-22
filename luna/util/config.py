@@ -47,6 +47,13 @@ class Config:
                 section_map[option] = None
         return section_map
 
+    def as_dict(self, only_props=True):
+        if only_props:
+            return {k: v
+                    for s in self.config.sections()
+                    for k, v in self.config.items(s)}
+        return {s: dict(self.config.items(s)) for s in self.config.sections()}
+
     def __getattr__(self, attr):
         if hasattr(self.config, attr):
             return getattr(self.config, attr)

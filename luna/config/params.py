@@ -1,257 +1,436 @@
 import ast
 from os import path
+from pathlib import Path
+import logging
 
 from luna.util.config import Config
-from luna.mol.entry import Entry
-from luna.interaction.calc import InteractionCalculator, DEFAULT_SOLVENTS
-from luna.interaction.config import (InteractionConfig,
-                                     DefaultInteractionConfig)
+from luna.mol.entry import *
+from luna.interaction.calc import InteractionCalculator
+from luna.interaction.config import InteractionConfig
 from luna.interaction.filter import InteractionFilter, BindingModeFilter
 from luna.interaction.fp.type import IFPType
-from luna.util.default_values import ATOM_PROP_FILE, ACCEPTED_MOL_OBJ_TYPES
+from luna.util.default_values import ACCEPTED_MOL_OBJ_TYPES
+from luna.util.logging import VERBOSITY_LEVEL
+from luna.util.exceptions import IllegalArgumentError
 
 
-class ProjectParams:
+class ProjectParams(dict):
 
-    def __init__(self, config_file=None):
+    def __init__(self, params=None, fill_defaults=False):
 
-        if config_file is None:
-            config_file = path.abspath(path.join(path.realpath(__file__),
-                                                 "../default.cfg"))
+        params_to_parse = {}
 
-        self.config_file = config_file
+        # Loads in default LUNA values.
+        if fill_defaults:
+            luna_path = path.abspath(path.join(path.realpath(__file__),
+                                               '../..'))
 
-        self._parse()
+            default_config_file = f"{luna_path}/config/default.cfg"
+            config = Config(default_config_file)
 
-    def _parse_value(self, params, param_name, fallback=None):
+            params_to_parse = config.as_dict(only_props=True)
+
+            if params_to_parse["feat_cfg"] == "None":
+                atom_prop_file = f"{luna_path}/data/LUNA.fdef"
+                params_to_parse["feat_cfg"] = atom_prop_file
+
+            if params_to_parse["inter_cfg"] == "None":
+                inter_config_file = f"{luna_path}/interaction/config.cfg"
+                params_to_parse["inter_cfg"] = inter_config_file
+
+        # Overwrites default values with provided params.
+        if params:
+            params_to_parse.update(params)
+
+        self._validate(params_to_parse)
+
+    @classmethod
+    def from_project_obj(cls, proj_obj):
+        params = {"add_h": proj_obj.add_h,
+                  "amend_mol": proj_obj.amend_mol,
+                  "append_mode": proj_obj.append_mode,
+                  "feat_cfg": proj_obj.atom_prop_file,
+                  "binding_mode_filter": proj_obj.binding_mode_filter,
+                  "ifp": proj_obj.calc_ifp,
+                  "mfp": proj_obj.calc_mfp,
+                  "entries": proj_obj.entries,
+                  "ifp_count": proj_obj.ifp_count,
+                  "ifp_diff_comp_classes": proj_obj.ifp_diff_comp_classes,
+                  "ifp_length": proj_obj.ifp_length,
+                  "ifp_num_levels": proj_obj.ifp_num_levels,
+                  "ifp_output": proj_obj.ifp_output,
+                  "ifp_radius_step": proj_obj.ifp_radius_step,
+                  "ifp_sim_matrix_output": proj_obj.ifp_sim_matrix_output,
+                  "ifp_type": proj_obj.ifp_type,
+                  "inter_calc": proj_obj.inter_calc,
+                  "logging_enabled": proj_obj.logging_enabled,
+                  "mfp_output": proj_obj.mfp_output,
+                  "mol_obj_type": proj_obj.mol_obj_type,
+                  "nproc": proj_obj.nproc,
+                  "pse": proj_obj.out_pse,
+                  "overwrite_path": proj_obj.overwrite_path,
+                  "pdb_path": proj_obj.pdb_path,
+                  "ph": proj_obj.ph,
+                  "pse_path": proj_obj.pse_path,
+                  "use_cache": proj_obj.use_cache,
+                  "verbosity": proj_obj.verbosity,
+                  "working_path": proj_obj.working_path}
+
+        return cls(params)
+
+    def _get_entry_params(self, config_file):
+        sep = ":"
+        entries = []
+        for e in self["entries"]:
+            if isinstance(e, MolEntry):
+                entries.append(e.to_string(sep))
+
+            elif isinstance(e, MolFileEntry):
+                fields = [str(e.pdb_id), str(e.mol_id), str(e.mol_file),
+                          str(e.is_multimol_file)]
+                entries.append(",".join(fields))
+
+        path = Path(config_file).parent.resolve()
+        filename = Path(config_file).stem
+
+        entry_file = f"{path}/{filename}.entries.txt"
+        with open(entry_file, "w") as OUT:
+            for e in entries:
+                OUT.write(f"{e}\n")
+
+        return {"entries": entry_file,
+                "pdb_id": None,
+                "mol_file": None,
+                "entries_sep": ":",
+                "fields_sep": ","}
+
+    def _get_inter_params(self, config_file):
+        path = Path(config_file).parent.resolve()
+        filename = Path(config_file).stem
+
+        ic = self["inter_calc"]
+
+        inter_config = ic.inter_config
+        inter_cfg_file = None
+        if isinstance(inter_config, InteractionConfig):
+            inter_cfg_file = f"{path}/{filename}.inter.txt"
+            inter_config.save_config_file(inter_cfg_file)
+
+        inter_filter = ic.inter_filter
+        filter_cfg_file = None
+        if isinstance(inter_filter, InteractionFilter):
+            filter_cfg_file = f"{path}/{filename}.filter.txt"
+            inter_filter.save_config_file(filter_cfg_file)
+
+        inter_filter = ic.inter_filter
+
+        return {"inter_cfg": inter_cfg_file,
+                "filter_cfg": filter_cfg_file,
+                "add_non_cov": ic.add_non_cov,
+                "add_cov": ic.add_cov,
+                "add_proximal": ic.add_proximal,
+                "add_atom_atom": ic.add_atom_atom,
+                "add_dependent_inter": ic.add_dependent_inter,
+                "add_h2o_pairs_with_no_target":
+                    ic.add_h2o_pairs_with_no_target,
+                "strict_donor_rules": ic.strict_donor_rules,
+                "strict_weak_donor_rules": ic.strict_weak_donor_rules,
+                "lazy_comps_list": ",".join(ic.lazy_comps_list)}
+
+    def _get_binding_filter_params(self, config_file):
+        path = Path(config_file).parent.resolve()
+        filename = Path(config_file).stem
+
+        bmf = self["binding_mode_filter"]
+        bmf_cfg_file = None
+        if isinstance(bmf, BindingModeFilter):
+            bmf_cfg_file = f"{path}/{filename}.bind.txt"
+            bmf.save_config_file(bmf_cfg_file)
+
+        return {"bind_cfg": bmf_cfg_file}
+
+    def save_config_file(self, config_file):
+
+        with open(config_file, "w") as OUT:
+            OUT.write("[entries]\n")
+            for k, v in self._get_entry_params(config_file).items():
+                OUT.write(f"{k} = {v}\n")
+            OUT.write("\n")
+
+            OUT.write("[paths]\n")
+            OUT.write("working_path = %s\n" % self["working_path"])
+            OUT.write("pdb_path = %s\n" % self["pdb_path"])
+            OUT.write("overwrite_path = %s\n" % self["overwrite_path"])
+            OUT.write("\n")
+
+            OUT.write("[hydrogens]\n")
+            OUT.write("add_h = %s\n" % self["add_h"])
+            OUT.write("ph = %s\n" % self["ph"])
+            OUT.write("\n")
+
+            OUT.write("[standardization]\n")
+            OUT.write("amend_mol = %s\n" % self["amend_mol"])
+            OUT.write("\n")
+
+            OUT.write("[features]\n")
+            OUT.write("feat_cfg = %s\n" % self["atom_prop_file"])
+            OUT.write("\n")
+
+            OUT.write("[interactions]\n")
+            for k, v in self._get_inter_params(config_file).items():
+                OUT.write(f"{k} = {v}\n")
+            OUT.write("\n")
+
+            OUT.write("[binding_mode_filter]\n")
+            for k, v in self._get_binding_filter_params(config_file).items():
+                OUT.write(f"{k} = {v}\n")
+            OUT.write("\n")
+
+            OUT.write("[mfp]\n")
+            OUT.write("mfp = %s\n" % self["calc_mfp"])
+            OUT.write("mfp_output = %s\n" % self["mfp_output"])
+            OUT.write("\n")
+
+            OUT.write("[ifp]\n")
+            OUT.write("ifp = %s\n" % self["calc_ifp"])
+            OUT.write("ifp_num_levels = %s\n" % self["ifp_num_levels"])
+            OUT.write("ifp_radius_step = %s\n" % self["ifp_radius_step"])
+            OUT.write("ifp_length = %s\n" % self["ifp_length"])
+            OUT.write("ifp_count = %s\n" % self["ifp_count"])
+            OUT.write("ifp_type = %s\n" % self["ifp_type"].name)
+            OUT.write("ifp_diff_comp_classes = %s\n"
+                      % self["ifp_diff_comp_classes"])
+            OUT.write("ifp_output = %s\n" % self["ifp_output"])
+            OUT.write("ifp_sim_matrix_output = %s\n"
+                      % self["ifp_sim_matrix_output"])
+            OUT.write("\n")
+
+            OUT.write("[pse]\n")
+            OUT.write("pse = %s\n" % self["out_pse"])
+            OUT.write("pse_path = %s\n" % self["pse_path"])
+            OUT.write("\n")
+
+            verbosity = [k for k, v in VERBOSITY_LEVEL.items()
+                         if v == self["verbosity"]].pop()
+
+            OUT.write("[general]\n")
+            OUT.write("mol_obj_type = %s\n" % self["mol_obj_type"])
+            OUT.write("append_mode = %s\n" % self["append_mode"])
+            OUT.write("use_cache = %s\n" % self["use_cache"])
+            OUT.write("verbosity = %s\n" % verbosity)
+            OUT.write("logging_enabled = %s\n" % self["logging_enabled"])
+            OUT.write("nproc = %s\n" % self["nproc"])
+            OUT.write("\n")
+
+    def _get_value(self, params, param_name, dtype,
+                   fallback=None, is_none_valid=True):
+
+        value = params.get(param_name, fallback)
 
         try:
-            value = params.get(param_name)
-        except ValueError:
-            return fallback
-
-        try:
-            return ast.literal_eval(value)
+            value = ast.literal_eval(value)
         except (ValueError, SyntaxError):
-            return value
+            pass
 
-    def _validate_type(self, value, expected_type,
-                       section, param_name, is_none_valid=False):
         if is_none_valid and value is None:
             return value
 
-        if type(value) != expected_type:
+        if type(value) != dtype:
             # Ok, if it's an int and the expected value is float.
-            if expected_type == float and type(value) == int:
+            if dtype == float and type(value) == int:
                 return value
             # Ok, if it's an integer represented as float.
-            if (expected_type == int and type(value) == float
+            if (dtype == int and type(value) == float
                     and value.is_integer()):
                 return int(value)
 
-            raise TypeError("The property '%s' from section '%s' "
-                            "must be a(n) %s."
-                            % (param_name, section, expected_type.__name__))
+            raise TypeError("The parameter '%s' must be a(n) %s."
+                            % (param_name, dtype.__name__))
+
         return value
 
     def _parse_entries_params(self, params):
-        section = 'entries'
+        try:
+            entries_file = self._get_value(params, "entries", str)
 
-        entries_file = self._validate_type(params.pop("input", None),
-                                           str, section, 'input', True)
+            pdb_id = self._get_value(params, "pdb_id", str)
+            mol_file = self._get_value(params, "mol_file", str)
+            entries_sep = self._get_value(params, "entries_sep", str)
+            fields_sep = self._get_value(params, "fields_sep", str,)
 
-        pdb_id = self._validate_type(params.pop("pdb_id", None),
-                                     str, section, 'pdb_id', True)
-
-        mol_file = self._validate_type(params.pop("mol_file", None),
-                                       str, section, 'mol_file', True)
-
-        entries_sep = self._validate_type(params.pop("entries_sep", ":"),
-                                          str, section, 'entries_sep', True)
-
-        fields_sep = self._validate_type(params.pop("fields_sep", ","),
-                                         str, section, 'fields_sep', True)
-
-        entries = None
-        if entries_file:
-            entries = list(Entry.from_file(entries_file, pdb_id, mol_file,
-                                           entries_sep, fields_sep))
+            entries = None
+            if entries_file:
+                entries = list(Entry.from_file(entries_file, pdb_id, mol_file,
+                                               entries_sep, fields_sep))
+        except Exception:
+            entries = self._get_value(params, "entries", list)
 
         return {"entries": entries}
 
     def _parse_paths_params(self, params):
-        section = 'paths'
+        working_path = self._get_value(params, "working_path", str)
+        pdb_path = self._get_value(params, "pdb_path", str)
+        overwrite_path = self._get_value(params, "overwrite_path", bool)
 
-        working_path = self._validate_type(params.pop("working_path", None),
-                                           str, section, 'working_path', True)
-
-        pdb_path = self._validate_type(params.pop("pdb_path", None),
-                                       str, section, 'pdb_path', True)
-
-        overwrite_path = self._validate_type(params.pop("overwrite_path",
-                                                        False),
-                                             bool, section, 'overwrite_path')
-
-        params = {"pdb_path": pdb_path, "overwrite_path": overwrite_path}
-
-        if working_path is not None:
-            params["working_path"] = working_path
-
-        return params
+        return {"working_path": working_path,
+                "pdb_path": pdb_path,
+                "overwrite_path": overwrite_path}
 
     def _parse_hydrogens_params(self, params):
-        section = 'hydrogens'
-
-        add_h = self._validate_type(params.pop("add", True),
-                                    bool, section, 'add')
-
-        ph = self._validate_type(params.pop("ph", 7.4),
-                                 float, section, 'ph')
+        add_h = self._get_value(params, "add_h", bool)
+        ph = self._get_value(params, "ph", float)
 
         return {"add_h": add_h, "ph": ph}
 
     def _parse_standardization_params(self, params):
-        section = 'standardization'
-        amend_mol = self._validate_type(params.pop("amend_mol", True),
-                                        bool, section, 'amend_mol')
+        amend_mol = self._get_value(params, "amend_mol", bool)
+
         return {"amend_mol": amend_mol}
 
     def _parse_features_params(self, params):
-        section = 'features'
-
-        config_file = self._validate_type(params.pop("config_file", None),
-                                          str, section, 'config_file', True)
-        if config_file is None:
-            config_file = ATOM_PROP_FILE
+        config_file = self._get_value(params, "feat_cfg", str)
 
         return {"atom_prop_file": config_file}
 
-    def _new_inter_calc(self, params):
-        section = 'interaction'
+    def _parse_filter_params(self, params):
+        filter_types = ["pli", "ppi", "pni", "nni", "nli"]
 
-        config_file = self._validate_type(params.pop("config_file", None),
-                                          str, section, 'config_file', True)
-        if config_file is None:
-            inter_config = DefaultInteractionConfig()
+        if "default_filter" in params:
+            default_filter = params["default_filter"]
+
+            if default_filter not in filter_types:
+                raise IllegalArgumentError("The informed default filter '%s' "
+                                           "is not valid. The valid default "
+                                           "filters are: %s."
+                                           % (default_filter,
+                                              ", ".join(filter_types)))
+
+            func_name = f"new_{default_filter}_filter"
+            func = getattr(InteractionFilter, func_name)
+            return func()
+
         else:
-            inter_config = InteractionConfig.from_config_file(config_file)
+            filter_file = self._get_value(params, "filter_cfg", str)
+            inter_filter = None
+            if filter_file is not None:
+                inter_filter = InteractionFilter.from_config_file(filter_file)
 
-        filter_file = self._validate_type(params.pop("filter_file", None),
-                                          str, section, 'filter_file', True)
-        inter_filter = None
-        if filter_file is not None:
-            inter_filter = InteractionFilter.from_config_file(filter_file)
+            return inter_filter
 
-        add_non_cov = self._validate_type(params.pop("add_non_cov", True),
-                                          bool, section, 'add_non_cov')
+    def _parse_inter_params(self, params):
 
-        add_cov = self._validate_type(params.pop("add_cov", True),
-                                      bool, section, 'add_cov')
+        try:
+            ic = self._get_value(params, "inter_calc",
+                                 InteractionCalculator,
+                                 is_none_valid=False)
 
-        add_proximal = self._validate_type(params.pop("add_proximal", False),
-                                           bool, section, 'add_proximal')
+        except Exception:
+            config_file = self._get_value(params, "inter_cfg", str)
 
-        add_atom_atom = self._validate_type(params.pop("add_atom_atom", True),
-                                            bool, section, 'add_atom_atom')
+            inter_config = None
+            if config_file is not None:
+                inter_config = InteractionConfig.from_config_file(config_file)
 
-        add_dep_inter = self._validate_type(params.pop("add_dependent_inter",
-                                                       False),
-                                            bool, section,
-                                            'add_dependent_inter')
+            inter_filter = self._parse_filter_params(params)
 
-        prop_val = params.pop("add_h2o_pairs_with_no_target", False)
-        add_h2o_pairs = self._validate_type(prop_val, bool, section,
-                                            'add_h2o_pairs_with_no_target')
+            add_non_cov = self._get_value(params, "add_non_cov", bool)
 
-        sdonor_rules = self._validate_type(params.pop("strict_donor_rules",
-                                                      True),
-                                           bool, section, 'strict_donor_rules')
+            add_cov = self._get_value(params, "add_cov", bool)
 
-        prop_name = "strict_weak_donor_rules"
-        swdonor_rules = self._validate_type(params.pop(prop_name, True),
-                                            bool, section, prop_name)
+            add_proximal = self._get_value(params, "add_proximal", bool)
 
-        prop_name = "lazy_comps_list"
-        lazy_comps_list = self._validate_type(params.pop(prop_name, None),
-                                              list, section, prop_name, True)
-        if lazy_comps_list is None:
-            lazy_comps_list = DEFAULT_SOLVENTS
+            add_atom_atom = self._get_value(params, "add_atom_atom", bool)
 
-        params = {
-            "inter_config": inter_config,
-            "inter_filter": inter_filter,
-            "add_non_cov": add_non_cov,
-            "add_cov": add_cov,
-            "add_proximal": add_proximal,
-            "add_atom_atom": add_atom_atom,
-            "add_dependent_inter": add_dep_inter,
-            "add_h2o_pairs_with_no_target": add_h2o_pairs,
-            "strict_donor_rules": sdonor_rules,
-            "strict_weak_donor_rules": swdonor_rules,
-            "lazy_comps_list": lazy_comps_list,
-        }
+            add_dep_inter = self._get_value(params, "add_dependent_inter",
+                                            bool)
 
-        return {"inter_calc": InteractionCalculator(**params)}
+            add_h2o_pairs = self._get_value(params,
+                                            "add_h2o_pairs_with_no_target",
+                                            bool)
 
-    def _new_binding_mode_filter(self, params):
-        section = 'binding_mode_filter'
+            sdonor_rules = self._get_value(params, "strict_donor_rules", bool)
 
-        config_file = self._validate_type(params.pop("config_file", None),
-                                          str, section, 'config_file', True)
+            swdonor_rules = self._get_value(params, "strict_weak_donor_rules",
+                                            bool)
 
-        bmf = None
-        if config_file:
-            bmf = BindingModeFilter.from_config_file(config_file)
+            lazy_comps_list = self._get_value(params, "lazy_comps_list", str)
+
+            if lazy_comps_list is not None:
+                lazy_comps_list = lazy_comps_list.split(",")
+
+            ic = None
+            if inter_config is not None:
+                params = {
+                    "inter_config": inter_config,
+                    "inter_filter": inter_filter,
+                    "add_non_cov": add_non_cov,
+                    "add_cov": add_cov,
+                    "add_proximal": add_proximal,
+                    "add_atom_atom": add_atom_atom,
+                    "add_dependent_inter": add_dep_inter,
+                    "add_h2o_pairs_with_no_target": add_h2o_pairs,
+                    "strict_donor_rules": sdonor_rules,
+                    "strict_weak_donor_rules": swdonor_rules,
+                    "lazy_comps_list": lazy_comps_list,
+                }
+
+                ic = InteractionCalculator(**params)
+
+        return {"inter_calc": ic}
+
+    def _parse_binding_mode_filter(self, params):
+        try:
+            bmf = self._get_value(params, "binding_mode_filter",
+                                  BindingModeFilter,
+                                  is_none_valid=False)
+        except Exception:
+            config_file = self._get_value(params, "bind_cfg", str)
+
+            bmf = None
+            if config_file is not None:
+                bmf = BindingModeFilter.from_config_file(config_file)
+
         return {"binding_mode_filter": bmf}
 
     def _parse_mfp_params(self, params):
-        section = 'mfp'
-
-        calc_mfp = self._validate_type(params.pop("calculate", False),
-                                       bool, section, 'calculate')
-
-        mfp_output = self._validate_type(params.pop("output", None), str,
-                                         section, 'output', True)
+        calc_mfp = self._get_value(params, "mfp", bool)
+        mfp_output = self._get_value(params, "mfp_output", str)
 
         return {"calc_mfp": calc_mfp, "mfp_output": mfp_output}
 
     def _parse_ifp_params(self, params):
-        section = 'ifp'
 
-        calc_ifp = self._validate_type(params.pop("calculate", False),
-                                       bool, section, 'calculate')
+        calc_ifp = self._get_value(params, "ifp", bool)
 
-        num_levels = self._validate_type(params.pop("num_levels", 2),
-                                         int, section, 'num_levels')
+        num_levels = self._get_value(params, "ifp_num_levels", int)
 
-        radius_step = self._validate_type(params.pop("radius_step", 5.73171),
-                                          float, section, 'radius_step')
+        radius_step = self._get_value(params, "ifp_radius_step", float)
 
-        ifp_length = self._validate_type(params.pop("length", 4096), int,
-                                         section, 'length')
+        ifp_length = self._get_value(params, "ifp_length", int)
 
-        ifp_count = self._validate_type(params.pop("count", True), bool,
-                                        section, 'count')
+        ifp_count = self._get_value(params, "ifp_count", bool)
 
-        diff_comp_classes = params.pop("diff_comp_classes", True)
-        diff_comp_classes = self._validate_type(diff_comp_classes, bool,
-                                                section, 'diff_comp_classes')
+        ifp_diff_comp_classes = self._get_value(params,
+                                                "ifp_diff_comp_classes",
+                                                bool)
 
-        ifp_type = params.pop("type", "EIFP")
         try:
-            ifp_type = IFPType[ifp_type]
-        except KeyError:
-            valid_ifps = ", ".join([e.name for e in IFPType])
-            raise KeyError("The accepted IFP types are: "
-                           "%s." % valid_ifps)
+            ifp_type = self._get_value(params, "ifp_type", str)
 
-        ifp_output = self._validate_type(params.pop("output", None), str,
-                                         section, 'output', True)
+            if ifp_type is not None:
+                try:
+                    ifp_type = IFPType[ifp_type]
+                except KeyError:
+                    valid_ifps = ", ".join([e.name for e in IFPType])
+                    raise KeyError("The accepted IFP types are: "
+                                   "%s." % valid_ifps)
+        except Exception:
+            ifp_type = self._get_value(params, "ifp_type", IFPType)
 
-        sim_matrix_output = params.pop("sim_matrix_output", IFPType.EIFP)
-        sim_matrix_output = self._validate_type(sim_matrix_output, str,
-                                                section, 'sim_matrix_output',
-                                                True)
+        ifp_output = self._get_value(params, "ifp_output", str)
+
+        ifp_sim_matrix_output = self._get_value(params,
+                                                "ifp_sim_matrix_output", str)
 
         return {
             "calc_ifp": calc_ifp,
@@ -259,94 +438,96 @@ class ProjectParams:
             "ifp_radius_step": radius_step,
             "ifp_length": ifp_length,
             "ifp_count": ifp_count,
-            "ifp_diff_comp_classes": diff_comp_classes,
+            "ifp_diff_comp_classes": ifp_diff_comp_classes,
             "ifp_type": ifp_type,
             "ifp_output": ifp_output,
-            "ifp_sim_matrix_output": sim_matrix_output,
+            "ifp_sim_matrix_output": ifp_sim_matrix_output,
         }
 
     def _parse_pse_params(self, params):
-        section = 'pse'
-        out_pse = self._validate_type(params.pop("generate", False), bool,
-                                      section, 'generate')
-        return {"out_pse": out_pse}
+        out_pse = self._get_value(params, "pse", bool)
+        pse_path = self._get_value(params, "pse_path", str)
+
+        return {"out_pse": out_pse, "pse_path": pse_path}
 
     def _parse_general_params(self, params):
-        section = 'general'
+        mol_obj_type = self._get_value(params, "mol_obj_type", str)
 
-        mol_obj_type = self._validate_type(params.pop("mol_obj_type", 'rdkit'),
-                                           str, section, 'mol_obj_type')
-        if mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES:
-            raise KeyError("Invalid choise '%s' for property 'mol_obj_type' "
-                           "from section '%s'. Choose from: %s."
-                           % (mol_obj_type, section,
+        if (mol_obj_type is not None
+                and mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES):
+            raise KeyError("Invalid choise '%s' for property 'mol_obj_type'. "
+                           "Choose from: %s."
+                           % (mol_obj_type,
                               ", ".join(ACCEPTED_MOL_OBJ_TYPES)))
 
-        append_mode = self._validate_type(params.pop("append_mode", False),
-                                          bool, section, 'append_mode')
+        append_mode = self._get_value(params, "append_mode", bool)
 
-        verbosity = self._validate_type(params.pop("verbosity", 3),
-                                        int, section, 'verbosity')
+        use_cache = self._get_value(params, "use_cache", bool)
 
-        logging_enabled = self._validate_type(params.pop("logging_enabled",
-                                                         True),
-                                              bool, section, 'logging_enabled')
+        verbosity = self._get_value(params, "verbosity", int)
 
-        nproc = self._validate_type(params.pop("nproc", -1),
-                                    int, section, 'nproc', True)
+        if verbosity is not None:
+            try:
+                verbosity = [verbosity for k, v in VERBOSITY_LEVEL.items()
+                             if v == verbosity].pop()
+            except Exception:
+                if verbosity not in VERBOSITY_LEVEL:
+                    lvls = sorted(VERBOSITY_LEVEL.items())
+                    msg = ("The informed verbosity level '%s' is not valid. "
+                           "The valid levels are: %s."
+                           % (repr(verbosity),
+                              ", ".join(["%d (%s)"
+                                         % (k, logging.getLevelName(v))
+                                         for k, v in lvls])))
+                    raise IllegalArgumentError(msg)
+
+        logging_enabled = self._get_value(params, "logging_enabled", bool)
+
+        nproc = self._get_value(params, "nproc", int)
 
         return {
             "mol_obj_type": mol_obj_type,
             "append_mode": append_mode,
+            "use_cache": use_cache,
             "verbosity": verbosity,
             "logging_enabled": logging_enabled,
             "nproc": nproc,
         }
 
-    def _parse(self):
-        config = Config(self.config_file)
+    def _validate(self, params):
+        validated_params = {}
 
-        proj_params = {}
-        for section in config.sections():
-            params_dict = config.get_section_map(section)
+        # Entries
+        validated_params.update(self._parse_entries_params(params))
 
-            params_dict = {param_name: self._parse_value(params_dict,
-                                                         param_name)
-                           for param_name in params_dict}
+        # Paths
+        validated_params.update(self._parse_paths_params(params))
 
-            if section == "entries":
-                params_dict = self._parse_entries_params(params_dict)
+        # Hydrogens
+        validated_params.update(self._parse_hydrogens_params(params))
 
-            if section == "paths":
-                params_dict = self._parse_paths_params(params_dict)
+        # Standardization
+        validated_params.update(self._parse_standardization_params(params))
 
-            if section == "hydrogens":
-                params_dict = self._parse_hydrogens_params(params_dict)
+        # Features
+        validated_params.update(self._parse_features_params(params))
 
-            if section == "standardization":
-                params_dict = self._parse_standardization_params(params_dict)
+        # Interactions
+        validated_params.update(self._parse_inter_params(params))
 
-            if section == "features":
-                params_dict = self._parse_features_params(params_dict)
+        # Binding mode filter
+        validated_params.update(self._parse_binding_mode_filter(params))
 
-            if section == "interactions":
-                params_dict = self._new_inter_calc(params_dict)
+        # MFPs
+        validated_params.update(self._parse_mfp_params(params))
 
-            if section == "binding_mode_filter":
-                params_dict = self._new_binding_mode_filter(params_dict)
+        # IFPs
+        validated_params.update(self._parse_ifp_params(params))
 
-            if section == "mfp":
-                params_dict = self._parse_mfp_params(params_dict)
+        # PSE
+        validated_params.update(self._parse_pse_params(params))
 
-            if section == "ifp":
-                params_dict = self._parse_ifp_params(params_dict)
+        # General
+        validated_params.update(self._parse_general_params(params))
 
-            if section == "pse":
-                params_dict = self._parse_pse_params(params_dict)
-
-            if section == "general":
-                params_dict = self._parse_general_params(params_dict)
-
-            proj_params.update(params_dict)
-
-        self.params = proj_params
+        super().__init__(validated_params)

@@ -3,10 +3,10 @@ import time
 import logging
 import glob
 import warnings
-import multiprocessing as mp
-from scipy.special import comb
 import itertools
 import networkx as nx
+import multiprocessing as mp
+from scipy.special import comb
 
 # Open Babel and RDKit libraries
 from rdkit.Chem import ChemicalFeatures
@@ -23,10 +23,12 @@ from luna.interaction.calc import InteractionCalculator
 from luna.interaction.fp.shell import ShellGenerator
 from luna.interaction.fp.type import IFPType
 from luna.wrappers.base import MolWrapper
+from luna.util import deprecated, LUNAWarning
 from luna.util.default_values import *
 from luna.util.exceptions import *
 from luna.util.file import *
-from luna.util.logging import new_logging_file, load_default_logging_config
+from luna.util.logging import (new_logging_file, load_default_logging_config,
+                               VERBOSITY_LEVEL)
 from luna.util.multiprocessing_logging import (start_mp_handler,
                                                MultiProcessingHandler)
 from luna.util.jobs import ArgsGenerator, ParallelJobs
@@ -42,12 +44,6 @@ from sys import setrecursionlimit
 setrecursionlimit(RECURSION_LIMIT)
 
 logger = load_default_logging_config()
-
-VERBOSITY_LEVEL = {4: logging.DEBUG,
-                   3: logging.INFO,
-                   2: logging.WARNING,
-                   1: logging.ERROR,
-                   0: logging.CRITICAL}
 
 MAX_NPROCS = mp.cpu_count() - 1
 
@@ -298,7 +294,7 @@ class Project:
                  calc_mfp=False,
                  mfp_output=None,
 
-                 calc_ifp=True,
+                 calc_ifp=False,
                  ifp_num_levels=2,
                  ifp_radius_step=5.73171,
                  ifp_length=IFP_LENGTH,
@@ -309,6 +305,7 @@ class Project:
                  ifp_sim_matrix_output=None,
 
                  out_pse=False,
+                 pse_path=None,
 
                  use_cache=False,
                  append_mode=False,
@@ -320,32 +317,36 @@ class Project:
         self.logging_enabled = logging_enabled
 
         if mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES:
-            raise IllegalArgumentError("Invalid value for 'mol_obj_type'. Objects of type '%s' are not currently accepted. "
-                                       "The available options are: %s." % (mol_obj_type,
-                                                                           ", ".join(["'%s'" % m for m in ACCEPTED_MOL_OBJ_TYPES])))
+            mobj_types = ["'%s'" % m for m in ACCEPTED_MOL_OBJ_TYPES]
+            raise IllegalArgumentError("Invalid value for 'mol_obj_type'. "
+                                       "Objects of type '%s' are not "
+                                       "currently accepted. "
+                                       "The available options are: %s."
+                                       % (mol_obj_type,
+                                          ", ".join(mobj_types)))
 
         self._log("info", "LUNA version: %s." % __version__)
 
-        if inter_calc is not None and isinstance(inter_calc, InteractionCalculator) is False:
-            raise IllegalArgumentError("The informed interaction configuration must be an instance of %s."
-                                       % ".".join([InteractionCalculator.__module__, InteractionCalculator.__name__]))
+        if (inter_calc is not None
+                and isinstance(inter_calc, InteractionCalculator) is False):
+            msg = ".".join([InteractionCalculator.__module__,
+                            InteractionCalculator.__name__])
+            raise IllegalArgumentError("The informed interaction "
+                                       "configuration must be an instance "
+                                       "of %s." % msg)
         elif inter_calc is None:
-            self._log("info", "No interaction calculator object was defined and the default will be used instead.")
+            self._log("info", "No interaction calculator object was defined "
+                      "and the default will be used instead.")
 
         if append_mode:
-            self._log("warning", "Append mode set ON, entries with existing results will be skipped from the entries processing.")
-
-        if pdb_path is None or not is_directory_valid(pdb_path):
-            new_pdb_path = "%s/pdbs/" % working_path
-            self._log("warning", "The provided PDB path '%s' is not valid or does not exist. "
-                      "Therefore, PDBs will be saved at the working path: %s" % (pdb_path, new_pdb_path))
-            pdb_path = new_pdb_path
+            self._log("warning", "Append mode set ON, entries with existing "
+                      "results will be skipped from the entries processing.")
 
         self.entries = entries
         self.working_path = working_path
         self.pdb_path = pdb_path
         self.overwrite_path = overwrite_path
-        self.atom_prop_file = atom_prop_file
+        self.atom_prop_file = atom_prop_file or ATOM_PROP_FILE
         self.ph = ph
         self.amend_mol = amend_mol
         self.mol_obj_type = mol_obj_type
@@ -372,19 +373,21 @@ class Project:
         self.ifp_output = ifp_output
         self.ifp_sim_matrix_output = ifp_sim_matrix_output
 
-        # General parameters.
+        # PSE parameters
         self.out_pse = out_pse
+        self.pse_path = pse_path
+
+        # General parameters.
         self.use_cache = use_cache
         self.append_mode = append_mode
         self.nproc = nproc
 
         self._loaded_logging_file = False
-        self.logging_file = "%s/logs/project.log" % self.working_path
         self.verbosity = verbosity
 
         self.version = __version__
 
-        self._paths = ["chunks", "figures", "logs", "pdbs",
+        self._paths = ["chunks", "configs", "logs", "pdbs",
                        "results/interactions", "results/fingerprints",
                        "results/pse", "results", "tmp"]
         self.errors = []
@@ -466,12 +469,16 @@ class Project:
                 nproc = MAX_NPROCS
 
             elif nproc >= mp.cpu_count():
-                self._log("warning", "It was trying to create %d processes, which is equal to or greater than the maximum "
-                          "amount of available CPUs (%d). Therefore, the number of processes 'nproc' was set to %d "
-                          "to leave at least one CPU free." % (nproc, mp.cpu_count(), MAX_NPROCS))
+                self._log("warning", "It was trying to create %d processes, "
+                          "which is equal to or greater than the maximum "
+                          "amount of available CPUs (%d). Therefore, the "
+                          "number of processes 'nproc' was set to %d "
+                          "to leave at least one CPU free."
+                          % (nproc, mp.cpu_count(), MAX_NPROCS))
                 nproc = MAX_NPROCS
         else:
-            self._log("warning", "The number of processes was set to '%s'. Therefore, LUNA will run jobs sequentially." % nproc)
+            self._log("warning", "The number of processes was set to '%s'. "
+                      "Therefore, LUNA will run jobs sequentially." % nproc)
 
         self._nproc = nproc
 
@@ -483,10 +490,15 @@ class Project:
     @logging_enabled.setter
     def logging_enabled(self, is_enabled):
         if not is_enabled:
-            warnings.warn("Logging mode was set OFF. No logging information will be saved from now on.")
+            warnings.warn("Logging mode was set OFF. No logging information "
+                          "will be saved from now on.", category=LUNAWarning,
+                          stacklevel=2)
+
             logger.disabled = True
         else:
-            warnings.warn("Logging mode was set ON. Logging information will be saved from now on.")
+            warnings.warn("Logging mode was set ON. Logging information will "
+                          "be saved from now on.", category=LUNAWarning,
+                          stacklevel=2)
             logger.disabled = False
 
         self._logging_enabled = is_enabled
@@ -499,9 +511,13 @@ class Project:
     @verbosity.setter
     def verbosity(self, verbosity):
         if verbosity not in VERBOSITY_LEVEL:
-            raise IllegalArgumentError("The informed logging level '%s' is not valid. The valid levels are: %s."
-                                       % (repr(verbosity), ", ".join(["%d (%s)" % (k, logging.getLevelName(v))
-                                                                      for k, v in sorted(VERBOSITY_LEVEL.items())])))
+            v_levels = ", ".join(["%d (%s)"
+                                  % (k, logging.getLevelName(v))
+                                  for k, v in sorted(VERBOSITY_LEVEL.items())])
+            error_msg = ("The informed verbosity level '%s' is not valid. "
+                         "The valid levels are: %s."
+                         % (repr(verbosity), v_levels))
+            raise IllegalArgumentError(error_msg)
         else:
             self._log("info", "Verbosity set to: %d (%s)."
                       % (verbosity,
@@ -547,9 +563,11 @@ class Project:
         params = []
         for key in sorted(self.__dict__):
             if key == "entries":
-                params.append("\t\t\t-- # %s = %d" % (key, len(self.__dict__[key])))
+                params.append("\t\t\t-- # %s = %d"
+                              % (key, len(self.__dict__[key])))
             else:
-                params.append("\t\t\t-- %s = %s" % (key, str(self.__dict__[key])))
+                params.append("\t\t\t-- %s = %s"
+                              % (key, str(self.__dict__[key])))
         self._log("debug", "Preferences:\n%s" % "\n".join(params))
 
     def _init_logging_file(self, logging_filename=None, use_mp_handler=True):
@@ -558,11 +576,14 @@ class Project:
                 logging_filename = new_unique_filename(TMP_FILES)
 
             try:
-                new_logging_file(logging_filename, logging_level=self.verbosity)
+                new_logging_file(logging_filename,
+                                 logging_level=self.verbosity)
 
                 start_mp_handler()
 
-                self._log("info", "Logging file '%s' initialized successfully." % logging_filename)
+                self._log("info",
+                          "Logging file '%s' initialized successfully."
+                          % logging_filename)
 
                 # Print preferences at the new logging file.
                 self._log_preferences()
@@ -570,7 +591,8 @@ class Project:
                 self._loaded_logging_file = True
             except Exception as e:
                 self._log("exception", e)
-                raise FileNotCreated("Logging file '%s' could not be created." % logging_filename)
+                raise FileNotCreated("Logging file '%s' could not be created."
+                                     % logging_filename)
 
     def _close_logging_file(self):
         try:
@@ -585,6 +607,13 @@ class Project:
     def _prepare_project_path(self, subdirs=None):
         self._log("info",
                   "Preparing project directory '%s'." % self.working_path)
+
+        if self.pdb_path is None or not is_directory_valid(self.pdb_path):
+            new_pdb_path = "%s/pdbs/" % self.working_path
+            self._log("warning", "The provided PDB path '%s' is not valid "
+                      "or does not exist. Therefore, PDBs will be saved at "
+                      "the working path: %s" % (self.pdb_path, new_pdb_path))
+            self.pdb_path = new_pdb_path
 
         if subdirs is None:
             subdirs = self._paths
@@ -610,15 +639,20 @@ class Project:
             if entry.to_string() not in entries:
                 entries[entry.to_string()] = entry
             else:
-                self._log("debug", "An entry with id '%s' already exists in the list of entries, so the entry %s is a duplicate and will "
-                          "be removed." % (entry.to_string(), entry))
+                self._log("debug", "An entry with id '%s' already exists in "
+                          "the list of entries, so the entry %s is a "
+                          "duplicate and will be removed."
+                          % (entry.to_string(), entry))
 
-        self._log("info", "The remotion of duplicate entries was finished. %d entrie(s) were removed." % (len(self.entries) - len(entries)))
+        self._log("info", "The remotion of duplicate entries was finished. "
+                  "%d entrie(s) were removed."
+                  % (len(self.entries) - len(entries)))
         self.entries = list(entries.values())
 
     def _validate_entry_format(self, entry):
         if not entry.is_valid():
-            raise InvalidEntry("Entry '%s' does not match a LUNA's entry format." % entry.to_string())
+            raise InvalidEntry("Entry '%s' does not match a LUNA's entry "
+                               "format." % entry.to_string())
 
     def verify_pdb_files_existence(self):
         """Verify if a local PDB file exists for each entry in ``entries``.
@@ -633,28 +667,35 @@ class Project:
             all_pdb_ids.add(entry.pdb_id)
 
         logger.info("%d PDB file(s) found at '%s' from a total of %d PDB(s). "
-                    "So, %d PDB(s) need to be downloaded." % ((len(all_pdb_ids) - len(to_download)), self.pdb_path, len(all_pdb_ids),
-                                                              len(to_download)))
+                    "So, %d PDB(s) need to be downloaded."
+                    % ((len(all_pdb_ids) - len(to_download)), self.pdb_path,
+                        len(all_pdb_ids), len(to_download)))
 
         if to_download:
             args = [(pdb_id, self.pdb_path) for pdb_id in to_download]
             pj = ParallelJobs(self.nproc)
-            job_results = pj.run_jobs(args=args, consumer_func=download_pdb, job_name="Download PDBs")
+            job_results = pj.run_jobs(args=args, consumer_func=download_pdb,
+                                      job_name="Download PDBs")
             errors = job_results.errors
 
-            # Warn the users for any errors found during the entries processing.
+            # Warn the users for any errors found during
+            # the entries processing.
             if errors:
-                self._log("warning", "Number of PDBs with errors: %d. Check the log file to see the complete list of PDBs that failed."
-                          % len(errors))
-                self._log("debug", "PDBs that failed: %s." % ", ".join([e[0][0] for e in errors]))
+                self._log("warning", "Number of PDBs with errors: %d. "
+                          "Check the log file to see the complete list of "
+                          "PDBs that failed." % len(errors))
+                self._log("debug", "PDBs that failed: %s."
+                          % ", ".join([e[0][0] for e in errors]))
 
     def _decide_hydrogen_addition(self, pdb_header, entry):
         if self.add_h:
             if "structure_method" in pdb_header:
                 method = pdb_header["structure_method"]
-                # If the method is not a NMR type does not add hydrogen as it usually already has hydrogens.
+                # If the method is not a NMR type does not add hydrogen
+                # as it usually already has hydrogens.
                 if method.upper() in NMR_METHODS:
-                    self._log("debug", "The structure related to the entry '%s' was obtained by NMR, so it will "
+                    self._log("debug", "The structure related to the entry "
+                              "'%s' was obtained by NMR, so it will "
                               "not add hydrogens to it." % entry.to_string())
                     return False
             return True
@@ -721,8 +762,13 @@ class Project:
         nb_compounds = set([p[1] for p in nb_pairs
                             if not p[1].is_target()])
 
+        mol_objs_dict = {}
+        if isinstance(entry, MolFileEntry):
+            mol_objs_dict[entry.get_biopython_key()] = entry.mol_obj
+
         perceiver = self._get_perceiver(add_h)
-        atm_grps_mngr = perceiver.perceive_atom_groups(nb_compounds)
+        atm_grps_mngr = perceiver.perceive_atom_groups(nb_compounds,
+                                                       mol_objs_dict=mol_objs_dict)
 
         # Remove any edges involving the ligand.
         valid_edges = set()
@@ -763,7 +809,8 @@ class Project:
         atm_grps_mngr = perceiver.perceive_atom_groups(nb_compounds,
                                                        mol_objs_dict=mol_objs_dict)
 
-        self._log("debug", "Pharmacophore perception for entry '%s' has finished." % entry.to_string())
+        self._log("debug", "Pharmacophore perception for entry '%s' has "
+                  "finished." % entry.to_string())
 
         return atm_grps_mngr
 
@@ -775,8 +822,9 @@ class Project:
             return generate_fp_for_mols([rdmol_lig], "morgan_fp")[0]["fp"]
         else:
             # TODO: implement support for other entries.
-            self._log("warning", "Currently, it cannot generate molecular fingerprints for "
-                      "instances of %s." % entry.__class__.__name__)
+            self._log("warning", "Currently, it cannot generate molecular "
+                      "fingerprints for instances of %s."
+                      % entry.__class__.__name__)
 
     def _create_ifp(self, atm_grps_mngr):
         sg = ShellGenerator(self.ifp_num_levels, self.ifp_radius_step,
@@ -785,10 +833,13 @@ class Project:
         sm = sg.create_shells(atm_grps_mngr)
 
         unique_shells = not self.ifp_count
-        return sm.to_fingerprint(fold_to_length=self.ifp_length, unique_shells=unique_shells, count_fp=self.ifp_count)
+        return sm.to_fingerprint(fold_to_length=self.ifp_length,
+                                 unique_shells=unique_shells,
+                                 count_fp=self.ifp_count)
 
     def _create_ifp_file(self):
-        ifp_output = self.ifp_output or "%s/results/fingerprints/ifp.csv" % self.working_path
+        ifp_output = self.ifp_output or ("%s/results/fingerprints/ifp.csv"
+                                         % self.working_path)
         with open(ifp_output, "w") as OUT:
             if self.ifp_count:
                 OUT.write("ligand_id,on_bits,count\n")
@@ -797,23 +848,40 @@ class Project:
 
             for entry, ifp in self.ifps:
                 if self.ifp_count:
-                    fp_bits_str = "\t".join([str(idx) for idx in ifp.counts.keys()])
-                    fp_count_str = "\t".join([str(count) for count in ifp.counts.values()])
-                    OUT.write("%s,%s,%s\n" % (entry.to_string(), fp_bits_str, fp_count_str))
+                    fp_bits_str = "\t".join([str(idx)
+                                             for idx in ifp.counts.keys()])
+                    fp_count_str = "\t".join([str(count) for count
+                                              in ifp.counts.values()])
+                    OUT.write("%s,%s,%s\n" % (entry.to_string(), fp_bits_str,
+                                              fp_count_str))
                 else:
-                    fp_bits_str = "\t".join([str(x) for x in ifp.get_on_bits()])
+                    fp_bits_str = "\t".join([str(x) for x
+                                             in ifp.get_on_bits()])
                     OUT.write("%s,%s\n" % (entry.to_string(), fp_bits_str))
 
     def _create_mfp_file(self):
-        self.mfp_output = self.mfp_output or "%s/results/fingerprints/mfp.csv" % self.working_path
-        with open(self.mfp_output, "w") as OUT:
-            OUT.write("ligand_id,smiles,on_bits\n")
+        mfp_output = (self.mfp_output or "%s/results/fingerprints/mfp.csv"
+                      % self.working_path)
+        with open(mfp_output, "w") as OUT:
+            OUT.write("ligand_id,on_bits\n")
             for entry, mfp in self.mfps:
-                fp_str = "\t".join([str(x) for x in mfp.GetOnBits()])
-                OUT.write("%s,%s,%s\n" % (entry.to_string(), "", fp_str))
+                try:
+                    bits = mfp.GetOnBits()
+                except Exception:
+                    try:
+                        bits = mfp.GetNonzeroElements().keys()
+                    except Exception:
+                        error_msg = ("Fingerprint bits cannot be recovered "
+                                     "for entry '%s'." % entry.to_string())
+                        raise InvalidFingerprintType(error_msg)
+
+                fp_str = "\t".join([str(x) for x in bits])
+                OUT.write("%s,%s\n" % (entry.to_string(), fp_str))
 
     def _calc_similarity(self, res1, res2):
-        return "%s,%s,%s" % (res1.entry.to_string(), res2.entry.to_string(), str(res1.ifp.calc_similarity(res2.ifp)))
+        return "%s,%s,%s" % (res1.entry.to_string(),
+                             res2.entry.to_string(),
+                             str(res1.ifp.calc_similarity(res2.ifp)))
 
     def _generate_similarity_matrix(self, output_file):
         nargs = int(comb(len(self.entries), 2))
@@ -821,8 +889,9 @@ class Project:
 
         header = "entry1,entry2,similarity"
         pj = ParallelJobs(self.nproc)
-        return pj.run_jobs(args=args, consumer_func=self._calc_similarity, output_file=output_file,
-                           output_header=header, job_name="Calculate similarities")
+        return pj.run_jobs(args=args, consumer_func=self._calc_similarity,
+                           output_file=output_file, output_header=header,
+                           job_name="Calculate similarities")
 
     def run(self):
         """Run LUNA. However, this method is not implemented by default.
@@ -848,6 +917,10 @@ class Project:
             If the file could not be created.
         """
         pickle_data(self, output_file, compressed)
+
+    @staticmethod
+    def get_project_file(working_path):
+        return "%s/project_v%s.pkl.gz" % (working_path, __version__)
 
     @staticmethod
     def load(pathname, verbosity=3, logging_enabled=True):
@@ -882,9 +955,8 @@ class Project:
             If the provided pathname does not exist or is an invalid file/directory.
         """
 
-        #
-        # Check if the provided input path is a valid file or a directory containing saved projects.
-        #
+        # Check if the provided input path is a valid file
+        # or a directory containing saved projects.
         if is_file_valid(pathname):
             input_file = pathname
         elif is_directory_valid(pathname):
@@ -892,12 +964,17 @@ class Project:
             if len(project_files) == 1:
                 input_file = project_files[0]
             elif len(project_files) == 0:
-                raise PKLNotReadError("In the provided working path '%s', there is no saved project." % pathname)
+                raise PKLNotReadError("In the provided working path '%s', "
+                                      "there is no saved project." % pathname)
             else:
-                raise PKLNotReadError("In the provided working path '%s', there are multiple saved projects. "
-                                      "Please, specify which one you want to load." % pathname)
+                raise PKLNotReadError("In the provided working path '%s', "
+                                      "there are multiple saved projects. "
+                                      "Please, specify which one you want "
+                                      "to load." % pathname)
         else:
-            raise IllegalArgumentError("The provided path '%s' does not exist or is an invalid file/directory." % pathname)
+            raise IllegalArgumentError("The provided path '%s' does not exist "
+                                       "or is an invalid file/directory."
+                                       % pathname)
 
         if not logging_enabled:
             logger.disabled = True
@@ -911,28 +988,38 @@ class Project:
             proj_obj.verbosity = verbosity
             proj_obj.logging_enabled = logging_enabled
 
-            # Update the working path if the project has been moved to a different path.
+            # Update the working path if the project has been
+            # moved to a different path.
             curr_working_path = dirname(abspath(input_file))
 
             if proj_obj.working_path != curr_working_path:
                 proj_obj.working_path = curr_working_path
-                proj_obj.logging_file = "%s/logs/project.log" % proj_obj.working_path
+                proj_obj.logging_file = ("%s/logs/project.log"
+                                         % proj_obj.working_path)
 
             proj_obj._log("info", "Project reloaded successfully.")
             return proj_obj
         else:
-            raise CompatibilityError("The project loaded from '%s' has a version (%s) not compatible with the "
-                                     "current %s's version (%s)." % (input_file, proj_obj.version, __package__.upper(), __version__))
+            raise CompatibilityError("The project loaded from '%s' has a "
+                                     "version (%s) not compatible with the "
+                                     "current %s's version (%s)."
+                                     % (input_file, proj_obj.version,
+                                        __package__.upper(), __version__))
 
     @classmethod
     def from_config_file(cls, config_file=None):
-
         if config_file is not None and not exists(config_file):
             raise OSError("File '%s' does not exist." % config_file)
 
-        proj_params = ProjectParams(config_file)
+        proj_params = ProjectParams(config_file, fill_defaults=True)
 
-        return cls(**proj_params.params)
+        return cls(**proj_params)
+
+    def save_config_file(self, config_file=None):
+        config_file = config_file or f"{self.working_path}/configs/project.cfg"
+
+        params = ProjectParams.from_project_obj(self)
+        params.save_config_file(config_file)
 
 
 class LocalProject(Project):
@@ -1030,40 +1117,54 @@ class LocalProject(Project):
             # Generate MFP (Molecular fingerprint)
             mfp = None
             if self.calc_mfp:
-                mfp = self._create_mfp()
+                mfp = self._create_mfp(entry)
 
             # Saving entry results.
-            entry_results = EntryResults(entry, atm_grps_mngr, interactions_mngr, ifp, mfp)
+            entry_results = EntryResults(entry, atm_grps_mngr,
+                                         interactions_mngr, ifp, mfp)
             entry_results.save(pkl_file)
 
             # Saving interactions to CSV file.
-            csv_file = "%s/results/interactions/%s.csv" % (self.working_path, entry.to_string())
+            csv_file = ("%s/results/interactions/%s.csv"
+                        % (self.working_path, entry.to_string()))
             interactions_mngr.to_csv(csv_file)
 
             # Saving interactions into a Pymol session.
             if self.out_pse:
                 from luna.interaction.view import InteractionViewer
-
-                pse_file = "%s/results/pse/%s.pse" % (self.working_path, entry.to_string())
+                pse_path = (self.pse_path
+                            or "%s/results/pse/" % self.working_path)
+                pse_file = "%s/%s.pse" % (pse_path, entry.to_string())
                 piv = InteractionViewer(add_directional_arrows=False)
-                piv.new_session([(entry, interactions_mngr, entry.pdb_file)], pse_file)
+                piv.new_session([(entry, interactions_mngr,
+                                  entry.pdb_file)], pse_file)
 
-            self._log("debug", "Processing of entry '%s' finished successfully." % entry.to_string())
+            self._log("debug",
+                      "Processing of entry '%s' finished successfully."
+                      % entry.to_string())
 
         except Exception:
-            self._log("debug", "Processing of entry '%s' failed. Check the logs for more information." % entry.to_string())
+            self._log("debug",
+                      "Processing of entry '%s' failed. "
+                      "Check the logs for more information."
+                      % entry.to_string())
             raise
 
         proc_time = time.time() - start
-        self._log("debug", "Processing of entry '%s' took %.2fs." % (entry.to_string(), proc_time))
+        self._log("debug",
+                  "Processing of entry '%s' took %.2fs."
+                  % (entry.to_string(), proc_time))
 
     def _process_ifps(self, entry):
         start = time.time()
 
-        self._log("debug", "Starting IFP processing for entry '%s'." % entry.to_string())
+        self._log("debug",
+                  "Starting IFP processing for entry '%s'."
+                  % entry.to_string())
 
         try:
-            pkl_file = "%s/chunks/%s.pkl.gz" % (self.working_path, entry.to_string())
+            pkl_file = ("%s/chunks/%s.pkl.gz"
+                        % (self.working_path, entry.to_string()))
 
             if exists(pkl_file):
                 # Reload results.
@@ -1077,8 +1178,11 @@ class LocalProject(Project):
                 entry_results.ifp = ifp
                 entry_results.save(pkl_file)
             else:
-                raise FileNotFoundError("The IFP of the entry '%s' could not be generated because its pickled "
-                                        "data file '%s' was not found." % (entry.to_string(), pkl_file))
+                error_msg = ("The IFP of the entry '%s' could not be "
+                             "generated because its pickled data file "
+                             "'%s' was not found." % (entry.to_string(),
+                                                      pkl_file))
+                raise FileNotFoundError(error_msg)
 
         except Exception:
             self._log("debug", "IFP processing for entry '%s' failed. Check "
@@ -1089,19 +1193,66 @@ class LocalProject(Project):
         self._log("debug", "IFP processing for entry '%s' took %.2fs." %
                   (entry.to_string(), proc_time))
 
+    def _process_mfps(self, entry):
+        start = time.time()
+
+        self._log("debug",
+                  "Starting MFP processing for entry '%s'."
+                  % entry.to_string())
+
+        try:
+            pkl_file = ("%s/chunks/%s.pkl.gz"
+                        % (self.working_path, entry.to_string()))
+
+            if exists(pkl_file):
+                # Reload results.
+                entry_results = EntryResults.load(pkl_file)
+
+                # Generate a new MFP.
+                mfp = self._create_mfp(entry)
+
+                # Substitute old MFP by the new version and save the project.
+                entry_results.mfp = mfp
+                entry_results.save(pkl_file)
+            else:
+                error_msg = ("The MFP of the entry '%s' could not be "
+                             "generated because its pickled data file "
+                             "'%s' was not found." % (entry.to_string(),
+                                                      pkl_file))
+                raise FileNotFoundError(error_msg)
+
+        except Exception:
+            self._log("debug", "MFP processing for entry '%s' failed. Check "
+                      "the logs for more information." % entry.to_string())
+            raise
+
+        proc_time = time.time() - start
+        self._log("debug", "MFP processing for entry '%s' took %.2fs." %
+                  (entry.to_string(), proc_time))
+
     def __call__(self):
 
-        if len(self.entries) == 0:
+        if self.entries is None or len(self.entries) == 0:
             warnings.warn("There is nothing to be done as no "
-                          "entry was informed.")
+                          "entry was informed.", category=LUNAWarning,
+                          stacklevel=2)
+            return
+
+        if self.working_path is None:
+            warnings.warn("A working path must be provided.",
+                          category=LUNAWarning, stacklevel=2)
             return
 
         start = time.time()
 
         self._prepare_project_path()
+
+        self.logging_file = "%s/logs/project.log" % self.working_path
         self._init_logging_file(self.logging_file)
 
         self.remove_duplicate_entries()
+
+        self.save_config_file()
 
         self._log("info", "It will verify the existence of PDB files and "
                   "download them as necessary.")
@@ -1138,9 +1289,12 @@ class LocalProject(Project):
             # Warn the users for any errors found
             # during the entries processing.
             if self.errors:
-                self._log("warning", "Number of entries with errors: %d. Check the log file to see the complete list of entries that failed."
-                          % len(entries_with_error))
-                self._log("debug", "Entries that failed: %s." % ", ".join([e for e in entries_with_error]))
+                self._log("warning",
+                          "Number of entries with errors: %d. Check the log "
+                          "file to see the complete list of entries that "
+                          "failed." % len(entries_with_error))
+                self._log("debug", "Entries that failed: %s."
+                          % ", ".join([e for e in entries_with_error]))
 
             # Generate IFP/MFP files
             if self.calc_ifp:
@@ -1149,7 +1303,8 @@ class LocalProject(Project):
                 self._create_mfp_file()
 
             if self.ifp_sim_matrix_output and len(self.entries) > 1:
-                self._log("info", "Calculating the Tanimoto similarity between fingerprints.")
+                self._log("info", "Calculating the Tanimoto similarity "
+                          "between fingerprints.")
                 self._generate_similarity_matrix(self.ifp_sim_matrix_output)
 
         # Save the whole project information.
@@ -1162,24 +1317,28 @@ class LocalProject(Project):
         self._log("info", "Project creation completed!!!")
         self._log("info", "Total processing time: %.2fs." % (end - start))
         self._log("info", "Results were saved at %s." % self.working_path)
-        self._log("info", "You can reload your project from %s.\n\n" % self.project_file)
+        self._log("info", "You can reload your project from %s.\n\n"
+                  % self.project_file)
 
         # Properly close any filehandlers.
         self._close_logging_file()
 
-    def generate_ifps(self):
-        """Generate LUNA interaction fingerprints (IFPs).
+    def generate_fps(self):
+        """Generate LUNA interaction fingerprints (IFPs) or
+        molecular fingerprints (MFPs).
 
-        This function can be used to generate new IFPs after a project is run.
-        Thus, you can reload your project, vary IFP parameters (``ifp_num_levels``, ``ifp_radius_step``,
-        ``ifp_length``, ``ifp_count``, ``ifp_diff_comp_classes``, ``ifp_type``,
-        ``ifp_output``), and call `generate_ifps` to create new IFPs without having to
-        run the project from the scratch.
+        This function can be used to generate new FPs after a project is run.
+        Thus, you can reload your project, vary IFP parameters
+        (``ifp_num_levels``, ``ifp_radius_step``, ``ifp_length``,
+        ``ifp_count``, ``ifp_diff_comp_classes``, ``ifp_type``,
+        ``ifp_output``), and call `generate_fps` to create new IFPs without
+        having to run the project from the scratch.
 
         Examples
         --------
 
-        In the below example, we will assume a LUNA project object named ``proj_obj`` already exists.
+        In the below example, we will assume a LUNA project object
+        named ``proj_obj`` already exists.
 
         >>> from luna.interaction.fp.type import IFPType
         >>> proj_obj.ifp_num_levels = 5
@@ -1190,8 +1349,125 @@ class LocalProject(Project):
         >>> proj_obj.generate_ifps()
         """
 
-        if len(self.entries) == 0:
-            warnings.warn("There is nothing to be done as no entry was informed.")
+        if self.entries is None or len(self.entries) == 0:
+            warnings.warn("There is nothing to be done as no "
+                          "entry was informed.", category=LUNAWarning,
+                          stacklevel=2)
+            return
+
+        if self.working_path is None:
+            warnings.warn("A working path must be provided.",
+                          category=LUNAWarning, stacklevel=2)
+            return
+
+        start = time.time()
+
+        if self.calc_ifp is False and self.calc_mfp is False:
+            warnings.warn("There is nothing to be done as both "
+                          "'calc_ifp' and 'calc_mfp' is set to False.",
+                          category=LUNAWarning, stacklevel=2)
+            return
+
+        self.overwrite_path = False
+
+        if self.ifp_output is None or self.mfp_output is None:
+            self._prepare_project_path(subdirs=["results",
+                                                "results/fingerprints"])
+
+        # Create a new directory for logs.
+        if self.logging_enabled:
+            if not exists("%s/logs/" % self.working_path):
+                self._prepare_project_path(subdirs=["logs"])
+            self._init_logging_file(self.logging_file)
+
+        self._log("info", "Fingerprint generation will start. "
+                  "Number of entries to be processed is: %d."
+                  % len(self.entries))
+        self._log("info", "The number of processes was set to: %s."
+                  % str(self.nproc))
+
+        def _create_fps(args, proc_func, file_func, job_name):
+            # Run jobs either in Parallel or Sequentially (nproc = None).
+            pj = ParallelJobs(self.nproc)
+            job_results = pj.run_jobs(args=args,
+                                      consumer_func=proc_func,
+                                      job_name=job_name)
+            errors = job_results.errors
+
+            tmp_entries = self.entries
+            # Identify failed entries.
+            if errors:
+                entries_with_error = set([e[0].to_string()
+                                          for e in errors])
+                tmp_entries = [e for e in self.entries
+                               if e.to_string() not in entries_with_error]
+
+            success = False
+            # If all molecules failed, it won't try to create the output file.
+            if len(tmp_entries) == 0:
+                self._log("critical", f"{job_name} failed.")
+            else:
+                self._log("info", f"{job_name} finished successfully.")
+
+                success = True
+
+                # Warn the users for any errors found during
+                # the entries processing.
+                if errors:
+                    self._log("warning", "Number of entries with errors: %d. "
+                              "Check the log file to see the complete list of "
+                              "entries that failed." % len(entries_with_error))
+                    self._log("debug", "Entries that failed: %s."
+                              % ", ".join([e for e in entries_with_error]))
+
+                # Create an output file by calling the provided function.
+                file_func()
+
+            return success, errors
+
+        all_errors = []
+        if self.calc_ifp:
+            success, errors = _create_fps(self.entries, self._process_ifps,
+                                          self._create_ifp_file,
+                                          "IFPs generation")
+            all_errors.extend(errors)
+
+            if success:
+                if self.ifp_sim_matrix_output and len(self.entries) > 1:
+                    self._log("info", "Calculating the Tanimoto similarity "
+                              "between IFPs.")
+                    output_file = self.ifp_sim_matrix_output
+                    self._generate_similarity_matrix(output_file)
+
+        if self.calc_mfp:
+            success, errors = _create_fps(self.entries, self._process_mfps,
+                                          self._create_mfp_file,
+                                          "MFPs generation")
+            all_errors.extend(errors)
+
+        self.errors = all_errors
+
+        # Remove unnecessary paths.
+        self._remove_empty_paths()
+
+        end = time.time()
+        self._log("info", "Total processing time: %.2fs." % (end - start))
+        self._log("info", "Results were saved at %s.\n\n" % self.working_path)
+
+        # Properly close any filehandlers.
+        self._close_logging_file()
+
+    @deprecated("0.12.0", msg="Use the general `generate_fps` instead.")
+    def generate_ifps(self):
+        if self.entries is None or len(self.entries) == 0:
+            warnings.warn("There is nothing to be done as no "
+                          "entry was informed.", category=LUNAWarning,
+                          stacklevel=2)
+            return
+
+        if self.working_path is None:
+            warnings.warn("A working path must be provided.",
+                          category=LUNAWarning, stacklevel=2)
             return
 
         start = time.time()
@@ -1200,7 +1476,8 @@ class LocalProject(Project):
         self.overwrite_path = False
 
         if self.ifp_output is None:
-            self._prepare_project_path(subdirs=["results", "results/fingerprints"])
+            self._prepare_project_path(subdirs=["results",
+                                                "results/fingerprints"])
 
         # Create a new directory for logs.
         if self.logging_enabled:
@@ -1208,19 +1485,25 @@ class LocalProject(Project):
                 self._prepare_project_path(subdirs=["logs"])
             self._init_logging_file(self.logging_file)
 
-        self._log("info", "Fingerprint generation will start. Number of entries to be processed is: %d." % len(self.entries))
-        self._log("info", "The number of processes was set to: %s." % str(self.nproc))
+        self._log("info", "Fingerprint generation will start. "
+                  "Number of entries to be processed is: %d."
+                  % len(self.entries))
+        self._log("info", "The number of processes was set to: %s."
+                  % str(self.nproc))
 
         # Run jobs either in Parallel or Sequentially (nproc = None).
         pj = ParallelJobs(self.nproc)
-        job_results = pj.run_jobs(args=self.entries, consumer_func=self._process_ifps, job_name="Fingerprint generation")
+        job_results = pj.run_jobs(args=self.entries,
+                                  consumer_func=self._process_ifps,
+                                  job_name="Fingerprint generation")
         self.errors = job_results.errors
 
         tmp_entries = self.entries
         # Remove failed entries.
         if self.errors:
             entries_with_error = set([e[0].to_string() for e in self.errors])
-            tmp_entries = [e for e in self.entries if e.to_string() not in entries_with_error]
+            tmp_entries = [e for e in self.entries
+                           if e.to_string() not in entries_with_error]
 
         # If all molecules failed, it won't try to create the output file.
         if len(tmp_entries) == 0:
@@ -1228,11 +1511,14 @@ class LocalProject(Project):
         else:
             self._log("info", "Fingerprint generation finished successfully.")
 
-            # Warn the users for any errors found during the entries processing.
+            # Warn the users for any errors found during
+            # the entries processing.
             if self.errors:
-                self._log("warning", "Number of entries with errors: %d. Check the log file to see the complete list of entries that failed."
-                          % len(entries_with_error))
-                self._log("debug", "Entries that failed: %s." % ", ".join([e for e in entries_with_error]))
+                self._log("warning", "Number of entries with errors: %d. "
+                          "Check the log file to see the complete list of "
+                          "entries that failed." % len(entries_with_error))
+                self._log("debug", "Entries that failed: %s."
+                          % ", ".join([e for e in entries_with_error]))
 
             # Generate IFP/MFP files
             if self.calc_ifp:
@@ -1241,7 +1527,8 @@ class LocalProject(Project):
                 self._create_mfp_file()
 
             if self.ifp_sim_matrix_output and len(self.entries) > 1:
-                self._log("info", "Calculating the Tanimoto similarity between fingerprints.")
+                self._log("info", "Calculating the Tanimoto similarity "
+                          "between fingerprints.")
                 self._generate_similarity_matrix(self.ifp_sim_matrix_output)
 
         # Remove unnecessary paths.

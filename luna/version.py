@@ -1,11 +1,14 @@
 """
     Pattern: MAJOR.MINOR.PATCH as in https://semver.org/, where
        - MAJOR stands for big scientific updates;
-       - MINOR stands for updates that "break" the compatibility between pharmacophoric perception, interactions,
+
+       - MINOR stands for updates that "break" the compatibility
+            between pharmacophoric perception, interactions,
             and interaction fingerprints;
+
        - PATCH stands for backward compatible bug fixes.
 """
-version_info = (0, 11, 4)
+version_info = (0, 12, 0)
 version = '.'.join(str(c) for c in version_info)
 __version__ = version
 
