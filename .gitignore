@@ -6,9 +6,7 @@
 *.pdb
 *.pkl
 *.pkl.gz
-
 *.output
-
 *.csv
 
 *\.fuse_hidden*
