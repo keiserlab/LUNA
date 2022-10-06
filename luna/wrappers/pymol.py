@@ -13,22 +13,31 @@ import logging
 
 logger = logging.getLogger()
 
-NUCLEOPHILE_INTERS = ["Orthogonal multipolar", "Parallel multipolar", "Antiparallel multipolar", "Tilted multipolar", "Multipolar",
-                      "Cation-nucleophile", "Unfavorable anion-nucleophile", "Unfavorable nucleophile-nucleophile"]
+NUCLEOPHILE_INTERS = ["Orthogonal multipolar", "Parallel multipolar",
+                      "Antiparallel multipolar", "Tilted multipolar",
+                      "Multipolar", "Cation-nucleophile",
+                      "Unfavorable anion-nucleophile",
+                      "Unfavorable nucleophile-nucleophile"]
 
-ELECTROPHILE_INTERS = ["Orthogonal multipolar", "Parallel multipolar", "Antiparallel multipolar", "Tilted multipolar", "Multipolar",
-                       "Anion-electrophile", "Unfavorable cation-electrophile", "Unfavorable electrophile-electrophile"]
+ELECTROPHILE_INTERS = ["Orthogonal multipolar", "Parallel multipolar",
+                       "Antiparallel multipolar", "Tilted multipolar",
+                       "Multipolar", "Anion-electrophile",
+                       "Unfavorable cation-electrophile",
+                       "Unfavorable electrophile-electrophile"]
 
-UNFAVORABLE_INTERS = ["Repulsive", "Unfavorable anion-nucleophile", "Unfavorable cation-electrophile",
-                      "Unfavorable nucleophile-nucleophile", "Unfavorable electrophile-electrophile"]
+UNFAVORABLE_INTERS = ["Repulsive", "Unfavorable anion-nucleophile",
+                      "Unfavorable cation-electrophile",
+                      "Unfavorable nucleophile-nucleophile",
+                      "Unfavorable electrophile-electrophile"]
 
 
 class PymolWrapper:
-
-    """This class provides functions to provide easy access to common functions from Pymol."""
+    """This class provides functions to provide easy access
+    to common functions from Pymol."""
 
     def get_cmd(self):
-        """Expose the Pymol ``cmd`` object, so that one can call Pymol functions directly."""
+        """Expose the Pymol ``cmd`` object, so that one can
+        call Pymol functions directly."""
         return cmd
 
     def load(self, input_file, obj_name=None):
@@ -53,7 +62,8 @@ class PymolWrapper:
         Parameters
         ----------
         tuples : iterable of tuple
-            Each tuple should contain a Pymol representation (e.g., 'sticks') and a selection (e.g., 'hetatm').
+            Each tuple should contain a Pymol representation (e.g., 'sticks')
+            and a selection (e.g., 'hetatm').
         """
         for representation, selection in tuples:
             cmd.show(representation, selection)
@@ -64,7 +74,8 @@ class PymolWrapper:
         Parameters
         ----------
         tuples : iterable of tuple
-            Each tuple should contain a Pymol representation (e.g., 'sticks') and a selection (e.g., 'hetatm').
+            Each tuple should contain a Pymol representation (e.g., 'sticks')
+             and a selection (e.g., 'hetatm').
         """
         for representation, selection in tuples:
             cmd.hide(representation, selection)
@@ -74,7 +85,8 @@ class PymolWrapper:
         self.hide([('everything', '')])
 
     def center(self, selection):
-        """Translate the window, the clipping slab, and the origin to a point centered within the selection."""
+        """Translate the window, the clipping slab, and the origin to a point
+        centered within the selection."""
         cmd.center(selection)
 
     def label(self, tuples):
@@ -83,21 +95,24 @@ class PymolWrapper:
         Parameters
         ----------
         tuples : iterable of tuple
-            Each tuple should contain a selection (e.g., 'hetatm') and some string to label the given selection.
+            Each tuple should contain a selection (e.g., 'hetatm') and some
+            string to label the given selection.
         """
         for selection, expression in tuples:
             cmd.label(selection, expression)
 
     def add_pseudoatom(self, name, opts=None):
-        """Create a molecular object with a pseudoatom or add a pseudoatom to a molecular object
-        if the specified object already exists.
+        """Create a molecular object with a pseudoatom or add a pseudoatom to
+        a molecular object if the specified object already exists.
 
         Parameters
         ----------
         name : str
             The object name to create or modify.
         opts : dict
-            A set of options to create the pseudoatom. Check `Pymol <https://pymolwiki.org/index.php/Pseudoatom>`_ to discover which options are available.
+            A set of options to create the pseudoatom.
+            Check `Pymol <https://pymolwiki.org/index.php/Pseudoatom>`_ to
+            discover which options are available.
 
         """
         opts = opts or {}
@@ -114,7 +129,8 @@ class PymolWrapper:
             The selection name, which by default is 'sele'.
         enable : {0, 1}
             If ``1``, activate the selection, i.e., show selection indicators.
-            The default value is 0, which implies the selection indicators won't be shown.
+            The default value is 0, which implies the selection
+            indicators won't be shown.
         """
         cmd.select(name, selection, enable=enable)
 
@@ -123,8 +139,10 @@ class PymolWrapper:
 
         Parameters
         ----------
-        obj_type : {'objects', 'selections', 'all', 'public_objects', 'public_selections', 'public_nongroup_objects', 'public_group_objects', 'nongroup_objects', 'group_objects'}
-            The target object type.
+        obj_type : {'objects', 'selections', 'all', 'public_objects', \
+            'public_selections', 'public_nongroup_objects', \
+            'public_group_objects', 'nongroup_objects', 'group_objects'}
+                The target object type.
 
         Returns
         -------
@@ -637,9 +655,11 @@ class PymolSessionManager:
             obj2_name = "%s.centroids.%s" % (main_grp, hash(tuple(sorted(inter.trgt_interacting_atms))))
             centroid_obj2 = inter.trgt_centroid
             centroid_obj2_visible = True
-            # Define the centroid in an electrophile with two atoms as the position of its less electronegative atom.
-            # Remember that the position in the interaction object matters. We have defined that the second group is always
-            # the electrophile for both dipole-dipole and ion-dipole interactions.
+            # Define the centroid in an electrophile with two atoms as
+            # the position of its less electronegative atom. Remember that 
+            # the position in the interaction object matters. We have defined
+            # that the second group is always the electrophile for both 
+            # dipole-dipole and ion-dipole interactions.
             if inter.type in ELECTROPHILE_INTERS and len(inter.trgt_grp.atoms) == 2:
                 dipole_atm = inter.trgt_grp.atoms[0] if (inter.trgt_grp.atoms[0].electronegativity
                                                          < inter.trgt_grp.atoms[1].electronegativity) else inter.trgt_grp.atoms[1]
@@ -656,9 +676,13 @@ class PymolSessionManager:
 
             # Add pseudoatoms
             if not self.wrapper.obj_exists(obj1_name):
-                self.wrapper.add_pseudoatom(obj1_name, {"vdw": 1, "pos": list(centroid_obj1)})
+                self.wrapper.add_pseudoatom(obj1_name,
+                                            {"vdw": 1,
+                                             "pos": list(centroid_obj1)})
             if not self.wrapper.obj_exists(obj2_name):
-                self.wrapper.add_pseudoatom(obj2_name, {"vdw": 1, "pos": list(centroid_obj2)})
+                self.wrapper.add_pseudoatom(obj2_name,
+                                            {"vdw": 1,
+                                             "pos": list(centroid_obj2)})
 
             # Set the representation for each compound in the groups involved in the interaction.
             for compound in inter.src_grp.compounds.union(inter.trgt_grp.compounds):
@@ -690,11 +714,17 @@ class PymolSessionManager:
             src_grp_name = "+".join(["%s-%s-%d%s" % (c.parent.id, c.resname, c.id[1], c.id[2].strip())
                                      for c in sorted(inter.src_grp.compounds)])
 
-            trgt_grp_name = "+".join(["%s-%s-%d%s" % (c.parent.id, c.resname, c.id[1], c.id[2].strip())
-                                      for c in sorted(inter.trgt_grp.compounds)])
+            trgt_grp_name = \
+                "+".join(["%s-%s-%d%s" % (c.parent.id, c.resname,
+                                          c.id[1], c.id[2].strip())
+                          for c in sorted(inter.trgt_grp.compounds)])
 
-            inter_name = "%s.all_inters.%s.%s.i%d_%s_and_%s.line" % (secondary_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type],
-                                                                     i, src_grp_name, trgt_grp_name)
+            inter_grp = ("%s.all_inters.%s.%s.i%d_%s_and_%s"
+                         % (secondary_grp, inter_grp,
+                            INTERACTION_SHORT_NAMES[inter.type],
+                            i, src_grp_name, trgt_grp_name))
+
+            inter_name = "%s.line" % inter_grp
 
             self.wrapper.distance(inter_name, obj1_name, obj2_name)
             self.wrapper.hide([("label", inter_name)])
@@ -703,10 +733,12 @@ class PymolSessionManager:
             self.wrapper.color([(self.inter_color.get_color(inter.type), inter_name)])
 
             if self.add_directional_arrows:
+
                 if inter.type in UNFAVORABLE_INTERS:
-                    arrow_name1 = "%s.all_inters.%s.%s.inter%d.arrow1" % (secondary_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type], i)
-                    arrow_name2 = "%s.all_inters.%s.%s.inter%d.arrow2" % (secondary_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type], i)
-                    square_name = "%s.all_inters.%s.%s.inter%d.block" % (secondary_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type], i)
+                    arrow_name1 = "%s.arrow1" % inter_grp
+                    arrow_name2 = "%s.arrow2" % inter_grp
+
+                    square_name = "%s.block" % inter_grp
 
                     arrow_opts = {"radius": 0.03, "gap": 0.9, "hlength": 0.5, "hradius": 0.2,
                                   "color": self.inter_color.get_color(inter.type)}
@@ -718,14 +750,22 @@ class PymolSessionManager:
 
                     if not inter.is_directional():
                         self.wrapper.arrow(arrow_name2, obj2_name, obj1_name, arrow_opts)
+                    self.wrapper.arrow(arrow_name2, obj2_name, obj1_name, arrow_opts)
 
                     # Add a square-like object
-                    self.wrapper.arrow(square_name, obj1_name, obj2_name, square_opts)
-                # Add arrows over the interaction lines to represent directional interactions
+                    self.wrapper.arrow(square_name, obj1_name,
+                                       obj2_name, square_opts)
+
+                # Add arrows over the interaction lines to
+                # represent directional interactions
                 elif inter.is_directional():
-                    arrow_name = "%s.all_inters.%s.%s.inter%d.arrow" % (secondary_grp, inter_grp, INTERACTION_SHORT_NAMES[inter.type], i)
-                    arrow_opts = {"radius": 0.03, "gap": 0.9, "hlength": 0.5, "hradius": 0.2,
-                                  "color": self.inter_color.get_color(inter.type)}
+                    arrow_name = "%s.arrow" % inter_grp
+
+                    inter_color = self.inter_color.get_color(inter.type)
+                    arrow_opts = {"radius": 0.03, "gap": 0.9,
+                                  "hlength": 0.5, "hradius": 0.2,
+                                  "color": inter_color}
+
                     self.wrapper.arrow(arrow_name, obj1_name, obj2_name, arrow_opts)
 
             # If a group object contains more than one atom.

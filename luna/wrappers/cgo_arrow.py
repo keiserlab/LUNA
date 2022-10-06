@@ -51,7 +51,13 @@ ARGUMENTS
             return v
         if v.startswith('['):
             return cmd.safe_list_eval(v)
-        return cmd.get_atom_coords(v)
+
+        coords = cmd.get_coords(v)
+
+        if len(coords) != 1:
+            raise CmdException("More than one atom found")
+
+        return coords[0]
 
     xyz1 = get_coord(atom1)
     xyz2 = get_coord(atom2)

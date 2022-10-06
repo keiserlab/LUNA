@@ -920,6 +920,7 @@ class Project:
 
     @staticmethod
     def get_project_file(working_path):
+        """Get the pickled project file at ``working_path``."""
         return "%s/project_v%s.pkl.gz" % (working_path, __version__)
 
     @staticmethod
