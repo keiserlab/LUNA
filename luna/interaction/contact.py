@@ -317,4 +317,5 @@ def get_proximal_compounds(source, radius=COV_SEARCH_RADIUS):
     proximal = get_contacts_with(entity=model, source=source, radius=radius, level='R')
 
     # Sorted by the compound order as in the PDB.
-    return sorted(list(set([p[1] for p in proximal])), key=lambda r: (r.parent.parent.id, r.parent.id, r.idx))
+    return sorted(list(set([p[1] for p in proximal])),
+                  key=lambda r: (r.parent.parent.id, r.parent.id, r.idx))
