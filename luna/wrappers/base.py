@@ -167,7 +167,7 @@ class AtomWrapper:
         -------
          : int
         """
-        
+
         # Both RDKit and Open Babel have the same function name.
         return self._atm_obj.GetAtomicNum()
 
@@ -190,7 +190,9 @@ class AtomWrapper:
         -------
          : int
         """
-        return self._atm_obj.GetFormalCharge()  # Both RDKit and Open Babel have the same function name.
+
+        # Both RDKit and Open Babel have the same function name.
+        return self._atm_obj.GetFormalCharge()
 
     def get_isotope(self):
         """Get this atom's isotope number.
@@ -282,15 +284,15 @@ class AtomWrapper:
     def get_valence(self):
         """Get this atom's total valence (implicit and explicit)."""
         if self.is_rdkit_obj():
-            return self._atm_obj.GetExplicitValence() + self._atm_obj.GetImplicitValence()
+            valence = (self._atm_obj.GetExplicitValence()
+                       + self._atm_obj.GetImplicitValence())
+            return valence
         elif self.is_openbabel_obj():
             return self._atm_obj.GetTotalValence()
 
-            bonds = [b.GetBondOrder() for b in ob.OBAtomBondIter(self._atm_obj)]
-            return sum(bonds) + self._atm_obj.ImplicitHydrogenCount()
-
     def get_h_count(self):
-        """Get the total number of hydrogens (implicit and explicit) bound to this atom.
+        """Get the total number of hydrogens (implicit and explicit) bound to
+        this atom.
 
         Returns
         -------
@@ -299,7 +301,9 @@ class AtomWrapper:
         if self.is_rdkit_obj():
             return self._atm_obj.GetTotalNumHs(includeNeighbors=True)
         elif self.is_openbabel_obj():
-            return self._atm_obj.GetImplicitHCount() + self._atm_obj.ExplicitHydrogenCount()
+            h_count = (self._atm_obj.GetImplicitHCount()
+                       + self._atm_obj.ExplicitHydrogenCount())
+            return h_count
 
     def get_bonds(self, wrapped=True):
         """Get this atom’s bonds.
