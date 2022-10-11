@@ -856,7 +856,6 @@ class AtomGroupPerceiver():
          : `AtomGroupsManager`
             An `AtomGroupsManager` object containing all atom groups perceived for the molecules in ``compounds``.
         """
-
         mol_objs_dict = mol_objs_dict or {}
 
         self.atm_grps_mngr = AtomGroupsManager()
@@ -865,66 +864,57 @@ class AtomGroupPerceiver():
         compounds = set(compounds)
         init_comps_set = set(compounds)
 
-        if self.cache:
-            cached_compounds = set([c for c in compounds
-                                    if self.cache.is_compound_cached(c)])
-            compounds = compounds - cached_compounds
-
         # Controls which compounds are allowed to expand
         # when 'expand_selection' is set ON.
         pruned_comps = set()
         # Create a queue of compounds to be processed.
         comp_queue = set(compounds)
 
+        # Map Residue objects to a MolWrapper object.
+        new_mol_objs_dict = {}
+
+        # Initial compounds + border compounds
+        target_compounds = set()
+
+        self.expand_selection = False
+
         while comp_queue:
-            try:
-                comp = comp_queue.pop()
+            comp = comp_queue.pop()
 
-                logger.debug("It will try to perceive the features of the "
-                             "compound '%s' as no predefined properties "
-                             "were provided." % comp.full_name)
+            # Skip molecules provided as a molecular object.
+            if comp.id in mol_objs_dict:
+                new_mol_objs_dict[comp] = mol_objs_dict[comp.id]
+                continue
 
-                mol_obj = mol_objs_dict.get(comp.id, None)
+            # Add this compound to the binding site set.
+            target_compounds.add(comp)
 
-                # If no OBMol object was defined and expand_selection
-                # was set ON and it is not a border compound, it will
-                # get all compounds around the target and create a new
-                # OBMol object with them.
-                if mol_obj is None and self.expand_selection:
-                    # Remove the ligand from the list when
-                    # it was provided as an OBMol object.
-                    comp_list = [c for c in get_proximal_compounds(comp)
-                                 if c.id not in mol_objs_dict]
+            if self.expand_selection:
+                # Remove the ligand from the list when
+                # it was provided as an OBMol object.
+                comp_list = [c for c in get_proximal_compounds(comp)
+                             if c.id not in mol_objs_dict]
 
-                    # Expands the queue of compounds
-                    # with any new border compound.
-                    if comp not in pruned_comps:
-                        border_comps = set(comp_list) - compounds
-                        pruned_comps |= border_comps
-                        comp_queue |= border_comps
+                target_compounds.update(comp_list)
 
-                # Otherwise, the compound list will be composed
-                # only by the target compound.
-                else:
-                    comp_list = [comp]
+                # Expands the queue of compounds
+                # with any new border compound.
+                if comp not in pruned_comps:
+                    border_comps = set(comp_list) - compounds
+                    pruned_comps |= border_comps
+                    comp_queue |= border_comps
 
-                # Recover all atoms from the previous selected compounds.
-                selector = Selector(keep_altloc=False,
-                                    keep_hydrog=self.keep_hydrog)
-                atoms = tuple([a for r in comp_list
-                               for a in r.get_unpacked_list()
-                               if selector.accept_atom(a)])
+            # Otherwise, the compound list will be composed
+            # only by the target compound.
+            else:
+                comp_list = [comp]
 
-                self._assign_properties(comp, atoms, mol_obj)
-            except Exception:
-                logger.debug("Features for the compound '%s' were "
-                             "not correctly perceived." % comp)
+        for comp, mol_obj in new_mol_objs_dict.items():
+            target_atoms = self._get_atoms(comp)
+            self._assign_properties(mol_obj, target_atoms)
 
-                if self.critical:
-                    raise
-
-        if self.cache and cached_compounds:
-            self._apply_cache(cached_compounds, comp.get_parent_by_level("M"))
+        mol_obj, target_atoms = self._get_mol_from_entity(target_compounds)
+        self._assign_properties(mol_obj, target_atoms)
 
         # Remove atom groups not comprising the provided
         # compound list (parameter 'compounds').
@@ -935,6 +925,80 @@ class AtomGroupPerceiver():
         self.atm_grps_mngr.remove_atm_grps(remove_atm_grps)
 
         return self.atm_grps_mngr
+
+    def _assign_properties(self, mol_obj, target_atoms=None):
+
+        try:
+            # Create a new MolWrapper object.
+            mol_obj = MolWrapper(mol_obj)
+
+            if mol_obj.get_num_heavy_atoms() != len(target_atoms):
+                raise MoleculeSizeError("The number of heavy atoms in the PDB "
+                                        "selection and in the MOL file are "
+                                        "different.")
+
+            # Ignore hydrogen atoms.
+            atm_obj_list = [atm for atm in mol_obj.get_atoms()
+                            if atm.get_atomic_num() != 1]
+
+            atm_map = {}
+            trgt_atms = {}
+            for i, atm_obj in enumerate(atm_obj_list):
+
+                bio_atom = target_atoms[i].get_full_id()
+
+                atm_map[atm_obj.get_idx()] = bio_atom
+
+                trgt_atms[bio_atom] = self._new_extended_atom(target_atoms[i])
+                # Update atomic invariants for new ExtendedAtoms created.
+                trgt_atms[bio_atom].invariants = \
+                    atm_obj.get_atomic_invariants()
+
+            # Set all neighbors, i.e., covalently bonded atoms.
+            for bond_obj in mol_obj.get_bonds():
+                bgn_atm_obj = bond_obj.get_begin_atom()
+                end_atm_obj = bond_obj.get_end_atom()
+
+                # At least one of the atoms must be a non-hydrogen atom.
+                if bgn_atm_obj.get_atomic_num() != 1 or end_atm_obj.get_atomic_num() != 1:
+                    # If the atom 1 is not a hydrogen, add atom 2 to its neighbor list.
+                    if bgn_atm_obj.get_atomic_num() != 1:
+                        full_id = atm_map.get(end_atm_obj.get_idx())
+                        coord = mol_obj.get_atom_coord_by_id(end_atm_obj.get_id())
+                        atom_info = AtomData(end_atm_obj.get_atomic_num(), coord, bond_obj.get_bond_type(), full_id)
+                        trgt_atms[atm_map[bgn_atm_obj.get_idx()]].add_nb_info([atom_info])
+
+                    # If the atom 2 is not a hydrogen, add atom 1 to its neighbor list.
+                    if end_atm_obj.get_atomic_num() != 1:
+                        full_id = atm_map.get(bgn_atm_obj.get_idx())
+                        coord = mol_obj.get_atom_coord_by_id(bgn_atm_obj.get_id())
+                        atom_info = AtomData(bgn_atm_obj.get_atomic_num(),
+                                             coord,
+                                             bond_obj.get_bond_type(),
+                                             full_id)
+                        trgt_atms[atm_map[end_atm_obj.get_idx()]].add_nb_info([atom_info])
+
+            # Perceive pharmacophoric properties and create AtomGroup objects.
+            group_features = \
+                self.feature_extractor.get_features_by_groups(mol_obj, atm_map)
+            for key in group_features:
+                grp_obj = group_features[key]
+                atoms = [trgt_atms[i] for i in grp_obj["atm_ids"]]
+                self.atm_grps_mngr.new_atm_grp(atoms, grp_obj["features"])
+
+            # Update the graph in the AtomGroupsManager object
+            # with the current network.
+            for atm in trgt_atms.values():
+                for nb_info in atm.neighbors_info:
+                    if nb_info.full_id in trgt_atms:
+                        pair = atm, trgt_atms[nb_info.full_id]
+                        self.atm_grps_mngr.graph.add_edge(*pair, weight=1)
+
+        except Exception:
+            logger.debug("Features were not correctly perceived.")
+
+            if self.critical:
+                raise
 
     def _apply_cache(self, compounds, model):
 
@@ -999,120 +1063,47 @@ class AtomGroupPerceiver():
             # Update the AtomGroupsManager object with a new edge.
             self.atm_grps_mngr.graph.add_edge(atoms[0], atoms[1], weight=1)
 
-    def _assign_properties(self, target_compound, target_atoms, mol_obj=None):
-
-        # If no OBMol was defined, create a new one with the compound list.
-        ignored_atoms = []
-        if mol_obj is None:
-            mol_obj, ignored_atoms = self._get_mol_from_entity(target_compound, target_atoms)
-        # Create a new MolWrapper object.
-        mol_obj = MolWrapper(mol_obj)
-
-        # If the add_h property is set to False, the code will not remove any existing hydrogens from the PDB structure.
-        # In these situations, the list of atoms may contain hydrogens. But, we do not need to attribute properties to hydrogens.
-        # We just need them to correctly set properties to heavy atoms. So let's just ignore them.
-        target_atoms = [atm for atm in target_atoms if atm.element != "H" and atm not in ignored_atoms]
-
-        if mol_obj.get_num_heavy_atoms() != len(target_atoms):
-            raise MoleculeSizeError("The number of heavy atoms in the PDB selection and in the MOL file are different.")
-
-        # Ignore hydrogen atoms.
-        atm_obj_list = [atm for atm in mol_obj.get_atoms() if atm.get_atomic_num() != 1]
-
-        atm_map = {}
-        trgt_atms = {}
-        for i, atm_obj in enumerate(atm_obj_list):
-            atm_map[atm_obj.get_idx()] = target_atoms[i].get_full_id()
-
-            trgt_atms[target_atoms[i].get_full_id()] = self._new_extended_atom(target_atoms[i])
-
-            # Invariants are still None, so it means a new ExtendedAtom has just been created.
-            if trgt_atms[target_atoms[i].get_full_id()].invariants is None:
-                # Update atomic invariants for new ExtendedAtoms created.
-                trgt_atms[target_atoms[i].get_full_id()].invariants = atm_obj.get_atomic_invariants()
-
-            # The current atom already has its invariants updated, which means the atom was created previously
-            # by another target compound.
-            else:
-                # In this case, if the current atom belongs to the target compound, we need to prioritize the current target compound
-                # and overwrite the atom's invariants. By doing so, we always guarantee the most accurate information of an atom.
-                #
-                # It is done because some atoms are updated by centroids (target compound) not corresponding to its real compound.
-                # When it happens, the information of covalently bonded atoms may be lost due to the short COV_SEARCH_RADIUS used when
-                # selecting nearby compounds. As a consequence, these atoms will have their properties and topology incorrectly
-                # perceived.
-                #
-                # However, we need to highlight that the main goal of selecting atoms using COV_SEARCH_RADIUS is to find atoms
-                # covalently bonded to the current compound. Therefore, atoms in the border of nearby molecules are not important
-                # right now and they will be updated in their own time.
-                if trgt_atms[target_atoms[i].get_full_id()].parent == target_compound:
-                    # Update the atomic invariants for an ExtendedAtom.
-                    trgt_atms[target_atoms[i].get_full_id()].invariants = atm_obj.get_atomic_invariants()
-
-        # Set all neighbors, i.e., covalently bonded atoms.
-        for bond_obj in mol_obj.get_bonds():
-            bgn_atm_obj = bond_obj.get_begin_atom()
-            end_atm_obj = bond_obj.get_end_atom()
-
-            # At least one of the atoms must be a non-hydrogen atom.
-            if bgn_atm_obj.get_atomic_num() != 1 or end_atm_obj.get_atomic_num() != 1:
-                # If the atom 1 is not a hydrogen, add atom 2 to its neighbor list.
-                if bgn_atm_obj.get_atomic_num() != 1:
-                    # If the current bgn_atm_obj consists of an atom from the current target compound, we can update its information.
-                    # Other compounds are ignored for now as they will have their own time to update its information.
-                    if trgt_atms[atm_map[bgn_atm_obj.get_idx()]].parent == target_compound:
-                        full_id = atm_map.get(end_atm_obj.get_idx())
-                        coord = mol_obj.get_atom_coord_by_id(end_atm_obj.get_id())
-                        atom_info = AtomData(end_atm_obj.get_atomic_num(), coord, bond_obj.get_bond_type(), full_id)
-                        trgt_atms[atm_map[bgn_atm_obj.get_idx()]].add_nb_info([atom_info])
-
-                # If the atom 2 is not a hydrogen, add atom 1 to its neighbor list.
-                if end_atm_obj.get_atomic_num() != 1:
-                    # If the current end_atm_obj consists of an atom from the current target compound, we can update its information.
-                    # Other compounds are ignored for now as they will have their own time to update its information.
-                    if trgt_atms[atm_map[end_atm_obj.get_idx()]].parent == target_compound:
-                        full_id = atm_map.get(bgn_atm_obj.get_idx())
-                        coord = mol_obj.get_atom_coord_by_id(bgn_atm_obj.get_id())
-                        atom_info = AtomData(bgn_atm_obj.get_atomic_num(), coord, bond_obj.get_bond_type(), full_id)
-                        trgt_atms[atm_map[end_atm_obj.get_idx()]].add_nb_info([atom_info])
-
-        group_features = self.feature_extractor.get_features_by_groups(mol_obj, atm_map)
-        for key in group_features:
-            grp_obj = group_features[key]
-
-            # It only accepts groups containing at least one atom from the target compound.
-            if any([trgt_atms[i].parent == target_compound for i in grp_obj["atm_ids"]]) is False:
-                continue
-
-            atoms = [trgt_atms[i] for i in grp_obj["atm_ids"]]
-            self.atm_grps_mngr.new_atm_grp(atoms, grp_obj["features"])
-
-        # Update the graph in the AtomGroupsManager object with the current compound information.
-        for mybio_atm in target_compound.get_atoms():
-            if mybio_atm.get_full_id() in trgt_atms and mybio_atm.parent == target_compound:
-                atm = trgt_atms[mybio_atm.get_full_id()]
-
-                for nb_info in atm.neighbors_info:
-                    if nb_info.full_id in trgt_atms:
-                        self.atm_grps_mngr.graph.add_edge(atm, trgt_atms[nb_info.full_id], weight=1)
-        return True
-
     def _new_extended_atom(self, atm, invariants=None):
         if atm not in self.atm_mapping:
             self.atm_mapping[atm] = ExtendedAtom(atm, invariants=invariants)
 
         return self.atm_mapping[atm]
 
-    def _get_mol_from_entity(self, target_compound, target_atoms):
-        validate_mol = self.amend_mol
-        standardize_mol = self.amend_mol and target_compound.is_residue()
+    def _get_atoms(self, compound):
+        selector = Selector(keep_altloc=False,
+                            keep_hydrog=self.keep_hydrog)
 
-        atom_selector = AtomSelector(target_atoms, keep_altloc=False, keep_hydrog=self.keep_hydrog)
+        return [atm for atm in compound.get_unpacked_list()
+                if selector.accept_atom(atm)]
 
-        return biopython_entity_to_mol(target_compound.get_parent_by_level('M'), atom_selector,
-                                       validate_mol=validate_mol, standardize_mol=standardize_mol, add_h=self.add_h,
-                                       ph=self.ph, mol_obj_type=self.mol_obj_type, tmp_path=self.tmp_path)
+    def _get_mol_from_entity(self, compounds):
+        atoms = [atm
+                 for comp in sorted(compounds,
+                                    key=lambda c: (c.parent.parent.id,
+                                                   c.parent.id, c.idx))
+                 for atm in self._get_atoms(comp)]
 
+        model = atoms[0].get_parent_by_level('M')
+        atom_selector = AtomSelector(atoms, keep_altloc=False,
+                                     keep_hydrog=self.keep_hydrog)
+
+        mol_obj, ignored_atoms = \
+            biopython_entity_to_mol(model, atom_selector,
+                                    amend_mol=self.amend_mol,
+                                    add_h=self.add_h, ph=self.ph,
+                                    mol_obj_type=self.mol_obj_type,
+                                    tmp_path=self.tmp_path,
+                                    keep_tmp_files=True)
+
+        # If the add_h property is set to False, the code will not remove any
+        # existing hydrogens from the PDB structure. In these situations, the
+        # list of atoms may contain hydrogens. But, we do not need to attribute
+        # properties to hydrogens. We just need them to correctly set
+        # properties to heavy atoms. So let's just ignore them.
+        target_atoms = [atm for atm in atoms if atm.element != "H"
+                        and atm not in ignored_atoms]
+
+        return mol_obj, target_atoms
 
 class AtomGroupNeighborhood:
     """ Class for fast neighbor atom groups searching.
