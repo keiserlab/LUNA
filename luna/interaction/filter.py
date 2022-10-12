@@ -27,7 +27,8 @@ class InteractionFilter:
     ignore_self_inter : bool
         If True, ignore interactions involving atoms of the same compound.
     ignore_intra_chain : bool
-        If True, ignore intra-chain interactions (e.g., interactions between residues in the same protein chain).
+        If True, ignore intra-chain interactions (e.g., interactions between
+        residues in the same protein chain).
     ignore_inter_chain : bool
         If True, ignore interactions between different chains.
     ignore_res_res : bool
@@ -47,11 +48,13 @@ class InteractionFilter:
     ignore_any_h2o : bool
         If True, ignore all interactions involving water.
     ignore_multi_comps : bool
-        If True, ignore interactions established by atom groups composed of multiple compounds
-        (e.g.: amides formed by peptide bonds involve two residues).
+        If True, ignore interactions established by atom groups composed of
+        multiple compounds (e.g.: amides formed by peptide bonds involve two
+        residues).
     ignore_mixed_class : bool
-        If True, ignore interactions established by atom groups comprising mixed compound classes
-        (e.g. residues and ligands bound by a covalent bond).
+        If True, ignore interactions established by atom groups comprising
+        mixed compound classes (e.g. residues and ligands bound by a
+        covalent bond).
     """
 
     def __init__(self, ignore_self_inter=True, ignore_intra_chain=True,
@@ -127,7 +130,8 @@ class InteractionFilter:
     def new_nni_filter(cls, ignore_nucl_nucl=False, ignore_inter_chain=False,
                        ignore_intra_chain=False, ignore_any_h2o=False,
                        ignore_self_inter=False, **kwargs):
-        """Initialize the default filter for nucleotide-nucleotide interactions.
+        """Initialize the default filter for nucleotide-nucleotide
+        interactions.
 
         Returns
         -------
@@ -155,7 +159,8 @@ class InteractionFilter:
                    ignore_self_inter=ignore_self_inter, **kwargs)
 
     def is_valid_pair(self, src_grp, trgt_grp):
-        """Evaluate if a pair of atom groups are valid according to the flags defined in this class.
+        """Evaluate if a pair of atom groups are valid according to the
+        flags defined in this class.
 
         src_grp, trgt_grp : :class:`luna.mol.groups.AtomGroup`
         """
@@ -173,7 +178,8 @@ class InteractionFilter:
             return False
 
         # If one of the groups contain atoms from different compounds.
-        has_multi_comps = (len(src_grp.compounds) > 1 or len(trgt_grp.compounds) > 1)
+        has_multi_comps \
+            = (len(src_grp.compounds) > 1 or len(trgt_grp.compounds) > 1)
         if self.ignore_multi_comps and has_multi_comps:
             return False
 
@@ -196,7 +202,8 @@ class InteractionFilter:
         # The same applies to any group formed after covalently bonding a
         # residue to a hetatm (ligand or non-standard amino acid
         # represented as hetatm)
-        is_same_compounds = len(src_grp.compounds.intersection(trgt_grp.compounds)) >= 1
+        is_same_compounds = \
+            len(src_grp.compounds.intersection(trgt_grp.compounds)) >= 1
         if self.ignore_self_inter and is_same_compounds:
             return False
 
@@ -205,7 +212,8 @@ class InteractionFilter:
         # containing residues of different chains as may occur due to
         # disulfide bonds. Note, however, that this flag will be used only
         # as a filter for intra-interactions in protein/RNA/DNA chains.
-        is_same_chain = src_grp.get_chains() == trgt_grp.get_chains() and len(src_grp.get_chains()) == 1
+        is_same_chain = (src_grp.get_chains() == trgt_grp.get_chains()
+                         and len(src_grp.get_chains()) == 1)
 
         # Filters for residue-residue interactions if required.
         is_res_res = (src_grp.is_residue() and trgt_grp.is_residue())
@@ -313,8 +321,8 @@ class InteractionFilter:
 
         if "ignore" in params.sections():
             params_dict = params.get_section_map("ignore")
-            params_dict = {"ignore_" + k: v
-                           for k, v in params_dict.items()}
+            params_dict = {"ignore_" + k: params.parse_value("ignore", k)
+                           for k in params_dict}
 
             if inter_filter:
                 for prop, val in params_dict.items():
@@ -351,14 +359,18 @@ class BindingModeCondition:
 
     condition : str
         A string defining which chains, compounds, or atoms should be accepted.
-        If ``condition`` is the wildcard '*', then all chains, compounds, and atoms will be considered valid.
-        Otherwise, ``condition`` should have the format '<CHAIN ID>/<COMPOUND NAME>/<COMPOUND NUMBER>/<ATOM>'.
+        If ``condition`` is the wildcard '*', then all chains, compounds, and
+        atoms will be considered valid. Otherwise, ``condition`` should have
+        the format '<CHAIN ID>/<COMPOUND NAME>/<COMPOUND NUMBER>/<ATOM>'.
         Wildcards are accepted for each one of these fields.
         For example:
 
-            * '\*/HIS/\*/\*': represents all histidines' atoms from all chains.
-            * 'A/CBL/\*/\*' represents all ligands named CBL from chain A.
-            * 'B/HIS/\*/N\*' represents all histidines' nitrogens from chain B.
+            * '\\*/HIS/\\*/\\*': represents all histidines' \
+                                 atoms from all chains.
+            * 'A/CBL/\\*/\\*' represents all ligands named CBL \
+                            from chain A.
+            * 'B/HIS/\\*/N\\*' represents all histidines' nitrogens \
+                             from chain B.
 
     Attributes
     ----------
@@ -369,7 +381,8 @@ class BindingModeCondition:
     accept_all_comps : bool
         If True, all compound names will be considered valid.
     accept_all_comp_nums : bool
-        If True, all compound numbers (residue sequence number in the PDB format) will be considered valid.
+        If True, all compound numbers (residue sequence number
+        in the PDB format) will be considered valid.
     accept_all_atoms : bool
         If True, all atoms will be considered valid.
     chain_id : str or None
@@ -377,9 +390,11 @@ class BindingModeCondition:
     comp_name : str or None
         If provided, accept only compounds whose name matches ``comp_name``.
     comp_num : int or None
-        If provided, accept only compounds whose sequence number matches ``comp_num``.
+        If provided, accept only compounds whose sequence number
+        matches ``comp_num``.
     comp_icode : str or None
-        If provided, accept only compounds whose insertion code matches ``comp_icode``.
+        If provided, accept only compounds whose insertion code
+        matches ``comp_icode``.
     atom : str or None
         If provided, accept only atoms whose name matches ``atom``.
     """
@@ -430,9 +445,13 @@ class BindingModeCondition:
                         assert float(comp_num).is_integer()
                         comp_num = int(comp_num)
                     except (ValueError, AssertionError):
-                        raise IllegalArgumentError("The informed compound number '%s' is invalid. It must be an integer." % str(comp_num))
+                        error_msg = ("The informed compound number '%s' is "
+                                     "invalid. It must be an integer."
+                                     % str(comp_num))
+                        raise IllegalArgumentError(error_msg)
 
-                    icode = None if matched.group(2) == "" else matched.group(2)
+                    icode = (None if matched.group(2) == ""
+                             else matched.group(2))
                 else:
                     error_msg = ("The compound number and its insertion code "
                                  "(if applicable) '%s' is invalid. It must be "
@@ -459,15 +478,17 @@ class BindingModeCondition:
             return True
 
         # Accept everything.
-        if self.accept_all_chains and self.accept_all_comps and self.accept_all_comp_nums and self.accept_all_atoms:
+        if (self.accept_all_chains and self.accept_all_comps
+                and self.accept_all_comp_nums and self.accept_all_atoms):
             return True
 
         # Tries to identify the first valid compound in the atom group.
         for atm in atm_grp.atoms:
             comp = atm.parent
 
-            is_chain_valid, is_comp_valid, is_comp_num_valid, is_atom_valid = (self.accept_all_chains, self.accept_all_comps,
-                                                                               self.accept_all_comp_nums, self.accept_all_atoms)
+            is_chain_valid, is_comp_valid, is_comp_num_valid, is_atom_valid = \
+                (self.accept_all_chains, self.accept_all_comps,
+                 self.accept_all_comp_nums, self.accept_all_atoms)
 
             if self.chain_id is not None and self.chain_id == comp.parent.id:
                 is_chain_valid = True
@@ -511,7 +532,8 @@ class BindingModeFilter:
     ----------
     config : dict of {str : iterable}
         A dict defining binding modes and how interactions should be validated.
-        Each key represents an interaction type and values are an iterable of `BindingModeCondition` instances.
+        Each key represents an interaction type and values are an iterable of
+        `BindingModeCondition` instances.
     """
 
     def __init__(self, config, names_map=None):
@@ -536,15 +558,22 @@ class BindingModeFilter:
 
         It follows an example of a configuration file::
 
-            ; To configurate an interaction type, create a new line and define the interaction: [New interaction].
-            ; Then you can define whether or not all interactions must be accepted by setting 'accept_only' to True or False.
+            ; To configurate an interaction type, create a new line and define
+            ; the interaction: [New interaction]. Then you can define whether
+            ; or not all interactions must be accepted by setting 'accept_only'
+            ; to True or False.
 
-            ; If you want to specify binding modes, use the variable 'accept_only', which expects a list of strings \
-            in the format: <CHAIN ID>/<COMPOUND NAME>/<COMPOUND NUMBER>/<ATOM>
+            ; If you want to specify binding modes, use the variable
+            ; 'accept_only', which expects a list of strings in the format:
+            ; <CHAIN ID>/<COMPOUND NAME>/<COMPOUND NUMBER>/<ATOM>.
+            ;
             ; Wildcards are accepted for the expected fields.
-            ; For example, "*/HIS/*/*" represents all histidines' atoms from all chains.
-            ;               "A/CBL/*/*" represents all ligands named CBL from chain A.
-            ;               "B/HIS/*/N*" represents all histidines' nitrogens from chain B.
+            ; For example, "*/HIS/*/*" represents all histidines' atoms from \
+all chains.
+            ;               "A/CBL/*/*" represents all ligands named CBL from \
+chain A.
+            ;               "B/HIS/*/N*" represents all histidines' nitrogens \
+from chain B.
 
             [Hydrogen bond]
             accept_only = ["A/LYS/245/*", "*/HIS/*/*"]
@@ -607,7 +636,8 @@ class BindingModeFilter:
         return cls(filtering_config, names_mapping)
 
     def is_valid(self, inter):
-        """Check if an interaction is valid or not based on this binding mode configuration.
+        """Check if an interaction is valid or not based on this
+        binding mode configuration.
 
         inter : :class:`luna.interaction.type.InteractionType`
         """

@@ -34,8 +34,8 @@ class Config:
         return ast.literal_eval(value)
 
     def get_section_map(self, section):
-        """
-        Try to access the section ``section`` from the parsed configuration file.
+        """Try to access the section ``section`` from the parsed
+        configuration file.
         """
         section_map = {}
         options = self.config.options(section)
