@@ -17,7 +17,7 @@ from luna.mol.charge_model import OpenEyeModel
 from luna.mol.features import ChemicalFeature
 from luna.wrappers.base import MolWrapper
 from luna.util.exceptions import MoleculeSizeError, IllegalArgumentError
-from luna.util.default_values import ACCEPTED_MOL_OBJ_TYPES, COV_SEARCH_RADIUS
+from luna.util.default_values import COV_SEARCH_RADIUS
 from luna.util import math as im
 from luna.util.file import pickle_data, unpickle_data
 from luna.version import __version__
@@ -773,10 +773,6 @@ class AtomGroupPerceiver():
         If True, apply validation and standardization of molecules read from a PDB file.
     charge_model : class:`~luna.mol.charge_model.ChargeModel`
         A charge model object. By default, the implementation of OpenEye charge model is used.
-    mol_obj_type : {"rdkit", "openbabel"}
-        If "rdkit", parse the converted molecule with RDKit and return an instance of :class:`rdkit.Chem.rdchem.Mol`.
-        If "openbabel", parse the converted molecule with Open Babel and return an instance of
-        :class:`openbabel.pybel.Molecule`.
     expand_selection : bool
         If True (the default), perceive features for a given molecule considering all nearby molecules.
         The goal is to identify any covalently bonded molecules that may alter the
@@ -797,24 +793,12 @@ class AtomGroupPerceiver():
     critical : bool
         If False, ignore any errors during the processing a molecule and continue to the next one.
         The default value is True, which implies that any errors will raise an exception.
-
-    Raises
-    ------
-    IllegalArgumentError
-        If ``mol_obj_type`` is not either 'rdkit' nor 'openbabel'.
     """
 
     def __init__(self, feature_extractor, add_h=False, ph=None, amend_mol=True,
-                 charge_model=OpenEyeModel(), mol_obj_type="rdkit",
-                 expand_selection=True, radius=COV_SEARCH_RADIUS,
-                 cache=None, tmp_path=None, critical=True):
-
-        if mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES:
-            acc_mol_obj_types = ", ".join(ACCEPTED_MOL_OBJ_TYPES)
-            raise IllegalArgumentError("Objects of type '%s' are not currently"
-                                       "accepted. The available options are: "
-                                       "%s." % (mol_obj_type,
-                                                acc_mol_obj_types))
+                 charge_model=OpenEyeModel(), expand_selection=True,
+                 radius=COV_SEARCH_RADIUS, cache=None, tmp_path=None,
+                 critical=True):
 
         self.feature_extractor = feature_extractor
 
@@ -826,7 +810,6 @@ class AtomGroupPerceiver():
 
         self.amend_mol = amend_mol
         self.charge_model = charge_model
-        self.mol_obj_type = mol_obj_type
         self.expand_selection = expand_selection
         self.radius = radius
 
@@ -875,8 +858,6 @@ class AtomGroupPerceiver():
 
         # Initial compounds + border compounds
         target_compounds = set()
-
-        self.expand_selection = False
 
         while comp_queue:
             comp = comp_queue.pop()
@@ -1091,7 +1072,6 @@ class AtomGroupPerceiver():
             biopython_entity_to_mol(model, atom_selector,
                                     amend_mol=self.amend_mol,
                                     add_h=self.add_h, ph=self.ph,
-                                    mol_obj_type=self.mol_obj_type,
                                     tmp_path=self.tmp_path,
                                     keep_tmp_files=True)
 

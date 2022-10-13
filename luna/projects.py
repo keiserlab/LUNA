@@ -175,9 +175,6 @@ class Project:
 
         .. note::
             Molecules from external files (:class:`~luna.mol.entry.MolFileEntry` objects) will not be modified.
-    mol_obj_type : {'rdkit', 'openbabel'}
-        Define which library (RDKit or Open Babel) to use to parse molecules.
-        The default value is 'rdkit'.
     atom_prop_file : str
         A feature definition file (FDef) containing all information needed to define a set of
         chemical or pharmacophoric features. The default value is 'LUNA.fdef', which contains
@@ -250,7 +247,6 @@ class Project:
     add_h : bool
     ph : float
     amend_mol : bool
-    mol_obj_type : {'rdkit', 'openbabel'}
     atom_prop_file : str
     inter_calc : :class:`~luna.interaction.calc.InteractionCalculator`
     binding_mode_filter : :class:`~luna.interaction.filter.BindingModeFilter`
@@ -285,7 +281,6 @@ class Project:
                  add_h=True,
                  ph=7.4,
                  amend_mol=True,
-                 mol_obj_type='rdkit',
                  atom_prop_file=ATOM_PROP_FILE,
 
                  inter_calc=None,
@@ -316,15 +311,6 @@ class Project:
         # Property required by self._log()
         self.logging_enabled = logging_enabled
 
-        if mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES:
-            mobj_types = ["'%s'" % m for m in ACCEPTED_MOL_OBJ_TYPES]
-            raise IllegalArgumentError("Invalid value for 'mol_obj_type'. "
-                                       "Objects of type '%s' are not "
-                                       "currently accepted. "
-                                       "The available options are: %s."
-                                       % (mol_obj_type,
-                                          ", ".join(mobj_types)))
-
         self._log("info", "LUNA version: %s." % __version__)
 
         if (inter_calc is not None
@@ -349,7 +335,6 @@ class Project:
         self.atom_prop_file = atom_prop_file or ATOM_PROP_FILE
         self.ph = ph
         self.amend_mol = amend_mol
-        self.mol_obj_type = mol_obj_type
         self.add_h = add_h
 
         if inter_calc is None:
@@ -740,7 +725,6 @@ class Project:
 
         perceiver = AtomGroupPerceiver(feature_extractor, add_h=add_h,
                                        ph=self.ph, amend_mol=self.amend_mol,
-                                       mol_obj_type=self.mol_obj_type,
                                        cache=cache,
                                        tmp_path="%s/tmp" % self.working_path)
 

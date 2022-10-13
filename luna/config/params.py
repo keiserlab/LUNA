@@ -9,7 +9,6 @@ from luna.interaction.calc import InteractionCalculator
 from luna.interaction.config import InteractionConfig
 from luna.interaction.filter import InteractionFilter, BindingModeFilter
 from luna.interaction.fp.type import IFPType
-from luna.util.default_values import ACCEPTED_MOL_OBJ_TYPES
 from luna.util.logging import VERBOSITY_LEVEL
 from luna.util.exceptions import IllegalArgumentError
 
@@ -65,7 +64,6 @@ class ProjectParams(dict):
                   "inter_calc": proj_obj.inter_calc,
                   "logging_enabled": proj_obj.logging_enabled,
                   "mfp_output": proj_obj.mfp_output,
-                  "mol_obj_type": proj_obj.mol_obj_type,
                   "nproc": proj_obj.nproc,
                   "pse": proj_obj.out_pse,
                   "overwrite_path": proj_obj.overwrite_path,
@@ -214,7 +212,6 @@ class ProjectParams(dict):
                          if v == self["verbosity"]].pop()
 
             OUT.write("[general]\n")
-            OUT.write("mol_obj_type = %s\n" % self["mol_obj_type"])
             OUT.write("append_mode = %s\n" % self["append_mode"])
             OUT.write("use_cache = %s\n" % self["use_cache"])
             OUT.write("verbosity = %s\n" % verbosity)
@@ -451,14 +448,6 @@ class ProjectParams(dict):
         return {"out_pse": out_pse, "pse_path": pse_path}
 
     def _parse_general_params(self, params):
-        mol_obj_type = self._get_value(params, "mol_obj_type", str)
-
-        if (mol_obj_type is not None
-                and mol_obj_type not in ACCEPTED_MOL_OBJ_TYPES):
-            raise KeyError("Invalid choise '%s' for property 'mol_obj_type'. "
-                           "Choose from: %s."
-                           % (mol_obj_type,
-                              ", ".join(ACCEPTED_MOL_OBJ_TYPES)))
 
         append_mode = self._get_value(params, "append_mode", bool)
 
@@ -486,7 +475,6 @@ class ProjectParams(dict):
         nproc = self._get_value(params, "nproc", int)
 
         return {
-            "mol_obj_type": mol_obj_type,
             "append_mode": append_mode,
             "use_cache": use_cache,
             "verbosity": verbosity,
