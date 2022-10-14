@@ -723,8 +723,9 @@ class AtomGroup():
     def __hash__(self):
         """Overrides the default implementation"""
         if self._hash_cache is None:
-            # Transform atoms and features list into an imutable data structure.
-            # The lists are sorted in order to avoid dependence on appending order.
+            # Transform atoms and features list into an imutable data
+            # structure. The lists are sorted in order to avoid
+            # dependence on appending order.
             atoms_tuple = tuple(self.atoms)
             feat_tuple = tuple(self.features)
             self._hash_cache = hash((atoms_tuple, feat_tuple, self.__class__))
@@ -732,9 +733,11 @@ class AtomGroup():
 
 
 class PseudoAtomGroup(AtomGroup):
-    """Represent only the atoms from an `AtomGroup` object that are involved in an interaction.
+    """Represent only the atoms from an `AtomGroup` object that are involved
+    in an interaction.
 
-    Currently, this class is only used during the generation of LUNA's fingerprints.
+    Currently, this class is only used during the generation of LUNA's
+    fingerprints.
 
     Parameters
     ----------
@@ -754,7 +757,8 @@ class PseudoAtomGroup(AtomGroup):
         super().__init__(atoms, features, interactions, recursive=False)
 
     def __repr__(self):
-        return '<PseudoAtomGroup: [%s]>' % ', '.join([str(x) for x in self.atoms])
+        return ('<PseudoAtomGroup: [%s]>'
+                % ', '.join([str(x) for x in self.atoms]))
 
 
 class AtomGroupPerceiver():
@@ -770,29 +774,36 @@ class AtomGroupPerceiver():
     ph : float, optional
         If not None, add hydrogens appropriate for pH ``ph``.
     amend_mol : bool
-        If True, apply validation and standardization of molecules read from a PDB file.
+        If True, apply validation and standardization of molecules read
+        from a PDB file.
     charge_model : class:`~luna.mol.charge_model.ChargeModel`
-        A charge model object. By default, the implementation of OpenEye charge model is used.
+        A charge model object. By default, the implementation of OpenEye
+        charge model is used.
     expand_selection : bool
-        If True (the default), perceive features for a given molecule considering all nearby molecules.
-        The goal is to identify any covalently bonded molecules that may alter the
-        pharmacophoric properties or chemical functional groups.
+        If True (the default), perceive features for a given molecule
+        considering all nearby molecules. The goal is to identify any
+        covalently bonded molecules that may alter the pharmacophoric
+        properties or chemical functional groups.
 
         For instance, consider an amide of a peptide bond.
-        If ``expand_selection`` is False, the residues forming the peptide bond will be analyzed separately,
-        which will make the oxygen and the nitrogen of the amide to be perceived as carbonyl oxygen
-        and amine, respectively.
-        On the other hand, if ``expand_selection`` is True, the covalent bond between the residues will be
-        identified and the amide will be correctly perceived.
+        If ``expand_selection`` is False, the residues forming the peptide
+        bond will be analyzed separately, which will make the oxygen and the
+        nitrogen of the amide to be perceived as carbonyl oxygen and amine,
+        respectively. On the other hand, if ``expand_selection`` is True, the
+        covalent bond between the residues will be identified and the amide
+        will be correctly perceived.
     radius : float
-        If ``expand_selection`` is True, select all molecules up to a maximum of ``radius`` away (measured in Å).
-        The default value is 2.2, which comprises covalent bond distances.
+        If ``expand_selection`` is True, select all molecules up to a maximum
+        of ``radius`` away (measured in Å). The default value is 2.2, which
+        comprises covalent bond distances.
     tmp_path : str, optional
         A temporary directory to where temporary files will be saved.
-        If not provided, the system's default temporary directory will be used instead.
+        If not provided, the system's default temporary directory will be used
+        instead.
     critical : bool
-        If False, ignore any errors during the processing a molecule and continue to the next one.
-        The default value is True, which implies that any errors will raise an exception.
+        If False, ignore any errors during the processing a molecule and
+        continue to the next one. The default value is True, which implies
+        that any errors will raise an exception.
     """
 
     def __init__(self, feature_extractor, add_h=False, ph=None, amend_mol=True,
@@ -828,16 +839,19 @@ class AtomGroupPerceiver():
         compounds : iterable of :class:`~luna.MyBio.PDB.Residue.Residue`
             A sequence of molecules.
         mol_objs_dict : dict
-            Map a compound, represented by its id, to a molecular object (:class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`,
+            Map a compound, represented by its id, to a molecular object
+            (:class:`~luna.wrappers.base.MolWrapper`,
+            :class:`rdkit.Chem.rdchem.Mol`,
             or :class:`openbabel.pybel.Molecule`).
 
-            This parameter can be used in cases where the ligand is read from a molecular file
-            and no standardization or validation is required.
+            This parameter can be used in cases where the ligand is read from a
+            molecular file and no standardization or validation is required.
 
         Returns
         -------
          : `AtomGroupsManager`
-            An `AtomGroupsManager` object containing all atom groups perceived for the molecules in ``compounds``.
+            An `AtomGroupsManager` object containing all atom groups perceived
+            for the molecules in ``compounds``.
         """
         mol_objs_dict = mol_objs_dict or {}
 

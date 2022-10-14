@@ -625,6 +625,13 @@ class BondWrapper:
         if self.is_rdkit_obj():
             return BondType[self._bond_obj.GetBondType().name]
         elif self.is_openbabel_obj():
+            # Open Babel does not have a type specific for aromatic bonds.
+            # Instead, they use a flag to specify if a bond is aromatic
+            # or not. Therefore, if a bond is aromatic, then it returns
+            # BondType.AROMATIC.
+            if self._bond_obj.IsAromatic():
+                return BondType["AROMATIC"]
+
             # Map Open Babel bonds to BondType.
             return BondType[OBBondType(self._bond_obj.GetBondOrder()).name]
 
