@@ -8,6 +8,7 @@ Subpackages
 
     luna.align
     luna.analysis
+    luna.config
     luna.interaction
     luna.mol
     luna.mybio

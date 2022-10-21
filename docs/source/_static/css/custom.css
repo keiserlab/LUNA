@@ -1,6 +1,5 @@
 .wy-side-nav-search {
     background-color: #fcfcfc;
-
 }
 
 .wy-side-nav-search > div.version {
@@ -26,6 +25,7 @@
 .wy-nav-top > a {
     display: none;
 }
-© 2022 GitHub, Inc.
-Terms
-Privacy
+
+dl.py.property {
+    display: block !important;
+}

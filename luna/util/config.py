@@ -30,12 +30,23 @@ class Config:
             raise IOError('Configuration file %s not read.' % config_file)
 
     def parse_value(self, section, property_name):
+        """Transform the value of property ``property_name`` from
+        section ``section`` to a Python object.
+
+        Returns
+        -------
+         : object
+        """
         value = self.config.get(section, property_name)
         return ast.literal_eval(value)
 
     def get_section_map(self, section):
         """Try to access the section ``section`` from the parsed
         configuration file.
+
+        Returns
+        -------
+         : dict
         """
         section_map = {}
         options = self.config.options(section)
@@ -48,6 +59,7 @@ class Config:
         return section_map
 
     def as_dict(self, only_props=True):
+        """Return the object parameters as :py:class:`dict`."""
         if only_props:
             return {k: v
                     for s in self.config.sections()

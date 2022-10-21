@@ -48,9 +48,9 @@ class InteractionFilter:
     ignore_any_h2o : bool
         If True, ignore all interactions involving water.
     ignore_multi_comps : bool
-        If True, ignore interactions established by atom groups composed of
-        multiple compounds (e.g.: amides formed by peptide bonds involve two
-        residues).
+        If True, ignore interactions established by atom groups composed
+        of multiple compounds (e.g.: amides formed by peptide bonds involve
+        two residues).
     ignore_mixed_class : bool
         If True, ignore interactions established by atom groups comprising
         mixed compound classes (e.g. residues and ligands bound by a
@@ -158,9 +158,69 @@ class InteractionFilter:
                    ignore_any_h2o=ignore_any_h2o,
                    ignore_self_inter=ignore_self_inter, **kwargs)
 
+    @classmethod
+    def from_config_file(cls, config_file):
+        """Initialize from a configuration file.
+
+        Parameters
+        ----------
+        config_file : str
+            The configuration file pathname.
+
+        Returns
+        -------
+         : `InteractionFilter`
+        """
+
+        if not path.exists(config_file):
+            raise OSError("File '%s' does not exist." % config_file)
+
+        params = Config(config_file)
+
+        inter_filter = None
+        if "default" in params.sections():
+            params_dict = params.get_section_map("default")
+            filter_type = params_dict.pop("type", None)
+
+            if filter_type is not None:
+                filter_type = filter_type.upper()
+
+                available_filters = ["PLI", "PPI", "PNI", "NNI", "NLI"]
+                if filter_type not in available_filters:
+                    raise KeyError("The accepted default filter types are: "
+                                   "%s." % ", ".join(available_filters))
+
+                if filter_type == "PLI":
+                    inter_filter = cls.new_pli_filter()
+
+                elif filter_type == "PPI":
+                    inter_filter = cls.new_ppi_filter()
+
+                elif filter_type == "PNI":
+                    inter_filter = cls.new_pni_filter()
+
+                elif filter_type == "NNI":
+                    inter_filter = cls.new_nni_filter()
+
+                elif filter_type == "NLI":
+                    inter_filter = cls.new_nli_filter()
+
+        if "ignore" in params.sections():
+            params_dict = params.get_section_map("ignore")
+            params_dict = {"ignore_" + k: v
+                           for k, v in params_dict.items()}
+
+            if inter_filter:
+                for prop, val in params_dict.items():
+                    setattr(inter_filter, prop, val)
+            else:
+                inter_filter = cls(**params_dict)
+
+        return inter_filter
+
     def is_valid_pair(self, src_grp, trgt_grp):
-        """Evaluate if a pair of atom groups are valid according to the
-        flags defined in this class.
+        """Evaluate if a pair of atom groups are valid according to the flags
+        defined in this class.
 
         src_grp, trgt_grp : :class:`luna.mol.groups.AtomGroup`
         """
@@ -178,8 +238,8 @@ class InteractionFilter:
             return False
 
         # If one of the groups contain atoms from different compounds.
-        has_multi_comps \
-            = (len(src_grp.compounds) > 1 or len(trgt_grp.compounds) > 1)
+        has_multi_comps = (len(src_grp.compounds) > 1
+                           or len(trgt_grp.compounds) > 1)
         if self.ignore_multi_comps and has_multi_comps:
             return False
 
@@ -283,56 +343,14 @@ class InteractionFilter:
 
         return True
 
-    @classmethod
-    def from_config_file(cls, config_file):
-
-        if not path.exists(config_file):
-            raise OSError("File '%s' does not exist." % config_file)
-
-        params = Config(config_file)
-
-        inter_filter = None
-        if "default" in params.sections():
-            params_dict = params.get_section_map("default")
-            filter_type = params_dict.pop("type", None)
-
-            if filter_type is not None:
-                filter_type = filter_type.upper()
-
-                available_filters = ["PLI", "PPI", "PNI", "NNI", "NLI"]
-                if filter_type not in available_filters:
-                    raise KeyError("The accepted default filter types are: "
-                                   "%s." % ", ".join(available_filters))
-
-                if filter_type == "PLI":
-                    inter_filter = cls.new_pli_filter()
-
-                elif filter_type == "PPI":
-                    inter_filter = cls.new_ppi_filter()
-
-                elif filter_type == "PNI":
-                    inter_filter = cls.new_pni_filter()
-
-                elif filter_type == "NNI":
-                    inter_filter = cls.new_nni_filter()
-
-                elif filter_type == "NLI":
-                    inter_filter = cls.new_nli_filter()
-
-        if "ignore" in params.sections():
-            params_dict = params.get_section_map("ignore")
-            params_dict = {"ignore_" + k: params.parse_value("ignore", k)
-                           for k in params_dict}
-
-            if inter_filter:
-                for prop, val in params_dict.items():
-                    setattr(inter_filter, prop, val)
-            else:
-                inter_filter = cls(**params_dict)
-
-        return inter_filter
-
     def save_config_file(self, config_file):
+        """Save the interaction filter parameters into a configuration file.
+
+        Parameters
+        ----------
+        config_file : str
+            The output configuration file.
+        """
         with open(config_file, "w") as OUT:
             OUT.write("[ignore]\n")
             OUT.write("self_inter = %s\n" % self.ignore_self_inter)
@@ -381,8 +399,8 @@ class BindingModeCondition:
     accept_all_comps : bool
         If True, all compound names will be considered valid.
     accept_all_comp_nums : bool
-        If True, all compound numbers (residue sequence number
-        in the PDB format) will be considered valid.
+        If True, all compound numbers (residue sequence number in the PDB
+        format) will be considered valid.
     accept_all_atoms : bool
         If True, all atoms will be considered valid.
     chain_id : str or None
@@ -390,11 +408,11 @@ class BindingModeCondition:
     comp_name : str or None
         If provided, accept only compounds whose name matches ``comp_name``.
     comp_num : int or None
-        If provided, accept only compounds whose sequence number
-        matches ``comp_num``.
+        If provided, accept only compounds whose sequence number matches
+        ``comp_num``.
     comp_icode : str or None
-        If provided, accept only compounds whose insertion code
-        matches ``comp_icode``.
+        If provided, accept only compounds whose insertion code matches
+        ``comp_icode``.
     atom : str or None
         If provided, accept only atoms whose name matches ``atom``.
     """
@@ -546,7 +564,7 @@ class BindingModeFilter:
 
         Parameters
         ----------
-        ``config_file`` : str
+        config_file : str
             The configuration file pathname.
 
         Returns
@@ -664,6 +682,14 @@ from chain B.
         return False
 
     def save_config_file(self, config_file):
+        """Save the binding mode filter parameters into a
+        configuration file.
+
+        Parameters
+        ----------
+        config_file : str
+            The output configuration file.
+        """
         args_by_section = defaultdict(list)
 
         for inter, conditions in self.config.items():

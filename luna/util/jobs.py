@@ -19,12 +19,15 @@ class Sentinel:
 
 class ArgsGenerator:
     """Custom generator that implements __len__().
-       This class can be used in conjunction with :class:`~luna.util.progress_tracker.ProgressTracker` in cases
-       where the tasks are obtained from generators. Note that :class:`~luna.util.progress_tracker.ProgressTracker`
-       requires a pre-defined number of tasks to calculate the progress, therefore a standard generator cannot be
-       used directly as it does not implement __len__(). Then, with `ArgsGenerator`, one may take advantage of
-       generators and :class:`~luna.util.progress_tracker.ProgressTracker` by explicitly providing the number
-       of tasks that will be generated.
+       This class can be used in conjunction with
+       :class:`~luna.util.progress_tracker.ProgressTracker` in cases where the
+       tasks are obtained from generators. Note that
+       :class:`~luna.util.progress_tracker.ProgressTracker` requires a
+       pre-defined number of tasks to calculate the progress, therefore a
+       standard generator cannot be used directly as it does not implement
+       __len__(). Then, with `ArgsGenerator`, one may take advantage of
+       generators and :class:`~luna.util.progress_tracker.ProgressTracker` by
+       explicitly providing the number of tasks that will be generated.
 
        Parameters
        ----------
@@ -48,20 +51,23 @@ class ArgsGenerator:
 
 class ParallelJobs:
 
-    """Executes a set of tasks in parallel (:py:class:`~multiprocessing.JoinableQueue`) or sequentially.
+    """Executes a set of tasks in parallel
+    (:py:class:`~multiprocessing.JoinableQueue`) or sequentially.
 
     Parameters
     ----------
     nproc : int or None
-       The number of CPUs to use. The default value is the ``maximum number of CPUs - 1``.
-       If ``nproc`` is None, 0, or 1, run the jobs sequentially. Otherwise, use the ``maximum number of CPUs - 1``.
+       The number of CPUs to use. The default value is the
+       ``maximum number of CPUs - 1``. If ``nproc`` is None, 0, or 1, run the
+       jobs sequentially. Otherwise, use the ``maximum number of CPUs - 1``.
 
     Attributes
     ----------
     nproc : int
         The number of CPUs to use.
     progress_tracker : ProgressTracker
-        A :class:`~luna.util.progress_tracker.ProgressTracker` object to track the tasks' progress.
+        A :class:`~luna.util.progress_tracker.ProgressTracker` object to track
+        the tasks' progress.
     """
 
     # TODO: add option to Threads/Multiprocessing
@@ -122,12 +128,15 @@ class ParallelJobs:
                 output_queue.put((data, output))
 
             # Update progress tracker.
-            pd = ProgressData(input_data=data, output_data=output, exception=exception, proc_time=proc_time, func=func)
+            pd = ProgressData(input_data=data, output_data=output,
+                              exception=exception, proc_time=proc_time,
+                              func=func)
             progress_queue.put(pd)
 
             job_queue.task_done()
 
-    def _saver(self, output_queue, output_file, proc_func=None, output_header=None):
+    def _saver(self, output_queue, output_file, proc_func=None,
+               output_header=None):
 
         with open(output_file, "w") as OUT:
             if output_header is not None:
@@ -171,30 +180,39 @@ class ParallelJobs:
             output, exception, proc_time = self._exec_func(data, func)
 
             # Save data.
-            pd = ProgressData(input_data=data, output_data=output, exception=exception, proc_time=proc_time)
+            pd = ProgressData(input_data=data, output_data=output,
+                              exception=exception, proc_time=proc_time)
 
             # Update progress tracker.
             progress_queue.put(pd)
 
-    def run_jobs(self, args, consumer_func, output_file=None, proc_output_func=None, output_header=None, job_name=None):
+    def run_jobs(self, args, consumer_func, output_file=None,
+                 proc_output_func=None, output_header=None, job_name=None):
         """
-        Run a set of tasks in parallel or sequentially according to the ``nproc``.
+        Run a set of tasks in parallel or sequentially according
+        to the ``nproc``.
 
         Parameters
         ----------
         args : iterable of iterables, `ArgsGenerator`
-            A sequence of arguments to be provided to the consumer function ``consumer_func``.
+            A sequence of arguments to be provided to the consumer function
+            ``consumer_func``.
         consumer_func : function
-            The function that will be executed for each set of arguments in ``args``.
+            The function that will be executed for each set of arguments
+            in ``args``.
         output_file : str, optional
             Save outputs to this file.
-            If ``proc_output_func`` is not provided, it tries to save a stringified version of each output data.
-            Otherwise, it executes ``proc_output_func`` first and its output will be printed to the output file instead.
+            If ``proc_output_func`` is not provided, it tries to save a
+            stringified version of each output data. Otherwise, it executes
+            ``proc_output_func`` first and its output will be printed to the
+            output file instead.
 
-            Note: if ``proc_output_func`` is provided but not ``output_file``, a new random unique filename will
-            be generated and the file will be saved in the current directory.
+            Note: if ``proc_output_func`` is provided but not ``output_file``,
+            a new random unique filename will be generated and the file will
+            be saved in the current directory.
         proc_output_func : function, optional
-            Post-processing function that is executed for each output data produced by ``consumer_func``.
+            Post-processing function that is executed for each output data
+            produced by ``consumer_func``.
         output_header : str, optional
             A header for the output file.
         job_name : str, optional
@@ -206,9 +224,11 @@ class ParallelJobs:
         """
         if proc_output_func is not None and output_file is None:
             output_file = new_unique_filename(".") + ".output"
-            logger.warning("No output file was defined. So, it will try to save results at '%s'." % output_file)
+            logger.warning("No output file was defined. So, it will try to "
+                           "save results at '%s'." % output_file)
         elif output_file is not None:
-            logger.warning("The output file '%s' was defined. So, it will try to save results at it." % output_file)
+            logger.warning("The output file '%s' was defined. So, it will try "
+                           "to save results at it." % output_file)
 
         # Queue for progress tracker.
         progress_queue = mp.JoinableQueue(maxsize=1)
