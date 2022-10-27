@@ -1,3 +1,4 @@
+name: luna-env
 channels:
   - anaconda
   - schrodinger
