@@ -13,9 +13,23 @@ Documentation is hosted by ReadTheDocs_, and development occurs on GitHub_.
 Installation and Usage
 ----------------------
 
-For installation and usage instructions, see the `documentation <http://luna-toolkit.readthedocs.io>`_.
+The latest stable release (and required dependencies) can be installed as follows:
 
-See the LUNA `paper repository`_ for an application of LUNA and all code used for the LUNA paper [1]_.
+1. Download LUNA’s `environment.yml <https://github.com/keiserlab/LUNA/blob/master/luna-env.yml>`_ file.
+
+2. Create the Conda environment using the downloaded file:
+
+    conda env create -f <LUNA-ENV-FILE>
+
+3. After creating the Conda environment, activate it:
+
+    conda activate luna-env
+
+4. Finally, install LUNA from Pip:
+
+    pip install luna
+
+For additional installation options and usage instructions, refer to the `documentation <http://luna-toolkit.readthedocs.io>`_.
 
 
 License
