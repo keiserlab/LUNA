@@ -94,6 +94,19 @@ class Atom(object):
         self.element = self._assign_element(element)
         self.mass = self._assign_atom_mass()
 
+    @property
+    def full_name(self):
+        full_name = "%s/%s/%s" % self.get_full_id()[0:3]
+        res_name = "%s/%d%s" % (self.parent.resname,
+                                self.parent.id[1],
+                                self.parent.id[2].strip())
+        atom_name = "%s" % self.name
+        if self.altloc != " ":
+            atom_name += "-%s" % self.altloc
+        full_name += "/%s/%s" % (res_name, atom_name)
+
+        return full_name
+
     def _assign_element(self, element):
         """Tries to guess element from atom name if not recognised."""
         if not element or element.capitalize() not in IUPACData.atom_weights:
