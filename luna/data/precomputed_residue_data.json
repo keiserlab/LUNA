@@ -1,0 +1,2936 @@
+{
+    "ALA": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "1,1,6,12,0,3,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "ARG": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD,NE": {"type": "SINGLE", "is_aromatic": false},
+            "CZ,NE": {"type": "SINGLE", "is_aromatic": false},
+            "CZ,NH1": {"type": "SINGLE", "is_aromatic": false},
+            "CZ,NH2": {"type": "DOUBLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CD": {
+                "features": "Atom,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CG": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CZ": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "CZ,NE,NH1,NH2": {
+                "features": "PositivelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;2,2,7,14,0,1,0;1,1,7,14,0,2,0;1,2,7,14,1,2,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "NE": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "NH1": {
+                "features": "Atom,Donor",
+                "invariants": "1,1,7,14,0,2,0",
+                "is_aromatic": false
+            },
+            "NH2": {
+                "features": "Atom,Donor",
+                "invariants": "1,2,7,14,1,2,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "ASN": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CG,ND2": {"type": "SINGLE", "is_aromatic": false},
+            "CG,OD1": {"type": "DOUBLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CG": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "CG,ND2,OD1": {
+                "features": "Amide",
+                "invariants": "3,4,6,12,0,0,0;1,1,7,14,0,2,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "CG,OD1": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "ND2": {
+                "features": "Atom,Donor",
+                "invariants": "1,1,7,14,0,2,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OD1": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "ASP": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CG,OD1": {"type": "DOUBLE", "is_aromatic": false},
+            "CG,OD2": {"type": "SINGLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CG": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "CG,OD1,OD2": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OD1": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OD2": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "ASP_OD1": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CG,OD1": {"type": "DOUBLE", "is_aromatic": false},
+            "CG,OD2": {"type": "SINGLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CG": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "CG,OD1,OD2": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OD1": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OD2": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "ASP_OD2": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CG,OD1": {"type": "SINGLE", "is_aromatic": false},
+            "CG,OD2": {"type": "DOUBLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CG": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "CG,OD1,OD2": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,1,8,16,-1,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OD1": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "OD2": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "CYS": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,SG": {"type": "SINGLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "SG": {
+                "features": "Acceptor,Atom,ChalcogenDonor,Donor",
+                "invariants": "1,1,16,32,0,1,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "CYM": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,SG": {"type": "SINGLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "SG": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,16,32,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "GLN": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD,NE2": {"type": "SINGLE", "is_aromatic": false},
+            "CD,OE1": {"type": "DOUBLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CD": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "CD,NE2,OE1": {
+                "features": "Amide",
+                "invariants": "3,4,6,12,0,0,0;1,1,7,14,0,2,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "CD,OE1": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "CG": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "NE2": {
+                "features": "Atom,Donor",
+                "invariants": "1,1,7,14,0,2,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OE1": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "GLU": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD,OE1": {"type": "DOUBLE", "is_aromatic": false},
+            "CD,OE2": {"type": "SINGLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CD": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "CD,OE1,OE2": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CG": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OE1": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OE2": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "GLU_OE1": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD,OE1": {"type": "DOUBLE", "is_aromatic": false},
+            "CD,OE2": {"type": "SINGLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CD": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "CD,OE1,OE2": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CG": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OE1": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OE2": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "GLU_OE2": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD,OE1": {"type": "SINGLE", "is_aromatic": false},
+            "CD,OE2": {"type": "DOUBLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CD": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "CD,OE1,OE2": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,1,8,16,-1,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "CG": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OE1": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "OE2": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "GLY": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "HIS": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD2,CG": {"type": "DOUBLE", "is_aromatic": true},
+            "CD2,NE2": {"type": "SINGLE", "is_aromatic": true},
+            "CE1,ND1": {"type": "DOUBLE", "is_aromatic": true},
+            "CE1,NE2": {"type": "SINGLE", "is_aromatic": true},
+            "CG,ND1": {"type": "SINGLE", "is_aromatic": true}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CD2": {
+                "features": "Atom,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CD2,CE1,CG,ND1,NE2": {
+                "features": "Aromatic,PositivelyIonizable",
+                "invariants": "2,3,6,12,0,1,1;2,3,6,12,0,1,1;3,4,6,12,0,0,1;2,3,7,14,0,0,1;2,2,7,14,0,1,1",
+                "is_aromatic": false
+            },
+            "CE1": {
+                "features": "Atom,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CG": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,1",
+                "is_aromatic": true
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "ND1": {
+                "features": "Acceptor,Atom,Donor",
+                "invariants": "2,3,7,14,0,0,1",
+                "is_aromatic": true
+            },
+            "NE2": {
+                "features": "Acceptor,Atom,Donor",
+                "invariants": "2,2,7,14,0,1,1",
+                "is_aromatic": true
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "HID": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD2,CG": {"type": "DOUBLE", "is_aromatic": true},
+            "CD2,NE2": {"type": "SINGLE", "is_aromatic": true},
+            "CE1,ND1": {"type": "SINGLE", "is_aromatic": true},
+            "CE1,NE2": {"type": "DOUBLE", "is_aromatic": true},
+            "CG,ND1": {"type": "SINGLE", "is_aromatic": true}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CD2": {
+                "features": "Atom,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CD2,CE1,CG,ND1,NE2": {
+                "features": "Aromatic,PositivelyIonizable",
+                "invariants": "2,3,6,12,0,1,1;2,3,6,12,0,1,1;3,4,6,12,0,0,1;2,2,7,14,0,1,1;2,3,7,14,0,0,1",
+                "is_aromatic": false
+            },
+            "CE1": {
+                "features": "Atom,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CG": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,1",
+                "is_aromatic": true
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "ND1": {
+                "features": "Acceptor,Atom,Donor",
+                "invariants": "2,2,7,14,0,1,1",
+                "is_aromatic": true
+            },
+            "NE2": {
+                "features": "Acceptor,Atom,Donor",
+                "invariants": "2,3,7,14,0,0,1",
+                "is_aromatic": true
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "HIE": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD2,CG": {"type": "DOUBLE", "is_aromatic": true},
+            "CD2,NE2": {"type": "SINGLE", "is_aromatic": true},
+            "CE1,ND1": {"type": "DOUBLE", "is_aromatic": true},
+            "CE1,NE2": {"type": "SINGLE", "is_aromatic": true},
+            "CG,ND1": {"type": "SINGLE", "is_aromatic": true}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CD2": {
+                "features": "Atom,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CD2,CE1,CG,ND1,NE2": {
+                "features": "Aromatic,PositivelyIonizable",
+                "invariants": "2,3,6,12,0,1,1;2,3,6,12,0,1,1;3,4,6,12,0,0,1;2,3,7,14,0,0,1;2,2,7,14,0,1,1",
+                "is_aromatic": false
+            },
+            "CE1": {
+                "features": "Atom,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CG": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,1",
+                "is_aromatic": true
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "ND1": {
+                "features": "Acceptor,Atom,Donor",
+                "invariants": "2,3,7,14,0,0,1",
+                "is_aromatic": true
+            },
+            "NE2": {
+                "features": "Acceptor,Atom,Donor",
+                "invariants": "2,2,7,14,0,1,1",
+                "is_aromatic": true
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "HIS_D": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD2,CG": {"type": "DOUBLE", "is_aromatic": true},
+            "CD2,NE2": {"type": "SINGLE", "is_aromatic": true},
+            "CE1,ND1": {"type": "DOUBLE", "is_aromatic": true},
+            "CE1,NE2": {"type": "SINGLE", "is_aromatic": true},
+            "CG,ND1": {"type": "SINGLE", "is_aromatic": true}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CD2": {
+                "features": "Atom,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CD2,CE1,CG,ND1,NE2": {
+                "features": "Aromatic, Negative",
+                "invariants": "2,3,6,12,0,1,1;2,3,6,12,0,1,1;3,4,6,12,0,0,1;2,3,7,14,0,0,1;2,2,7,14,-1,0,1",
+                "is_aromatic": false
+            },
+            "CE1": {
+                "features": "Atom,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CG": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,1",
+                "is_aromatic": true
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "ND1": {
+                "features": "Acceptor,Atom",
+                "invariants": "2,3,7,14,0,0,1",
+                "is_aromatic": true
+            },
+            "NE2": {
+                "features": "Acceptor,Atom",
+                "invariants": "2,2,7,14,-1,0,1",
+                "is_aromatic": true
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "HOH": {
+        "atoms": {
+            "O": {
+                "features": "Acceptor,Atom,Donor,Nucleophile",
+                "invariants": "0,0,8,16,0,2,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "ILE": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG1": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG2": {"type": "SINGLE", "is_aromatic": false},
+            "CD1,CG1": {"type": "SINGLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CD1": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "1,1,6,12,0,3,0",
+                "is_aromatic": false
+            },
+            "CG1": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CG2": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "1,1,6,12,0,3,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "LEU": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD1,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD2,CG": {"type": "SINGLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CD1": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "1,1,6,12,0,3,0",
+                "is_aromatic": false
+            },
+            "CD2": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "1,1,6,12,0,3,0",
+                "is_aromatic": false
+            },
+            "CG": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "LYS": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD,CE": {"type": "SINGLE", "is_aromatic": false},
+            "CD,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CE,NZ": {"type": "SINGLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CD": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CE": {
+                "features": "Atom,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CG": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "NZ": {
+                "features": "Atom,Donor,PositivelyIonizable",
+                "invariants": "1,1,7,14,1,3,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "LYN": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD,CE": {"type": "SINGLE", "is_aromatic": false},
+            "CD,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CE,NZ": {"type": "SINGLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CD": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CE": {
+                "features": "Atom,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CG": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "NZ": {
+                "features": "Atom,Donor",
+                "invariants": "1,1,7,14,0,2,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "MET": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CE,SD": {"type": "SINGLE", "is_aromatic": false},
+            "CG,SD": {"type": "SINGLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CE": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "1,1,6,12,0,3,0",
+                "is_aromatic": false
+            },
+            "CE,SD": {
+                "features": "Nucleophile",
+                "invariants": "1,1,6,12,0,3,0;2,2,16,32,0,0,0",
+                "is_aromatic": false
+            },
+            "CG": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CG,SD": {
+                "features": "Nucleophile",
+                "invariants": "2,2,6,12,0,2,0;2,2,16,32,0,0,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "SD": {
+                "features": "Acceptor,Atom,ChalcogenDonor,Hydrophobic",
+                "invariants": "2,2,16,32,0,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "PHE": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD1,CE1": {"type": "SINGLE", "is_aromatic": true},
+            "CD1,CG": {"type": "DOUBLE", "is_aromatic": true},
+            "CD2,CE2": {"type": "DOUBLE", "is_aromatic": true},
+            "CD2,CG": {"type": "SINGLE", "is_aromatic": true},
+            "CE1,CZ": {"type": "DOUBLE", "is_aromatic": true},
+            "CE2,CZ": {"type": "SINGLE", "is_aromatic": true}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CD1": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CD1,CD2,CE1,CE2,CG,CZ": {
+                "features": "Aromatic",
+                "invariants": "2,3,6,12,0,1,1;2,3,6,12,0,1,1;2,3,6,12,0,1,1;2,3,6,12,0,1,1;3,4,6,12,0,0,1;2,3,6,12,0,1,1",
+                "is_aromatic": false
+            },
+            "CD2": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CE1": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CE2": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CG": {
+                "features": "Atom,Hydrophobic",
+                "invariants": "3,4,6,12,0,0,1",
+                "is_aromatic": true
+            },
+            "CZ": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "PRO": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD,N": {"type": "SINGLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,1",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,1",
+                "is_aromatic": false
+            },
+            "CD": {
+                "features": "Atom,WeakDonor",
+                "invariants": "2,2,6,12,0,2,1",
+                "is_aromatic": false
+            },
+            "CG": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,1",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom",
+                "invariants": "3,3,7,14,0,0,1",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "SER": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,OG": {"type": "SINGLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CB,OG": {
+                "features": "Nucleophile",
+                "invariants": "2,2,6,12,0,2,0;1,1,8,16,0,1,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OG": {
+                "features": "Acceptor,Atom,Donor",
+                "invariants": "1,1,8,16,0,1,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "SER_D": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,OG": {"type": "SINGLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OG": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "THR": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG2": {"type": "SINGLE", "is_aromatic": false},
+            "CB,OG1": {"type": "SINGLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB,OG1": {
+                "features": "Nucleophile",
+                "invariants": "3,3,6,12,0,1,0;1,1,8,16,0,1,0",
+                "is_aromatic": false
+            },
+            "CG2": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "1,1,6,12,0,3,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OG1": {
+                "features": "Acceptor,Atom,Donor",
+                "invariants": "1,1,8,16,0,1,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "THR_D": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG2": {"type": "SINGLE", "is_aromatic": false},
+            "CB,OG1": {"type": "SINGLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CG2": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "1,1,6,12,0,3,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OG1": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "TRP": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD1,CG": {"type": "DOUBLE", "is_aromatic": true},
+            "CD1,NE1": {"type": "SINGLE", "is_aromatic": true},
+            "CD2,CE2": {"type": "DOUBLE", "is_aromatic": true},
+            "CD2,CE3": {"type": "SINGLE", "is_aromatic": true},
+            "CD2,CG": {"type": "SINGLE", "is_aromatic": true},
+            "CE2,CZ2": {"type": "SINGLE", "is_aromatic": true},
+            "CE2,NE1": {"type": "SINGLE", "is_aromatic": true},
+            "CE3,CZ3": {"type": "DOUBLE", "is_aromatic": true},
+            "CH2,CZ2": {"type": "DOUBLE", "is_aromatic": true},
+            "CH2,CZ3": {"type": "SINGLE", "is_aromatic": true}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CD1": {
+                "features": "Atom,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CD1,CD2,CE2,CG,NE1": {
+                "features": "Aromatic",
+                "invariants": "2,3,6,12,0,1,1;3,4,6,12,0,0,1;3,4,6,12,0,0,1;3,4,6,12,0,0,1;2,2,7,14,0,1,1",
+                "is_aromatic": false
+            },
+            "CD2": {
+                "features": "Atom,Hydrophobic",
+                "invariants": "3,4,6,12,0,0,1",
+                "is_aromatic": true
+            },
+            "CD2,CE2,CE3,CH2,CZ2,CZ3": {
+                "features": "Aromatic",
+                "invariants": "3,4,6,12,0,0,1;3,4,6,12,0,0,1;2,3,6,12,0,1,1;2,3,6,12,0,1,1;2,3,6,12,0,1,1;2,3,6,12,0,1,1",
+                "is_aromatic": false
+            },
+            "CE2": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,1",
+                "is_aromatic": true
+            },
+            "CE3": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CG": {
+                "features": "Atom,Hydrophobic",
+                "invariants": "3,4,6,12,0,0,1",
+                "is_aromatic": true
+            },
+            "CH2": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CZ2": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CZ3": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "NE1": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,1",
+                "is_aromatic": true
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "TYR": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD1,CE1": {"type": "SINGLE", "is_aromatic": true},
+            "CD1,CG": {"type": "DOUBLE", "is_aromatic": true},
+            "CD2,CE2": {"type": "DOUBLE", "is_aromatic": true},
+            "CD2,CG": {"type": "SINGLE", "is_aromatic": true},
+            "CE1,CZ": {"type": "DOUBLE", "is_aromatic": true},
+            "CE2,CZ": {"type": "SINGLE", "is_aromatic": true},
+            "CZ,OH": {"type": "SINGLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CD1": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CD1,CD2,CE1,CE2,CG,CZ": {
+                "features": "Aromatic",
+                "invariants": "2,3,6,12,0,1,1;2,3,6,12,0,1,1;2,3,6,12,0,1,1;2,3,6,12,0,1,1;3,4,6,12,0,0,1;3,4,6,12,0,0,1",
+                "is_aromatic": false
+            },
+            "CD2": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CE1": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CE2": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CG": {
+                "features": "Atom,Hydrophobic",
+                "invariants": "3,4,6,12,0,0,1",
+                "is_aromatic": true
+            },
+            "CZ": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,1",
+                "is_aromatic": true
+            },
+            "CZ,OH": {
+                "features": "Nucleophile",
+                "invariants": "3,4,6,12,0,0,1;1,1,8,16,0,1,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OH": {
+                "features": "Acceptor,Atom,Donor",
+                "invariants": "1,1,8,16,0,1,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "TYR_D": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG": {"type": "SINGLE", "is_aromatic": false},
+            "CD1,CE1": {"type": "SINGLE", "is_aromatic": true},
+            "CD1,CG": {"type": "DOUBLE", "is_aromatic": true},
+            "CD2,CE2": {"type": "DOUBLE", "is_aromatic": true},
+            "CD2,CG": {"type": "SINGLE", "is_aromatic": true},
+            "CE1,CZ": {"type": "DOUBLE", "is_aromatic": true},
+            "CE2,CZ": {"type": "SINGLE", "is_aromatic": true},
+            "CZ,OH": {"type": "SINGLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,2,6,12,0,2,0",
+                "is_aromatic": false
+            },
+            "CD1": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CD1,CD2,CE1,CE2,CG,CZ": {
+                "features": "Aromatic",
+                "invariants": "2,3,6,12,0,1,1;2,3,6,12,0,1,1;2,3,6,12,0,1,1;2,3,6,12,0,1,1;3,4,6,12,0,0,1;3,4,6,12,0,0,1",
+                "is_aromatic": false
+            },
+            "CD2": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CE1": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CE2": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "2,3,6,12,0,1,1",
+                "is_aromatic": true
+            },
+            "CG": {
+                "features": "Atom,Hydrophobic",
+                "invariants": "3,4,6,12,0,0,1",
+                "is_aromatic": true
+            },
+            "CZ": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,1",
+                "is_aromatic": true
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OH": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "VAL": {
+        "bonds": {
+            "C,CA": {"type": "SINGLE", "is_aromatic": false},
+            "C,N": {"type": "SINGLE", "is_aromatic": false},
+            "C,O": {"type": "DOUBLE", "is_aromatic": false},
+            "C,OXT": {"type": "SINGLE", "is_aromatic": false},
+            "CA,CB": {"type": "SINGLE", "is_aromatic": false},
+            "CA,N": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG1": {"type": "SINGLE", "is_aromatic": false},
+            "CB,CG2": {"type": "SINGLE", "is_aromatic": false}
+        },
+        "atoms": {
+            "C": {
+                "features": "Atom",
+                "invariants": "3,4,6,12,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O": {
+                "features": "Electrophile,Nucleophile",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "C,O,OXT": {
+                "features": "NegativelyIonizable",
+                "invariants": "3,4,6,12,0,0,0;1,2,8,16,0,0,0;1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            },
+            "CA": {
+                "features": "Atom,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CB": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "3,3,6,12,0,1,0",
+                "is_aromatic": false
+            },
+            "CG1": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "1,1,6,12,0,3,0",
+                "is_aromatic": false
+            },
+            "CG2": {
+                "features": "Atom,Hydrophobic,WeakDonor",
+                "invariants": "1,1,6,12,0,3,0",
+                "is_aromatic": false
+            },
+            "N": {
+                "features": "Atom,Donor",
+                "invariants": "2,2,7,14,0,1,0",
+                "is_aromatic": false
+            },
+            "O": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,2,8,16,0,0,0",
+                "is_aromatic": false
+            },
+            "OXT": {
+                "features": "Acceptor,Atom",
+                "invariants": "1,1,8,16,-1,0,0",
+                "is_aromatic": false
+            }
+        }
+    },
+    "LI": {
+        "atoms": {
+            "LI": {
+                "features": "Metal",
+                "invariants": "0,0,3,7,1,0,0",
+                "is_aromatic": false,
+                "coords": "4,5,6"
+            }
+        }
+    },
+    "NA": {
+        "atoms": {
+            "NA": {
+                "features": "Metal",
+                "invariants": "0,0,11,23,1,0,0",
+                "is_aromatic": false,
+                "coords": "4,5,6,7"
+            }
+        }
+    },
+    "MG": {
+        "atoms": {
+            "MG": {
+                "features": "Metal",
+                "invariants": "0,0,12,24,2,0,0",
+                "is_aromatic": false,
+                "coords": "3,4,5,6"
+            }
+        }
+    },
+    "AL": {
+        "atoms": {
+            "AL": {
+                "features": "Metal",
+                "invariants": "0,0,13,27,3,0,0",
+                "is_aromatic": false,
+                "coords": "4,5,6"
+            }
+        }
+    },
+    "K": {
+        "atoms": {
+            "K": {
+                "features": "Metal",
+                "invariants": "0,0,19,39,1,0,0",
+                "is_aromatic": false,
+                "coords": "4,5,6,7,8"
+            }
+        }
+    },
+    "CA": {
+        "atoms": {
+            "CA": {
+                "features": "Metal",
+                "invariants": "0,0,20,40,2,0,0",
+                "is_aromatic": false,
+                "coords": "4,5,6,7,8"
+            }
+        }
+    },
+    "4TI": {
+        "atoms": {
+            "TI": {
+                "features": "Metal",
+                "invariants": "0,0,22,48,4,0,0",
+                "is_aromatic": false,
+                "coords": "6"
+            }
+        }
+    },
+    "V": {
+        "atoms": {
+            "V": {
+                "features": "Metal",
+                "invariants": "0,0,23,51,3,0,0",
+                "is_aromatic": false,
+                "coords": "6"
+            }
+        }
+    },
+    "CR": {
+        "atoms": {
+            "CR": {
+                "features": "Metal",
+                "invariants": "0,0,24,52,3,0,0",
+                "is_aromatic": false,
+                "coords": "6"
+            }
+        }
+    },
+    "MN": {
+        "atoms": {
+            "MN": {
+                "features": "Metal",
+                "invariants": "0,0,25,55,2,0,0",
+                "is_aromatic": false,
+                "coords": "4,5,6"
+            }
+        }
+    },
+    "MN3": {
+        "atoms": {
+            "MN": {
+                "features": "Metal",
+                "invariants": "0,0,25,55,3,0,0",
+                "is_aromatic": false,
+                "coords": "5,6"
+            }
+        }
+    },
+    "FE2": {
+        "atoms": {
+            "FE": {
+                "features": "Metal",
+                "invariants": "0,0,26,56,2,0,0",
+                "is_aromatic": false,
+                "coords": "4,5,6"
+            }
+        }
+    },
+    "FE": {
+        "atoms": {
+            "FE": {
+                "features": "Metal",
+                "invariants": "0,0,26,56,3,0,0",
+                "is_aromatic": false,
+                "coords": "4,5,6"
+            }
+        }
+    },
+    "CO": {
+        "atoms": {
+            "CO": {
+                "features": "Metal",
+                "invariants": "0,0,27,59,2,0,0",
+                "is_aromatic": false,
+                "coords": "4,5,6"
+            }
+        }
+    },
+    "3CO": {
+        "atoms": {
+            "CO": {
+                "features": "Metal",
+                "invariants": "0,0,27,59,3,0,0",
+                "is_aromatic": false,
+                "coords": "6"
+            }
+        }
+    },
+    "NI": {
+        "atoms": {
+            "NI": {
+                "features": "Metal",
+                "invariants": "0,0,28,58,2,0,0",
+                "is_aromatic": false,
+                "coords": "4,5,6"
+            }
+        }
+    },
+    "3NI": {
+        "atoms": {
+            "NI": {
+                "features": "Metal",
+                "invariants": "0,0,28,58,3,0,0",
+                "is_aromatic": false,
+                "coords": "4,5,6"
+            }
+        }
+    },
+    "CU1": {
+        "atoms": {
+            "CU": {
+                "features": "Metal",
+                "invariants": "0,0,29,63,1,0,0",
+                "is_aromatic": false,
+                "coords": "2,3,4,6"
+            }
+        }
+    },
+    "CU": {
+        "atoms": {
+            "CU": {
+                "features": "Metal",
+                "invariants": "0,0,29,63,2,0,0",
+                "is_aromatic": false,
+                "coords": "4,5,6"
+            }
+        }
+    },
+    "CU3": {
+        "atoms": {
+            "CU": {
+                "features": "Metal",
+                "invariants": "0,0,29,63,3,0,0",
+                "is_aromatic": false,
+                "coords": "6"
+            }
+        }
+    },
+    "ZN": {
+        "atoms": {
+            "ZN": {
+                "features": "Metal",
+                "invariants": "0,0,30,64,2,0,0",
+                "is_aromatic": false,
+                "coords": "4,5,6"
+            }
+        }
+    },
+    "GA": {
+        "atoms": {
+            "GA": {
+                "features": "Metal",
+                "invariants": "0,0,31,69,3,0,0",
+                "is_aromatic": false,
+                "coords": "4,5,6"
+            }
+        }
+    },
+    "YT3": {
+        "atoms": {
+            "Y": {
+                "features": "Metal",
+                "invariants": "0,0,39,89,3,0,0",
+                "is_aromatic": false,
+                "coords": "6,7,8"
+            }
+        }
+    },
+    "ZR": {
+        "atoms": {
+            "ZR": {
+                "features": "Metal",
+                "invariants": "0,0,40,90,4,0,0",
+                "is_aromatic": false,
+                "coords": "6"
+            }
+        }
+    },
+    "4MO": {
+        "atoms": {
+            "MO": {
+                "features": "Metal",
+                "invariants": "0,0,42,98,4,0,0",
+                "is_aromatic": false,
+                "coords": "6"
+            }
+        }
+    },
+    "6MO": {
+        "atoms": {
+            "MO": {
+                "features": "Metal",
+                "invariants": "0,0,42,98,6,0,0",
+                "is_aromatic": false,
+                "coords": "6"
+            }
+        }
+    },
+    "RU": {
+        "atoms": {
+            "RU": {
+                "features": "Metal",
+                "invariants": "0,0,44,102,3,0,0",
+                "is_aromatic": false,
+                "coords": "6"
+            }
+        }
+    },
+    "RH": {
+        "atoms": {
+            "RH1": {
+                "features": "Metal",
+                "invariants": "0,0,45,103,1,0,0",
+                "is_aromatic": false,
+                "coords": "4,5,6"
+            }
+        }
+    },
+    "RH3": {
+        "atoms": {
+            "RH": {
+                "features": "Metal",
+                "invariants": "0,0,45,103,3,0,0",
+                "is_aromatic": false,
+                "coords": "4,5,6"
+            }
+        }
+    },
+    "PD": {
+        "atoms": {
+            "PD": {
+                "features": "Metal",
+                "invariants": "0,0,46,106,2,0,0",
+                "is_aromatic": false,
+                "coords": "4,5,6"
+            }
+        }
+    },
+    "AG": {
+        "atoms": {
+            "AG": {
+                "features": "Metal",
+                "invariants": "0,0,47,107,1,0,0",
+                "is_aromatic": false,
+                "coords": "4"
+            }
+        }
+    },
+    "CD": {
+        "atoms": {
+            "CD": {
+                "features": "Metal",
+                "invariants": "0,0,48,114,2,0,0",
+                "is_aromatic": false,
+                "coords": "4,5,6"
+            }
+        }
+    },
+    "BA": {
+        "atoms": {
+            "BA": {
+                "features": "Metal",
+                "invariants": "0,0,56,138,2,0,0",
+                "is_aromatic": false,
+                "coords": "4,5,6,7,8"
+            }
+        }
+    },    
+    "W": {
+        "atoms": {
+            "W": {
+                "features": "Metal",
+                "invariants": "0,0,74,184,6,0,0",
+                "is_aromatic": false,
+                "coords": "6"
+            }
+        }
+    },
+    "RE": {
+        "atoms": {
+            "RE": {
+                "features": "Metal",
+                "invariants": "0,0,75,187,1,0,0",
+                "is_aromatic": false,
+                "coords": "4,5,6"
+            }
+        }
+    },
+    "OS": {
+        "atoms": {
+            "OS": {
+                "features": "Metal",
+                "invariants": "0,0,76,192,3,0,0",
+                "is_aromatic": false,
+                "coords": "6"
+            }
+        }
+    },
+    "OS4": {
+        "atoms": {
+            "OS": {
+                "features": "Metal",
+                "invariants": "0,0,76,192,4,0,0",
+                "is_aromatic": false,
+                "coords": "6"
+            }
+        }
+    },
+    "IR": {
+        "atoms": {
+            "IR": {
+                "features": "Metal",
+                "invariants": "0,0,77,193,4,0,0",
+                "is_aromatic": false,
+                "coords": "6"
+            }
+        }
+    },
+    "IR3": {
+        "atoms": {
+            "IR": {
+                "features": "Metal",
+                "invariants": "0,0,77,193,3,0,0",
+                "is_aromatic": false,
+                "coords": "6"
+            }
+        }
+    },
+    "PT": {
+        "atoms": {
+            "PT": {
+                "features": "Metal",
+                "invariants": "0,0,78,195,2,0,0",
+                "is_aromatic": false,
+                "coords": "4"
+            }
+        }
+    },
+    "PT4": {
+        "atoms": {
+            "PT": {
+                "features": "Metal",
+                "invariants": "0,0,78,195,4,0,0",
+                "is_aromatic": false,
+                "coords": "6"
+            }
+        }
+    },
+    "AU": {
+        "atoms": {
+            "AU": {
+                "features": "Metal",
+                "invariants": "0,0,79,197,1,0,0",
+                "is_aromatic": false,
+                "coords": "2"
+            }
+        }
+    },
+    "AU3": {
+        "atoms": {
+            "AU": {
+                "features": "Metal",
+                "invariants": "0,0,79,197,3,0,0",
+                "is_aromatic": false,
+                "coords": "4"
+            }
+        }
+    },
+    "HG": {
+        "atoms": {
+            "HG": {
+                "features": "Metal",
+                "invariants": "0,0,80,202,2,0,0",
+                "is_aromatic": false,
+                "coords": "2,3,4,5,6"
+            }
+        }
+    },
+    "PB": {
+        "atoms": {
+            "PB": {
+                "features": "Metal",
+                "invariants": "0,0,82,208,2,0,0",
+                "is_aromatic": false,
+                "coords": "4"
+            }
+        }
+    },
+    "BS3": {
+        "atoms": {
+            "BS3": {
+                "features": "Metal",
+                "invariants": "0,0,83,209,3,0,0",
+                "is_aromatic": false,
+                "coords": "4,5"
+            }
+        }
+    }
+}
