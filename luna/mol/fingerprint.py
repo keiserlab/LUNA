@@ -338,6 +338,6 @@ def generate_fp_for_mols(mols, fp_function=None, fp_opt=None, critical=False):
             if critical:
                 raise
 
-    logger.debug("%d molecular sfingerprint(s) created." % len(fp_mols))
+    logger.debug("%d molecular fingerprint(s) created." % len(fp_mols))
 
     return fp_mols
