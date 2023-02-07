@@ -61,7 +61,7 @@ from luna.MyBio.PDB.parse_pdb_header import _parse_pdb_header_list
 # Possible labels for water molecules.
 # Ref: http://prody.csb.pitt.edu/manual/reference/atomic/flags.html.
 # DOD: deutered water.
-WATER_NAMES = ['HOH', 'DOD', 'WAT', 'H2O', 'OH2']
+WATER_NAMES = ['HOH', 'DOD', 'WAT', 'H2O', 'OH2', "O"]
 
 # MODBY: Alexandre Fassio
 # Replace empty chains for a default value.
