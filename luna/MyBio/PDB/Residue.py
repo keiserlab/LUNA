@@ -172,20 +172,24 @@ class Residue(Entity):
         return self.get_id()[0] == "W"
 
     # MODBY: Alexandre Fassio
+    # Check if a compound is a metal.
+    def is_metal(self):
+        """Return True if the residue is a metal."""
+        return (self.get_id()[0].startswith("H_")
+                and self.resname in METALS)
+
+    # MODBY: Alexandre Fassio
     # Check if a compound is a hetero group.
     def is_hetatm(self):
         """Return True if the residue is an hetero group."""
-        return self.get_id()[0].startswith("H_")
-
-    def is_metal(self):
-        """Return True if the residue is a metal."""
-        return self.is_hetatm() and self.resname in METALS
+        return (self.get_id()[0].startswith("H_")
+                and not self.is_metal())
 
     # MODBY: Alexandre Fassio
     # Check if a residue is an amino acid.
-    def is_residue(self):
+    def is_residue(self, standard=True):
         """Return True if the residue is an amino acid."""
-        return self.get_id()[0] == " " and is_aa(self.resname)
+        return is_aa(self.resname, standard=standard)
 
     # MODBY: Alexandre Fassio
     # Check if a residue is a nucleotide.
@@ -194,7 +198,8 @@ class Residue(Entity):
         return self.get_id()[0] == " " and not self.is_residue()
 
     # MODBY: Alexandre Fassio
-    # Check if a residue is a target, i.e., if it will be used for any calculations.
+    # Check if a residue is a target, i.e., if it will be
+    # used for any calculations.
     def is_target(self):
         return self._is_target
 
