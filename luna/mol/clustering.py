@@ -109,10 +109,12 @@ def cluster_fps(fps, cutoff=0.2, similarity_func="BulkTanimotoSimilarity"):
     Returns
     -------
     clusters : tuple of tuples
-        Each cluster is defined as a tuple of tuples, where the first element for each cluster is its centroid.
+        Each cluster is defined as a tuple of tuples, where the first
+        element for each cluster is its centroid.
     """
     logger.debug("Trying to clusterize %d molecules." % len(fps))
-    logger.debug("Defined cutoff: %.2f. Defined similarity function: %s." % (cutoff, similarity_func))
+    logger.debug("Defined cutoff: %.2f. Defined similarity function: %s."
+                 % (cutoff, similarity_func))
 
     # first generate the distance matrix.
     dists = calc_distance_matrix(fps, similarity_func)
