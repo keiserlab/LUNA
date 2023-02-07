@@ -20,9 +20,10 @@ class OpenEyeModel(ChargeModel):
     def get_charge(self, atm_obj):
         """Get the formal charge for atom ``atom_obj``.
 
-        Currently, only formal charges for the elements Hydrogen, Carbon, Nitrogen, Oxygen, Phosphorus,
-        Sulfur, Chlorine, Fluorine, Bromine, Iodine, Magnesium, Calcium, Zinc, Lithium, Sodium,
-        Potassium, and Boron can be recovered.
+        Currently, only formal charges for the elements Hydrogen, Carbon,
+        Nitrogen, Oxygen, Phosphorus, Sulfur, Chlorine, Fluorine, Bromine,
+        Iodine, Magnesium, Calcium, Zinc, Lithium, Sodium, Potassium,
+        and Boron can be recovered.
 
         Parameters
         ----------
@@ -58,6 +59,7 @@ class OpenEyeModel(ChargeModel):
                 formal_charge = 1
             elif valence == 1:
                 formal_charge = 0
+
         # Carbon
         elif atm_num == 6:
             if valence == 3:
@@ -75,6 +77,7 @@ class OpenEyeModel(ChargeModel):
                     formal_charge = -1
             elif valence == 4:
                 formal_charge = 0
+
         # Nitrogen
         elif atm_num == 7:
             if valence == 2:
@@ -83,6 +86,7 @@ class OpenEyeModel(ChargeModel):
                 formal_charge = 1
             elif valence == 3:
                 formal_charge = 0
+
         # Oxygen
         elif atm_num == 8:
             if valence == 1:
@@ -91,10 +95,12 @@ class OpenEyeModel(ChargeModel):
                 formal_charge = 1
             elif valence == 2:
                 formal_charge = 0
+
         # Phosphorus
         elif atm_num == 15:
             if valence == 4:
                 formal_charge = 1
+
         # Sulfur
         elif atm_num == 16:
             if valence == 1:
@@ -108,6 +114,7 @@ class OpenEyeModel(ChargeModel):
                     formal_charge = 2
             elif valence == 2 or valence == 6:
                 formal_charge == 0
+
         # Chlorine
         elif atm_num == 17:
             if valence == 0:
@@ -116,33 +123,40 @@ class OpenEyeModel(ChargeModel):
                 formal_charge = 3
             elif valence == 1:
                 formal_charge = 0
+
         # Fluorine, Bromine, Iodine
         elif atm_num == 9 or atm_num == 35 or atm_num == 53:
             if valence == 0:
                 formal_charge = -1
             elif valence == 1:
                 formal_charge = 0
+
         # Magnesium, Calcium, Zinc
         elif atm_num == 12 or atm_num == 20 or atm_num == 30:
             if valence == 0:
                 formal_charge = 2
             elif valence == 2:
                 formal_charge = 0
+
         # Lithium, Sodium, Potassium
         elif atm_num == 3 or atm_num == 11 or atm_num == 19:
             if valence == 0:
                 formal_charge = 1
             elif valence == 1:
                 formal_charge = 0
+
         # Boron
         elif atm_num == 5:
             # If the valence is four, the formal charge is -1.
-            # OBS: there is an error in OpenEye chargel model text, they said that Boron should have a
-            # charge of +1 when the valence is 4. However, the MDL Valence Model says it should be -1.
+            # OBS: there is an error in OpenEye chargel model text,
+            # they said that Boron should have a charge of +1 when
+            # the valence is 4.
+            # However, the MDL Valence Model says it should be -1.
             if valence == 4:
                 formal_charge = -1
             elif valence == 3:
                 formal_charge = 0
+
         # Iron: 26
         # If the valence is zero, the formal charge is +3 if the partial charge is 3.0, and +2 otherwise.
         # Copper: 29
