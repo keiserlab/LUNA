@@ -10,6 +10,7 @@ from openbabel.pybel import Molecule as PybelMol
 from openbabel.pybel import readstring
 
 from luna.wrappers.rdkit import new_mol_from_block
+from luna.util.math import euclidean_distance
 from luna.util.exceptions import (AtomObjectTypeError, BondObjectTypeError,
                                   IllegalArgumentError, MoleculeObjectError,
                                   MoleculeObjectTypeError)
@@ -219,7 +220,8 @@ class AtomWrapper:
             return self._atm_obj.GetExactMass()
 
     def get_atomic_mass(self):
-        """Get this atom's atomic mass given by standard IUPAC average molar mass.
+        """Get this atom's atomic mass given by standard IUPAC average
+        molar mass.
 
         Returns
         -------
@@ -243,7 +245,8 @@ class AtomWrapper:
          : int
         """
 
-        # Subtract the number of hydrogens from the degree if only heavy atoms must be considered.
+        # Subtract the number of hydrogens from the degree if only heavy atoms
+        # must be considered.
         penalty = 0 if only_heavy_atoms is False else self.get_h_count()
         return self.get_degree() - penalty
 
@@ -315,7 +318,8 @@ class AtomWrapper:
 
         Returns
         -------
-         : iterable of `BondWrapper`, :class:`rdkit.Chem.rdchem.Bond`, or :class:`openbabel.OBBond`
+         : iterable of `BondWrapper`, :class:`rdkit.Chem.rdchem.Bond`,
+            or :class:`openbabel.OBBond`
         """
         bonds = []
         if self.is_rdkit_obj():
@@ -327,12 +331,16 @@ class AtomWrapper:
             return [BondWrapper(bond) for bond in bonds]
         return bonds
 
+    def get_coords(self):
+        return self.parent.get_atom_coord_by_id(self.get_id())
+
     def get_atomic_invariants(self):
         """Get the atomic invariants of this atom.
 
-        Atomic invariants are derived from ECFP [1]_ and E3FP [2]_ and consists of seven fields:
+        Atomic invariants are derived from ECFP [1]_ and E3FP [2]_ and
+        consists of seven fields:
 
-            * Number of heavy atoms;
+            * Number of neighboring heavy atoms;
             * Valence - Number of hydrogens;
             * Atomic number;
             * Isotope number;
@@ -344,17 +352,19 @@ class AtomWrapper:
         -------
          : list
         """
-        return [self.get_neighbors_number(only_heavy_atoms=True),       # Number of heavy atoms
-                (self.get_valence() - self.get_h_count()),              # Valence - Num. Hs
-                self.get_atomic_num(),                                  # Atomic number
-                self.get_isotope(),                                     # Isotope number
-                self.get_charge(),                                      # Formal charge
-                self.get_h_count(),                                     # Num. Hs
-                int(self.is_in_ring())]                                 # If the atom belongs to a ring or not
+        return [self.get_neighbors_number(only_heavy_atoms=True),
+                (self.get_valence() - self.get_h_count()),
+                self.get_atomic_num(),
+                self.get_isotope(),
+                self.get_charge(),
+                self.get_h_count(),
+                int(self.is_in_ring())]
 
     def is_in_ring(self):
         """Check if this atom is in a ring."""
-        return self._atm_obj.IsInRing()  # Both RDKit and Open Babel have the same function name.
+
+        # Both RDKit and Open Babel have the same function name.
+        return self._atm_obj.IsInRing()
 
     def is_aromatic(self):
         """Check if this atom is aromatic."""
@@ -511,6 +521,12 @@ class AtomWrapper:
 
     def __getattr__(self, attr):
         return getattr(self._atm_obj, attr)
+
+    def __sub__(self, other):
+        if not isinstance(other, AtomWrapper):
+            other = AtomWrapper(other)
+
+        return euclidean_distance(self.get_coords(), other.get_coords())
 
 
 class BondWrapper:
@@ -876,6 +892,17 @@ class MolWrapper:
         if atoms and wrapped:
             return [AtomWrapper(atm, self) for atm in atoms]
         return atoms
+
+    def get_atom_by_idx(self, idx, wrapped=True):
+        """Return the atom whose index is ``idx``."""
+        try:
+            atm = [a for a in self.get_atoms() if a.get_idx() == idx][0]
+
+            if wrapped:
+                return atm
+            return atm.unwrap()
+        except Exception:
+            return None
 
     def get_bonds(self, wrapped=True):
         """Get all molecule's bonds.
