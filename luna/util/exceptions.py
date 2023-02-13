@@ -14,6 +14,14 @@ class EntityLevelError(KeyError):
     pass
 
 
+class MissingAtomsError(ValueError):
+    pass
+
+
+class AtomsListError(ValueError):
+    pass
+
+
 class ChainNotFoundError(KeyError):
     pass
 
