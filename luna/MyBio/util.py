@@ -3,9 +3,8 @@ import logging
 from io import StringIO
 from os.path import exists
 from shutil import move as rename_pdb_file
-from itertools import product, combinations
 
-from openbabel import openbabel as ob
+
 from openbabel.pybel import readfile
 from openbabel.pybel import Molecule as PybelWrapper
 
@@ -22,7 +21,7 @@ from luna.MyBio.PDB import Selection
 from luna.MyBio.PDB.PDBIO import PDBIO
 from luna.MyBio.PDB.PDBParser import PDBParser
 from luna.mol.validator import MolValidator
-from luna.mol.standardiser import ResiduesStandardiser
+from luna.mol.standardiser import Standardizer
 from luna.wrappers.base import MolWrapper
 from luna.wrappers.obabel import convert_molecule
 from luna.wrappers.rdkit import read_mol_from_file
@@ -124,43 +123,55 @@ def save_to_file(entity, output_file, select=Select(), write_conects=True,
     output_file : str
         Save the selected atoms to this file.
     select : :class:`~luna.MyBio.PDB.PDBIO.Select`
-        Decide which atoms will be saved at the PDB output. By default, all atoms are accepted.
+        Decide which atoms will be saved at the PDB output.
+        By default, all atoms are accepted.
     write_conects : bool
         If True, write CONECT records.
     write_end : bool
         If True, write the END record.
     preserve_atom_numbering : bool
-        If True, preserve the atom numbering. Otherwise, re-enumerate the atom serial numbers.
+        If True, preserve the atom numbering.
+        Otherwise, re-enumerate the atom serial numbers.
     """
     try:
         io = PDBIO()
         io.set_structure(entity)
-        io.save(output_file, select=select, write_conects=write_conects, write_end=write_end,
+        io.save(output_file, select=select,
+                write_conects=write_conects,
+                write_end=write_end,
                 preserve_atom_numbering=preserve_atom_numbering)
     except Exception as e:
         logger.exception(e)
-        raise FileNotCreated("PDB file '%s' could not be created." % output_file)
+        raise FileNotCreated("PDB file '%s' could not be created."
+                             % output_file)
 
 
-def entity_to_string(entity, select=Select(), write_conects=True, write_end=True, preserve_atom_numbering=True):
-    """Convert a Structure object (or a subset of a :class:`~luna.MyBio.PDB.Structure.Structure` object) to string.
+def entity_to_string(entity, select=Select(),
+                     write_conects=True,
+                     write_end=True,
+                     preserve_atom_numbering=True):
+    """Convert a Structure object (or a subset of a
+    :class:`~luna.MyBio.PDB.Structure.Structure` object) to string.
 
-    This function works on a structural level. That means if ``entity`` is not a :class:`~luna.MyBio.PDB.Structure.Structure` object,
-    the structure will be recovered directly from ``entity``.
-    Therefore, use ``select`` to select specific chains, residues, and atoms from the structure object.
+    This function works on a structural level. That means if ``entity`` is not
+    a :class:`~luna.MyBio.PDB.Structure.Structure` object, the structure will
+    be recovered directly from ``entity``. Therefore, use ``select`` to select
+    specific chains, residues, and atoms from the structure object.
 
     Parameters
     ----------
     entity : :class:`~luna.MyBio.PDB.Entity.Entity`
         The PDB object to be converted.
     select : :class:`~luna.MyBio.PDB.PDBIO.Select`
-        Decides which atoms will be saved at the output. By default, all atoms are accepted.
+        Decides which atoms will be saved at the output.
+        By default, all atoms are accepted.
     write_conects : bool
         If True, writes CONECT records.
     write_end : bool
         If True, writes the END record.
     preserve_atom_numbering : bool
-        If True, preserve the atom numbering. Otherwise, re-enumerate the atom serial numbers.
+        If True, preserve the atom numbering.
+        Otherwise, re-enumerate the atom serial numbers.
 
     Returns
     -------
@@ -170,14 +181,18 @@ def entity_to_string(entity, select=Select(), write_conects=True, write_end=True
     fh = StringIO()
     io = PDBIO()
     io.set_structure(entity)
-    io.save(fh, select=select, write_conects=write_conects, write_end=write_end, preserve_atom_numbering=preserve_atom_numbering)
+    io.save(fh, select=select,
+            write_conects=write_conects,
+            write_end=write_end,
+            preserve_atom_numbering=preserve_atom_numbering)
     fh.seek(0)
     return ''.join(fh.readlines())
 
 
 def get_entity_from_entry(entity, entry, model=0):
-    """Get a :class:`~luna.MyBio.PDB.Entity.Chain` or :class:`~luna.MyBio.PDB.Residue.Residue`
-    instance based on the provided entry ``entry``.
+    """Get a :class:`~luna.MyBio.PDB.Entity.Chain` or
+    :class:`~luna.MyBio.PDB.Residue.Residue` instance based on the
+    provided entry ``entry``.
 
     Parameters
     ----------
@@ -212,194 +227,24 @@ def get_entity_from_entry(entity, entry, model=0):
             if ligand_key in chain.child_dict:
                 target_entity = chain[ligand_key]
             else:
-                raise MoleculeNotFoundError("Ligand '%s' does not exist in the PDB '%s'."
-                                            % (entry.to_string(ENTRY_SEPARATOR), structure.get_id()))
+                error_msg = ("Ligand '%s' does not exist in PDB '%s'."
+                             % (entry.to_string(ENTRY_SEPARATOR),
+                                structure.get_id()))
+                raise MoleculeNotFoundError(error_msg)
         else:
             target_entity = chain
     else:
-        raise ChainNotFoundError("The informed chain id '%s' for the ligand entry '%s' does not exist in the PDB '%s'." %
-                                 (entry.chain_id, entry.to_string(ENTRY_SEPARATOR), structure.get_id()))
+        error_msg = ("The informed chain id '%s' for the ligand entry '%s' "
+                     "does not exist in the PDB '%s'."
+                     % (entry.chain_id, entry.to_string(ENTRY_SEPARATOR),
+                        structure.get_id()))
+        raise ChainNotFoundError()
 
     return target_entity
 
 
-def is_covalently_bound(atm1, atm2):
-    """Verifies if atoms ``atm1`` and ``atm2`` are covalently bound."""
-
-    # Distance atom-atom
-    dist = atm1 - atm2
-    # Covalent radius
-    cov1 = ob.GetCovalentRad(ob.GetAtomicNum(atm1.element))
-    cov2 = ob.GetCovalentRad(ob.GetAtomicNum(atm2.element))
-
-    # OpenBabel thresholds.
-    if 0.4 <= dist <= cov1 + cov2 + 0.45:
-        return True
-    return False
-
-
-def get_residue_cov_bonds(residue, select=Select()):
-    """Get covalently bound atoms from residues or other molecules.
-
-    Parameters
-    ----------
-    residue : :class:`~luna.MyBio.PDB.Residue.Residue`
-        The residue or other molecule from which covalently bound atoms will be recovered.
-    select : :class:`~luna.MyBio.PDB.PDBIO.Select`
-        Decides which atoms will be consired. By default, all atoms are accepted.
-
-    Returns
-    -------
-    list of tuple(:class:`~luna.MyBio.PDB.Atom.Atom`, :class:`~luna.MyBio.PDB.Atom.Atom`)
-        List of pairs of covalently bound atoms.
-    """
-
-    # Get valid atoms according to the provided selection function.
-    trgt_res_atms = {atm.name: atm for atm in residue.get_atoms() if select.accept_atom(atm)}
-
-    cov_bonds = []
-    for atm1, atm2 in combinations(trgt_res_atms.values(), 2):
-        if is_covalently_bound(atm1, atm2):
-            cov_bonds.append((atm1, atm2))
-
-    return cov_bonds
-
-
-def get_residue_neighbors(residue, select=Select()):
-    """Get all neighbors from a residue.
-
-    In the case of an amino acid that is part of a peptide bond, its neighbors are any predecessor or successor residues.
-    The same idea applies to nucleic acids.
-
-    Parameters
-    ----------
-    residue : :class:`~luna.MyBio.PDB.Residue.Residue`
-        The residue or other molecule from which covalently bound molecules will be recovered.
-    select : :class:`~luna.MyBio.PDB.PDBIO.Select`
-        Decides which atoms will be consired. By default, all atoms are accepted.
-
-    Returns
-    -------
-    neighbors : dict of {str : :class:`~luna.MyBio.PDB.Residue.Residue`}
-        A dictionary containing the predecessor (``previous``) or successor (``next``) molecules.
-    """
-
-    # Get valid atoms according to the provided selection function.
-    trgt_res_atms = {atm.name: atm for atm in residue.get_atoms() if select.accept_atom(atm)}
-
-    if residue.is_residue():
-        if "N" not in trgt_res_atms:
-            logger.debug("There is a missing N in the residue %s. It may have been filtered out by the provided "
-                         "selection function. So, the predecessor residue cannot be identified." % residue)
-        if "C" not in trgt_res_atms:
-            logger.debug("There is a missing C in the residue %s. It may have been filtered out by the provided "
-                         "selection function. So, the successor residue cannot be identified." % residue)
-
-        # If neither N and C are available in the valid atom list.
-        if "N" not in trgt_res_atms and "C" not in trgt_res_atms:
-            return {}
-
-        neighbors = {}
-        # If the chain has a residue coming before the target residue.
-        if residue.idx - 1 >= 0:
-            # First residue before the target in the chain list.
-            prev_res = residue.parent.child_list[residue.idx - 1]
-            # Get valid atoms according to the provided selection function.
-            prev_res_atms = {atm.name: atm for atm in prev_res.get_atoms() if select.accept_atom(atm)}
-
-            # A peptide bond exists between the C of one amino acid and the N of another.
-            if "C" in prev_res_atms and "N" in trgt_res_atms:
-                if is_covalently_bound(trgt_res_atms["N"], prev_res_atms["C"]):
-                    neighbors["previous"] = prev_res
-                else:
-                    logger.debug("The first residue before %s is too distant to fulfill the covalent bond threshold. "
-                                 "It may be an indication of bad atom positioning or that there are missing residues." % residue)
-            elif "C" not in prev_res_atms:
-                logger.debug("There is a missing C in %s, the first residue before %s in the chain list. "
-                             "It may have been filtered out by the provided selection function. "
-                             "So, the predecessor residue cannot be identified." % (prev_res, residue))
-        # Otherwise, it could mean that the residue is the first one in the sequence or there are missing residues.
-        else:
-            logger.debug("The residue %s seems not to have any predecessor residue. "
-                         "It may be the first in the chain sequence or there are missing residues." % residue)
-
-        # If the chain has a residue coming after the target residue.
-        if residue.idx + 1 < len(residue.parent.child_list):
-            # First residue after the target in the chain list.
-            next_res = residue.parent.child_list[residue.idx + 1]
-            # Get valid atoms according to the provided selection function.
-            next_res_atms = {atm.name: atm for atm in next_res.get_atoms() if select.accept_atom(atm)}
-
-            # A peptide bond exists between the C of one amino acid and the N of another.
-            if "C" in trgt_res_atms and "N" in next_res_atms:
-                if is_covalently_bound(trgt_res_atms["C"], next_res_atms["N"]):
-                    neighbors["next"] = next_res
-                else:
-                    logger.debug("The first residue after %s is too distant to fulfill the covalent thresholds. "
-                                 "It may be an indication of bad atom positioning or that there are missing residues." % residue)
-            elif "N" in next_res_atms:
-                logger.debug("There is a missing N in %s, the first residue after %s in the chain list. "
-                             "It may have been filtered out by the provided selection function. "
-                             "So, the predecessor residue cannot be identified." % (next_res, residue))
-        # Otherwise, it could mean that the residue is the last one in the sequence or there are missing residues.
-        else:
-            logger.debug("The residue %s seems not to have any successor residue. "
-                         "It may be the last in the chain sequence or there are missing residues." % residue)
-        return neighbors
-    else:
-        # First residue before the target in the chain list.
-        prev_res = residue.parent.child_list[residue.idx - 1]
-        # Get valid atoms according to the provided selection function.
-        prev_res_atms = {atm.name: atm for atm in prev_res.get_atoms() if select.accept_atom(atm)}
-
-        neighbors = {}
-        # If the chain has a residue coming before the target residue.
-        if residue.idx - 1 >= 0:
-            # First residue before the target in the chain list.
-            prev_res = residue.parent.child_list[residue.idx - 1]
-            # Get valid atoms according to the provided selection function.
-            prev_res_atms = {atm.name: atm for atm in prev_res.get_atoms() if select.accept_atom(atm)}
-
-            for trgt_atm, prev_atm in product(trgt_res_atms.values(), prev_res_atms.values()):
-                if is_covalently_bound(trgt_atm, prev_atm):
-                    neighbors["previous"] = prev_res
-                    break
-
-            if "previous" not in neighbors:
-                logger.debug("The first residue after %s is too distant to fulfill the covalent thresholds. "
-                             "It may be an indication of bad atom positioning or that there are missing residues." % residue)
-        # Otherwise, it could mean that the residue is the first one in the sequence or there are missing residues.
-        else:
-            logger.debug("The residue %s seems not to have any predecessor residue. "
-                         "It may be the first in the chain sequence or there are missing residues." % residue)
-
-        # If the chain has a residue coming after the target residue.
-        if residue.idx + 1 < len(residue.parent.child_list):
-            # First residue after the target in the chain list.
-            next_res = residue.parent.child_list[residue.idx + 1]
-            # Get valid atoms according to the provided selection function.
-            next_res_atms = {atm.name: atm for atm in next_res.get_atoms() if select.accept_atom(atm)}
-
-            # Check each pair of atoms for covalently bonded atoms.
-            for trgt_atm, next_atm in product(trgt_res_atms.values(), next_res_atms.values()):
-                if is_covalently_bound(trgt_atm, next_atm):
-                    neighbors["next"] = next_res
-                    break
-
-            if "next" not in neighbors:
-                logger.debug("The first residue after %s is too distant to fulfill the covalent thresholds. "
-                             "It may be an indication of bad atom positioning or that there are missing residues." % residue)
-        # Otherwise, it could mean that the residue is the last one in the sequence or there are missing residues.
-        else:
-            logger.debug("The residue %s seems not to have any successor residue. "
-                         "It may be the last in the chain sequence or there are missing residues." % residue)
-        return neighbors
-    return {}
-
-
 def biopython_entity_to_mol(entity, select=Select(), amend_mol=True,
                             template=None, add_h=False, ph=None,
-                            break_metal_bonds=False,
                             wrapped=True, openbabel=OPENBABEL, tmp_path=None,
                             keep_tmp_files=False):
     """Convert an object :class:`~luna.MyBio.PDB.Entity.Entity` to a
@@ -426,9 +271,6 @@ def biopython_entity_to_mol(entity, select=Select(), amend_mol=True,
         If True, add hydrogen to the converted molecule.
     ph : float, optional
         Add hydrogens considering pH ``ph``.
-    break_metal_bonds : bool
-        If True, remove covalent bonds between residues and metals and
-        fix the residue bond order.
     wrapped : bool
         If True, wrap the molecular object with
         :class:`~luna.wrappers.base.MolWrapper`.
@@ -552,23 +394,17 @@ def biopython_entity_to_mol(entity, select=Select(), amend_mol=True,
         atm_obj_list = [atm for atm in mol_obj.get_atoms()
                         if atm.get_atomic_num() != 1]
 
-        # Pairs of AtomWrapper and Atom (Biopython) objects.
+        # Pairs of AtomWrapper and Atom (Biopython) objects
+        # to standardize.
         atom_pairs = []
         for i, atm_obj in enumerate(atm_obj_list):
-            # Accept only residues because, currently, we only have
-            # a standardiser for residues.
-            if target_atoms[i].parent.is_residue():
-                atom_pairs.append((atm_obj, target_atoms[i]))
+            atom_pairs.append((atm_obj, target_atoms[i]))
 
         # If there is something to be standardised.
         if atom_pairs:
-            rs = ResiduesStandardiser(break_metal_bonds=break_metal_bonds)
+            rs = Standardizer()
             mol_obj.unwrap().DeleteHydrogens()
-            rs.standardise(atom_pairs)
-
-            for i, atm_obj in enumerate(atm_obj_list):
-                if atm_obj.get_id() in rs.removed_atoms:
-                    ignored_atoms.append(target_atoms[i])
+            rs.standardize(atom_pairs)
 
             # After standardizing residues, we need to recreate the Mol
             # file, otherwise implicit hydrogens will not be included
@@ -599,7 +435,7 @@ def biopython_entity_to_mol(entity, select=Select(), amend_mol=True,
             if not keep_tmp_files:
                 remove_files([new_mol_file])
 
-        mv = MolValidator()
+        mv = MolValidator(bound_to_metals=rs.bound_to_metals)
         is_valid = mv.validate_mol(mol_obj)
         logger.debug('Validation finished!!!')
 
