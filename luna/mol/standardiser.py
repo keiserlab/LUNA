@@ -1,6 +1,10 @@
+from operator import xor
 from enum import Enum, auto
+from collections import defaultdict
 
-from luna.wrappers.base import BondType
+from luna.mol.precomp_data import DefaultResidueData
+from luna.wrappers.base import MolWrapper, BondType, OBBondType
+from luna.MyBio.neighbors import get_residue_neighbors
 
 
 import logging
@@ -19,1207 +23,582 @@ METAL_ATOM = "[%s]" % ",".join(METALS)
 class ResidueStandard(Enum):
     """An enumeration of protonation states for standard residues."""
 
-    # TODO: add other residues to the standard
+    # Aspartate with double bond on OD1.
+    ASP = auto()
+    # Same as ASP.
+    ASP_OD1 = auto()
+    # Aspartate with double bond on OD2.
+    ASP_OD2 = auto()
 
+    # Glutamate with double bond on OE1.
+    GLU = auto()
+    # Same as GLU.
+    GLU_OE1 = auto()
+    # Glutamate with double bond on OE2.
+    GLU_OE2 = auto()
+
+    # HIS: same as HIE.
+    HIS = auto()
     # HID as in Amber: histidine with hydrogen on the delta nitrogen.
     HID = auto()
     # HIE as in Amber: histidine with hydrogen on the epsilon nitrogen.
     HIE = auto()
-    # HIP as in Amber: histidine with hydrogens on both nitrogens; this is positively charged.
+    # HIP as in Amber: histidine with hydrogens on both nitrogens, i.e.,
+    # this is positively charged.
     HIP = auto()
+    # Negatively charged HIS: both ND1 and NE2 are deprotonated.
+    # This is usually used for HIS coordinating two metals.
+    HIS_D = auto()
 
-    # CYS as in Amber: protonated cysteine
+    # CYS as in Amber: neutral cysteine
     CYS = auto()
     # CYM as in Amber: deprotonated cysteine.
     CYM = auto()
 
+    # LYS as in Amber: protonated lysine
+    LYS = auto()
+    # LYN as in Amber: neutral lysine.
+    LYN = auto()
 
-# TODO: create a new MetalStandardiser or LigandStandardiser for common ligands.
+    # Default SER
+    SER = auto()
+    # SER with the hydroxyl group deprotonated.
+    SER_D = auto()
 
-class ResiduesStandardiser:
-    """Standardize residues.
+    # Default THR
+    THR = auto()
+    # THR with the hydroxyl group deprotonated.
+    THR_D = auto()
 
-    Parameters
-    ----------
-    break_metal_bonds : bool
-        If True, break covalent bonds with metals and correct the topology of the involved atoms.
-    his_type : {:class:`~ResidueStandard.HID`, :class:`~ResidueStandard.HIE`, :class:`~ResidueStandard.HIP`}
-        Define which histidine protonation state to use. Currently, this option is still not been used.
+    # Default TYR
+    TYR = auto()
+    # TYR with the hydroxyl group deprotonated.
+    TYR_D = auto()
 
-    """
 
-    # TODO: create filters for specific patterns like HIS tautomers or CYS:S- vs CYS:SH
+class Standardizer:
 
-    # TODO: some residues still have no WARNING for unexpected atoms bound to the atoms N, O, S.
+    def __init__(self,
+                 asp_type=ResidueStandard.ASP_OD1,
+                 cys_type=ResidueStandard.CYS,
+                 glu_type=ResidueStandard.GLU_OE1,
+                 his_type=ResidueStandard.HIE,
+                 lys_type=ResidueStandard.LYS,
+                 res_data=DefaultResidueData()):
 
-    # TODO: I need to verify for HIS tautomers and metals around it, which will influenciate on the Hydrogen placement.
-
-    # TODO: Metals will influentiate where the Hydrogen should be placed in TYR.
-
-    def __init__(self, break_metal_bonds=False, his_type=ResidueStandard.HIE):
-
-        self.break_metal_bonds = break_metal_bonds
-
-        # TODO: not being used
+        self.asp_type = asp_type
+        self.cys_type = cys_type
+        self.glu_type = glu_type
         self.his_type = his_type
+        self.lys_type = lys_type
 
-    def standardise(self, atom_pairs):
-        """Standardize residues.
+        self.res_data = res_data
 
-        Parameters
-        ----------
-        atom_pairs : iterable of tuple of (:class:`~luna.wrappers.base.MolWrapper`, :class:`~luna.MyBio.PDB.Atom.Atom`)
-            The atoms to standardise.
-        """
-        pdb_map = {atm_obj.get_idx(): pdb_atm for atm_obj, pdb_atm in atom_pairs}
+    def _validate_atoms_list(self, res, atom_names):
+        # Current list of atoms found in this residue.
+        atom_names = set(atom_names)
 
-        self.found_metals = {}
-        self.removed_atoms = []
+        # Set of expected atom names.
+        data = self.res_data.get(res.resname, {})
+        props = data.get("atoms", {})
+        expected_atms = set([a for a in props if "," not in a])
 
-        for atm_obj, pdb_atm in atom_pairs:
+        # Identify missing atoms, except OXT.
+        missing_atoms = [a for a in expected_atms - atom_names
+                         if a != "OXT"]
 
-            # Atom: N
-            # Sanity check for all N nitrogens with invalid bond types.
-            #
-            # E.g.: 3QQL:A:GLY:11.
-            if pdb_atm.name == "N":
+        # Warn about the missing atoms.
+        if missing_atoms:
+            logger.error("The following atoms were not found for "
+                         "residue %s: %s."
+                         % (res.full_name,
+                            ", ".join(sorted(missing_atoms))))
 
-                # Non-N-terminal N where the carbonyl O is involved in a covalent bond with an atom not comprised
-                # by the metal rules. So, it's better not to update anything here.
-                if atm_obj.matches_smarts(f"N-,=[C;X4,X3]([#6])[OX2;$(O([C;X4,X3])[!#1]);!$(O{METAL_ATOM})]"):
-                    logger.debug("While checking for inconsistencies in the atom N of the residue %s, it was found an unexpected "
-                                 "atom covalently bound to the neighboring atom O. So, N will not be amended." % pdb_atm.parent)
+        # Unexpected atoms found in this residue.
+        other_atoms = [a for a in atom_names - expected_atms]
+
+        # Warn about the unexpected atom names identified.
+        if other_atoms:
+            logger.error("The following unexpected atoms were found "
+                         "for residue %s: %s."
+                         % (res.full_name,
+                            ", ".join(sorted(other_atoms))))
+
+    def _resolve_resname(self, res):
+
+        atom_pairs = self.residues[res]
+
+        # Check if ASP is bound to metals.
+        if res.resname == "ASP":
+            try:
+                OD2_atm_obj = [atm_obj for atm_obj, pdb_atm in atom_pairs
+                               if pdb_atm.name == "OD2"][0]
+            except IndexError:
+                # In case OD2 cannot be recovered, return the
+                # ASP type defined by the user.
+                return self.asp_type.name
+
+            # OD1 -- M.
+            smarts1 = f"[OX1]=[CX3]([#6])[OX2;$(O{METAL_ATOM})]"
+            # OD2 -- M.
+            smarts2 = f"[OX2]({METAL_ATOM})[CX3]([#6])=[OX1]"
+
+            # If OD1 is bound to a metal, move the double bond to OD2.
+            if OD2_atm_obj.matches_smarts(smarts1):
+                return "ASP_OD2"
+            # If OD2 is bound to a metal, move the double bond to OD1.
+            elif OD2_atm_obj.matches_smarts(smarts2):
+                return "ASP_OD1"
+            # Otherwise, return the ASP type defined by the user.
+            return self.asp_type.name
+
+        # Check if CYS is bound to metals.
+        elif res.resname == "CYS":
+            try:
+                SG_atm_obj = [atm_obj for atm_obj, pdb_atm in atom_pairs
+                              if pdb_atm.name == "SG"][0]
+            except IndexError:
+                # In case SG cannot be recovered, return the
+                # CYS type defined by the user.
+                return self.cys_type.name
+
+            # If SG is bound to a metal, deprotonate it.
+            if SG_atm_obj.matches_smarts(f"[S]{METAL_ATOM}"):
+                return "CYM"
+            # Otherwise, return the CYS type defined by the user.
+            return self.cys_type.name
+
+        # Check if GLU is bound to metals.
+        elif res.resname == "GLU":
+            try:
+                OE2_atm_obj = [atm_obj for atm_obj, pdb_atm in atom_pairs
+                               if pdb_atm.name == "OE2"][0]
+            except IndexError:
+                # In case OE2 cannot be recovered, return the
+                # GLU type defined by the user.
+                return self.glu_type.name
+
+            # OE1 -- M.
+            smarts1 = f"[OX1]=[CX3]([#6])[OX2;$(O{METAL_ATOM})]"
+            # OE2 -- M.
+            smarts2 = f"[OX2]({METAL_ATOM})[CX3]([#6])=[OX1]"
+
+            # If OE1 is bound to a metal, move the double bond to OE2.
+            if OE2_atm_obj.matches_smarts(smarts1):
+                return "GLU_OE2"
+            # If OE2 is bound to a metal, move the double bond to OE1.
+            elif OE2_atm_obj.matches_smarts(smarts2):
+                return "GLU_OE1"
+            # Otherwise, return the GLU type defined by the user.
+            return self.glu_type.name
+
+        elif res.resname == "HIS":
+            try:
+                ND1_atm_obj = [atm_obj for atm_obj, pdb_atm in atom_pairs
+                               if pdb_atm.name == "ND1"][0]
+            except IndexError:
+                # In case ND1 cannot be recovered, return the
+                # HIS type defined by the user.
+                return self.his_type.name
+
+            # HIS bound to two different metals:  M1 <--- ND1 ... NE2 ---> M2.
+            smarts1 = f"[#7;R]({METAL_ATOM})~[#6;R]~[#7;R]{METAL_ATOM}"
+            # ND1 ---> M1
+            smarts2 = f"[#7;R]{METAL_ATOM}"
+            # NE2 ---> M1
+            smarts3 = f"[#7;R]~[#6;R]~[#7;R]{METAL_ATOM}"
+
+            # If both Ns are bound to the metal, deprotonate the HIS.
+            if ND1_atm_obj.matches_smarts(smarts1):
+                return "HIS_D"
+            # If ND1 is bound to the metal, the H is added to NE2.
+            elif ND1_atm_obj.matches_smarts(smarts2):
+                return "HIE"
+            # If NE2 is bound to the metal, the H is added to ND1.
+            elif ND1_atm_obj.matches_smarts(smarts3):
+                return "HID"
+            # Otherwise, return the HIS type defined by the user.
+            else:
+                return self.his_type.name
+
+        elif res.resname == "LYS":
+            try:
+                NZ_atm_obj = [atm_obj for atm_obj, pdb_atm in atom_pairs
+                              if pdb_atm.name == "NZ"][0]
+            except IndexError:
+                # In case NZ cannot be recovered, return the
+                # LYS type defined by the user.
+                return self.lys_type.name
+
+            # If NZ is bound to a metal, deprotonate it.
+            if NZ_atm_obj.matches_smarts(f"[N]{METAL_ATOM}"):
+                return "LYN"
+            # Otherwise, return the LYS type defined by the user.
+            return self.lys_type.name
+
+        elif res.resname in ["SER", "THR", "TYR"]:
+            try:
+                OH_atm_obj = [atm_obj for atm_obj, pdb_atm in atom_pairs
+                              if pdb_atm.name in ["OG", "OG1", "OH"]][0]
+            except IndexError:
+                # In case OG/OG1/OH cannot be recovered, return the
+                # residue type defined by the user.
+                return res.resname
+
+            # If the oxygen is bound to a metal, deprotonate it.
+            if OH_atm_obj.matches_smarts(f"[O]{METAL_ATOM}"):
+                return res.resname + "_D"
+            # Otherwise, return the residue type defined by the user.
+            return res.resname
+
+        # If any rule applies to this residue, return its current name.
+        return res.resname
+
+    def _check_metal_coordination(self, atm_obj, pdb_atm):
+
+        res = pdb_atm.parent
+        n_heavy_atoms = \
+            atm_obj.get_neighbors_number(only_heavy_atoms=True)
+
+        # If this residue is not bound to any atom, then its valence
+        # is correct.
+        if n_heavy_atoms == 0:
+            return res.resname
+
+        # Metal properties.
+        data = self.res_data.get(res.resname, {})
+        props = data.get("atoms", {})
+
+        # Coordination number.
+        coords = props[pdb_atm.name].get("coords", [])
+        coords = [int(i) for i in coords.split(",")]
+
+        # Evaluate if the coordination number is correct.
+        if n_heavy_atoms not in coords:
+            msg = ("An unexpected coordination number (%d) has been "
+                   "found for metal %s.")
+            logger.error(msg % (n_heavy_atoms, pdb_atm.full_name))
+
+    def _get_partner_atm(self, atm_obj, pdb_atm, bond_obj):
+        partner_obj = \
+            bond_obj.get_partner_atom(atm_obj)
+        partner_idx = partner_obj.get_idx()
+
+        # If this atom's partner cannot be identified, it is better
+        # not to update this atom.
+        if partner_idx not in self._pdb_map:
+            self._events["ignore"].add(pdb_atm)
+
+            msg = ("Atom %s of residue %s will not be amended "
+                   "because an unidentified atom is covalently bound "
+                   "to it." % (pdb_atm, pdb_atm.parent))
+            logger.error(msg)
+
+            return None, None
+
+        partner_atm = self._pdb_map[partner_idx]
+
+        return partner_obj, partner_atm
+
+    def _resolve_bonds(self, resname, atm_obj, pdb_atm):
+
+        # All expected residue bonds.
+        res_dict = self.res_data.get(resname, {})
+        res_bonds = res_dict.get("bonds", {})
+
+        # Add disulfide bridge as a standard bond to CYS.
+        if pdb_atm.parent.resname == "CYS":
+            res_bonds["SG,SG"] = {"type": "SINGLE", "is_aromatic": False}
+
+        # Bonds found for atom 'atom_obj', identified by their key.
+        found_bonds = set()
+        # Set of atom pairs.
+        found_atm_pairs = set()
+
+        # Loop through the bonds formed by this atom to check if there
+        # is any unexpected bond (e.g., metal bonds).
+        for bond_obj in atm_obj.get_bonds():
+
+            # Get this atom's partner.
+            partner_obj, partner_atm = \
+                self._get_partner_atm(atm_obj, pdb_atm, bond_obj)
+
+            if partner_obj is None or partner_atm is None:
+                return
+
+            bond_key = ",".join(sorted([pdb_atm.name, partner_atm.name]))
+
+            # Break any bonds with metals.
+            if (atm_obj.get_symbol() in METALS
+                    or partner_obj.get_symbol() in METALS):
+                self._events["break"].add(((atm_obj, pdb_atm),
+                                           (partner_obj, partner_atm),
+                                           bond_obj))
+                continue
+
+            # Break any bonds with water.
+            if pdb_atm.parent.is_water():
+                self._events["break"].add(((atm_obj, pdb_atm),
+                                           (partner_obj, partner_atm),
+                                           bond_obj))
+                continue
+
+            # If an unexpected bond between residue atoms
+            # is found, break it.
+            if (pdb_atm.parent.is_residue()
+                    and partner_atm.parent.is_residue(standard=False)
+                    and bond_key not in res_bonds):
+
+                self._events["break"].add(((atm_obj, pdb_atm),
+                                           (partner_obj, partner_atm),
+                                           bond_obj))
+
+                if pdb_atm.parent == partner_atm.parent:
+                    msg = ("An unexpected bond between atoms %s and %s from "
+                           "%s was found. It will break the bond and "
+                           "standardise the atoms."
+                           % (pdb_atm, partner_atm, pdb_atm.parent))
+                else:
+                    msg = ("An unexpected bond between atoms %s and %s from "
+                           "residues %s and %s was found. It will break the "
+                           "bond and standardise the atoms."
+                           % (pdb_atm, partner_atm,
+                              pdb_atm.parent, partner_atm.parent))
+                logger.error(msg)
+                continue
+
+            # If this atom's partner is not a residue, it is better
+            # not to update this atom.
+            elif ((pdb_atm.parent.is_residue()
+                    and not partner_atm.parent.is_residue(standard=False))
+                    or bond_key not in res_bonds):
+
+                self._events["ignore"].add(pdb_atm)
+
+                msg = ("Atom %s of molecule %s will not be amended "
+                       "because an unexpected atom (%s) from %s is covalently "
+                       "bound to it." % (pdb_atm, pdb_atm.parent,
+                                         partner_atm, partner_atm.parent))
+                logger.error(msg)
+                return
+
+            # Update the sets with the new identified pair.
+            found_bonds.add(bond_key)
+            found_atm_pairs.add(tuple(sorted([pdb_atm, partner_atm])))
+
+            # Get bond type from the file definition.
+            bond_type = BondType[res_bonds[bond_key]["type"]]
+            # Get bond aromaticity from the file definition.
+            is_aromatic = res_bonds[bond_key]["is_aromatic"]
+
+            # If the current bond is as expected, don't modify it.
+            if (bond_type == bond_obj.get_bond_type()
+                    and is_aromatic == bond_obj.is_aromatic()):
+                continue
+
+            # Add a new modification event for this bond.
+            self._events["modbonds"].add(((atm_obj, pdb_atm),
+                                          (partner_obj, partner_atm),
+                                          bond_obj, bond_type,
+                                          is_aromatic))
+
+        # Set of expected bonds.
+        expected_bonds = set([b for b in res_bonds
+                              for an in b.split(",") if pdb_atm.name == an])
+
+        # Set of missing bonds.
+        # It ignores missing disulfide bonds as they may not exist.
+        missing_bonds = [b for b in expected_bonds - set(found_bonds)
+                         if b != "SG,SG"]
+
+        # Only verify missing bonds for residues.
+        if missing_bonds and pdb_atm.parent.is_residue():
+            nb_residues = get_residue_neighbors(pdb_atm.parent, verbose=False)
+
+            # Loop through each missing bond and add them in case
+            # both atoms exist.
+            for bond_key in missing_bonds:
+                bond_pair = bond_key.split(",")
+
+                partner_atm_name = (bond_pair[1]
+                                    if bond_pair[0] == pdb_atm.name
+                                    else bond_pair[0])
+
+                partner_res = pdb_atm.parent
+                if pdb_atm.name == "N" and partner_atm_name == "C":
+                    # There's nothing to be done because the previous
+                    # residue was not selected or is missing.
+                    if not nb_residues.has_predecessor():
+                        continue
+                    partner_res = nb_residues.predecessor
+
+                elif pdb_atm.name == "C" and partner_atm_name == "N":
+                    # There's nothing to be done because the next
+                    # residue was not selected or is missing.
+                    if not nb_residues.has_successor():
+                        continue
+                    partner_res = nb_residues.successor
+
+                trg_atm_pairs = []
+                # If the partner residue exists, search for the partner
+                # atom by name.
+                if partner_res in self.residues:
+                    atom_pairs = self.residues[partner_res]
+                    trg_atm_pairs = [(o, p) for o, p in atom_pairs
+                                     if (p.parent == partner_res
+                                         and p.name == partner_atm_name)]
+
+                # Skip missing bonds related to C- and N-terminal residues.
+                if (bond_key in ["C,N", "C,OXT"]
+                        and len(trg_atm_pairs) == 0):
                     continue
-                # Non-N-terminal N where the carbonyl O is involved in a covalent bond with a metal.
-                # However, 'break_metal_bonds' was set to False and there isn't anything to be done so.
-                elif atm_obj.matches_smarts(f"N-,=[C;X4,X3]([#6])[OX2]{METAL_ATOM}") and self.break_metal_bonds is False:
-                    logger.debug("While checking for inconsistencies in the atom N of the residue %s, it was found a metal "
-                                 "covalently bound to its atom O. However, nothing will be done because 'break_metal_bonds' "
-                                 "was set to False." % pdb_atm.parent)
+
+                # If the partner atom could not be identified, skip it.
+                elif len(trg_atm_pairs) == 0:
+                    self._events["ignore"].add(pdb_atm)
+
+                    msg = ("The bond '%s' was not found for residue %s. "
+                           "However, it cannot be added because the atom %s "
+                           "seems not to exist."
+                           % (bond_key, pdb_atm.parent, partner_atm_name))
+                    logger.error(msg)
                     continue
 
-                # Any non-N-terminal N not from PRO.
-                if (pdb_atm.parent.resname != "PRO" and atm_obj.get_neighbors_number(True) == 2
-                    and (atm_obj.get_valence() != 3 or atm_obj.get_charge() != 0
-                         or atm_obj.has_only_bond_type(BondType.SINGLE) is False
-                         or atm_obj.get_h_count() != 1 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=1)
-
-                # Any N-terminal N not from PRO.
-                elif (pdb_atm.parent.resname != "PRO" and atm_obj.get_neighbors_number(True) == 1
-                        and (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 1
-                             or atm_obj.has_only_bond_type(BondType.SINGLE) is False
-                             or atm_obj.get_h_count() != 3 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=1, implicit_h_count=3)
-
-                # Non-N-terminal N from PRO.
-                elif (pdb_atm.parent.resname == "PRO" and atm_obj.get_neighbors_number(True) == 3
-                        and (atm_obj.get_valence() != 3 or atm_obj.get_charge() != 0
-                             or atm_obj.has_only_bond_type(BondType.SINGLE) is False
-                             or atm_obj.get_h_count() != 0 or atm_obj.is_in_ring() is False or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=0, in_ring=True)
-
-                # N-terminal N from PRO.
-                elif (pdb_atm.parent.resname == "PRO" and atm_obj.get_neighbors_number(True) == 2
-                        and (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 1
-                             or atm_obj.has_only_bond_type(BondType.SINGLE) is False
-                             or atm_obj.get_h_count() != 2 or atm_obj.is_in_ring() is False or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=1, implicit_h_count=2, in_ring=True)
-
-            # Atom: C.
-            # Sanity check for all C carbons with invalid bond types.
-            elif pdb_atm.name == "C":
-
-                fix_atom = False
-
-                # If it is bonded to 3 heavy atoms.
-                if atm_obj.get_neighbors_number(True) == 3:
-                    # Main chain carbonyl O involved in a metallic coordination.
-                    #
-                    #   It identifies only the form generated by Open Babel, where the double bond between O and C becomes
-                    #       a single bond, and it adds an additional single bond with a Metal.
-                    #
-                    #   Note that if the list of atoms is sorted in a way that O comes first than C in this loop, then the
-                    #       double bond would have already been amended and the bond with the metal would have already been removed.
-                    #
-                    #   E.g.: 6JWU:A:GLU:42.
-                    #         1DKA:A:PRO:99.
-                    #
-                    if atm_obj.matches_smarts(f"[C;X4,X3]([$([OX2]{METAL_ATOM})])([#6])(-,=[N,O])"):
-                        # If it is necessary to break covalent bonds with metals.
-                        if self.break_metal_bonds:
-                            fix_atom = True
-                        else:
-                            logger.debug("While checking for inconsistencies in the atom C of the residue %s, it was found a metal "
-                                         "covalently bound to its atom O. However, nothing will be done because 'break_metal_bonds' "
-                                         "was set to False." % pdb_atm.parent)
-
-                    # If the neighboring oxygen is bound to something else not comprised in the previous rule, it is better not to
-                    # update anything. Otherwise, fix the C.
-                    elif (atm_obj.matches_smarts(f"[C;X4,X3]([OX2;$(O([C;X4,X3])[!#1]);!$(O{METAL_ATOM})])([#6])(-,=[N,O])") is False
-                            and atm_obj.matches_smarts("[CX3](=[OX1])([#6])[NX3]") is False
-                            and atm_obj.matches_smarts("[CX3](=[OX1])([#6])[O;H1,H0&-1]") is False):
-                        fix_atom = True
-
-                    # Alert for unexpected atoms bound to the oxygen O.
-                    elif atm_obj.matches_smarts(f"[C;X4,X3]([OX2;$(O([C;X4,X3])[!#1]);!$(O{METAL_ATOM})])([#6])(-,=[N,O])"):
-                        logger.debug("While checking for inconsistencies in the atom C of the residue %s, it was found an unexpected "
-                                     "atom covalently bound to its atom O. So, C will not be amended." % pdb_atm.parent)
-
-                    if fix_atom:
-                        bond_types = []
-                        for bond_obj in atm_obj.get_bonds():
-                            partner_obj = bond_obj.get_partner_atom(atm_obj)
-                            if partner_obj.get_idx() in pdb_map and pdb_map[partner_obj.get_idx()].name == "O":
-                                bond_types.append((bond_obj, BondType.DOUBLE))
-                            else:
-                                bond_types.append((bond_obj, BondType.SINGLE))
-
-                        self._fix_atom(atm_obj, bond_types=bond_types, charge=0, implicit_h_count=0)
-
-                # If it is bonded only to 2 heavy atoms, then it is a C-terminal with a missing OXT or there are missing residues.
-                elif atm_obj.get_neighbors_number(True) == 2:
-
-                    logger.debug("The residue %s seems not to have any successor residue. "
-                                 "It may be the last in the chain sequence or there are missing residues." % pdb_atm.parent)
-
-                    # Main chain carbonyl O involved in a metallic coordination.
-                    #
-                    #   It identifies only the form generated by Open Babel, where the double bond between O and C becomes
-                    #       a single bond, and it adds an additional single bond with a Metal.
-                    #
-                    #   Note that if the list of atoms is sorted in a way that O comes first than C in this loop, then the
-                    #       double bond would have already been amended and the bond with the metal would have already been removed.
-                    #
-                    #   E.g.: 6JWU:A:GLU:42.
-                    #         1DKA:A:THR:98.
-                    #
-                    if atm_obj.matches_smarts(f"[CX4]([$([OX2]{METAL_ATOM})])([#6])"):
-                        # If it is necessary to break covalent bonds with metals.
-                        if self.break_metal_bonds:
-                            fix_atom = True
-                        else:
-                            logger.debug("While checking for inconsistencies in the atom C of the residue %s, it was found a metal "
-                                         "covalently bound to its atom O. However, nothing will be done because 'break_metal_bonds' "
-                                         "was set to False." % pdb_atm.parent)
-
-                    # If the neighboring oxygen is bound to something else not comprised in the previous rule, it is better not to
-                    # update anything. Otherwise, fix the C.
-                    elif (atm_obj.matches_smarts(f"[CX4]([OX2;$(O([CX4])[!#1]);!$(O{METAL_ATOM})])([#6])") is False and
-                            atm_obj.matches_smarts("[CX3](=[OX1])([#6])") is False):
-                        fix_atom = True
-
-                    # Alert for unexpected atoms bound to the oxygen O.
-                    elif atm_obj.matches_smarts(f"[CX4]([OX2;$(O([CX4])[!#1]);!$(O{METAL_ATOM})])([#6])"):
-                        logger.debug("While checking for inconsistencies in the atom C of the residue %s, it was found an unexpected "
-                                     "atom covalently bound to its atom O. So, C will not be amended." % pdb_atm.parent)
-
-                    if fix_atom:
-                        bond_types = []
-                        for bond_obj in atm_obj.get_bonds():
-                            partner_obj = bond_obj.get_partner_atom(atm_obj)
-                            if partner_obj.get_idx() in pdb_map and pdb_map[partner_obj.get_idx()].name == "O":
-                                bond_types.append((bond_obj, BondType.DOUBLE))
-                            else:
-                                bond_types.append((bond_obj, BondType.SINGLE))
-
-                        self._fix_atom(atm_obj, bond_types=bond_types, charge=0, implicit_h_count=1)
-
-            # Atom: CA
-            # Sanity check for all CA with invalid bond types.
-            # E.g.: 3QQL:A:GLY:11.
-            elif pdb_atm.name == "CA":
-
-                # Any CA not from GLY/PRO.
-                if (pdb_atm.parent.resname not in ["GLY", "PRO"] and atm_obj.get_neighbors_number(True) == 3 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 1 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=1)
-
-                elif (pdb_atm.parent.resname == "PRO" and atm_obj.get_neighbors_number(True) == 3 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 1 or atm_obj.is_in_ring() is False or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=1, in_ring=True)
-
-                # CA from GLY.
-                elif (pdb_atm.parent.resname == "GLY" and atm_obj.get_neighbors_number(True) == 2 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 2 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=2)
-
-            # Atom: CB
-            # Sanity check for all CB carbons with invalid bond types.
-            # E.g.: 1THA:B:GLN:63.
-            elif pdb_atm.name == "CB":
-
-                # Any CB not from ALA, ILE, PRO, THR, VAL.
-                if (pdb_atm.parent.resname not in ["ALA", "ILE", "PRO", "THR", "VAL"] and atm_obj.get_neighbors_number(True) == 2 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 2 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=2)
-
-                # CB from ILE, THR, VAL.
-                elif (pdb_atm.parent.resname in ["ILE", "THR", "VAL"] and atm_obj.get_neighbors_number(True) == 3 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 1 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=1)
-
-                # CB from ALA.
-                elif (pdb_atm.parent.resname == "ALA" and atm_obj.get_neighbors_number(True) == 1 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 3 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=3)
-
-                # CB from PRO.
-                elif (pdb_atm.parent.resname == "PRO" and atm_obj.get_neighbors_number(True) == 2 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 2 or atm_obj.is_in_ring() is False or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=2, in_ring=True)
-
-            # Atom: CG
-            # Sanity check for all CG carbons with invalid bond types.
-            elif pdb_atm.name == "CG":
-
-                # E.g.: 1THA:B:GLN:63, 6COD:A:LYS:121.
-                if (pdb_atm.parent.resname in ["ARG", "GLN", "GLU", "LYS", "MET"] and atm_obj.get_neighbors_number(True) == 2 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 2 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=2)
-
-                elif (pdb_atm.parent.resname == "PRO" and atm_obj.get_neighbors_number(True) == 2 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 2 or atm_obj.is_in_ring() is False or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=2, in_ring=True)
-
-                elif (pdb_atm.parent.resname in ["ASN", "ASP"] and atm_obj.get_neighbors_number(True) == 3 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.get_degree() != 3 or
-                            atm_obj.get_h_count() != 0 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                    fix_atom = False
-                    # ASN/ASP with metallic coordination perceived as covalent bond.
-                    #
-                    #   It identifies only the form generated by Open Babel, where the double bond between OD1 and CG becomes
-                    #       a single bond, and it adds an additional single bond with a Metal.
-                    #
-                    #   Note that if the list of atoms is sorted in a way that OD1 comes first than CG in this loop, then the
-                    #       double bond would have already been amended and the bond with the metal would have already been removed.
-                    #
-                    #   E.g.: 6JWU:B:ASP:210, 4FVR:A:ASN:678
-                    #
-                    if (atm_obj.matches_smarts(f"[CX4](N)([#6])[OX2]{METAL_ATOM}") or
-                            atm_obj.matches_smarts(f"[C;X4,X3](-,=[O])([#6])[OX2]({METAL_ATOM})")):
-                        # If it is necessary to break covalent bonds with metals.
-                        if self.break_metal_bonds:
-                            fix_atom = True
-                        else:
-                            logger.debug("While checking for inconsistencies in the atom CG of the residue %s, it was found a metal "
-                                         "covalently bound to its atom OD1. However, nothing will be done because 'break_metal_bonds' "
-                                         "was set to False." % pdb_atm.parent)
-
-                    # If the neighboring oxygen is bound to something else not comprised in the previous rule, it is better not to
-                    # update anything. Otherwise, fix the CG.
-                    elif (atm_obj.matches_smarts("[CX4](N)([#6])[OX2][!#1]") is False and
-                            atm_obj.matches_smarts("[C;X4,X3](-,=[O])([#6])[OX2]([!#1])") is False):
-                        fix_atom = True
-
-                    # Alert for unexpected atoms bound to the neighboring nitrogen/oxygen.
-                    elif atm_obj.matches_smarts("[C;X4,X3](-,=[N,O])([#6])[OX2][!#1]"):
-                        logger.debug("While checking for inconsistencies in the atom CG of the residue %s, it was found an unexpected "
-                                     "atom covalently bound to a neighboring nitrogen/oxygen. So, CG will not be amended."
-                                     % pdb_atm.parent)
-
-                    if fix_atom:
-                        bond_types = []
-                        for bond_obj in atm_obj.get_bonds():
-                            partner_obj = bond_obj.get_partner_atom(atm_obj)
-
-                            if partner_obj.get_idx() in pdb_map:
-                                # Redundant rules: OD1 and OD2 section already fixes the bonds with CG.
-                                if partner_obj.get_idx() in pdb_map and pdb_map[partner_obj.get_idx()].name == "OD1":
-                                    # If the OD1 atom is bound to the below metals, update the CG-OD1 bond to CG=OD1.
-                                    if partner_obj.matches_smarts(f"[OX2]({METAL_ATOM})"):
-                                        bond_types.append((bond_obj, BondType.DOUBLE))
-                                    else:
-                                        bond_types.append((bond_obj, BondType.SINGLE))
-
-                                # Redundant rules: OD1 and OD2 section already fixes the bonds with CG.
-                                elif partner_obj.get_idx() in pdb_map and pdb_map[partner_obj.get_idx()].name == "OD2":
-                                    # If the second oxygen (OD1) is bound to some atom not comprised by the expected metals, but OD2 is,
-                                    # then update the CG-OD2 bond to CG=OD2.
-                                    if partner_obj.matches_smarts(f"[OX2]({METAL_ATOM})[CX4]([#6])"
-                                                                  f"[OX2;$(O([CX4])[!#1]);!$(O{METAL_ATOM})]"):
-                                        bond_types.append((bond_obj, BondType.DOUBLE))
-                                    else:
-                                        bond_types.append((bond_obj, BondType.SINGLE))
-
-                                # Any other atom bound to CG
-                                else:
-                                    bond_types.append((bond_obj, BondType.SINGLE))
-
-                        self._fix_atom(atm_obj, bond_types=bond_types, charge=0, implicit_h_count=0)
-
-                elif (pdb_atm.parent.resname == "LEU" and atm_obj.get_neighbors_number(True) == 3 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 1 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=1)
-
-                elif (pdb_atm.parent.resname in ["HIS", "PHE", "TRP", "TYR"] and atm_obj.get_neighbors_number(True) == 3 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.get_degree() != 3 or
-                            atm_obj.get_h_count() != 0 or atm_obj.is_aromatic() is False)):
-
-                    bond_types = []
-                    for bond_obj in atm_obj.get_bonds():
-                        partner_obj = bond_obj.get_partner_atom(atm_obj)
-                        if partner_obj.get_idx() in pdb_map:
-                            # Single bonds with CB (all)
-                            if pdb_map[partner_obj.get_idx()].name == "CB":
-                                bond_types.append((bond_obj, BondType.SINGLE))
-                            # Single bond with ND1 (only in HIS)
-                            elif pdb_map[partner_obj.get_idx()].name == "ND1":
-                                bond_types.append((bond_obj, BondType.SINGLE, True))
-                            # Double bonds with CD1 (all, except HIS)
-                            elif pdb_map[partner_obj.get_idx()].name == "CD1":
-                                bond_types.append((bond_obj, BondType.DOUBLE, True))
-                            # Bonds with CD2
-                            elif pdb_map[partner_obj.get_idx()].name == "CD2":
-                                # Double bond as in HIS.
-                                if pdb_atm.parent.resname == "HIS":
-                                    bond_types.append((bond_obj, BondType.DOUBLE, True))
-                                # Single bonds (all, except HIS)
-                                else:
-                                    bond_types.append((bond_obj, BondType.SINGLE, True))
-
-                    self._fix_atom(atm_obj, bond_types=bond_types, charge=0, implicit_h_count=0, is_aromatic=True)
-
-            # Atom: CG1
-            # Sanity check for all CG1 carbons with invalid bond types.
-            elif pdb_atm.name == "CG1":
-                # CG1 from ILE.
-                if (pdb_atm.parent.resname == "ILE" and atm_obj.get_neighbors_number(True) == 2 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 2 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=2)
-
-                # CG1 from VAL.
-                elif (pdb_atm.parent.resname == "VAL" and atm_obj.get_neighbors_number(True) == 1 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 3 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=3)
-
-            # Atom: CG2
-            # Sanity check for all CG2 carbons with invalid bond types.
-            elif (pdb_atm.name == "CG2" and atm_obj.get_neighbors_number(True) == 1 and
-                    (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                        atm_obj.get_h_count() != 3 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=3)
-
-            # Atom: CD
-            # Sanity check for all CD carbons with invalid bond types.
-            elif pdb_atm.name == "CD":
-
-                if (pdb_atm.parent.resname in ["ARG", "LYS"] and atm_obj.get_neighbors_number(True) == 2 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 2 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=2)
-
-                # E.g.: 4FVR:A:PRO:792
-                elif (pdb_atm.parent.resname == "PRO" and atm_obj.get_neighbors_number(True) == 2 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 2 or atm_obj.is_in_ring() is False or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=2, in_ring=True)
-
-                # E.g.: 1THA:B:GLN:63
-                # E.g.: 6JWU:A:GLU:42 containing metallic cordination.
-                elif (pdb_atm.parent.resname in ["GLN", "GLU"] and atm_obj.get_neighbors_number(True) == 3 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.get_degree() != 3 or
-                            atm_obj.get_h_count() != 0 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                    fix_atom = False
-                    # GLN/GLU with metallic coordination perceived as covalent bond.
-                    #
-                    #   It identifies only the form generated by Open Babel, where the double bond between OE1 and CD becomes
-                    #       a single bond, and it adds an additional single bond with a Metal.
-                    #
-                    #   Note that if the list of atoms is sorted in a way that OE1 comes first than CD in this loop, then the
-                    #       double bond would have already been amended and the bond with the metal would have already been removed.
-                    #
-                    if (atm_obj.matches_smarts(f"[CX4](N)([#6])[OX2]{METAL_ATOM}") or
-                            atm_obj.matches_smarts(f"[C;X4,X3](-,=[O])([#6])[OX2]({METAL_ATOM})")):
-                        # If it is necessary to break covalent bonds with metals.
-                        if self.break_metal_bonds:
-                            fix_atom = True
-                        else:
-                            logger.debug("While checking for inconsistencies in the atom CD of the residue %s, it was found a metal "
-                                         "covalently bound to its atom OE1. However, nothing will be done because 'break_metal_bonds' "
-                                         "was set to False." % pdb_atm.parent)
-
-                    # If the neighboring oxygen is bound to something else not comprised in the previous rule, it is better not to
-                    # update anything. Otherwise, fix the CD.
-                    elif (atm_obj.matches_smarts("[CX4](N)([#6])[OX2][!#1]") is False and
-                            atm_obj.matches_smarts("[C;X4,X3](-,=[O])([#6])[OX2][!#1]") is False):
-                        fix_atom = True
-
-                    # Alert for unexpected atoms bound to the neighboring nitrogen/oxygen.
-                    elif atm_obj.matches_smarts("[C;X4,X3](-,=[N,O])([#6])[OX2][!#1]"):
-                        logger.debug("While checking for inconsistencies in the atom CD of the residue %s, it was found an unexpected "
-                                     "atom covalently bound to a neighboring nitrogen/oxygen. So, CD will not be amended."
-                                     % pdb_atm.parent)
-
-                    if fix_atom:
-                        bond_types = []
-                        for bond_obj in atm_obj.get_bonds():
-                            partner_obj = bond_obj.get_partner_atom(atm_obj)
-
-                            if partner_obj.get_idx() in pdb_map:
-                                # Redundant rules: OE1 and OE2 section already fixes the bonds with CD.
-                                if partner_obj.get_idx() in pdb_map and pdb_map[partner_obj.get_idx()].name == "OE1":
-                                    # If the OE1 atom is bound to the below metals, update the CD-OE1 bond to CD=OE1.
-                                    if partner_obj.matches_smarts(f"[OX2]({METAL_ATOM})"):
-                                        bond_types.append((bond_obj, BondType.DOUBLE))
-                                    else:
-                                        bond_types.append((bond_obj, BondType.SINGLE))
-
-                                # Redundant rules: OE1 and OE2 section already fixes the bonds with CD.
-                                elif partner_obj.get_idx() in pdb_map and pdb_map[partner_obj.get_idx()].name == "OE2":
-                                    # If the second oxygen (OE1) is bound to some atom not comprised by the expected metals, but OE2 is,
-                                    # then update the CD-OE2 bond to CD=OE2.
-                                    if partner_obj.matches_smarts(f"[OX2]({METAL_ATOM})[CX4]([#6])"
-                                                                  f"[OX2;$(O([CX4])[!#1]);!$(O{METAL_ATOM})]"):
-                                        bond_types.append((bond_obj, BondType.DOUBLE))
-                                    else:
-                                        bond_types.append((bond_obj, BondType.SINGLE))
-
-                                # Any other atom bound to CD
-                                else:
-                                    bond_types.append((bond_obj, BondType.SINGLE))
-
-                        self._fix_atom(atm_obj, bond_types=bond_types, charge=0, implicit_h_count=0)
-
-            # Atom: CD1
-            # Sanity check for all CD1 carbons with invalid bond types.
-            elif pdb_atm.name == "CD1":
-
-                if (pdb_atm.parent.resname in ["ILE", "LEU"] and atm_obj.get_neighbors_number(True) == 1 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 3 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=3)
-
-                elif (pdb_atm.parent.resname in ["PHE", "TRP", "TYR"] and atm_obj.get_neighbors_number(True) == 2 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.get_degree() != 3 or
-                            atm_obj.get_h_count() != 1 or atm_obj.is_aromatic() is False)):
-
-                    bond_types = []
-                    for bond_obj in atm_obj.get_bonds():
-                        partner_obj = bond_obj.get_partner_atom(atm_obj)
-                        if partner_obj.get_idx() in pdb_map:
-                            # Double bonds with CG
-                            if pdb_map[partner_obj.get_idx()].name == "CG":
-                                bond_types.append((bond_obj, BondType.DOUBLE, True))
-                            # Single bonds with CE1 and NE1
-                            else:
-                                bond_types.append((bond_obj, BondType.SINGLE, True))
-
-                    self._fix_atom(atm_obj, bond_types=bond_types, charge=0, implicit_h_count=1, is_aromatic=True)
-
-            # Atom: CD2
-            # Sanity check for all CD2 carbons with invalid bond types.
-            elif pdb_atm.name == "CD2":
-
-                if (pdb_atm.parent.resname == "LEU" and atm_obj.get_neighbors_number(True) == 1 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 3 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=3)
-
-                elif (pdb_atm.parent.resname in ["HIS", "PHE", "TYR"] and atm_obj.get_neighbors_number(True) == 2 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.get_degree() != 3 or
-                            atm_obj.get_h_count() != 1 or atm_obj.is_aromatic() is False)):
-
-                    bond_types = []
-                    for bond_obj in atm_obj.get_bonds():
-                        partner_obj = bond_obj.get_partner_atom(atm_obj)
-                        if partner_obj.get_idx() in pdb_map:
-                            # Bonds with CG
-                            if pdb_map[partner_obj.get_idx()].name == "CG":
-                                # Double bond with CG (only in HIS)
-                                if pdb_atm.parent.resname == "HIS":
-                                    bond_types.append((bond_obj, BondType.DOUBLE, True))
-                                # Single bonds with CG (all, except HIS)
-                                else:
-                                    bond_types.append((bond_obj, BondType.SINGLE, True))
-                            # Double bonds with CE2 (all, except HIS)
-                            elif pdb_map[partner_obj.get_idx()].name == "CE2":
-                                bond_types.append((bond_obj, BondType.DOUBLE, True))
-                            # Single bonds with NE2 (only HIS)
-                            elif pdb_map[partner_obj.get_idx()].name == "NE2":
-                                bond_types.append((bond_obj, BondType.SINGLE, True))
-
-                    self._fix_atom(atm_obj, bond_types=bond_types, charge=0, implicit_h_count=1, is_aromatic=True)
-
-                elif (pdb_atm.parent.resname == "TRP" and atm_obj.get_neighbors_number(True) == 3 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.get_degree() != 3 or
-                            atm_obj.get_h_count() != 0 or atm_obj.is_aromatic() is False)):
-
-                    bond_types = []
-                    for bond_obj in atm_obj.get_bonds():
-                        partner_obj = bond_obj.get_partner_atom(atm_obj)
-                        if partner_obj.get_idx() in pdb_map:
-                            # Double bonds with CE2
-                            if pdb_map[partner_obj.get_idx()].name == "CE2":
-                                bond_types.append((bond_obj, BondType.DOUBLE, True))
-                            # Single bonds with CG and CE3
-                            else:
-                                bond_types.append((bond_obj, BondType.SINGLE, True))
-
-                    self._fix_atom(atm_obj, bond_types=bond_types, charge=0, implicit_h_count=0, is_aromatic=True)
-
-            # Atom: CE
-            # Sanity check for all CE carbons with invalid bond types.
-            elif pdb_atm.name == "CE":
-
-                # CE from LYS.
-                if (pdb_atm.parent.resname == "LYS" and atm_obj.get_neighbors_number(True) == 2 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 2 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=2)
-
-                # CE from MET.
-                elif (pdb_atm.parent.resname == "MET" and atm_obj.get_neighbors_number(True) == 1 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 3 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=3)
-
-            # Atom: CE1
-            # Sanity check for all CE1 carbons with invalid bond types.
-            elif pdb_atm.name == "CE1":
-
-                if (pdb_atm.parent.resname in ["HIS", "PHE", "TYR"] and atm_obj.get_neighbors_number(True) == 2 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.get_degree() != 3 or
-                            atm_obj.get_h_count() != 1 or atm_obj.is_aromatic() is False)):
-
-                    bond_types = []
-                    for bond_obj in atm_obj.get_bonds():
-                        partner_obj = bond_obj.get_partner_atom(atm_obj)
-                        if partner_obj.get_idx() in pdb_map:
-                            # Single bonds with CD1 (all, except HYS)
-                            if pdb_map[partner_obj.get_idx()].name == "CD1":
-                                bond_types.append((bond_obj, BondType.SINGLE, True))
-                            # Double bonds with CZ (all, except HYS)
-                            elif pdb_map[partner_obj.get_idx()].name == "CZ":
-                                bond_types.append((bond_obj, BondType.DOUBLE, True))
-                            # Double bonds with ND1 (only HYS)
-                            elif pdb_map[partner_obj.get_idx()].name == "ND1":
-                                bond_types.append((bond_obj, BondType.DOUBLE, True))
-                            # Single bonds with NE2 (only HYS)
-                            elif pdb_map[partner_obj.get_idx()].name == "NE2":
-                                # CE1 - NE2
-                                bond_types.append((bond_obj, BondType.SINGLE, True))
-
-                    self._fix_atom(atm_obj, bond_types=bond_types, charge=0, implicit_h_count=1, is_aromatic=True)
-
-            # Atom: CE2
-            # Sanity check for all CE2 carbons with invalid bond types.
-            elif pdb_atm.name == "CE2":
-
-                if (pdb_atm.parent.resname in ["PHE", "TYR"] and atm_obj.get_neighbors_number(True) == 2 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.get_degree() != 3 or
-                            atm_obj.get_h_count() != 1 or atm_obj.is_aromatic() is False)):
-
-                    bond_types = []
-                    for bond_obj in atm_obj.get_bonds():
-                        partner_obj = bond_obj.get_partner_atom(atm_obj)
-                        if partner_obj.get_idx() in pdb_map:
-                            # Double bonds with CD2
-                            if pdb_map[partner_obj.get_idx()].name == "CD2":
-                                bond_types.append((bond_obj, BondType.DOUBLE, True))
-                            # Single bonds with CZ
-                            elif pdb_map[partner_obj.get_idx()].name == "CZ":
-                                bond_types.append((bond_obj, BondType.SINGLE, True))
-
-                    self._fix_atom(atm_obj, bond_types=bond_types, charge=0, implicit_h_count=1, is_aromatic=True)
-
-                elif (pdb_atm.parent.resname == "TRP" and atm_obj.get_neighbors_number(True) == 3 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.get_degree() != 3 or
-                            atm_obj.get_h_count() != 0 or atm_obj.is_aromatic() is False)):
-
-                    bond_types = []
-                    for bond_obj in atm_obj.get_bonds():
-                        partner_obj = bond_obj.get_partner_atom(atm_obj)
-                        if partner_obj.get_idx() in pdb_map:
-                            # Double bond with CD2
-                            if pdb_map[partner_obj.get_idx()].name == "CD2":
-                                bond_types.append((bond_obj, BondType.DOUBLE, True))
-                            # Single bonds with NE1 and CZ2
-                            else:
-                                bond_types.append((bond_obj, BondType.SINGLE, True))
-
-                    self._fix_atom(atm_obj, bond_types=bond_types, charge=0, implicit_h_count=0, is_aromatic=True)
-
-            # Atom: CZ
-            # Sanity check for all CZ carbons with invalid bond types.
-            elif pdb_atm.name == "CZ":
-
-                if (pdb_atm.parent.resname == "PHE" and atm_obj.get_neighbors_number(True) == 2 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.get_degree() != 3 or
-                            atm_obj.get_h_count() != 1 or atm_obj.is_aromatic() is False)):
-
-                    bond_types = []
-                    for bond_obj in atm_obj.get_bonds():
-                        partner_obj = bond_obj.get_partner_atom(atm_obj)
-                        if partner_obj.get_idx() in pdb_map:
-                            # Double bond with CE1
-                            if pdb_map[partner_obj.get_idx()].name == "CE1":
-                                bond_types.append((bond_obj, BondType.DOUBLE, True))
-                            # Single bond with CE2
-                            else:
-                                bond_types.append((bond_obj, BondType.SINGLE, True))
-
-                    self._fix_atom(atm_obj, bond_types=bond_types, charge=0, implicit_h_count=1, is_aromatic=True)
-
-                elif (pdb_atm.parent.resname == "TYR" and atm_obj.get_neighbors_number(True) == 3 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.get_degree() != 3 or
-                            atm_obj.get_h_count() != 0 or atm_obj.is_aromatic() is False)):
-
-                    bond_types = []
-                    for bond_obj in atm_obj.get_bonds():
-                        partner_obj = bond_obj.get_partner_atom(atm_obj)
-                        if partner_obj.get_idx() in pdb_map:
-                            # Double bond with CE1
-                            if pdb_map[partner_obj.get_idx()].name == "CE1":
-                                bond_types.append((bond_obj, BondType.DOUBLE, True))
-                            # Single bond with CE2
-                            elif pdb_map[partner_obj.get_idx()].name == "CE2":
-                                bond_types.append((bond_obj, BondType.SINGLE, True))
-                            # Single bond with OH
-                            else:
-                                bond_types.append((bond_obj, BondType.SINGLE))
-
-                    self._fix_atom(atm_obj, bond_types=bond_types, charge=0, implicit_h_count=0, is_aromatic=True)
-
-                elif (pdb_atm.parent.resname == "ARG" and atm_obj.get_neighbors_number(True) == 3 and
-                        (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.get_degree() != 3 or
-                            atm_obj.get_h_count() != 0 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                    bond_types = []
-                    for bond_obj in atm_obj.get_bonds():
-                        partner_obj = bond_obj.get_partner_atom(atm_obj)
-                        if partner_obj.get_idx() in pdb_map:
-                            # Double bond with NH2
-                            if pdb_map[partner_obj.get_idx()].name == "NH2":
-                                bond_types.append((bond_obj, BondType.DOUBLE))
-                            # Single bonds with NE and NH1
-                            else:
-                                bond_types.append((bond_obj, BondType.SINGLE))
-
-                    self._fix_atom(atm_obj, bond_types=bond_types, charge=0, implicit_h_count=0)
-
-            # Atom: CE3, CZ2, CZ3, CH2
-            # Sanity check for TRP carbons with invalid bond types.
-            elif (pdb_atm.name in ["CE3", "CZ2", "CZ3", "CH2"] and atm_obj.get_neighbors_number(True) == 2 and
-                    (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 0 or atm_obj.get_degree() != 3 or
-                        atm_obj.get_h_count() != 1 or atm_obj.is_aromatic() is False)):
-
-                bond_types = []
-                for bond_obj in atm_obj.get_bonds():
-                    partner_obj = bond_obj.get_partner_atom(atm_obj)
-                    if partner_obj.get_idx() in pdb_map:
-
-                        # Double bonds
-                        if ((pdb_atm.name == "CE3" and pdb_map[partner_obj.get_idx()].name == "CZ3") or
-                                (pdb_atm.name == "CZ3" and pdb_map[partner_obj.get_idx()].name == "CE3") or
-                                (pdb_atm.name == "CZ2" and pdb_map[partner_obj.get_idx()].name == "CH2") or
-                                (pdb_atm.name == "CH2" and pdb_map[partner_obj.get_idx()].name == "CZ2")):
-
-                            bond_types.append((bond_obj, BondType.DOUBLE, True))
-                        # Single bonds
-                        else:
-                            bond_types.append((bond_obj, BondType.SINGLE, True))
-
-                self._fix_atom(atm_obj, bond_types=bond_types, charge=0, implicit_h_count=1, is_aromatic=True)
-
-            # Atom: ND1
-            # Sanity check for HIS:ND1 with invalid bond types.
-            elif pdb_atm.name == "ND1":
-
-                fix_atom = False
-                # HIS with metallic coordination perceived as covalent bond.
-                #
-                # Sometimes, the aromatic ring in HIS becomes a simple ring, therefore we should check for any
-                # type of nitrogen in a ring, i.e, aromatic or aliphatic. Note that the aromatic ring
-                # will be fixed after removing the bond with the metal.
-                #
-                # E.g.: 1USN:A:HIS:179
-                #       1IUZ:A:HIS:37
-                #
-                if atm_obj.matches_smarts(f"[#7;R]-{METAL_ATOM}"):
-                    # If it is necessary to break covalent bonds with metals.
-                    if self.break_metal_bonds:
-                        self._remove_metallic_bond(atm_obj)
-                        fix_atom = True
-                    else:
-                        logger.debug("While checking for inconsistencies in the atom ND1 of the residue %s, it was found a metal "
-                                     "covalently bound to it. However, nothing will be done because 'break_metal_bonds' "
-                                     "was set to False." % pdb_atm.parent)
-
-                # If the nitrogen is bound to something else not comprised in the previous rule, it is better not to
-                # update anything. Otherwise, fix ND1.
-                elif (atm_obj.matches_smarts("[#7;R]([#6])([#6])[!#1]") is False and
-                      atm_obj.get_neighbors_number(True) == 2 and (atm_obj.get_valence() != 3 or atm_obj.get_charge() != 0 or
-                                                                   atm_obj.get_degree() != 2 or atm_obj.get_h_count() != 0 or
-                                                                   atm_obj.is_aromatic() is False)):
-                    fix_atom = True
-
-                # Alert for unexpected atoms bound to the nitrogen ND1.
-                elif atm_obj.matches_smarts("[#7;R]([#6])([#6])[!#1]"):
-                    logger.debug("While checking for inconsistencies in the atom ND1 of the residue %s, it was found an unexpected "
-                                 "atom covalently bound to it. So, ND1 will not be amended." % pdb_atm.parent)
-
-                if fix_atom:
-                    bond_types = []
-                    for bond_obj in atm_obj.get_bonds():
-                        partner_obj = bond_obj.get_partner_atom(atm_obj)
-                        if partner_obj.get_idx() in pdb_map:
-                            # Double bond with CE1
-                            if pdb_map[partner_obj.get_idx()].name == "CE1":
-                                bond_types.append((bond_obj, BondType.DOUBLE, True))
-                            # Single bonds with CG
-                            else:
-                                bond_types.append((bond_obj, BondType.SINGLE, True))
-
-                    self._fix_atom(atm_obj, bond_types=bond_types, charge=0, implicit_h_count=0, is_aromatic=True)
-
-            elif (pdb_atm.name == "ND1" and atm_obj.get_neighbors_number(True) == 2 and
-                    (atm_obj.get_valence() != 3 or atm_obj.get_charge() != 0 or atm_obj.get_degree() != 2 or
-                        atm_obj.get_h_count() != 0 or atm_obj.is_aromatic() is False)):
-
-                bond_types = []
-                for bond_obj in atm_obj.get_bonds():
-                    partner_obj = bond_obj.get_partner_atom(atm_obj)
-                    if partner_obj.get_idx() in pdb_map:
-                        # Double bond with CE1
-                        if pdb_map[partner_obj.get_idx()].name == "CE1":
-                            bond_types.append((bond_obj, BondType.DOUBLE, True))
-                        # Single bonds with CG
-                        else:
-                            bond_types.append((bond_obj, BondType.SINGLE, True))
-
-                self._fix_atom(atm_obj, bond_types=bond_types, charge=0, implicit_h_count=0, is_aromatic=True)
-
-            # Atom: ND2
-            # Sanity check for ASN:ND2 with invalid bond types.
-            elif (pdb_atm.name == "ND2" and atm_obj.get_neighbors_number(True) == 1 and
-                    (atm_obj.get_valence() != 3 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                        atm_obj.get_h_count() != 2 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                # ASN with metallic coordination perceived as covalent bond.
-                #
-                #   It identifies two forms:
-                #       - the firt consists of the usual form generated by Open Babel, where the double bond between
-                #           OD1 and CG becomes a single bond, and it adds an additional single bond with a Metal.
-                #
-                #       - the second form may appear after correcting CG first, so the missing double bond would have already been
-                #           fixed.
-                #
-                #   E.g.: 4FVR:A:ASN:678
-                #
-                if atm_obj.matches_smarts(f"N[C;X4,X3]([#6])-,=[OX2]{METAL_ATOM}"):
-                    # If it is necessary to break covalent bonds with metals.
-                    if self.break_metal_bonds:
-                        self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=2)
-                    else:
-                        logger.debug("While checking for inconsistencies in the atom ND2 of the residue %s, it was found a metal "
-                                     "covalently bound to the atom OD1. However, nothing will be done because 'break_metal_bonds' "
-                                     "was set to False." % pdb_atm.parent)
-
-                # If the oxygen is bound to something else not comprised in the previous rules, it is better not to update anything.
-                # Otherwise, fix the ND2.
-                elif atm_obj.matches_smarts("N[CX4]([#6])[OX2][!#1]") is False:
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=2)
-
-                # Alert for unexpected atoms bound to the oxygen OD1.
-                elif atm_obj.matches_smarts("N[CX4]([#6])[OX2][!#1]"):
-                    logger.debug("While checking for inconsistencies in the atom ND2 of the residue %s, it was found an unexpected "
-                                 "atom covalently bound to the oxygen OD1. So, ND2 will not be amended." % pdb_atm.parent)
-
-            # Atom: NE
-            # Sanity check for ARG:NE with invalid bond types.
-            elif (pdb_atm.name == "NE" and atm_obj.get_neighbors_number(True) == 2 and
-                    (atm_obj.get_valence() != 3 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                        atm_obj.get_h_count() != 1 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=1)
-
-            # Atom: NE1
-            # Sanity check for TRP:NE1 with invalid bond types.
-            elif (pdb_atm.name == "NE1" and atm_obj.get_neighbors_number(True) == 2 and
-                    (atm_obj.get_valence() != 3 or atm_obj.get_charge() != 0 or atm_obj.get_degree() != 3 or
-                        atm_obj.get_h_count() != 1 or atm_obj.is_aromatic() is False)):
-
-                bond_types = [(bond_obj, BondType.SINGLE, True) for bond_obj in atm_obj.get_bonds()]
-                self._fix_atom(atm_obj, bond_types=bond_types, charge=0, implicit_h_count=1, is_aromatic=True)
-
-            # Atom: NE2
-            # Sanity check for NE2 nitrogens with invalid bond types.
-            elif pdb_atm.name == "NE2":
-
-                if pdb_atm.parent.resname == "HIS":
-                    # HIS with metallic coordination perceived as covalent bond.
-                    #
-                    # Sometimes, the aromatic ring in HIS becomes a simple ring, therefore we check for any
-                    # type of nitrogen in a ring, i.e, aromatic or aliphatic. Note that the aromatic ring
-                    # will be fixed after removing the bond with the metal.
-                    #
-                    # E.g.: 1USN:A:HIS:151
-                    #       1USN:A:HIS:166
-                    if atm_obj.matches_smarts(f"[#7;R]{METAL_ATOM}"):
-                        # If it is necessary to break covalent bonds with metals.
-                        if self.break_metal_bonds:
-                            self._remove_metallic_bond(atm_obj)
-
-                            bond_types = [(bond_obj, BondType.SINGLE, True) for bond_obj in atm_obj.get_bonds()]
-                            self._fix_atom(atm_obj, bond_types=bond_types, charge=0, implicit_h_count=1, is_aromatic=True)
-                        else:
-                            logger.debug("While checking for inconsistencies in the atom NE2 of the residue %s, it was found a metal "
-                                         "covalently bound to it. However, nothing will be done because 'break_metal_bonds' "
-                                         "was set to False." % pdb_atm.parent)
-
-                    # If the nitrogen is bound to something else not comprised in the previous rule, it is better not to
-                    # update anything. Otherwise, fix NE2.
-                    elif (atm_obj.matches_smarts("[#7;R]([#6])([#6])[!#1]") is False and
-                          atm_obj.get_neighbors_number(True) == 2 and (atm_obj.get_valence() != 3 or atm_obj.get_charge() != 0 or
-                                                                       atm_obj.get_degree() != 3 or atm_obj.get_h_count() != 1 or
-                                                                       atm_obj.is_aromatic() is False)):
-
-                        bond_types = [(bond_obj, BondType.SINGLE, True) for bond_obj in atm_obj.get_bonds()]
-                        self._fix_atom(atm_obj, bond_types=bond_types, charge=0, implicit_h_count=1, is_aromatic=True)
-
-                    # Alert for unexpected atoms bound to the nitrogen NE2.
-                    elif atm_obj.matches_smarts("[#7;R]([#6])([#6])[!#1]"):
-                        logger.debug("While checking for inconsistencies in the atom NE2 of the residue %s, it was found an unexpected "
-                                     "atom covalently bound to it. So, NE2 will not be amended." % pdb_atm.parent)
-
-                elif (pdb_atm.parent.resname == "GLN" and atm_obj.get_neighbors_number(True) == 1 and
-                        (atm_obj.get_valence() != 3 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                            atm_obj.get_h_count() != 2 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                    # GLN with metallic coordination perceived as covalent bond.
-                    #
-                    #   It identifies two forms:
-                    #       - the firt consists of the usual form generated by Open Babel, where the double bond between
-                    #           OE1 and CD becomes a single bond, and it adds an additional single bond with a Metal.
-                    #
-                    #       - the second form may appear after correcting CD first, so the missing double bond would have already been
-                    #           fixed.
-                    #
-                    if atm_obj.matches_smarts(f"N[C;X4,X3]([#6])-,=[OX2]{METAL_ATOM}"):
-                        # If it is necessary to break covalent bonds with metals.
-                        if self.break_metal_bonds:
-                            self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=2)
-                        else:
-                            logger.debug("While checking for inconsistencies in the atom NE2 of the residue %s, it was found a metal "
-                                         "covalently bound to the atom OE1. However, nothing will be done because 'break_metal_bonds' "
-                                         "was set to False." % pdb_atm.parent)
-
-                    # If the oxygen is bound to something else not comprised in the previous rules, it is better not to update anything.
-                    # Otherwise, fix the NE2.
-                    elif atm_obj.matches_smarts("N[CX4]([#6])[OX2][!#1]") is False:
-                        self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=2)
-
-                    # Alert for unexpected atoms bound to the oxygen OE1.
-                    elif atm_obj.matches_smarts("N[CX4]([#6])[OX2][!#1]"):
-                        logger.debug("While checking for inconsistencies in the atom NE2 of the residue %s, it was found an unexpected "
-                                     "atom covalently bound to the oxygen OE1. So, NE2 will not be amended." % pdb_atm.parent)
-
-            # Atom: NZ
-            # Sanity check for LYS:NZ with invalid bond types.
-            elif (pdb_atm.name == "NZ" and atm_obj.get_neighbors_number(True) == 1 and
-                    (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 1 or atm_obj.get_degree() != 4 or
-                        atm_obj.get_h_count() != 3 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=1, implicit_h_count=3)
-
-            # Atom: NH1
-            # Sanity check for ARG:NH1 with invalid bond types.
-            elif (pdb_atm.name == "NH1" and atm_obj.get_neighbors_number(True) == 1 and
-                    (atm_obj.get_valence() != 3 or atm_obj.get_charge() != 0 or atm_obj.get_degree() != 3 or
-                        atm_obj.get_h_count() != 2 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=2)
-
-            # Atom: NH2
-            # Sanity check for ARG:NH2 with invalid bond types.
-            elif (pdb_atm.name == "NH2" and atm_obj.get_neighbors_number(True) == 1 and
-                    (atm_obj.get_valence() != 4 or atm_obj.get_charge() != 1 or atm_obj.get_degree() != 3 or
-                        atm_obj.get_h_count() != 2 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                self._fix_atom(atm_obj, bond_types=[BondType.DOUBLE], charge=1, implicit_h_count=2)
-
-            # Atom: O, OD1, and OE1
-            # Sanity check for OD1/OE1 oxygens with invalid bond types.
-            elif pdb_atm.name in ["O", "OD1", "OE1"]:
-
-                # Any O oxygen or ASN/ASP/GLN/GLU OD1/OE1 with metallic coordination perceived as covalent bond.
-                #
-                #   It identifies two forms:
-                #       - the firt consists of the usual form generated by Open Babel where the double bonds between O and C,
-                #           OD1 and CG, or OE1 and CD become single bonds, while it adds an additional single bond with a Metal.
-                #
-                #       - the second form may appear after correcting C/CG/CD first, so the missing double bond would have already been
-                #           fixed, but it makes the oxygens to have incorrect valence and degree, so we still need to fix them.
-                #           And of course, we still need to remove the bond with the metal.
-                #
-                # E.g.: 6JWU:A:GLU:42, 6JWU:B:ASP:210, 4FVR:A:ASN:678.
-                #
-                if (atm_obj.matches_smarts(f"[OX2]({METAL_ATOM})-,=[C;X4,X3]([#6])(-,=[N])") or
-                        atm_obj.matches_smarts(f"[OX2]({METAL_ATOM})-,=[C;X4,X3]([#6])(-,=[O])")):
-                    # If it is necessary to break covalent bonds with metals.
-                    if self.break_metal_bonds:
-                        self._remove_metallic_bond(atm_obj)
-                        self._fix_atom(atm_obj, bond_types=[BondType.DOUBLE], charge=0, implicit_h_count=0)
-                    else:
-                        logger.debug("While checking for inconsistencies in the atom %s of the residue %s, it was found a metal "
-                                     "covalently bound to it. However, nothing will be done because 'break_metal_bonds' "
-                                     "was set to False." % (pdb_atm.name, pdb_atm.parent))
-
-                # If the oxygen is bound to something else not comprised in the previous rules, it is better not to update anything.
-                # Otherwise, fix the oxygen.
-                #
-                # Note that it doesn't check out the situation of the other oxygen (OXT or OD2/OE2 in ASP/GLU), because O/OD1/OE1 will
-                # always have a double bond no matter the other oxygen has or not a bond with metals or other atoms.
-                #
-                # E.g.: 3QQL:A:GLY:11 contain incorrectly perceived bonds.
-                #
-                elif (atm_obj.get_neighbors_number(True) == 1 and (atm_obj.get_valence() != 2 or atm_obj.get_charge() != 0 or
-                                                                   atm_obj.has_only_bond_type(BondType.DOUBLE) is False or
-                                                                   atm_obj.get_h_count() != 0 or atm_obj.is_in_ring() or
-                                                                   atm_obj.is_aromatic())):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.DOUBLE], charge=0, implicit_h_count=0)
-
-                # Alert for unexpected atoms bound to the oxygens.
-                elif atm_obj.matches_smarts(f"[OX2;$(O([C;X4,X3])[!#1]);!$(O{METAL_ATOM})]-,=[C;X4,X3]"):
-                    logger.debug("While checking for inconsistencies in the atom %s of the residue %s, it was found an unexpected "
-                                 "atom covalently bound to it. So, %s will not be amended." % (pdb_atm.name, pdb_atm.parent,
-                                                                                                 pdb_atm.name))
-
-            # Atom: OXT, OD2, and OE2
-            # Sanity check for OXT/OD2/OE2 oxygens with invalid bond types.
-            elif pdb_atm.name in ["OXT", "OD2", "OE2"]:
-
-                # ASP/GLU or any OXT with metallic coordination perceived as covalent bond.
-                #
-                #   It considers monodentate (only OXT/OD2/E2) and bidentate (both oxygens in ASP/GLU or main chain O and OXT)
-                #   interactions with metals.
-                #
-                #   For the second oxygen (O/OD1/OE1), we also consider that it may appear after correcting C/CG/CD first, so the
-                #   missing double bond would have already been fixed.
-                #
-                #   E.g.: 6JWU:B:ASP:210.
-                #
-                if (atm_obj.matches_smarts(f"[OX2]({METAL_ATOM})[C;X4,X3]([#6])-,=[OX2;$(O{METAL_ATOM})]") or
-                        atm_obj.matches_smarts(f"[OX2]({METAL_ATOM})[CX3]([#6])=[OX1]")):
-                    # If it is necessary to break covalent bonds with metals.
-                    if self.break_metal_bonds:
-                        self._remove_metallic_bond(atm_obj)
-                        self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=-1, implicit_h_count=0)
-                    else:
-                        logger.debug("While checking for inconsistencies in the atom %s of the residue %s, it was found a metal "
-                                     "covalently bound to it. However, nothing will be done because 'break_metal_bonds' "
-                                     "was set to False." % (pdb_atm.name, pdb_atm.parent))
-
-                # If the second oxygen (OD1/OE1) is bound to something else not comprised in the previous rules,
-                # then it won't be fixed and, therefore, we should update OD2/OE2 as follows: remove the bond with
-                # the metal and then substitute the single bond with CG/CD for a double bond. Note that OD2/OE2
-                # will play the role of OD1/OE1 after the update because that oxygen won't be amended.
-                #
-                # Note, we also consider that it may appear after correcting C/CG/CD first, so the missing double
-                # bond would have already been fixed.
-                elif atm_obj.matches_smarts(f"[OX2]({METAL_ATOM})-,=[C;X4,X3]([#6])[OX2;$(O([C;X4,X3])[!#1])]"):
-                    # If it is necessary to break covalent bonds with metals.
-                    if self.break_metal_bonds:
-                        self._remove_metallic_bond(atm_obj)
-                        self._fix_atom(atm_obj, bond_types=[BondType.DOUBLE], charge=0, implicit_h_count=0)
-                    else:
-                        logger.debug("While checking for inconsistencies in the atom %s of the residue %s, it was found a metal "
-                                     "covalently bound to it. However, nothing will be done because 'break_metal_bonds' "
-                                     "was set to False." % (pdb_atm.name, pdb_atm.parent))
-
-                # Capture cases where the second oxygen is bound to a metal atom, but not OXT/OD2/OE2.
-                elif atm_obj.matches_smarts(f"[OX1]=[CX3]([#6])[OX2;$(O{METAL_ATOM})]"):
-                    # If it is necessary to break covalent bonds with metals.
-                    if self.break_metal_bonds:
-                        self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=-1, implicit_h_count=0)
-                    else:
-                        logger.debug("While checking for inconsistencies in the atom %s of the residue %s, it was found a metal "
-                                     "covalently bound to the other carboxyl oxygen. However, nothing will be done because "
-                                     "'break_metal_bonds' was set to False." % (pdb_atm.name, pdb_atm.parent))
-
-                # It fixes invalid oxygens, excluing cases where OD2/OE2 is bound to an atom not comprised in the
-                # previous rules and cases where OD2/OE2 has a double bond with CG/CD and the second oxygen (OD1/OE1)
-                # is bound to two atoms, one of which is an unexpected atom not considered in our standardization function
-                elif (atm_obj.matches_smarts("[OX2]([!#1])[C;X4,X3]") is False and
-                        atm_obj.matches_smarts(f"[OX1]=[CX3]([#6])[OX2;$(O([CX3])[!#1]);!$(O{METAL_ATOM})]") is False and
-                        atm_obj.get_neighbors_number(True) == 1 and (atm_obj.get_valence() != 1 or atm_obj.get_charge() != -1 or
-                                                                     atm_obj.get_degree() != 1 or atm_obj.get_h_count() != 0 or
-                                                                     atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=-1, implicit_h_count=0)
-
-                # Alert for unexpected atoms bound to the oxygens.
-                elif atm_obj.matches_smarts("[OX2]([!#1])[C;X4,X3]"):
-                    logger.debug("While checking for inconsistencies in the atom %s of the residue %s, it was found an unexpected "
-                                 "atom covalently bound to it. So, %s will not be amended." % (pdb_atm.name, pdb_atm.parent,
-                                                                                                 pdb_atm.name))
-
-                # Alert for unexpected atoms bound to the oxygens.
-                elif atm_obj.matches_smarts(f"[OX1]=[CX3]([#6])[OX2;$(O([CX3])[!#1]);!$(O{METAL_ATOM})]"):
-                    logger.debug("While checking for inconsistencies in the atom %s of the residue %s, it was found an unexpected "
-                                 "atom covalently bound to the other carboxyl oxygen. So, %s was treated as a carbonyl oxygen." %
-                                 (pdb_atm.name, pdb_atm.parent, pdb_atm.name))
-
-            # Atom: OG, OG1, and OH
-            # Sanity check for OG/OG1/OH oxygens with invalid bond types.
-            elif pdb_atm.name in ["OG", "OG1", "OH"]:
-
-                # TYR/SER/THR with metallic coordination perceived as covalent bond.
-                #
-                # Bertini et al. 2007. Biological Inorganic Chemistry: Structure and Reactivity.
-                #
-                # E.g: 1TFD:A:TYR:188
-                #
-                if atm_obj.matches_smarts(f"[OX2]{METAL_ATOM}"):
-                    # If it is necessary to break covalent bonds with metals.
-                    if self.break_metal_bonds:
-                        self._remove_metallic_bond(atm_obj)
-                        self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=1)
-                    else:
-                        logger.debug("While checking for inconsistencies in the atom %s of the residue %s, it was found a metal "
-                                     "covalently bound to it. However, nothing will be done because 'break_metal_bonds' "
-                                     "was set to False." % (pdb_atm.name, pdb_atm.parent))
-
-                # If the oxygen is bound to something else not comprised in the previous rule, it is better not to
-                # update anything. Otherwise, fix OG/OG1/OH.
-                elif atm_obj.get_neighbors_number(True) == 1 and (atm_obj.get_valence() != 2 or atm_obj.get_charge() != 0 or
-                                                                  atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                                                                  atm_obj.get_h_count() != 1 or atm_obj.is_in_ring() or
-                                                                  atm_obj.is_aromatic()):
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=1)
-
-                # Alert for unexpected atoms bound to the hydroxyl oxygens.
-                elif atm_obj.matches_smarts(f"[OX2;$(O([#6])[!#1]);!$(O{METAL_ATOM})]"):
-                    logger.debug("While checking for inconsistencies in the atom %s of the residue %s, it was found an unexpected "
-                                 "atom covalently bound to it. So, %s will not be amended." % (pdb_atm.name, pdb_atm.parent,
-                                                                                                 pdb_atm.name))
-
-            # Atom: SD
-            # Sanity check for MET:SD with invalid bond types.
-            #
-            # Although MET can be involved in the coordination of metals, due to its two single bonds, it will never be incorrectly
-            # perceived as being covalently bound to metals. Therefore, we do not need to check for it.
-            #
-            elif (pdb_atm.name == "SD" and atm_obj.get_neighbors_number(True) == 2 and
-                    (atm_obj.get_valence() != 2 or atm_obj.get_charge() != 0 or atm_obj.has_only_bond_type(BondType.SINGLE) is False or
-                        atm_obj.get_h_count() != 0 or atm_obj.is_in_ring() or atm_obj.is_aromatic())):
-
-                self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=0)
-
-            # Atom: SG
-            # Sanity check for CYS:SG with invalid bond types.
-            elif pdb_atm.name == "SG":
-
-                # CYS with metallic coordination perceived as covalent bond.
-                #
-                # Harding et al. 2010. Metals in protein structures: a review of their principal features.
-                # Bertini et al. 2007. Biological Inorganic Chemistry: Structure and Reactivity.
-                #
-                # E.g: 1IUZ:A:CYS:84
-                #
-                if atm_obj.matches_smarts(f"[SX2]{METAL_ATOM}"):
-                    # If it is necessary to break covalent bonds with metals.
-                    if self.break_metal_bonds:
-                        self._remove_metallic_bond(atm_obj)
-                        self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=-1, implicit_h_count=0)
-                    else:
-                        logger.debug("While checking for inconsistencies in the atom SG of the residue %s, it was found a metal "
-                                     "covalently bound to it. However, nothing will be done because 'break_metal_bonds' "
-                                     "was set to False." % pdb_atm.parent)
-
-                # If the sulfur is bound to something else not comprised in the previous rule, it is better not to
-                # update anything. Otherwise, fix SG.
-                elif (atm_obj.matches_smarts("[SX2](C)[!#1]") is False and
-                        (atm_obj.get_valence() != 2 or atm_obj.get_charge() != 0 or atm_obj.get_degree() != 2 or
-                         atm_obj.has_only_bond_type(BondType.SINGLE) is False or atm_obj.is_in_ring() or
-                         atm_obj.is_aromatic())):
-
-                    # Get the number of implicit hydrogen count based on the bonds SG has, i.e., if it is the usual cysteine, then
-                    # it has 1 implicit hydrogen, but if it establishes a disulfide bond, then it has no hydrogen.
-                    implicit_h_count = 0 if atm_obj.get_neighbors_number(True) == 2 else 1
-
-                    self._fix_atom(atm_obj, bond_types=[BondType.SINGLE], charge=0, implicit_h_count=implicit_h_count)
-
-                # Alert for unexpected atoms bound to the hydroxyl oxygens.
-                elif atm_obj.matches_smarts("[SX2](C)[!#1]"):
-                    logger.debug("While checking for inconsistencies in the atom SG of the residue %s, it was found an unexpected "
-                                 "atom covalently bound to it. So, SG will not be amended." % pdb_atm.parent)
-
-        # Only remove metals with no bond to any residue.
-        for metal_obj in self.found_metals.values():
-            if len(metal_obj.get_bonds()) == 0:
-                self.removed_atoms.append(metal_obj.get_id())
-                atm_obj.parent.unwrap().DeleteAtom(metal_obj)
-
-    def _fix_atom(self, atm_obj, charge=None, remove_explict_h=True, implicit_h_count=None,
-                  bond_types=None, is_aromatic=False, in_ring=False):
-
-        # Remove all current explicit hydrogens.
-        if remove_explict_h:
-            self._remove_explict_hydrogens(atm_obj)
-
-        # Convert bond types.
-        if bond_types is not None:
-            self._fix_bonds(atm_obj, bond_types)
-
-        # All aromatic atoms will have their in_ring property set to True.
-        if is_aromatic:
-            in_ring = True
-
-        # Set if atom belongs to a ring or not.
-        atm_obj.set_in_ring(in_ring)
-
-        # Set if an atom is aromatic or not.
-        atm_obj.set_as_aromatic(is_aromatic)
-
-        if implicit_h_count is not None:
-            atm_obj.unwrap().SetImplicitHCount(implicit_h_count)
-
-        # Set charge.
-        if charge is not None:
-            atm_obj.set_charge(charge)
-
-    def _remove_explict_hydrogens(self, atm_obj):
+                # Partner atom's object
+                partner_obj, partner_atm = trg_atm_pairs[0]
+                # Bond type
+                bond_name = res_bonds[bond_key]["type"]
+                bond_type = OBBondType[bond_name].value
+                # Bond aromaticity
+                is_aromatic = res_bonds[bond_key]["is_aromatic"]
+
+                # Create a new bond modification event.
+                self._events["modbonds"].add(((atm_obj, pdb_atm),
+                                              (partner_obj, partner_atm),
+                                              None, bond_type,
+                                              is_aromatic))
+
+    def _resolve_invariants(self, resname, atm_obj, pdb_atm, atm_names=None):
+
+        if pdb_atm in self._events["ignore"]:
+            return
+
+        res = pdb_atm.parent
+        atm_names = atm_names or []
+
+        # Expected invariant.
+        invariants = None
+        # Define if this atom is aromatic.
+        is_aromatic = None
+
+        if res.is_water():
+            smarts1 = f"[O]({METAL_ATOM}){METAL_ATOM}"
+            smarts2 = f"[O]{METAL_ATOM}"
+            if (pdb_atm.name == "O"
+                    and atm_obj.matches_smarts(smarts1)):
+                invariants = [0, 0, 8, 16, -2, 0, 0]
+
+            elif (pdb_atm.name == "O"
+                    and atm_obj.matches_smarts(smarts2)):
+                invariants = [0, 0, 8, 16, -1, 1, 0]
+
+        elif pdb_atm.name in ["C", "N"]:
+            nb_residues = get_residue_neighbors(res,
+                                                verbose=False)
+
+            if (pdb_atm.name == "N"
+                    and nb_residues.predecessor not in self.residues):
+
+                invariants = [1, 1, 7, 14, 1, 3, 0]
+                if res.resname == "PRO":
+                    invariants = [2, 2, 7, 14, 1, 2, 1]
+
+            elif (pdb_atm.name == "N"
+                    and atm_obj.matches_smarts(f"[N]{METAL_ATOM}")):
+                invariants = [2, 2, 7, 14, -1, 0, 0]
+
+            elif (pdb_atm.name == "C"
+                    and nb_residues.successor not in self.residues):
+
+                n_heavy_atms = \
+                    atm_obj.get_neighbors_number(only_heavy_atoms=True)
+
+                # If it's a C-terminal residue and OXT exists,
+                # then C has no Hydrogen.
+                if "OXT" not in atm_names or n_heavy_atms != 3:
+                    invariants = [2, 3, 6, 12, 0, 1, 0]
+
+        # Load the invariants from the definition file.
+        if invariants is None:
+            props = self.res_data[resname]["atoms"]
+            invariants = props[pdb_atm.name]["invariants"]
+            invariants = [int(i) for i in invariants.split(",")]
+            is_aromatic = props[pdb_atm.name]["is_aromatic"]
+
+        # Add a new event to modify the atom in case the invariants
+        # don't match.
+        if atm_obj.get_atomic_invariants() != invariants:
+            self._events["modatms"].add(((atm_obj, pdb_atm),
+                                         tuple(invariants),
+                                         is_aromatic))
+
+    def _fix_bonds(self, bond_types):
+        # bond_types becomes an empty list if bond_types is None.
+        bond_types = bond_types or []
+
+        # If bond_types is an empty list, do nothing.
+        if len(bond_types) == 0:
+            return
+
+        # It expects a list of tuples where the first element is the bond to be
+        # updated, the second element should be the new type, and the third
+        # optional element is a flag to indicate if the bond is aromatic
+        # or not.
+        for bond_info in bond_types:
+            bond_obj, new_bond_type = bond_info[0:2]
+            # Update bond type
+            bond_obj.set_bond_type(new_bond_type)
+
+            # If the tuple contains three elements, it must be a boolean to
+            # define if it is an aromatic bond or not.
+            if len(bond_info) == 3:
+                is_aromatic = bond_info[2]
+                bond_obj.set_as_aromatic(is_aromatic)
+
+    def _add_bonds(self, mol_obj, new_bonds):
+        # new_bonds becomes an empty list if new_bonds is None.
+        new_bonds = new_bonds or []
+
+        # If new_bonds is an empty list, do nothing.
+        if len(new_bonds) == 0:
+            return
+
+        obmol = mol_obj
+        if isinstance(mol_obj, MolWrapper):
+            mol_obj = mol_obj.unwrap()
+
+        # It expects a list of tuples where the first element is the bond to be
+        # updated, the second element should be the new type, and the third
+        # optional element is a flag to indicate if the bond is aromatic
+        # or not.
+        for bond_info in new_bonds:
+            begin_idx, end_idx = bond_info[0:2]
+            bond_type = bond_info[2]
+
+            # If 'flags' is:
+            #   - 0: the bond is not aromatic.
+            #   - 2: the bond is aromatic.
+            flags = 0
+
+            # If the tuple contains four elements, it must be a boolean to
+            # define if it is an aromatic bond or not.
+            if len(bond_info) == 4:
+                flags = 2 if bond_info[3] is True else 0
+
+            obmol.AddBond(begin_idx, end_idx,
+                          bond_type, flags)
+
+    def _remove_explicit_hydrogens(self, atm_obj):
         delete_hs = []
         for b in atm_obj.get_bonds():
             if b.get_partner_atom(atm_obj).get_symbol() == "H":
@@ -1228,45 +607,182 @@ class ResiduesStandardiser:
         for hs_obj in delete_hs:
             atm_obj.parent.unwrap().DeleteAtom(hs_obj.unwrap())
 
-    def _fix_bonds(self, atm_obj, bond_types):
-        # bond_types becomes an empty list if bond_types is None.
-        bond_types = bond_types or []
+    def _fix_atom(self, atm_obj, charge=None, remove_explict_h=True,
+                  implicit_h_count=None, is_aromatic=None,
+                  in_ring=None):
 
-        # If bond_types is an empty list, do nothing.
-        if len(bond_types) == 0:
+        # Remove all current explicit hydrogens.
+        if remove_explict_h:
+            self._remove_explicit_hydrogens(atm_obj)
+
+        # All aromatic atoms will have their in_ring property set to True.
+        if is_aromatic:
+            in_ring = True
+
+        # Set if atom belongs to a ring or not.
+        if in_ring is not None:
+            atm_obj.set_in_ring(in_ring)
+
+        # Set if an atom is aromatic or not.
+        if is_aromatic is not None:
+            atm_obj.set_as_aromatic(is_aromatic)
+
+        if implicit_h_count is not None:
+            atm_obj.unwrap().SetImplicitHCount(implicit_h_count)
+
+        # Set charge.
+        if charge is not None:
+            atm_obj.set_charge(charge)
+
+    def _apply_modifications(self):
+
+        processed_bonds = set()
+
+        for data in self._events["break"]:
+            atm_obj, pdb_atm = data[0]
+            partner_obj, partner_atm = data[1]
+            bond_to_break = data[2]
+
+            bond_key = tuple(sorted([pdb_atm, partner_atm]))
+            if bond_key in processed_bonds:
+                continue
+            if pdb_atm in self._events["ignore"]:
+                continue
+
+            if xor(pdb_atm.parent.is_metal(),
+                   partner_atm.parent.is_metal()):
+
+                if pdb_atm.parent.is_metal():
+                    key = (partner_obj.get_idx(), partner_atm)
+                    val = atm_obj
+                else:
+                    key = (atm_obj.get_idx(), pdb_atm)
+                    val = partner_obj
+
+                self.bound_to_metals[key].append(val)
+
+            obmol = atm_obj.parent.unwrap()
+            obmol.DeleteBond(bond_to_break.unwrap())
+
+            processed_bonds.add(bond_key)
+
+        for data in self._events["modbonds"]:
+            (atm_obj, pdb_atm) = data[0]
+            (partner_obj, partner_atm) = data[1]
+
+            bond_to_mod, new_bond_type, is_aromatic = data[2:]
+
+            if (pdb_atm in self._events["ignore"]
+                    or partner_atm in self._events["ignore"]):
+                continue
+
+            if bond_to_mod is not None:
+                self._fix_bonds([(bond_to_mod, new_bond_type, is_aromatic)])
+            else:
+                obmol = atm_obj.parent
+                new_bond = [(atm_obj.get_idx(), partner_obj.get_idx(),
+                             new_bond_type, is_aromatic)]
+                self._add_bonds(obmol, new_bond)
+
+        for data in self._events["modatms"]:
+            (atm_obj, pdb_atm) = data[0]
+            invariants = data[1]
+            is_aromatic = data[2]
+
+            if pdb_atm in self._events["ignore"]:
+                continue
+
+            charge, implicit_h_count, in_ring = None, None, None
+            if invariants is not None:
+                charge = invariants[4]
+                implicit_h_count = invariants[5]
+                in_ring = bool(invariants[6])
+
+            self._fix_atom(atm_obj,
+                           charge=charge,
+                           implicit_h_count=implicit_h_count,
+                           is_aromatic=is_aromatic,
+                           in_ring=in_ring)
+
+    def _standardize_residue(self, res):
+        atom_pairs = self.residues[res]
+        atm_names = [pdb_atm.name
+                     for atm_obj, pdb_atm in atom_pairs]
+        self._validate_atoms_list(res, atm_names)
+
+        resname = self._resolve_resname(res)
+        for atm_obj, pdb_atm in atom_pairs:
+            self._resolve_bonds(resname, atm_obj, pdb_atm)
+            self._resolve_invariants(resname, atm_obj, pdb_atm, atm_names)
+
+    def _standardize_water(self, res):
+        atom_pairs = self.residues[res]
+
+        if len(atom_pairs) != 1:
+            logger.error("The water molecule %s contains %d "
+                         "heavy atom(s), while one is expected."
+                         % (res, len(atom_pairs)))
             return
 
-        # All bonds will be converted to the same type.
-        elif len(bond_types) == 1 and isinstance(bond_types[0], BondType):
-            new_bond_type = bond_types[0]
-            for bond_obj in atm_obj.get_bonds():
-                bond_obj.set_bond_type(new_bond_type)
+        atm_obj, pdb_atm = atom_pairs[0]
 
-        # It expects a list of tuples where the first element is the bond to be updated, the second element should be the new type,
-        # and the third optional element is a flag to indicate if the bond is aromatic or not.
-        else:
-            for bond_info in bond_types:
-                bond_obj, new_bond_type = bond_info[0:2]
-                # Update bond type
-                bond_obj.set_bond_type(new_bond_type)
+        self._resolve_bonds("HOH", atm_obj, pdb_atm)
+        self._resolve_invariants("HOH", atm_obj, pdb_atm)
 
-                # If the tuple contains three elements, it must be a boolean to define if it is an aromatic bond or not.
-                if len(bond_info) == 3:
-                    is_aromatic = bond_info[2]
-                    bond_obj.set_as_aromatic(is_aromatic)
+    def _standardize_metal(self, res):
+        atom_pairs = self.residues[res]
 
-    def _remove_metallic_bond(self, atm_obj):
+        if len(atom_pairs) != 1:
+            logger.error("The metal %s contains %d "
+                         "heavy atom(s), while one is expected."
+                         % (res, len(atom_pairs)))
+            return
 
-        bonds_to_remove = []
-        for bond_obj in atm_obj.get_bonds():
-            partner_obj = bond_obj.get_partner_atom(atm_obj)
+        atm_obj, pdb_atm = atom_pairs[0]
 
-            if partner_obj.get_symbol() in METALS:
-                bonds_to_remove.append((partner_obj, bond_obj))
+        resname = self._resolve_metal_name(pdb_atm, atm_obj)
 
-        # Remove metallic bond and mark metal to remotion.
-        for metal_obj, bond_obj in bonds_to_remove:
+        self._resolve_bonds(res.resname, atm_obj, pdb_atm)
+        self._resolve_invariants(resname, atm_obj, pdb_atm)
 
-            self.found_metals[metal_obj.get_id()] = metal_obj
+    def _check_mol(self, res):
+        atom_pairs = self.residues[res]
+        atm_names = [pdb_atm.name
+                     for atm_obj, pdb_atm in atom_pairs]
+        self._validate_atoms_list(res, atm_names)
 
-            atm_obj.parent.unwrap().DeleteBond(bond_obj.unwrap())
+        resname = res.resname
+        if res.is_residue():
+            resname = self._resolve_resname(res)
+        elif res.is_water():
+            resname = "HOH"
+
+        for atm_obj, pdb_atm in atom_pairs:
+            if res.is_metal():
+                self._check_metal_coordination(atm_obj, pdb_atm)
+
+            self._resolve_bonds(resname, atm_obj, pdb_atm)
+            self._resolve_invariants(resname, atm_obj, pdb_atm, atm_names)
+
+    def standardize(self, atom_pairs):
+
+        self.bound_to_metals = defaultdict(list)
+
+        self.metals = {}
+        self.events = []
+
+        self.residues = defaultdict(list)
+        self._pdb_map = {}
+
+        self._events = defaultdict(set)
+
+        for atm_obj, pdb_atm in atom_pairs:
+            self._pdb_map[atm_obj.get_idx()] = pdb_atm
+            self.residues[pdb_atm.parent].append((atm_obj, pdb_atm))
+
+        for res in self.residues:
+            if res.is_hetatm():
+                continue
+            self._check_mol(res)
+
+        self._apply_modifications()
