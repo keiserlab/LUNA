@@ -39,12 +39,13 @@ class MolValidator:
 
     def __init__(self, charge_model=OpenEyeModel(), fix_nitro=True,
                  fix_amidine_and_guanidine=True, fix_valence=True,
-                 fix_charges=True):
+                 fix_charges=True, bound_to_metals=None):
         self.charge_model = charge_model
         self.fix_nitro = fix_nitro
         self.fix_amidine_and_guanidine = fix_amidine_and_guanidine
         self.fix_valence = fix_valence
         self.fix_charges = fix_charges
+        self.bound_to_metals = bound_to_metals or []
 
     def validate_mol(self, mol_obj):
         """Validate molecule ``mol_obj``.
@@ -74,6 +75,9 @@ class MolValidator:
         #       TODO: check aromaticity.
         #       TODO: return list of errors
 
+        if self.bound_to_metals:
+            self._fix_atoms_bound_to_metals(mol_obj)
+
         if self.fix_nitro:
             self._fix_nitro_substructure_and_charge(mol_obj)
 
@@ -94,6 +98,67 @@ class MolValidator:
                          "information.")
 
         return is_valid
+
+    def _fix_atoms_bound_to_metals(self, mol_obj):
+
+        # Iterate over each atom that has a dative bond with a metal
+        # to evaluate if its charge is correct.
+        for idx, pdb_atm in self.bound_to_metals:
+
+            atm_obj = mol_obj.get_atom_by_idx(idx)
+            metals = self.bound_to_metals[(idx, pdb_atm)]
+
+            if not atm_obj:
+                raise KeyError("Atom #%d does not exist." % idx)
+
+            # Fix HIS:ND1 and HIS:NE2 that are bound to metals.
+            if (pdb_atm.name in ["ND1", "NE2"]
+                    and pdb_atm.parent.resname == "HIS"):
+
+                if atm_obj.get_charge() == 1:
+                    logger.debug("Atom #%d has incorrect charge. It will "
+                                 "update its charge from 1 to 0." % idx)
+
+                    atm_obj.set_charge(0)
+                    self._remove_explicit_hydrogens(atm_obj)
+
+            # Fix main chain N or LYS:NZ that are bound to metals and
+            # that has a charge = +1.
+            elif (pdb_atm.name == "N"
+                    or (pdb_atm.name == "NZ"
+                        and pdb_atm.parent.resname == "LYS")):
+
+                if atm_obj.get_charge() == 1:
+                    logger.debug("Atom #%d has incorrect charge. It will "
+                                 "update its charge from 1 to 0 and fix "
+                                 "its number of bound hydrogens." % idx)
+
+                    # Set residue charge to 0.
+                    atm_obj.set_charge(0)
+
+                    # Now, loop over this atom's bonds to identify
+                    # all bonds with hydrogens. Then, it will identify
+                    # the closest H to the metal and remove it.
+                    #
+                    # That's because residue can only coordinate
+                    # one metal at once.
+                    h_to_remove = None
+                    min_dist = float('inf')
+                    for b in atm_obj.get_bonds():
+                        if b.get_partner_atom(atm_obj).get_symbol() == "H":
+                            h_obj = b.get_partner_atom(atm_obj)
+
+                            for metal_obj in metals:
+                                # Distance between the H and the metal.
+                                d = h_obj - metal_obj
+                                if d < min_dist:
+                                    h_to_remove = h_obj
+                                    min_dist = d
+
+                    # Remove the closest H to the metal.
+                    if h_to_remove:
+                        ob_mol = atm_obj.parent.unwrap()
+                        ob_mol.DeleteAtom(h_to_remove.unwrap())
 
     def _fix_nitro_substructure_and_charge(self, mol_obj):
         ob_smart = OBSmartsPattern()
@@ -198,14 +263,14 @@ class MolValidator:
             #                charge to +1.
             #
             if atm_obj.get_valence() == 5 and atm_obj.get_charge() == 0:
-                logger.debug("Atom # %d has incorrect valence and charge."
-                             % atm_obj.get_id())
+                logger.debug("Atom #%d has incorrect valence and charge."
+                             % atm_obj.get_idx())
 
                 if self.fix_valence:
                     logger.debug("'Fix valence' option is set on. It will "
-                                 "update the valence of atom # %d from %d "
+                                 "update the valence of atom #%d from %d "
                                  "to 4 and correct its charge."
-                                 % (atm_obj.get_id(), atm_obj.get_valence()))
+                                 % (atm_obj.get_idx(), atm_obj.get_valence()))
 
                     # Fix the number of implicit Hs and charge.
                     atm_obj.unwrap().SetImplicitHCount(0)
@@ -226,34 +291,21 @@ class MolValidator:
             elif (atm_obj.get_valence() == 5 and atm_obj.get_charge() == 1
                     and atm_obj.get_h_count() == 1):
 
-                logger.debug("Atom # %d has incorrect valence and number of "
+                logger.debug("Atom #%d has incorrect valence and number of "
                              "hydrogens."
-
-                             % atm_obj.get_id())
+                             % atm_obj.get_idx())
 
                 if self.fix_valence:
                     logger.debug("'Fix valence' option is set on. It will "
-                                 "update the valence of atom # %d from %d "
+                                 "update the valence of atom #%d from %d "
                                  "to 4 and correct the number of hydrogens "
                                  "bound to it."
-                                 % (atm_obj.get_id(), atm_obj.get_valence()))
+                                 % (atm_obj.get_idx(), atm_obj.get_valence()))
 
-                    ob_mol = atm_obj.parent.unwrap()
-                    hs_to_remove = []
-                    # Remove any N-H bonds.
-                    for bond_obj in atm_obj.get_bonds():
-                        partner_obj = bond_obj.get_partner_atom(atm_obj)
+                    self._remove_explicit_hydrogens(atm_obj)
 
-                        if partner_obj.get_symbol() == "H":
-                            hs_to_remove.append(partner_obj)
-                            ob_mol.DeleteBond(bond_obj.unwrap())
-
-                    # Remove Hs bound to the N.
-                    for hs_obj in hs_to_remove:
-                        ob_mol.DeleteAtom(hs_obj.unwrap())
                     return True
                 return False
-
         return True
 
     def _is_charge_valid(self, atm_obj):
@@ -264,18 +316,17 @@ class MolValidator:
 
         if (expected_charge is not None
                 and expected_charge != atm_obj.get_charge()):
-            logger.debug("Atom # %d has incorrect charges defined."
-                         % atm_obj.get_id())
+            logger.debug("Atom #%d has incorrect charges defined."
+                         % atm_obj.get_idx())
 
             if self.fix_charges:
                 logger.debug("'Fix charges' option is set on. It will update "
-                             "the charge of atom # %d from %d to %d."
-                             % (atm_obj.get_id(), atm_obj.get_charge(),
+                             "the charge of atom #%d from %d to %d."
+                             % (atm_obj.get_idx(), atm_obj.get_charge(),
                                 expected_charge))
                 atm_obj.set_charge(expected_charge)
                 return True
-            else:
-                return False
+            return False
         return True
 
     def _get_expected_charge(self, atm_obj):
@@ -283,6 +334,18 @@ class MolValidator:
             atm_obj = AtomWrapper(atm_obj)
 
         return self.charge_model.get_charge(atm_obj)
+
+    def _remove_explicit_hydrogens(self, atm_obj):
+        if not isinstance(atm_obj, AtomWrapper):
+            atm_obj = AtomWrapper(atm_obj)
+
+        delete_hs = []
+        for b in atm_obj.get_bonds():
+            if b.get_partner_atom(atm_obj).get_symbol() == "H":
+                delete_hs.append(b.get_partner_atom(atm_obj))
+
+        for hs_obj in delete_hs:
+            atm_obj.parent.unwrap().DeleteAtom(hs_obj.unwrap())
 
 
 class RDKitValidator:
