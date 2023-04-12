@@ -62,7 +62,7 @@ AtomType NitroLikeO [$([O-]-[N+])]
 # 2nd constraint: barbiturates/thiazolidinediones/rhodanine...
 #
 # OBS: I removed general sulfonamide constraint ("$([NH,NH0-1](S(=O)(=O))c)") from this atom definition.
-#      I did it because the sulfonamides are weakly acid (pKa=~10) and depend on appropriate substituents to lower the pKa.
+#      That's because sulfonamides are weakly acid (pKa=~10) and depend on appropriate substituents to lower the pKa.
 #      Then, I prefer to let their N to be donor atoms, i.e., the N will not be considered always deprotonated.
 #      REF: Ballatore C, Huryn DM, Smith AB. Carboxylic Acid (Bio)Isosteres in Drug Design. ChemMedChem. 2013;8:385–95
 #
@@ -83,7 +83,19 @@ EndFeature
 # Adapted from RDKit (Marcus Kossner)
 #
 AtomType TetrazoleN [nR1r5;$(n:n:n:n:c),$(n:n:n:c:n)]
-DefineFeature TautomerRingDonorN [$(n[n;H1]),$(nc[n;H1]);!{TetrazoleN}]
+
+#
+# Capture: tautomeric nitrogens as in imidazole.
+#
+#   => Aromatic rings containing a tertiary N are not tautomeric.
+#
+#   => R1 forces all atoms to belong to the same ring, avoiding cases where a C connecting two rings (R2)
+#           is captured by the rule 'ncn' and makes the N to be incorrectly perceived as a Donor.
+#
+#       . E.g: 2-aminopurin-6-one (Nc1nc(=O)c2ncnc2[nH]1)
+#       
+#
+DefineFeature TautomerRingDonorN [$([n;R1][n;H1;R1]),$([n;R1][c;R1][n;H1;R1]);!$([n;H0;X3]);!{TetrazoleN}]
   Family Donor
   Weights 1.0
 EndFeature
@@ -103,15 +115,20 @@ EndFeature
 # This constraint also cover thioketones, i.e., compounds with a double bonded S, instead of a double bonded O.
 #
 AtomType AcidicHydroxyl [$([O][C,S,P](=[O,S]))]
+
 DefineFeature DonorAtom [N!H0v3,N!H0+v4,nH+0&!{TetrazoleN},OH2v2,OH+0,SH+0;!{AcidicN};!{AcidicHydroxyl}]
   Family Donor
   Weights 1.0
 EndFeature
 
+
+#
+# Capture: Carbonic acid or carbonate
+AtomType CarbonateO [$([O;H1,H0&-1]C(=[O,S])-[O;H1,H0&-1]),$([O,S]=C(-[O;H1,H0&-1])-[O;H1,H0&-1])]
 #
 # Capture: Ketene acetal oxygen
 #
-DefineFeature KeteneAcetalO [$([O;H1,H0&-1]-[#6;X3]-,:[#8])]
+DefineFeature KeteneAcetalO [$([O;H1,H0&-1]-[#6;X3]-,:[#8]);!{CarbonateO}]
   Family Donor
   Weights 1.0
 EndFeature
@@ -172,13 +189,29 @@ EndFeature
 #                                - Chalcogen  bond                                     #
 #                                                                                      #
 ########################################################################################
-#
+
 #
 # Joule JA, Mills K. Heterocyclic chemistry. 5th ed. Hoboken, N.J: Wiley; 2009.
 # Li S, Hong M. Protonation, Tautomerization, and Rotameric Structure of Histidine: A Comprehensive Study by Magic-Angle-Spinning Solid-State NMR. Journal of the American Chemical Society. 2011;133:1534–44.
 # Sudmeier JL, Bradshaw EM, Haddad KEC, Day RM, Thalhauser CJ, Bullock PA, et al. Identification of Histidine Tautomers in Proteins by 2D 1 H/ 13 C δ2 One-Bond Correlated NMR. Journal of the American Chemical Society. 2003;125:8430–1.
 #
-DefineFeature TautomerRingAcceptorN [$([n;H1]n),$([n;H1]cn);!{TetrazoleN}]
+#   => Aromatic rings containing a tertiary N are not tautomeric.
+#
+#   => R1 forces all atoms to belong to the same ring, avoiding cases where a C connecting two rings (R2)
+#           is captured by the rule 'ncn' and makes the N to be incorrectly perceived as an Acceptor.
+#
+DefineFeature TautomerRingAcceptorN [$([n;H1;R1][n;R1]),$([n;H1;R1][c;R1][n;R1]);!$([nH,n-1][c;R1][n;H0;X3;R1]);!{TetrazoleN}]
+  Family Acceptor
+  Weights 1.0
+EndFeature
+
+#
+# Capture: uracil-like aromatic rings.
+#
+#   . E.g: 1-methyluracil (CN1C=CC(=O)NC1=O)
+#
+AtomType UracilLikeN [$([nH,n-1;R1]1[c;R1](=O)[n;H0;X3;R1][c;R1][c;R1][c;R1]1(=O))]
+DefineFeature UracilLikeN [{UracilLikeN}]
   Family Acceptor
   Weights 1.0
 EndFeature
@@ -343,6 +376,14 @@ EndFeature
 ########################################################################################
 #
 #
+# Capture: Carbonic acid and carbonate.
+# It also captures thiocarboxylic acids
+#
+DefineFeature CarbonateGroup C(=[O,S])(-[O;H1,H0&-1])-[O;H1,H0&-1]
+    Family NegativelyIonizable
+    Weights 1.0,1.0,1.0,1.0
+EndFeature
+
 # Capture: Carboxylic acid and Carboxylate
 # It also captures thiocarboxylic acids
 #
@@ -386,9 +427,19 @@ EndFeature
 # Generic constraint for barbiturates/thiazolidinediones...
 #
 # Good AC, Oprea TI. Optimization of CAMD techniques 3. Virtual screening enrichment studies: a help or hindrance in tool selection? Journal of Computer-Aided Molecular Design. 2008;22:169–78.
-DefineFeature Diformamide [NH1,NH0-1;R](C(=O))(C(=O))
+DefineFeature Diformamide [NH1,NH0-1;R](C(=O))C(=O)
     Family NegativelyIonizable
     Weights 1.0,1.0,1.0,1.0,1.0
+EndFeature
+
+#
+# Capture: uracil-like aromatic rings.
+#
+#   . E.g: 1-methyluracil (CN1C=CC(=O)NC1=O)
+#
+DefineFeature UracilAromaticRing [nH,n-1;R1]1[c;R1](=O)[n;H0;X3;R1][c;R1][c;R1][c;R1]1(=O)
+  Family NegativelyIonizable
+  Weights 1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
 EndFeature
 
 
@@ -737,7 +788,9 @@ EndFeature
 # For amide-pi interactions
 # Amide–π interactions between formamide and benzene (Imai et al, 2009).
 #
-DefineFeature AmideGroup [NX3][CX3](=[OX1])
+# It also captures deprotonated amide Ns.
+#
+DefineFeature AmideGroup [NX3,NX2-1][CX3](=[OX1])
   Family Amide
   Weights 1.0,1.0,1.0
 EndFeature
