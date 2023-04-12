@@ -142,6 +142,14 @@ class Residue(Entity):
         full_name += "/%s" % res_name
         return full_name
 
+    @property
+    def metal_coordination(self):
+        metal_coordination = {}
+        for a in self.get_atoms():
+            if a.has_metal_coordination():
+                metal_coordination[a] = a.metal_coordination
+        return metal_coordination
+
     def add(self, atom):
         """Add an Atom object.
 
@@ -255,7 +263,6 @@ class Residue(Entity):
         self._is_target = is_target
 
     def as_json(self):
-
         if self.is_water():
             comp_repr = "sphere"
         elif self.is_hetatm():

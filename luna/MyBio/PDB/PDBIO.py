@@ -192,8 +192,35 @@ class PDBIO(object):
         structure.conects = conects
         self.structure = structure
 
+    def _get_list(self, entity, sort=False):
+        # S -> M
+        # M -> C
+        if entity.get_level() in ["S", "M"]:
+            the_list = entity.get_list()
+
+            # Sort Models/Chains by id.
+            if sort:
+                return sorted(the_list, key=lambda x: x.id)
+
+        # C -> R
+        elif entity.get_level() == "C":
+            the_list = entity.get_unpacked_list()
+
+            # Sort residues by index, i.e., by their order in a PDB chain.
+            if sort:
+                return sorted(the_list, key=lambda x: x.idx)
+
+        # R -> A
+        #
+        #   Always keep atoms order as in PDB.
+        #
+        elif entity.get_level() == "R":
+            the_list = entity.get_unpacked_list()
+
+        return the_list
+
     def save(self, file, select=Select(), write_conects=False,
-             write_end=True, preserve_atom_numbering=False):
+             write_end=True, preserve_atom_numbering=False, sort=False):
         """
         @param select: selects which entities will be written.
         @type select: object
@@ -230,7 +257,8 @@ class PDBIO(object):
             model_flag = 1
         else:
             model_flag = 0
-        for model in self.structure.get_list():
+
+        for model in self._get_list(self.structure, sort):
             if not select.accept_model(model):
                 continue
             # necessary for ENDMDL
@@ -241,7 +269,7 @@ class PDBIO(object):
                 atom_number = 1
             if model_flag:
                 fp.write("MODEL      %s\n" % model.serial_num)
-            for chain in model.get_list():
+            for chain in self._get_list(model, sort):
                 if not select.accept_chain(chain):
                     continue
                 chain_id = chain.get_id()
@@ -249,13 +277,13 @@ class PDBIO(object):
                 # do not write TER if no residues were written
                 # for this chain
                 chain_residues_written = 0
-                for residue in chain.get_unpacked_list():
+                for residue in self._get_list(chain, sort):
                     if not select.accept_residue(residue):
                         continue
                     hetfield, resseq, icode = residue.get_id()
                     resname = residue.get_resname()
                     segid = residue.get_segid()
-                    for atom in residue.get_unpacked_list():
+                    for atom in self._get_list(residue, sort):
                         if select.accept_atom(atom):
                             chain_residues_written = 1
                             model_residues_written = 1
@@ -298,7 +326,6 @@ class PDBIO(object):
         # Print CONECT records
         if write_conects:
             conects = self.structure.conects
-
             for serial_number in sorted(conects):
                 # Substitutes the old serial number by the new serial number
                 new_serial_number = serial_number_mapping.get(serial_number, None)

@@ -93,7 +93,8 @@ class Model(Entity):
             for r in c:
                 yield r
 
+    # MODBY: Alexandre
     def get_atoms(self):
         for r in self.get_residues():
-            for a in r:
+            for a in r.get_unpacked_list():
                 yield a

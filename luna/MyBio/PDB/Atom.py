@@ -94,6 +94,8 @@ class Atom(object):
         self.element = self._assign_element(element)
         self.mass = self._assign_atom_mass()
 
+        self.metal_coordination = set()
+
     @property
     def full_name(self):
         full_name = "%s/%s/%s" % self.get_full_id()[0:3]
@@ -164,7 +166,17 @@ class Atom(object):
     # MODBY: Alexandre Fassio.
     # __lt__ method overwritten.
     def __lt__(self, a2):
-        return self.id < a2.id
+
+        # I have substituted the residue id for its index in order 
+        # to keep the same order as in the PDB.
+        full_id1 = (self.get_full_id()[0:3] + 
+                    (self.parent.idx, ) +
+                    self.get_full_id()[4:])
+        full_id2 = (a2.get_full_id()[0:3] +
+                    (a2.parent.idx, ) +
+                    a2.get_full_id()[4:])
+
+        return full_id1 < full_id2
 
     # set methods
 
@@ -304,6 +316,9 @@ class Atom(object):
 
     def get_level(self):
         return self.level
+
+    def has_metal_coordination(self):
+        return len(self.metal_coordination) > 0
 
     def transform(self, rot, tran):
         """Apply rotation and translation to the atomic coordinates.
