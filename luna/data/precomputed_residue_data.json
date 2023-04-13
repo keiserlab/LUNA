@@ -2476,7 +2476,7 @@
     "LI": {
         "atoms": {
             "LI": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,3,7,1,0,0",
                 "is_aromatic": false,
                 "coords": "4,5,6"
@@ -2486,7 +2486,7 @@
     "NA": {
         "atoms": {
             "NA": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,11,23,1,0,0",
                 "is_aromatic": false,
                 "coords": "4,5,6,7"
@@ -2496,7 +2496,7 @@
     "MG": {
         "atoms": {
             "MG": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,12,24,2,0,0",
                 "is_aromatic": false,
                 "coords": "3,4,5,6"
@@ -2506,7 +2506,7 @@
     "AL": {
         "atoms": {
             "AL": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,13,27,3,0,0",
                 "is_aromatic": false,
                 "coords": "4,5,6"
@@ -2516,7 +2516,7 @@
     "K": {
         "atoms": {
             "K": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,19,39,1,0,0",
                 "is_aromatic": false,
                 "coords": "4,5,6,7,8"
@@ -2526,7 +2526,7 @@
     "CA": {
         "atoms": {
             "CA": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,20,40,2,0,0",
                 "is_aromatic": false,
                 "coords": "4,5,6,7,8"
@@ -2536,7 +2536,7 @@
     "4TI": {
         "atoms": {
             "TI": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,22,48,4,0,0",
                 "is_aromatic": false,
                 "coords": "6"
@@ -2546,7 +2546,7 @@
     "V": {
         "atoms": {
             "V": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,23,51,3,0,0",
                 "is_aromatic": false,
                 "coords": "6"
@@ -2556,7 +2556,7 @@
     "CR": {
         "atoms": {
             "CR": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,24,52,3,0,0",
                 "is_aromatic": false,
                 "coords": "6"
@@ -2566,7 +2566,7 @@
     "MN": {
         "atoms": {
             "MN": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,25,55,2,0,0",
                 "is_aromatic": false,
                 "coords": "4,5,6"
@@ -2576,7 +2576,7 @@
     "MN3": {
         "atoms": {
             "MN": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,25,55,3,0,0",
                 "is_aromatic": false,
                 "coords": "5,6"
@@ -2586,7 +2586,7 @@
     "FE2": {
         "atoms": {
             "FE": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,26,56,2,0,0",
                 "is_aromatic": false,
                 "coords": "4,5,6"
@@ -2596,7 +2596,7 @@
     "FE": {
         "atoms": {
             "FE": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,26,56,3,0,0",
                 "is_aromatic": false,
                 "coords": "4,5,6"
@@ -2606,7 +2606,7 @@
     "CO": {
         "atoms": {
             "CO": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,27,59,2,0,0",
                 "is_aromatic": false,
                 "coords": "4,5,6"
@@ -2616,7 +2616,7 @@
     "3CO": {
         "atoms": {
             "CO": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,27,59,3,0,0",
                 "is_aromatic": false,
                 "coords": "6"
@@ -2626,7 +2626,7 @@
     "NI": {
         "atoms": {
             "NI": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,28,58,2,0,0",
                 "is_aromatic": false,
                 "coords": "4,5,6"
@@ -2636,7 +2636,7 @@
     "3NI": {
         "atoms": {
             "NI": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,28,58,3,0,0",
                 "is_aromatic": false,
                 "coords": "4,5,6"
@@ -2646,7 +2646,7 @@
     "CU1": {
         "atoms": {
             "CU": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,29,63,1,0,0",
                 "is_aromatic": false,
                 "coords": "2,3,4,6"
@@ -2656,7 +2656,7 @@
     "CU": {
         "atoms": {
             "CU": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,29,63,2,0,0",
                 "is_aromatic": false,
                 "coords": "4,5,6"
@@ -2666,7 +2666,7 @@
     "CU3": {
         "atoms": {
             "CU": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,29,63,3,0,0",
                 "is_aromatic": false,
                 "coords": "6"
@@ -2676,7 +2676,7 @@
     "ZN": {
         "atoms": {
             "ZN": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,30,64,2,0,0",
                 "is_aromatic": false,
                 "coords": "4,5,6"
@@ -2686,7 +2686,7 @@
     "GA": {
         "atoms": {
             "GA": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,31,69,3,0,0",
                 "is_aromatic": false,
                 "coords": "4,5,6"
@@ -2696,7 +2696,7 @@
     "YT3": {
         "atoms": {
             "Y": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,39,89,3,0,0",
                 "is_aromatic": false,
                 "coords": "6,7,8"
@@ -2706,7 +2706,7 @@
     "ZR": {
         "atoms": {
             "ZR": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,40,90,4,0,0",
                 "is_aromatic": false,
                 "coords": "6"
@@ -2716,7 +2716,7 @@
     "4MO": {
         "atoms": {
             "MO": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,42,98,4,0,0",
                 "is_aromatic": false,
                 "coords": "6"
@@ -2726,7 +2726,7 @@
     "6MO": {
         "atoms": {
             "MO": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,42,98,6,0,0",
                 "is_aromatic": false,
                 "coords": "6"
@@ -2736,7 +2736,7 @@
     "RU": {
         "atoms": {
             "RU": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,44,102,3,0,0",
                 "is_aromatic": false,
                 "coords": "6"
@@ -2746,7 +2746,7 @@
     "RH": {
         "atoms": {
             "RH1": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,45,103,1,0,0",
                 "is_aromatic": false,
                 "coords": "4,5,6"
@@ -2756,7 +2756,7 @@
     "RH3": {
         "atoms": {
             "RH": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,45,103,3,0,0",
                 "is_aromatic": false,
                 "coords": "4,5,6"
@@ -2766,7 +2766,7 @@
     "PD": {
         "atoms": {
             "PD": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,46,106,2,0,0",
                 "is_aromatic": false,
                 "coords": "4,5,6"
@@ -2776,7 +2776,7 @@
     "AG": {
         "atoms": {
             "AG": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,47,107,1,0,0",
                 "is_aromatic": false,
                 "coords": "4"
@@ -2786,7 +2786,7 @@
     "CD": {
         "atoms": {
             "CD": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,48,114,2,0,0",
                 "is_aromatic": false,
                 "coords": "4,5,6"
@@ -2796,7 +2796,7 @@
     "BA": {
         "atoms": {
             "BA": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,56,138,2,0,0",
                 "is_aromatic": false,
                 "coords": "4,5,6,7,8"
@@ -2806,7 +2806,7 @@
     "W": {
         "atoms": {
             "W": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,74,184,6,0,0",
                 "is_aromatic": false,
                 "coords": "6"
@@ -2816,7 +2816,7 @@
     "RE": {
         "atoms": {
             "RE": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,75,187,1,0,0",
                 "is_aromatic": false,
                 "coords": "4,5,6"
@@ -2826,7 +2826,7 @@
     "OS": {
         "atoms": {
             "OS": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,76,192,3,0,0",
                 "is_aromatic": false,
                 "coords": "6"
@@ -2836,7 +2836,7 @@
     "OS4": {
         "atoms": {
             "OS": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,76,192,4,0,0",
                 "is_aromatic": false,
                 "coords": "6"
@@ -2846,7 +2846,7 @@
     "IR": {
         "atoms": {
             "IR": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,77,193,4,0,0",
                 "is_aromatic": false,
                 "coords": "6"
@@ -2856,7 +2856,7 @@
     "IR3": {
         "atoms": {
             "IR": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,77,193,3,0,0",
                 "is_aromatic": false,
                 "coords": "6"
@@ -2866,7 +2866,7 @@
     "PT": {
         "atoms": {
             "PT": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,78,195,2,0,0",
                 "is_aromatic": false,
                 "coords": "4"
@@ -2876,7 +2876,7 @@
     "PT4": {
         "atoms": {
             "PT": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,78,195,4,0,0",
                 "is_aromatic": false,
                 "coords": "6"
@@ -2886,7 +2886,7 @@
     "AU": {
         "atoms": {
             "AU": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,79,197,1,0,0",
                 "is_aromatic": false,
                 "coords": "2"
@@ -2896,7 +2896,7 @@
     "AU3": {
         "atoms": {
             "AU": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,79,197,3,0,0",
                 "is_aromatic": false,
                 "coords": "4"
@@ -2906,7 +2906,7 @@
     "HG": {
         "atoms": {
             "HG": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,80,202,2,0,0",
                 "is_aromatic": false,
                 "coords": "2,3,4,5,6"
@@ -2916,7 +2916,7 @@
     "PB": {
         "atoms": {
             "PB": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,82,208,2,0,0",
                 "is_aromatic": false,
                 "coords": "4"
@@ -2926,7 +2926,7 @@
     "BS3": {
         "atoms": {
             "BS3": {
-                "features": "Metal",
+                "features": "Atom,Metal",
                 "invariants": "0,0,83,209,3,0,0",
                 "is_aromatic": false,
                 "coords": "4,5"
