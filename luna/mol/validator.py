@@ -1,8 +1,13 @@
+import numpy as np
+from itertools import product
+from collections import defaultdict
+
 from rdkit.Chem import SanitizeFlags, SanitizeMol
 from openbabel.openbabel import OBSmartsPattern
 
 from luna.wrappers.base import BondType, AtomWrapper, MolWrapper
 from luna.mol.charge_model import OpenEyeModel
+import luna.util.math as lm
 
 import logging
 
@@ -39,13 +44,13 @@ class MolValidator:
 
     def __init__(self, charge_model=OpenEyeModel(), fix_nitro=True,
                  fix_amidine_and_guanidine=True, fix_valence=True,
-                 fix_charges=True, bound_to_metals=None):
+                 fix_charges=True, metals_coord=None):
         self.charge_model = charge_model
         self.fix_nitro = fix_nitro
         self.fix_amidine_and_guanidine = fix_amidine_and_guanidine
         self.fix_valence = fix_valence
         self.fix_charges = fix_charges
-        self.bound_to_metals = bound_to_metals or []
+        self.metals_coord = metals_coord or []
 
     def validate_mol(self, mol_obj):
         """Validate molecule ``mol_obj``.
@@ -75,7 +80,7 @@ class MolValidator:
         #       TODO: check aromaticity.
         #       TODO: return list of errors
 
-        if self.bound_to_metals:
+        if self.metals_coord:
             self._fix_atoms_bound_to_metals(mol_obj)
 
         if self.fix_nitro:
@@ -101,64 +106,98 @@ class MolValidator:
 
     def _fix_atoms_bound_to_metals(self, mol_obj):
 
-        # Iterate over each atom that has a dative bond with a metal
-        # to evaluate if its charge is correct.
-        for idx, pdb_atm in self.bound_to_metals:
+        amine_smarts = "[$([NX4+;H3,H2,H1;!$(NC=O)][C])]"
 
-            atm_obj = mol_obj.get_atom_by_idx(idx)
-            metals = self.bound_to_metals[(idx, pdb_atm)]
+        # Imidazole-like, but not tetrazoles.
+        imidazole_smarts = ("[$(nc[n;H1]);"
+                            "!$([nR1r5;$(n:n:n:n:c),"
+                            "$(n:n:n:c:n)])]")
 
-            if not atm_obj:
-                raise KeyError("Atom #%d does not exist." % idx)
+        # Iterate over each residue and that has a dative bond
+        # with a metal to evaluate if its charge is incorrect.
+        for res in self.metals_coord:
 
-            # Fix HIS:ND1 and HIS:NE2 that are bound to metals.
-            if (pdb_atm.name in ["ND1", "NE2"]
-                    and pdb_atm.parent.resname == "HIS"):
+            for pdb_atm, data in self.metals_coord[res].items():
 
-                if atm_obj.get_charge() == 1:
-                    logger.debug("Atom #%d has incorrect charge. It will "
-                                 "update its charge from 1 to 0." % idx)
+                if data["atm_idx"] is None:
+                    continue
 
-                    atm_obj.set_charge(0)
+                atm_obj = mol_obj.get_atom_by_idx(data["atm_idx"])
+                metals = data["metals"]
+
+                if not atm_obj:
+                    raise KeyError("Atom #%d does not exist."
+                                   % data["atm_idx"])
+
+                # Fix HIS:ND1 and HIS:NE2 that are bound to metals
+                #   and other imidazole groups.
+                #
+                # It only fixes imidazole Ns having a +1 charge, i.e, the
+                # N with the double bond. For these Ns, Open Babel tend to
+                # protonate the N even if it has being neutralized by the
+                # standardization method.
+                if ((res.resname == "HIS"
+                        and pdb_atm.name in ["ND1", "NE2"])
+                        or (atm_obj.matches_smarts(imidazole_smarts))):
+
+                    if atm_obj.get_charge() == 1:
+                        logger.debug("Atom #%d has incorrect charge. It will "
+                                     "update its charge from 1 to 0."
+                                     % atm_obj.get_idx())
+
+                        atm_obj.set_charge(0)
+                        self._remove_explicit_hydrogens(atm_obj)
+
+                # Fix main chain N or LYS:NZ that are bound to metals and
+                # that has a charge = +1.
+                elif ((res.resname == "LYS" and pdb_atm.name == "NZ")
+                        or pdb_atm.name == "N"
+                        or (pdb_atm.parent.is_hetatm()
+                            and atm_obj.get_symbol() == "N"
+                            and atm_obj.matches_smarts(amine_smarts))):
+
+                    if atm_obj.get_charge() == 1:
+
+                        logger.debug("Atom #%d has incorrect charge. It will "
+                                     "update its charge from 1 to 0 and fix "
+                                     "its number of bound hydrogens."
+                                     % atm_obj.get_idx())
+
+                        # Set residue charge to 0.
+                        atm_obj.set_charge(0)
+
+                        # Now, loop over this atom's bonds to identify
+                        # all bonds with hydrogens. Then, it will identify
+                        # the closest H to the metal and remove it.
+                        #
+                        # That's because residue can only coordinate
+                        # one metal at once.
+                        h_to_remove = None
+                        min_dist = float('inf')
+                        for b in atm_obj.get_bonds():
+                            if b.get_partner_atom(atm_obj).get_symbol() == "H":
+                                h_obj = b.get_partner_atom(atm_obj)
+
+                                for metal in metals:
+                                    metal_atm = list(metal.get_atoms())[0]
+
+                                    c1 = h_obj.get_coord()
+                                    c2 = metal_atm.coord
+                                    dist = lm.euclidean_distance(c1, c2)
+                                    # Distance between the H and the metal.
+                                    if dist < min_dist:
+                                        h_to_remove = h_obj
+                                        min_dist = dist
+
+                        # Remove the closest H to the metal.
+                        if h_to_remove:
+                            ob_mol = atm_obj.parent.unwrap()
+                            ob_mol.DeleteAtom(h_to_remove.unwrap())
+
+                # Fix ligands' phenol OH.
+                elif res.is_hetatm() and atm_obj.matches_smarts("[OH+0]c"):
+                    atm_obj.set_charge(-1)
                     self._remove_explicit_hydrogens(atm_obj)
-
-            # Fix main chain N or LYS:NZ that are bound to metals and
-            # that has a charge = +1.
-            elif (pdb_atm.name == "N"
-                    or (pdb_atm.name == "NZ"
-                        and pdb_atm.parent.resname == "LYS")):
-
-                if atm_obj.get_charge() == 1:
-                    logger.debug("Atom #%d has incorrect charge. It will "
-                                 "update its charge from 1 to 0 and fix "
-                                 "its number of bound hydrogens." % idx)
-
-                    # Set residue charge to 0.
-                    atm_obj.set_charge(0)
-
-                    # Now, loop over this atom's bonds to identify
-                    # all bonds with hydrogens. Then, it will identify
-                    # the closest H to the metal and remove it.
-                    #
-                    # That's because residue can only coordinate
-                    # one metal at once.
-                    h_to_remove = None
-                    min_dist = float('inf')
-                    for b in atm_obj.get_bonds():
-                        if b.get_partner_atom(atm_obj).get_symbol() == "H":
-                            h_obj = b.get_partner_atom(atm_obj)
-
-                            for metal_obj in metals:
-                                # Distance between the H and the metal.
-                                d = h_obj - metal_obj
-                                if d < min_dist:
-                                    h_to_remove = h_obj
-                                    min_dist = d
-
-                    # Remove the closest H to the metal.
-                    if h_to_remove:
-                        ob_mol = atm_obj.parent.unwrap()
-                        ob_mol.DeleteAtom(h_to_remove.unwrap())
 
     def _fix_nitro_substructure_and_charge(self, mol_obj):
         ob_smart = OBSmartsPattern()
@@ -292,8 +331,7 @@ class MolValidator:
                     and atm_obj.get_h_count() == 1):
 
                 logger.debug("Atom #%d has incorrect valence and number of "
-                             "hydrogens."
-                             % atm_obj.get_idx())
+                             "hydrogens." % atm_obj.get_idx())
 
                 if self.fix_valence:
                     logger.debug("'Fix valence' option is set on. It will "
@@ -306,6 +344,89 @@ class MolValidator:
 
                     return True
                 return False
+
+            # Fix amide N with an incorrect assigned charge.
+            #
+            # E.g: 1BK0:A:FE:350
+            # E.g: 1BLZ:A:FE:332
+            elif atm_obj.matches_smarts("[$([#7;X4H2+1](C)C=O)]"):
+
+                logger.debug("Atom #%d has incorrect valence, charge, and "
+                             "number of hydrogens." % atm_obj.get_idx())
+
+                if not self.fix_valence:
+                    return False
+
+                # Find all Cs and Hs bound to the N.
+                C_atms = []
+                H_atms = []
+                for bond_obj in atm_obj.get_bonds():
+                    partner_obj = bond_obj.get_partner_atom(atm_obj)
+
+                    if partner_obj.get_symbol() == "H":
+                        H_atms.append(partner_obj)
+                    else:
+                        C_atms.append(partner_obj)
+
+                # N coordinate.
+                N_coord = np.array(atm_obj.get_coord())
+                # Cs coordinates.
+                C_coords = [np.array(c.get_coord()) for c in C_atms]
+
+                # CNC normal vector.
+                CNC_normal = lm.calc_normal(C_coords + [N_coord])
+
+                # Measures the displacement angle between the
+                # normal vector and the NH vector.
+                H_data = defaultdict(dict)
+                for H_atm in H_atms:
+                    NH_vect = (np.array(H_atm.get_coord())
+                               - np.array(atm_obj.get_coord()))
+                    disp_angle = lm.angle(CNC_normal, NH_vect)
+
+                    H_data[H_atm.get_idx()]["atm_obj"] = H_atm
+                    H_data[H_atm.get_idx()]["disp"] = disp_angle
+
+                # Measures the angles between each pair of C, N, and H.
+                for C_atm, H_atm in product(C_atms, H_atms):
+                    NC_vect = (np.array(C_atm.get_coord()) - N_coord)
+                    NH_vect = (np.array(H_atm.get_coord()) - N_coord)
+
+                    key = ("angle1" if "angle1" not in H_data[H_atm.get_idx()]
+                           else "angle2")
+
+                    H_data[H_atm.get_idx()][key] = lm.angle(NH_vect, NC_vect)
+
+                # Verifies if the angles formed by the Hs.
+                H_to_remove = []
+                for key in H_data:
+                    angle_diff = abs(H_data[key]["angle1"]
+                                     - H_data[key]["angle2"])
+                    disp_diff = abs(H_data[key]["disp"] - 90)
+
+                    # The angle between the Cs, N, and H should be nearly
+                    # equal, while the H must be in the same plane as the
+                    # C-N-C. If it does not match this criteria, remove
+                    # the H.
+                    if angle_diff > 1 or disp_diff > 1:
+                        H_to_remove.append(H_data[key]["atm_obj"])
+
+                # If there are no or more than two Hs to remove, return False.
+                if len(H_to_remove) != 1:
+                    return False
+
+                logger.debug("'Fix valence' option is set on. It will "
+                             "update the valence of atom #%d from %d "
+                             "to 3 and correct its charge and the number "
+                             "of hydrogens bound to it."
+                             % (atm_obj.get_idx(), atm_obj.get_valence()))
+
+                ob_mol = atm_obj.parent.unwrap()
+                ob_mol.DeleteAtom(H_to_remove[0].unwrap())
+
+                atm_obj.set_charge(0)
+
+                return True
         return True
 
     def _is_charge_valid(self, atm_obj):
