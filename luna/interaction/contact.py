@@ -1,6 +1,6 @@
 from itertools import product
 
-from luna.util.default_values import COV_SEARCH_RADIUS, BOUNDARY_CONFIG
+from luna.util.default_values import (COV_SEARCH_RADIUS, BOUNDARY_CONFIG)
 from luna.util.exceptions import EntityLevelError, IllegalArgumentError
 from luna.interaction.cov import is_covalently_bound
 from luna.MyBio.util import ENTITY_LEVEL_NAME
@@ -13,7 +13,8 @@ import logging
 logger = logging.getLogger()
 
 
-def get_all_contacts(entity, radius=BOUNDARY_CONFIG["bsite_cutoff"],
+def get_all_contacts(entity,
+                     radius=BOUNDARY_CONFIG["bsite_cutoff"],
                      level='A'):
     """Recover all residue-residue or atom-atom contacts in ``entity``.
 
@@ -83,19 +84,24 @@ def get_all_contacts(entity, radius=BOUNDARY_CONFIG["bsite_cutoff"],
         raise
 
 
-def get_contacts_with(entity, source, target=None,
-                      radius=BOUNDARY_CONFIG["bsite_cutoff"], level='A'):
+def get_contacts_with(source,
+                      target=None,
+                      entity=None,
+                      radius=BOUNDARY_CONFIG["bsite_cutoff"],
+                      level='A'):
     """Recover atoms or residues in contact with ``source``.
 
     Parameters
     ----------
-    entity : :class:`~luna.MyBio.PDB.Entity.Entity`
-        The PDB object from where atoms and residues will be recovered.
     source : :class:`~luna.MyBio.PDB.Entity.Entity`
         The reference, which can be any :class:`~luna.MyBio.PDB.Entity.Entity`
         instance (structure, model, chain, residue, or atom).
     target : :class:`~luna.MyBio.PDB.Entity.Entity`, optional
         If provided, only contacts with the ``target`` will be considered.
+    entity : :class:`~luna.MyBio.PDB.Entity.Entity`
+        The PDB object from where atoms will be recovered.
+        If not provided (the default), the model object that contains
+        ``source`` will be used instead.
     radius : float
         The cutoff distance (in Å) for defining contacts.
         The default value is 6.2.
@@ -137,7 +143,7 @@ def get_contacts_with(entity, source, target=None,
     :meth:`get_contacts_with` with ``level`` set to 'R'.
 
     >>> from luna.interaction.contact import get_contacts_with
-    >>> contacts = sorted(get_contacts_with(structure, ligand, radius=3, level="R"))
+    >>> contacts = sorted(get_contacts_with(ligand, entity=structure, radius=3, level="R"))
     >>> for pair in contacts:
     ...     print(pair)
     (<Residue X02 het=H_X02 resseq=497 icode= >, <Residue GLU het=  resseq=81 icode= >)
@@ -165,7 +171,7 @@ def get_contacts_with(entity, source, target=None,
     As we need atom-wise contacts, set ``level`` to 'A'.
 
     >>> from luna.interaction.contact import get_contacts_with
-    >>> contacts = sorted(get_contacts_with(structure, ligand, target=residue, radius=4, level="A"))
+    >>> contacts = sorted(get_contacts_with(ligand, target=residue, entity=structure, radius=4, level="A"))
     >>> for pair in contacts:
     ...     print(pair)
     (<Atom C7>, <Atom O>)
@@ -181,12 +187,20 @@ def get_contacts_with(entity, source, target=None,
             raise EntityLevelError("The defined level '%s' does not exist"
                                    % level)
 
+        entity = entity or source.get_parent_by_level("M")
+
         source_atoms = Selection.unfold_entities([source], 'A')
+
         target_atoms = []
         if target is None:
             target_atoms = list(entity.get_atoms())
         else:
-            target_atoms = Selection.unfold_entities(target, 'A')
+            if target.level == "A":
+                target_atoms = [target]
+            else:
+                target_residues = Selection.unfold_entities(target, 'R')
+                target_atoms = [a for r in target_residues
+                                for a in r.get_unpacked_list()]
 
         ns = NeighborSearch(target_atoms)
         entities = set()
@@ -257,7 +271,7 @@ def get_proximal_compounds(source, radius=COV_SEARCH_RADIUS):
                                    "A Residue object is expected instead.")
 
     model = source.get_parent_by_level('M')
-    proximal = get_contacts_with(entity=model, source=source,
+    proximal = get_contacts_with(source, entity=model,
                                  radius=radius, level='R')
 
     # Sorted by the compound order as in the PDB.
@@ -265,7 +279,7 @@ def get_proximal_compounds(source, radius=COV_SEARCH_RADIUS):
                   key=lambda r: (r.parent.parent.id, r.parent.id, r.idx))
 
 
-def get_cov_contacts_with(entity, source, target=None):
+def get_cov_contacts_with(source, target=None, entity=None):
     """Recover potential covalent bonds with ``source``.
 
     Covalent bonds between two nearby atoms A and B are determined
@@ -279,14 +293,16 @@ def get_cov_contacts_with(entity, source, target=None):
 
     Parameters
     ----------
-    entity : :class:`~luna.MyBio.PDB.Entity.Entity`
-        The PDB object from where atoms will be recovered.
     source : :class:`~luna.MyBio.PDB.Entity.Entity`
         The reference, which can be any :class:`~luna.MyBio.PDB.Entity.Entity`
         instance (structure, model, chain, residue, or atom).
     target : :class:`~luna.MyBio.PDB.Entity.Entity`, optional
         If provided, only covalent bonds with the ``target``
         will be considered.
+    entity : :class:`~luna.MyBio.PDB.Entity.Entity`
+        The PDB object from where atoms will be recovered.
+        If not provided (the default), the model object that contains
+        ``source`` will be used instead.
 
     Returns
     -------
@@ -316,7 +332,7 @@ def get_cov_contacts_with(entity, source, target=None):
     together with the atom name.
 
     >>> from luna.interaction.contact import get_cov_contacts_with
-    >>> cov_bonds = sorted(get_cov_contacts_with(structure, residue), key=lambda x: (x[0].serial_number, x[1].serial_number))
+    >>> cov_bonds = sorted(get_cov_contacts_with(residue, entity=structure), key=lambda x: (x[0].serial_number, x[1].serial_number))
     >>> for atm1, atm2 in cov_bonds:
     >>>     pair = ("%s%d/%s" % (atm1.parent.resname, atm1.parent.id[1], atm1.name),
     ...             "%s%d/%s" % (atm2.parent.resname, atm2.parent.id[1], atm2.name))
@@ -332,8 +348,13 @@ def get_cov_contacts_with(entity, source, target=None):
     ('GLU81/CD', 'GLU81/OE1')
     ('GLU81/CD', 'GLU81/OE2')
     """
-    entities = get_contacts_with(entity, source, target,
-                                 radius=COV_SEARCH_RADIUS, level='A')
+
+    entity = entity or source.get_parent_by_level("M")
+    entities = get_contacts_with(source,
+                                 target=target,
+                                 entity=entity,
+                                 radius=COV_SEARCH_RADIUS,
+                                 level='A')
 
     cov_bonds = set()
     for atm1, atm2 in entities:
