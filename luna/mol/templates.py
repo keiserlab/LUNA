@@ -44,7 +44,8 @@ class LigandExpoTemplate(Template):
 
     @property
     def data(self):
-        """:py:class:`pandas.DataFrame` : The `LigandExpo <http://ligand-expo.rcsb.org/>`_ data."""
+        """:py:class:`pandas.DataFrame` : \
+                The `LigandExpo <http://ligand-expo.rcsb.org/>`_ data."""
         if self._data is None:
             self._data = pd.read_csv(self.lig_expo_file,
                                      sep="\t+",
@@ -80,14 +81,19 @@ class LigandExpoTemplate(Template):
 
         Parameters
         ----------
-        mol_obj : :class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`
+        mol_obj : :class:`~luna.wrappers.base.MolWrapper`, \
+                    :class:`rdkit.Chem.rdchem.Mol`, or \
+                    :class:`openbabel.pybel.Molecule`
             A molecule to standardise.
         lig_id : str
-            The ligand identifier (PDB id) in `LigandExpo <http://ligand-expo.rcsb.org/>`_.
+            The ligand identifier (PDB id) in \
+                `LigandExpo <http://ligand-expo.rcsb.org/>`_.
 
         Returns
         -------
-        new_mol : :class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`
+        new_mol : :class:`~luna.wrappers.base.MolWrapper`, \
+                    :class:`rdkit.Chem.rdchem.Mol`, or \
+                    :class:`openbabel.pybel.Molecule`
             A standardized molecular object of the same type as ``mol_obj``.
         """
         tmp_mol_obj = MolWrapper(mol_obj)

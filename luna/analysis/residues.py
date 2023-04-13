@@ -12,12 +12,14 @@ def generate_residue_matrix(interactions_mngrs, by_interaction=True):
 
     Parameters
     ----------
-    interactions_mngrs : iterable of :class:`~luna.interaction.calc.InteractionsManager`
-        A sequence of :class:`~luna.interaction.calc.InteractionsManager` objects
-        from where interactions will be recovered.
+    interactions_mngrs : iterable of \
+            :class:`~luna.interaction.calc.InteractionsManager`
+        A sequence of :class:`~luna.interaction.calc.InteractionsManager`
+        objects from where interactions will be recovered.
     by_interaction : bool
-        If True (the default), count the number of each interaction type per residue.
-        Otherwise, count the overall number of interactions per residue.
+        If True (the default), count the number of each interaction type
+        per residue. Otherwise, count the overall number of interactions
+        per residue.
 
     Returns
     -------
@@ -32,7 +34,8 @@ def generate_residue_matrix(interactions_mngrs, by_interaction=True):
 
         for inter in inter_mngr:
             # Continue if no target is in the interaction.
-            if not inter.src_grp.has_target() and not inter.trgt_grp.has_target():
+            if (not inter.src_grp.has_target()
+                    and not inter.trgt_grp.has_target()):
                 continue
             # Ignore interactions involving the same compounds.
             if inter.src_grp.compounds == inter.trgt_grp.compounds:
@@ -49,10 +52,18 @@ def generate_residue_matrix(interactions_mngrs, by_interaction=True):
                 comp2 = sorted(inter.trgt_grp.compounds)
                 comp1, comp2 = sorted([comp1, comp2])
 
-            comp1 = ";".join(["%s/%s/%d%s" % (r.parent.id, r.resname, r.id[1], r.id[2].strip()) for r in comp1])
-            comp2 = ";".join(["%s/%s/%d%s" % (r.parent.id, r.resname, r.id[1], r.id[2].strip()) for r in comp2])
+            comp1 = ";".join(["%s/%s/%d%s" % (r.parent.id,
+                                              r.resname,
+                                              r.id[1],
+                                              r.id[2].strip()) for r in comp1])
+            comp2 = ";".join(["%s/%s/%d%s" % (r.parent.id,
+                                              r.resname,
+                                              r.id[1],
+                                              r.id[2].strip()) for r in comp2])
 
-            entry_id = entry.mol_id if isinstance(entry, MolFileEntry) else entry.to_string()
+            entry_id = (entry.mol_id if isinstance(entry, MolFileEntry)
+                        else entry.to_string())
+
             if by_interaction:
                 key = (entry_id, inter.type)
             else:
@@ -87,22 +98,36 @@ def generate_residue_matrix(interactions_mngrs, by_interaction=True):
     df = pd.DataFrame.from_dict(heatmap_data)
 
     if by_interaction:
-        return pd.pivot_table(df, index=['entry', 'interaction'], columns='residues', values='frequency', fill_value=0)
+        return pd.pivot_table(df,
+                              index=['entry', 'interaction'],
+                              columns='residues',
+                              values='frequency',
+                              fill_value=0)
     else:
-        return pd.pivot_table(df, index='entry', columns='residues', values='frequency', fill_value=0)
+        return pd.pivot_table(df,
+                              index='entry',
+                              columns='residues',
+                              values='frequency',
+                              fill_value=0)
 
 
-def heatmap(data_df, figsize=None, cmap="Blues", heatmap_kw=None, gridspec_kw=None):
+def heatmap(data_df,
+            figsize=None,
+            cmap="Blues",
+            heatmap_kw=None,
+            gridspec_kw=None):
     """ Plot a residue matrix as a color-encoded matrix.
 
     Parameters
     ----------
     data_df : :class:`pandas.DataFrame`
-        A residue matrix produced with :func:`~luna.analysis.residues.generate_residue_matrix`.
+        A residue matrix produced
+        with :func:`~luna.analysis.residues.generate_residue_matrix`.
     figsize : tuple, optional
         Size (width, height) of a figure in inches.
     cmap : str, iterable of str
-        The mapping from data values to color space. The default value is 'Blues'.
+        The mapping from data values to color space.
+        The default value is 'Blues'.
     heatmap_kw : dict, optional
         Keyword arguments for :func:`seaborn.heatmap`.
     gridspec_kw : dict, optional
@@ -111,7 +136,8 @@ def heatmap(data_df, figsize=None, cmap="Blues", heatmap_kw=None, gridspec_kw=No
 
     Returns
     -------
-     : :class:`matplotlib.axes.Axes` or :class:`numpy.ndarray` of :class:`matplotlib.axes.Axes`
+     : :class:`matplotlib.axes.Axes` or :class:`numpy.ndarray` \
+            of :class:`matplotlib.axes.Axes`
 
     """
     data_df = data_df.reset_index()
@@ -130,7 +156,8 @@ def heatmap(data_df, figsize=None, cmap="Blues", heatmap_kw=None, gridspec_kw=No
         data_df.set_index('entry', inplace=True)
 
         fig = plt.figure(figsize=figsize)
-        ax = sns.heatmap(data_df, cmap=cmap, vmax=max_value, vmin=0, **heatmap_kw)
+        ax = sns.heatmap(data_df, cmap=cmap,
+                         vmax=max_value, vmin=0, **heatmap_kw)
         ax.set_xlabel("")
         ax.set_ylabel("")
         return ax
@@ -141,7 +168,8 @@ def heatmap(data_df, figsize=None, cmap="Blues", heatmap_kw=None, gridspec_kw=No
             del gridspec_kw["ncols"]
         nrows = math.ceil(len(interactions) / ncols)
 
-        fig, axs = plt.subplots(nrows, ncols, figsize=figsize, gridspec_kw=gridspec_kw)
+        fig, axs = plt.subplots(nrows, ncols, 
+                                figsize=figsize, gridspec_kw=gridspec_kw)
 
         row, col = 0, 0
         for i, interaction in enumerate(interactions):
@@ -149,7 +177,8 @@ def heatmap(data_df, figsize=None, cmap="Blues", heatmap_kw=None, gridspec_kw=No
             df.drop(columns="interaction", inplace=True)
             df.set_index('entry', inplace=True)
 
-            g = sns.heatmap(df, cmap=cmap, vmax=max_value, vmin=0, ax=axs[row][col], **heatmap_kw)
+            g = sns.heatmap(df, cmap=cmap, vmax=max_value, vmin=0,
+                            ax=axs[row][col], **heatmap_kw)
 
             g.set_title(interaction)
             g.set_xlabel("")

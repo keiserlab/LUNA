@@ -36,9 +36,11 @@ def get_file_format(path, max_split=None, ignore_compression=False):
     path : str
         The pathname.
     max_split : int or None
-        Specifies how many splits to do. The default value is None, which is "all occurrences".
+        Specifies how many splits to do. The default value is None,
+        which is "all occurrences".
     ignore_compression: bool, optional
-        Ignore compression format. The default value is False, which does not ignore compression format.
+        Ignore compression format. The default value is False,
+        which does not ignore compression format.
 
     Returns
     -------
@@ -60,7 +62,8 @@ def get_filename(path, max_split=None):
     path : str
         The pathname.
     max_split : int or None
-        Specifies how many splits to do. The default value is None, which is "all occurrences".
+        Specifies how many splits to do. The default value is None,
+        which is "all occurrences".
 
     Returns
     -------
@@ -78,7 +81,8 @@ def generic_splitext(path, max_split=None):
     path : str
         The pathname.
     max_split : int or None
-        Specifies how many splits to do. The default value is None, which is "all occurrences".
+        Specifies how many splits to do. The default value is None,
+        which is "all occurrences".
 
     Returns
     -------
@@ -106,7 +110,8 @@ def generic_splitext(path, max_split=None):
 
 
 def generate_json_file(json_data, output_file, indent=4, sort_keys=True):
-    """Serialize ``json_data`` to a JSON formatted string and save it at ``output_file``.
+    """Serialize ``json_data`` to a JSON formatted string and save it
+    at ``output_file``.
 
     Parameters
     ----------
@@ -115,20 +120,24 @@ def generate_json_file(json_data, output_file, indent=4, sort_keys=True):
     output_file : str
         The output file where the serialized data will be saved.
     indent : int
-        If indent is a non-negative integer or string, then JSON array elements and object members
-        will be pretty-printed with that indent level. An indent level of 0, negative, or "" will only insert newlines.
-        None selects the most compact representation. Using a positive integer indent indents that many spaces per level.
-        If indent is a string (such as "\t"), that string is used to indent each level.
+        If indent is a non-negative integer or string, then JSON array
+        elements and object members will be pretty-printed with that indent
+        level. An indent level of 0, negative, or "" will only insert newlines.
+        None selects the most compact representation. Using a positive integer
+        indent indents that many spaces per level. If indent is a string
+        (such as "\t"), that string is used to indent each level.
         The default value is 4.
 
     sort_keys : bool
-        If ``sort_keys`` is True, the output of dictionaries will be sorted by key.
+        If ``sort_keys`` is True, the output of dictionaries will be
+        sorted by key.
     """
     try:
         import simplejson as json
         logger.warning("Module 'simplejson' imported.")
     except ImportError:
-        logger.warning("Module 'simplejson' not available. Built-in module 'json' will be imported.")
+        logger.warning("Module 'simplejson' not available. "
+                       "Built-in module 'json' will be imported.")
         import json
 
     try:
@@ -217,10 +226,12 @@ def remove_directory(path, only_empty_paths=False):
     path : str
         The pathname.
     only_empty_paths: bool, optional
-        If True, do not remove non-empty directories. The default value is False, which removes all directories.
+        If True, do not remove non-empty directories.
+        The default value is False, which removes all directories.
     """
     if isdir(path):
-        # Do nothing if the directory is not empty and if only empty paths must be removed.
+        # Do nothing if the directory is not empty and if only
+        # empty paths must be removed.
         if only_empty_paths and len(listdir(path)) != 0:
             return
 
@@ -230,7 +241,10 @@ def remove_directory(path, only_empty_paths=False):
             raise
 
 
-def new_unique_filename(path, size=32, chars=string.ascii_uppercase + string.digits, retries=5):
+def new_unique_filename(path,
+                        size=32,
+                        chars=string.ascii_uppercase + string.digits,
+                        retries=5):
     """Generate a new unique random pathname.
 
     Parameters
@@ -240,10 +254,12 @@ def new_unique_filename(path, size=32, chars=string.ascii_uppercase + string.dig
     size : int, optional
         The size of the new filename. The default value is 32.
     chars : iterable, optional
-        A sequence of characters to choose from. The default value is 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.
+        A sequence of characters to choose from.
+        The default value is 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.
     retries : int, optional
-        The function will keep trying to generate a unique filename (not exist in the pathname ``path``)
-        until the maximum number of retries ``retries`` is reached.
+        The function will keep trying to generate a unique filename
+        (not exist in the pathname ``path``) until the maximum number
+        of retries ``retries`` is reached.
 
     Returns
     -------
@@ -271,7 +287,8 @@ def validate_filesystem(path, type):
     FileNotFoundError
         If the file or directory given by the pathname ``path`` does not exist.
     IsADirectoryError
-        If a file is provided but a directory is found instead at the pathname ``path``.
+        If a file is provided but a directory is found instead at the
+        pathname ``path``.
     NotADirectoryError
         If the filesystem given by the pathname ``path`` is not a directory.
     """
@@ -313,7 +330,8 @@ def validate_file(path):
 
 
 def pickle_data(data, output_file, compressed=True):
-    """Write the pickled representation of the object ``data`` to the file ``output_file``.
+    """Write the pickled representation of the object ``data`` to
+    the file ``output_file``.
 
     Parameters
     ----------
@@ -322,7 +340,8 @@ def pickle_data(data, output_file, compressed=True):
     output_file : str
         The output file where the pickled representation will be saved.
     compressed : bool, optional
-        If True (the default), compress the pickled representation as a gzip file (.gz).
+        If True (the default), compress the pickled representation as
+        a gzip file (.gz).
 
     Raises
     -------
@@ -339,15 +358,16 @@ def pickle_data(data, output_file, compressed=True):
         with open_func(output_file, "wb") as OUT:
             pickle.dump(data, OUT, pickle.HIGHEST_PROTOCOL)
     except OSError as e:
-        raise FileNotCreated("File '%s' could not be created." % output_file) from e
+        raise FileNotCreated("File '%s' could not be created."
+                             % output_file) from e
     except Exception:
         raise
 
 
 def unpickle_data(input_file):
-    """Read the pickled representation of an object from the file ``input_file`` and
-    return the reconstituted object hierarchy specified therein.
-    ``input_file`` can be a gzip-compressed file.
+    """Read the pickled representation of an object from the file
+    ``input_file`` and return the reconstituted object hierarchy
+    specified therein. ``input_file`` can be a gzip-compressed file.
 
     Raises
     -------
@@ -361,9 +381,11 @@ def unpickle_data(input_file):
     except Exception:
         pass
 
-    # If the decompression failed, let's try to unpickle the file directly. Maybe it is not a compressed file.
+    # If the decompression failed, let's try to unpickle the file directly.
+    # Maybe it is not a compressed file.
     try:
         with open(input_file, "rb") as IN:
             return pickle.load(IN)
     except OSError as e:
-        raise PKLNotReadError("File '%s' could not be loaded." % input_file) from e
+        raise PKLNotReadError("File '%s' could not be loaded."
+                              % input_file) from e

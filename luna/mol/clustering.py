@@ -16,17 +16,21 @@ def available_similarity_functions():
 
 
 def calc_distance_matrix(fps, similarity_func="BulkTanimotoSimilarity"):
-    """Calculate the pairwise distance (dissimilarity) between fingerprints in ``fps`` using
-        the similarity metric ``similarity_func``.
+    """Calculate the pairwise distance (dissimilarity) between fingerprints
+     in ``fps`` using the similarity metric ``similarity_func``.
 
     Parameters
     ----------
-    fps : iterable of RDKit :class:`~rdkit.DataStructs.cDataStructs.ExplicitBitVect` or :class:`~rdkit.DataStructs.cDataStructs.SparseBitVect`
+    fps : iterable of RDKit \
+            :class:`~rdkit.DataStructs.cDataStructs.ExplicitBitVect` or \
+            :class:`~rdkit.DataStructs.cDataStructs.SparseBitVect`
         A sequence of fingerprints.
     similarity_func : str
-        A similarity metric to calculate the distance between the provided fingerprints. The default value is 'BulkTanimotoSimilarity'.
+        A similarity metric to calculate the distance between the provided
+        fingerprints. The default value is 'BulkTanimotoSimilarity'.
 
-        To check out the list of available similarity metrics, call the function :py:meth:`available_similarity_functions`.
+        To check out the list of available similarity metrics, call the
+        function :py:meth:`available_similarity_functions`.
 
     Examples
     --------
@@ -43,7 +47,8 @@ def calc_distance_matrix(fps, similarity_func="BulkTanimotoSimilarity"):
     >>> from luna.mol.fingerprint import generate_fp_for_mols
     >>> fps = [d["fp"] for d in generate_fp_for_mols(mols, "morgan_fp")]
 
-    Finally, calculate the distance between the molecules based on their fingerprints.
+    Finally, calculate the distance between the molecules based on their
+    fingerprints.
 
     >>> from luna.mol.clustering import calc_distance_matrix
     >>> print(calc_distance_matrix(fps))
@@ -72,18 +77,24 @@ def calc_distance_matrix(fps, similarity_func="BulkTanimotoSimilarity"):
 
 
 def cluster_fps(fps, cutoff=0.2, similarity_func="BulkTanimotoSimilarity"):
-    """Clusterize molecules based on fingerprints using the Butina clustering algorithm.
+    """Clusterize molecules based on fingerprints using the Butina
+    clustering algorithm.
 
     Parameters
     ----------
-    fps : iterable of RDKit :class:`~rdkit.DataStructs.cDataStructs.ExplicitBitVect` or :class:`~rdkit.DataStructs.cDataStructs.SparseBitVect`
+    fps : iterable of RDKit \
+            :class:`~rdkit.DataStructs.cDataStructs.ExplicitBitVect` or
+            :class:`~rdkit.DataStructs.cDataStructs.SparseBitVect`
         A sequence of fingerprints.
     cutoff : float
-        Elements within this range of each other are considered to be neighbors.
+        Elements within this range of each other are considered
+        to be neighbors.
     similarity_func : str
-        A similarity metric to calculate the distance between the provided fingerprints.  The default value is 'BulkTanimotoSimilarity'.
+        A similarity metric to calculate the distance between the provided
+        fingerprints.  The default value is 'BulkTanimotoSimilarity'.
 
-        To check out the list of available similarity metrics, call the function :py:meth:`available_similarity_functions`.
+        To check out the list of available similarity metrics, call the
+        function :py:meth:`available_similarity_functions`.
 
     Examples
     --------

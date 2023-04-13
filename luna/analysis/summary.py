@@ -5,24 +5,33 @@ import logging
 logger = logging.getLogger()
 
 
-def count_interaction_types(interactions, must_have_target=True, compounds=None, key_map={}):
+def count_interaction_types(interactions,
+                            must_have_target=True,
+                            compounds=None,
+                            key_map={}):
     """Count the number of each type of interaction in ``interactions``.
 
     Parameters
     ----------
     interactions : iterable
-            An iterable object containing a sequence of interactions (``InteractionType``).
+            An iterable object containing a sequence of interactions
+            (``InteractionType``).
     must_have_target : bool
-            If True, count only interactions involving the target ligand. The default value is True.
+            If True, count only interactions involving the target ligand.
+            The default value is True.
     compounds: iterable, optional
             Only count interactions involving the compounds in ``compounds``.
-            The default value is None, which implies that all compounds will be considered.
+            The default value is None, which implies that all compounds will
+            be considered.
     key_map: dictionary, optional
-            A dictionary to control which interactions to count and how to aggregate them.
-            The keys are the interaction types to be considered and the values are the final interaction type,
-            which can be used to aggregate interactions. If a value is None, the interaction will be ignored.
+            A dictionary to control which interactions to count and how to
+            aggregate them. The keys are the interaction types to be
+            considered and the values are the final interaction type, which
+            can be used to aggregate interactions. If a value is None, the
+            interaction will be ignored.
 
-            For example, to aggregate all covalent interactions, ``key_map`` could be defined as follows:
+            For example, to aggregate all covalent interactions, ``key_map``
+            could be defined as follows:
 
                .. code-block:: python
 
@@ -31,7 +40,8 @@ def count_interaction_types(interactions, must_have_target=True, compounds=None,
                                "Triple bond": "Covalent bond",
                                "Aromatic bond": "Covalent bond"}
 
-            Now, if Ionic interactions should be ignored, ``key_map`` could be defined as follows:
+            Now, if Ionic interactions should be ignored, ``key_map`` could
+            be defined as follows:
 
                 .. code-block:: python
 
@@ -57,7 +67,8 @@ def count_interaction_types(interactions, must_have_target=True, compounds=None,
                     is_valid = True
 
             if compounds:
-                if len(i.src_grp.compounds & compounds) > 0 or len(i.trgt_grp.compounds & compounds):
+                if (len(i.src_grp.compounds & compounds) > 0
+                        or len(i.trgt_grp.compounds & compounds)):
                     is_valid = True
 
         if is_valid:

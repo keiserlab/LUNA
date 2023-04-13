@@ -331,7 +331,7 @@ class AtomWrapper:
             return [BondWrapper(bond) for bond in bonds]
         return bonds
 
-    def get_coords(self):
+    def get_coord(self):
         return self.parent.get_atom_coord_by_id(self.get_id())
 
     def get_atomic_invariants(self):
@@ -677,9 +677,12 @@ class BondWrapper:
                 logger.exception(e)
 
                 tool = "Open Babel" if self.is_openbabel_obj() else "RDKit"
-                raise KeyError("The bond type '%s' is not a valid %s bond type." % (bond_type.name, tool))
+                raise KeyError("The bond type '%s' is not a valid %s "
+                               "bond type." % (bond_type.name, tool))
         else:
-            raise IllegalArgumentError("The informed bond type must be an instance of '%s'." % BondType)
+            error_msg = ("The informed bond type must be an instance "
+                         "of '%s'." % BondType)
+            raise IllegalArgumentError(error_msg)
 
         if self.is_rdkit_obj():
             try:

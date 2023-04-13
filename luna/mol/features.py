@@ -32,7 +32,8 @@ class ChemicalFeature():
         Parameters
         ----------
         name : str
-            The name of a string case function from :py:mod:`luna.util.stringcase`.
+            The name of a string case function from
+            :py:mod:`luna.util.stringcase`.
         """
 
         func = getattr(case, case_func)
@@ -60,7 +61,8 @@ class ChemicalFeature():
 
 
 class OBMolChemicalFeature:
-    """Mimic :class:`rdkit.Chem.rdMolChemicalFeatures.MolChemicalFeature` for Open Babel.
+    """Mimic :class:`rdkit.Chem.rdMolChemicalFeatures.MolChemicalFeature`
+    for Open Babel.
 
     Parameters
     ----------
@@ -79,7 +81,8 @@ class OBMolChemicalFeature:
         return self.atom_ids
 
     def GetFamily(self):
-        """Get the family to which the feature belongs (e.g., donor, acceptor, etc.)"""
+        """Get the family to which the feature belongs (e.g., donor,
+        acceptor, etc.)"""
         return self.family
 
 
@@ -88,8 +91,9 @@ class FeatureExtractor:
 
     Parameters
     ----------
-    feature_factory : :class:`~rdkit.Chem.rdMolChemicalFeatures.MolChemicalFeatureFactory`
-        An RDKit feature factory.
+    feature_factory : \
+        :class:`~rdkit.Chem.rdMolChemicalFeatures.MolChemicalFeatureFactory`
+            An RDKit feature factory.
 
     Examples
     --------
@@ -99,7 +103,8 @@ class FeatureExtractor:
     >>> from luna.wrappers.base import MolWrapper
     >>> mol = MolWrapper.from_smiles("N[C@@H](CCC(N)=O)C(O)=O").unwrap()
 
-    Now, create a feature factory and instantiate a new `FeatureExtractor` object.
+    Now, create a feature factory and instantiate a new
+    `FeatureExtractor` object.
 
     >>> from luna.util.default_values import ATOM_PROP_FILE
     >>> from rdkit.Chem import ChemicalFeatures
@@ -122,7 +127,9 @@ class FeatureExtractor:
 
         Parameters
         ----------
-        mol_obj : :class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`
+        mol_obj : :class:`~luna.wrappers.base.MolWrapper`, \
+                :class:`rdkit.Chem.rdchem.Mol`, or \
+                :class:`openbabel.pybel.Molecule`
             The molecule.
         atm_map : dict
             A dictionary to map an atom's index to a different value.
@@ -130,21 +137,25 @@ class FeatureExtractor:
         Returns
         -------
         atm_features : dict of {int : list of `ChemicalFeature`}
-            Chemical features by atoms that are represented by their index or by a value from ``atm_map``.
+            Chemical features by atoms that are represented by their index or
+            by a value from ``atm_map``.
 
         """
         if isinstance(mol_obj, MolWrapper):
             mol_obj = mol_obj.unwrap()
 
         if isinstance(mol_obj, RDMol):
-            perceived_features = self.feature_factory.GetFeaturesForMol(mol_obj)
+            perceived_features = \
+                self.feature_factory.GetFeaturesForMol(mol_obj)
         elif isinstance(mol_obj, OBMol):
             perceived_features = self._get_features_from_obmol(mol_obj)
         elif isinstance(mol_obj, PybelMol):
             perceived_features = self._get_features_from_obmol(mol_obj.OBMol)
         else:
-            logger.exception("Objects of type '%s' are not currently accepted." % mol_obj.__class__)
-            raise MoleculeObjectTypeError("Objects of type '%s' are not currently accepted." % mol_obj.__class__)
+            error_msg = ("Objects of type '%s' are not currently accepted."
+                         % mol_obj.__class__)
+            logger.exception(error_msg)
+            raise MoleculeObjectTypeError(error_msg)
 
         atm_features = defaultdict(set)
         for f in perceived_features:
@@ -154,7 +165,9 @@ class FeatureExtractor:
                     if atm_idx in atm_map:
                         tmp_atm_idx = atm_map[atm_idx]
                     else:
-                        logger.warning("There is no corresponding mapping to the index '%d'. It will be ignored." % atm_idx)
+                        logger.warning("There is no corresponding mapping to "
+                                       "the index '%d'. It will be ignored."
+                                       % atm_idx)
 
                 feature = ChemicalFeature(f.GetFamily())
                 atm_features[tmp_atm_idx].add(feature)
@@ -162,11 +175,14 @@ class FeatureExtractor:
         return atm_features
 
     def get_features_by_groups(self, mol_obj, atm_map=None):
-        """Perceive chemical features from the molecule ``mol_obj`` by atom groups.
+        """Perceive chemical features from the molecule ``mol_obj``
+        by atom groups.
 
         Parameters
         ----------
-        mol_obj : :class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`
+        mol_obj : :class:`~luna.wrappers.base.MolWrapper`, \
+                :class:`rdkit.Chem.rdchem.Mol`, or \
+                :class:`openbabel.pybel.Molecule`
             The molecule.
         atm_map : dict
             A dictionary to map an atom's index to a different value.
@@ -174,24 +190,30 @@ class FeatureExtractor:
         Returns
         -------
         grp_features : dict of {str : dict}
-            Chemical features by groups. Each dictionary value is defined as follows:
+            Chemical features by groups. Each dictionary value is
+            defined as follows:
 
-            * ``atm_ids`` (list): list of atoms represented by their index or by a value from ``atm_map`` ;
-            * ``features`` (list of `ChemicalFeature`): list of chemical features.
+            * ``atm_ids`` (list): list of atoms represented by their \
+                    index or by a value from ``atm_map`` ;
+            * ``features`` (list of `ChemicalFeature`): list of chemical \
+                    features.
 
         """
         if isinstance(mol_obj, MolWrapper):
             mol_obj = mol_obj.unwrap()
 
         if isinstance(mol_obj, RDMol):
-            perceived_features = self.feature_factory.GetFeaturesForMol(mol_obj)
+            perceived_features = \
+                self.feature_factory.GetFeaturesForMol(mol_obj)
         elif isinstance(mol_obj, OBMol):
             perceived_features = self._get_features_from_obmol(mol_obj)
         elif isinstance(mol_obj, PybelMol):
             perceived_features = self._get_features_from_obmol(mol_obj.OBMol)
         else:
-            logger.exception("Objects of type '%s' are not currently accepted." % mol_obj.__class__)
-            raise MoleculeObjectTypeError("Objects of type '%s' are not currently accepted." % mol_obj.__class__)
+            error_msg = ("Objects of type '%s' are not currently accepted."
+                         % mol_obj.__class__)
+            logger.exception(error_msg)
+            raise MoleculeObjectTypeError(error_msg)
 
         grp_features = {}
         for f in perceived_features:
@@ -203,7 +225,9 @@ class FeatureExtractor:
                     if atm_id in atm_map:
                         tmp_atm_ids.append(atm_map[atm_id])
                     else:
-                        logger.warning("There is no corresponding mapping to the index '%d'. It will be ignored." % atm_id)
+                        logger.warning("There is no corresponding mapping to "
+                                       "the index '%d'. It will be ignored."
+                                       % atm_id)
                 atm_ids = tmp_atm_ids
 
             key = ','.join([str(x) for x in atm_ids])
@@ -238,12 +262,14 @@ class FeatureExtractor:
 
                     for ids in grp_features[grp_type]:
                         ids = set(ids)
-                        # If there is any other group of the same type that already contains the current atoms.
+                        # If there is any other group of the same type that
+                        # already contains the current atoms.
                         if cur_ids.issubset(ids):
                             exists = True
                             # It just need to find one bigger group.
                             break
-                        # If the current group contains atoms from already added group atoms.
+                        # If the current group contains atoms from already
+                        # added group atoms.
                         elif ids.issubset(cur_ids):
                             exists = True
                             # Find all smaller groups to remove them.
@@ -256,4 +282,6 @@ class FeatureExtractor:
                             grp_features[grp_type].remove(ids)
                         grp_features[grp_type].add(tuple(cur_ids))
 
-        return [OBMolChemicalFeature(family, atom_ids) for family in grp_features for atom_ids in grp_features[family]]
+        return [OBMolChemicalFeature(family, atom_ids)
+                for family in grp_features
+                for atom_ids in grp_features[family]]

@@ -37,12 +37,15 @@ DEFAULT_SOLVENTS = WATER_NAMES + ["NH3", "NH4"]
 
 class InteractionsManager:
 
-    """Store and manage :class:`~luna.interaction.type.InteractionType` objects.
+    """Store and manage :class:`~luna.interaction.type.InteractionType`
+    objects.
 
     Parameters
     ----------
-    interactions : iterable of :class:`~luna.interaction.type.InteractionType`, optional
-        An initial sequence of :class:`~luna.interaction.type.InteractionType` objects.
+    interactions : iterable of \
+                :class:`~luna.interaction.type.InteractionType`, optional
+        An initial sequence of :class:`~luna.interaction.type.InteractionType`
+        objects.
     entry : :class:`~luna.mol.entry.Entry`, optional
         The chain or compound used as reference to calculate interactions.
 
@@ -59,8 +62,10 @@ class InteractionsManager:
 
     @property
     def interactions(self):
-        """ list of :class:`~luna.interaction.type.InteractionType`, read-only: The list of interactions.\
-        Additional interactions should be added using the method :py:meth:`add_interactions`."""
+        """ list of :class:`~luna.interaction.type.InteractionType`, \
+            read-only: The list of interactions.\
+        Additional interactions should be added using the method
+        :py:meth:`add_interactions`."""
         return self._interactions
 
     @property
@@ -88,23 +93,25 @@ class InteractionsManager:
         ----------
         must_have_target : bool
                 If True, count only interactions involving the target ligand.
-                The default value is False, which implies all interactions will be considered.
+                The default value is False, which implies all interactions
+                will be considered.
 
         Returns
         -------
          : dict
         """
-        return count_interaction_types(self.interactions, must_have_target=must_have_target)
+        return count_interaction_types(self.interactions,
+                                       must_have_target=must_have_target)
 
     def add_interactions(self, interactions):
-        """Add one or more :class:`~luna.interaction.type.InteractionType` objects to
-         ``interactions``."""
+        """Add one or more :class:`~luna.interaction.type.InteractionType`
+        objects to ``interactions``."""
 
         self._interactions = list(set(self.interactions + list(interactions)))
 
     def remove_interactions(self, interactions):
-        """Remove one or more :class:`~luna.interaction.type.InteractionType` objects from \
-        ``interactions``.
+        """Remove one or more :class:`~luna.interaction.type.InteractionType`
+        objects from ``interactions``.
 
         Any recursive references to the removed objects will also be cleared.
         """
@@ -114,7 +121,8 @@ class InteractionsManager:
             inter.clear_refs()
 
     def filter_by_types(self, types):
-        """Filter :class:`~luna.interaction.type.InteractionType` objects by their types.
+        """Filter :class:`~luna.interaction.type.InteractionType` objects by
+        their types.
 
         Parameters
         ----------
@@ -136,9 +144,11 @@ class InteractionsManager:
 
         Parameters
         ----------
-        binding_modes_filter : :class:`~luna.interaction.filter.BindingModeFilter`
-            A :class:`~luna.interaction.filter.BindingModeFilter` object that defines binding mode conditions
-            to decide which interactions are valid.
+        binding_modes_filter : \
+                :class:`~luna.interaction.filter.BindingModeFilter`
+            A :class:`~luna.interaction.filter.BindingModeFilter` object that
+            defines binding mode conditions to decide which interactions
+            are valid.
 
         Returns
         -------
@@ -164,8 +174,10 @@ class InteractionsManager:
         """
         interactions_set = set()
         for inter in self.interactions:
-            grp1 = ";".join(sorted(["/".join(a.full_atom_name.split("/")) for a in inter.src_grp.atoms]))
-            grp2 = ";".join(sorted(["/".join(a.full_atom_name.split("/")) for a in inter.trgt_grp.atoms]))
+            grp1 = ";".join(sorted(["/".join(a.full_atom_name.split("/"))
+                                    for a in inter.src_grp.atoms]))
+            grp2 = ";".join(sorted(["/".join(a.full_atom_name.split("/"))
+                                    for a in inter.trgt_grp.atoms]))
 
             grp1, grp2 = sorted([grp1, grp2])
             interactions_set.add((grp1, grp2, inter.type))
@@ -173,7 +185,8 @@ class InteractionsManager:
         with open(output_file, "w") as OUT:
             OUT.write("atom_group1,atom_group2,interaction\n")
             # Sort lines before writing to always keep the same order.
-            OUT.write("\n".join([",".join(k) for k in sorted(interactions_set)]))
+            OUT.write("\n".join([",".join(k)
+                                 for k in sorted(interactions_set)]))
 
     def to_json(self, output_file=None, indent=None):
         """Write interactions to a_initial_shell_data JSON file.
@@ -186,22 +199,25 @@ class InteractionsManager:
             Indent level for pretty-printed JSON files.
             An indent level of 0, negative, or '' only insert newlines.
             Positive integers indent that many spaces per level.
-            If a string is provided (e.g., '\\\\t'), it will be used to indent each level.
-            The default value is None, which selects the most compact representation.
+            If a string is provided (e.g., '\\\\t'), it will be used to indent
+            each level. The default value is None, which selects the most
+            compact representation.
         """
         with open(output_file, 'w') as OUT:
             inter_objs = [inter.as_json() for inter in self.interactions]
             json.dump(inter_objs, OUT, indent=indent)
 
     def save(self, output_file, compressed=True):
-        """Write the pickled representation of the `InteractionsManager` object to the file ``output_file``.
+        """Write the pickled representation of the `InteractionsManager` object
+        to the file ``output_file``.
 
         Parameters
         ----------
         output_file : str
             The output file.
         compressed : bool, optional
-            If True (the default), compress the pickled representation as a gzip file (.gz).
+            If True (the default), compress the pickled representation as a
+            gzip file (.gz).
 
         Raises
         -------
@@ -212,7 +228,8 @@ class InteractionsManager:
 
     @staticmethod
     def load(input_file):
-        """Load the pickled representation of an `InteractionsManager` object saved at the file ``input_file``.
+        """Load the pickled representation of an `InteractionsManager` object
+        saved at the file ``input_file``.
 
         Returns
         ----------
@@ -242,98 +259,120 @@ class InteractionCalculator:
 
     .. note::
         This class provides default LUNA methods to calculate interactions.
-        However, one can provide their own methods without modifying this class.
-        In the **Examples** section, we will show how to define custom functions.
+        However, one can provide their own methods without modifying this
+        class. In the **Examples** section, we will show how to define
+        custom functions.
 
     .. note::
-        In case you want to disable specific parameters (e.g., angles) used during
-        the calculation of interactions, you do not need to define a custom
-        function for it. You could just delete the parameter from the configuration
-        and LUNA will automatically recognize that a given parameter is not
-        necessary anymore.
+        In case you want to disable specific parameters (e.g., angles) used
+        during the calculation of interactions, you do not need to define a
+        custom function for it. You could just delete the parameter from the
+        configuration and LUNA will automatically recognize that a given
+        parameter is not necessary anymore.
 
-        Check **Examples 3** to see how to do it and how to implement this automatic
-        behavior on your custom functions.
+        Check **Examples 3** to see how to do it and how to implement this
+        automatic behavior on your custom functions.
 
 
     Parameters
     ----------
     inter_config : :class:`~luna.interaction.config.InteractionConfig`
-        An :class:`~luna.interaction.config.InteractionConfig` object with all parameters and cutoffs necessary
-        to compute interactions defined in ``inter_funcs``.
-        If not provided, the default LUNA configuration will be used instead \
+        An :class:`~luna.interaction.config.InteractionConfig` object with
+        all parameters and cutoffs necessary to compute interactions defined
+        in ``inter_funcs``. If not provided, the default LUNA configuration
+        will be used instead \
         (:class:`~luna.interaction.config.DefaultInteractionConfig`).
-    inter_filter : :class:`~luna.interaction.filter.InteractionFilter`, optional
-        An :class:`~luna.interaction.filter.InteractionFilter` object to filter out interactions on-the-fly.
-        The default value is None, which implies no interaction will be filtered out.
+    inter_filter : :class:`~luna.interaction.filter.InteractionFilter`, \
+            optional
+        An :class:`~luna.interaction.filter.InteractionFilter` object to filter
+        out interactions on-the-fly. The default value is None, which implies
+        no interaction will be filtered out.
     inter_funcs : dict of {tuple : iterable of callable}
         A dict to define custom functions to calculate interactions,
-        where keys are tuples of feature names (e.g. ``("Hydrophobic", "Hydrophobic")``) and
-        values are lists of references to custom functions (see Examples for more details).
+        where keys are tuples of feature names \
+        (e.g. ``("Hydrophobic", "Hydrophobic")``) and values are lists of
+        references to custom functions (see Examples for more details).
         If not provided, the default LUNA methods will be used instead.
     add_non_cov : bool
          If True (the default), compute non-covalent interactions.
-         If you are providing custom functions to compute non-covalent interactions and
-         want to make them controllable by this flag, make sure to verify the state of
-         ``add_non_cov`` at the beginning of the function and return an empty list in case it is False.
+         If you are providing custom functions to compute non-covalent
+         interactions and want to make them controllable by this flag, make
+         sure to verify the state of ``add_non_cov`` at the beginning of the
+         function and return an empty list in case it is False.
     add_cov : bool
         If True (the default), compute covalent interactions.
-        If you are providing custom functions to compute covalent interactions and
-        want to make them controllable by this flag, make sure to verify the state of
-        ``add_cov`` at the beginning of the function and return an empty list in case it is False.
+        If you are providing custom functions to compute covalent interactions
+        and want to make them controllable by this flag, make sure to verify
+        the state of ``add_cov`` at the beginning of the function and return
+        an empty list in case it is False.
     add_proximal : bool
-        If True, compute proximal interactions, which are only distance-based contacts between atoms
-        or atom groups that, therefore, only imply proximity. The default value is False.
-        If you are providing custom functions to compute proximal interactions and
-        want to make them controllable by this flag, make sure to verify the state of
-        ``add_proximal`` at the beginning of the function and return an empty list in case it is False.
+        If True, compute proximal interactions, which are only distance-based
+        contacts between atoms or atom groups that, therefore, only imply
+        proximity. The default value is False. If you are providing custom
+        functions to compute proximal interactions and want to make them
+        controllable by this flag, make sure to verify the state of
+        ``add_proximal`` at the beginning of the function and return an empty
+        list in case it is False.
     add_atom_atom : bool
         If True (the default), compute atom-atom interactions,
-        which, as the name suggests, are interactions that only involve atoms no matter their features.
-        If you are providing custom functions to compute atom-atom interactions and want to make them
-        controllable by this flag, make sure to verify the state of ``add_atom_atom`` at the beginning
-        of the function and return an empty list in case it is False.
+        which, as the name suggests, are interactions that only involve atoms
+        no matter their features. If you are providing custom functions to
+        compute atom-atom interactions and want to make them controllable by
+        this flag, make sure to verify the state of ``add_atom_atom`` at the
+        beginning of the function and return an empty list in case it is False.
 
         .. note::
-            In LUNA, we consider the following interactions as atom-atom: `Van der Waals`,
-            `Van der Waals clash`, and `Atom overlap`. We opted to separate `Van der Waals` from
-            other non-covalent interactions because LUNA may generate an unnecessary number of additional
-            interactions that are usually already represented by other non-covalent interactions as
-            weak hydrogen bonds, hydrophobic, or dipole-dipole interactions.
-            Thus, to give users a fine-grain control over which interactions to calculate,
-            we provided this additional flag to turn off the calculation of Van der Waals interactions.
+            In LUNA, we consider the following interactions as atom-atom:
+            `Van der Waals`, `Van der Waals clash`, and `Atom overlap`.
+            We opted to separate `Van der Waals` from other non-covalent
+            interactions because LUNA may generate an unnecessary number of
+            additional interactions that are usually already represented by
+            other non-covalent interactions as weak hydrogen bonds,
+            hydrophobic, or dipole-dipole interactions. Thus, to give users
+            a fine-grain control over which interactions to calculate, we
+            provided this additional flag to turn off the calculation of
+            Van der Waals interactions.
     add_dependent_inter : bool
         If True, compute interactions that depend on other interactions.
-        Currently, only water-bridged hydrogen bonds and salt bridges have a dependency on
-        other interactions. The first, depends on two or more hydrogen bonds, while the second depends on
-        an ionic and a hydrogen bond. The default value is False, which implies no dependent interaction
-        will be computed.
+        Currently, only water-bridged hydrogen bonds and salt bridges have a
+        dependency on other interactions. The first, depends on two or more
+        hydrogen bonds, while the second depends on an ionic and a hydrogen
+        bond. The default value is False, which implies no dependent
+        interaction will be computed.
     add_h2o_pairs_with_no_target : bool
-        If True, keep interactions of water with atoms and atom groups that do not belong to the target
-        of LUNA's analysis, which are chains or molecules defined as an :class:`~luna.mol.entry.Entry` instance.
-        For example, if the target is a ligand and ``add_h2o_pairs_with_no_target`` is False,
-        then water-water and water-residue hydrogen bonds will be removed because the ligand is not
+        If True, keep interactions of water with atoms and atom groups that
+        do not belong to the target of LUNA's analysis, which are chains or
+        molecules defined as an :class:`~luna.mol.entry.Entry` instance.
+        For example, if the target is a ligand and
+        ``add_h2o_pairs_with_no_target`` is False, then water-water and
+        water-residue hydrogen bonds will be removed because the ligand is not
         participating in the interactions. The default value is False.
     strict_donor_rules : bool
-        If True (the default), hydrogen bonds will only be considered for donor atoms with explicit
-        hydrogens bound to them. In that case, angles and distances will be evaluated.
-        However, if the molecule containing the donor atom is in ``lazy_comps_list``, then angles and hydrogens
-        will be ignored and LUNA will proceed with the determination of hydrogen bonds based only on
-        donor-acceptor distances.
-        Another exception occurs for solvent molecules in which the donor atom is only bound to hydrogens atoms
-        (e.g., water, ammonia, and hydrogen sulfide).
-        In that case, hydrogens can be positioned in many different ways by Open Babel, which may cause LUNA to
-        detect different hydrogen bonds at each run.
-        So, to circumvent this problem, by default, LUNA always ignores the explicit hydrogen position
-        for donor atoms that only contain hydrogens bound to it.
+        If True (the default), hydrogen bonds will only be considered for donor
+        atoms with explicit hydrogens bound to them. In that case, angles and
+        distances will be evaluated. However, if the molecule containing the
+        donor atom is in ``lazy_comps_list``, then angles and hydrogens will be
+        ignored and LUNA will proceed with the determination of hydrogen bonds
+        based only on donor-acceptor distances. Another exception occurs for
+        solvent molecules in which the donor atom is only bound to hydrogens
+        atoms (e.g., water, ammonia, and hydrogen sulfide). In that case,
+        hydrogens can be positioned in many different ways by Open Babel, which
+        may cause LUNA to detect different hydrogen bonds at each run.
+        So, to circumvent this problem, by default, LUNA always ignores the
+        explicit hydrogen position for donor atoms that only contain hydrogens
+        bound to it.
     strict_weak_donor_rules : bool
-        If True (the default), weak hydrogen bonds will only be considered for donor atoms with explicit
-        hydrogens bound to them. In that case, angles and distances will be evaluated.
+        If True (the default), weak hydrogen bonds will only be considered for
+        donor atoms with explicit hydrogens bound to them. In that case, angles
+        and distances will be evaluated.
         The same exceptions described for ``strict_donor_rules`` apply here.
     lazy_comps_list : iterable
-         A sequence of molecule names to ignore explicit hydrogen position during the calculation of hydrogen bonds and weak hydrogen bonds.
-         The default list is ['HOH', 'DOD', 'WAT', 'H2O', 'OH2', 'NH3', 'NH4'], which only contains water, ammonia, and ammonium ion,
-         including water name variations used by different programs.
+         A sequence of molecule names to ignore explicit hydrogen position
+         during the calculation of hydrogen bonds and weak hydrogen bonds.
+         The default list is
+         ['HOH', 'DOD', 'WAT', 'H2O', 'OH2', 'NH3', 'NH4'], which only contains
+         water, ammonia, and ammonium ion, including water name variations
+         used by different programs.
 
 
     Examples
@@ -341,7 +380,8 @@ class InteractionCalculator:
 
     **Example 1) How to define custom interactions:**
 
-    In this example, we will define a custom function to calculate hydrogen bonds.
+    In this example, we will define a custom function to calculate
+    hydrogen bonds.
 
     First, let's start importing the classes and the function we will use.
 
@@ -349,9 +389,10 @@ class InteractionCalculator:
     >>> from luna.interaction.calc import InteractionCalculator
     >>> from luna.util.math import euclidean_distance
 
-    Now, we define the custom function, which simply calculates hydrogen bonds based
-    on donor-acceptor distances. If it is less than 3.5, then a new
-    :class:`~luna.interaction.type.InteractionType` object is created with type `Hydrogen bond`.
+    Now, we define the custom function, which simply calculates hydrogen bonds
+    based on donor-acceptor distances. If it is less than 3.5, then a new
+    :class:`~luna.interaction.type.InteractionType` object is created with type
+    `Hydrogen bond`.
 
     .. code-block::
 
@@ -370,18 +411,20 @@ class InteractionCalculator:
             return interactions
 
     .. note::
-        Observe that the function checks if ``add_non_cov`` has been turned off and if
-        so returns an empty list. That's a recommended strategy because it allows one to
-        turn off all non-covalent interactions with a single flag.
+        Observe that the function checks if ``add_non_cov`` has been turned off
+        and if so returns an empty list. That's a recommended strategy because
+        it allows one to turn off all non-covalent interactions with a single
+        flag.
 
-        Also, observe that `InteractionCalculator` always expects functions to return a list at the end.
-        That means multiple interactions may be detected for a single pair of
-        :class:`~luna.mol.groups.AtomGroup` objects.
-        For example, a donor atom containing 2 hydrogens could, in theory, form two
-        different hydrogen bonds with an acceptor atom.
+        Also, observe that `InteractionCalculator` always expects functions to
+        return a list at the end. That means multiple interactions may be
+        detected for a single pair of :class:`~luna.mol.groups.AtomGroup`
+        objects. For example, a donor atom containing 2 hydrogens could,
+        in theory, form two different hydrogen bonds with an acceptor atom.
 
 
-    Now, we have two options to set the custom function to an `InteractionCalculator` object:
+    Now, we have two options to set the custom function to an
+    `InteractionCalculator` object:
 
         1) Define a new dict with the custom functions:
 

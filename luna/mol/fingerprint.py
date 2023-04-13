@@ -22,7 +22,9 @@ class FingerprintGenerator():
 
     Parameters
     ----------
-    mol : :class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`, optional
+    mol : :class:`~luna.wrappers.base.MolWrapper`, \
+            :class:`rdkit.Chem.rdchem.Mol`, or \
+            :class:`openbabel.pybel.Molecule`, optional
         The molecule.
 
     Examples
@@ -33,20 +35,24 @@ class FingerprintGenerator():
     >>> from luna.mol.fingerprint import FingerprintGenerator
     >>> fg = FingerprintGenerator()
 
-    Now, let's read a molecule (glutamine) and set it to the `FingerprintGenerator` object.
+    Now, let's read a molecule (glutamine) and set it to the
+    `FingerprintGenerator` object.
 
     >>> from luna.wrappers.base import MolWrapper
     >>> fg.mol = MolWrapper.from_smiles("N[C@@H](CCC(N)=O)C(O)=O")
 
-    Finally, you can call any available function to generate the desired fingerprint type.
-    In the below example, a count ECFP4 fingerprint of size 1,024 is created.
+    Finally, you can call any available function to generate the desired
+    fingerprint type. In the below example, a count ECFP4 fingerprint of
+    size 1,024 is created.
 
     >>> fp = fg.morgan_fp(radius=2, length=1024, type=2)
     >>> print(fp.GetNonzeroElements())
-    {1: 1, 80: 2, 140: 1, 147: 2, 389: 1, 403: 1, 540: 1, 545: 1, 650: 2, 728: 1, 739: 1, 767: 1, 786: 1, 807: 3, 820: 1, 825: 1, 874: 1, 893: 2, 900: 1}
+    {1: 1, 80: 2, 140: 1, 147: 2, 389: 1, 403: 1, 540: 1, 545: 1, 650: 2,\
+728: 1, 739: 1, 767: 1, 786: 1, 807: 3, 820: 1, 825: 1, 874: 1, 893: 2, 900: 1}
 
-    You can then continue using the `FingerprintGenerator` object to create other fingerprint types.
-    For example, let's create a 2D pharmacophore fingerprint.
+    You can then continue using the `FingerprintGenerator` object to
+    create other fingerprint types. For example, let's create a 2D
+    pharmacophore fingerprint.
 
     >>> fp = fg.pharm2d_fp()
     >>> print(fp.GetNumOnBits())
@@ -58,7 +64,9 @@ class FingerprintGenerator():
 
     @property
     def mol(self):
-        """:class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`: The molecule."""
+        """:class:`~luna.wrappers.base.MolWrapper`, \
+                :class:`rdkit.Chem.rdchem.Mol`, or \
+                :class:`openbabel.pybel.Molecule`: The molecule."""
         return self._mol_obj
 
     @mol.setter
@@ -119,7 +127,8 @@ class FingerprintGenerator():
             If the fingerprint could not be created.
         """
         try:
-            return Torsions.GetTopologicalTorsionFingerprintAsIntVect(self._rdmol)
+            func = Torsions.GetTopologicalTorsionFingerprintAsIntVect
+            return func(self._rdmol)
         except Exception as e:
             logger.exception(e)
             raise FingerprintNotCreated("Fingerprint could not be created.")
@@ -130,19 +139,29 @@ class FingerprintGenerator():
         Parameters
         ----------
         radius : int
-            Define the maximum radius of the circular neighborhoods considered for each atom.
-            The default value is 2, which is roughly equivalent to ECFP4 and FCFP4.
+            Define the maximum radius of the circular neighborhoods
+            considered for each atom. The default value is 2, which is
+            roughly equivalent to ECFP4 and FCFP4.
         length : int
             The length of the fingerprint. The default value is 2,048.
         features : bool
-            If True, use pharmacophoric properties (FCFP) instead of atomic invariants (ECFP).
-            The default value is False.
+            If True, use pharmacophoric properties (FCFP) instead of
+            atomic invariants (ECFP). The default value is False.
         type : {1, 2, 3}
-            Define the type of the Morgan fingerprint function to be used, where:
+            Define the type of the Morgan fingerprint function to be
+            used, where:
 
-            * ``1`` means **GetMorganFingerprintAsBitVect()**. It returns an explicit bit vector of size ``length`` (hashed fingerprint), where 0s and 1s represent the presence or absence of a given feature, respectively.
-            * ``2`` means **GetHashedMorganFingerprint()**. It returns a sparse int vector ``length`` elements long (hashed fingerprint) containing the occurrence number of each feature.
-            * ``3`` means **GetMorganFingerprint()**. It returns a sparse int vector 2^32 elements long containing the occurrence number of each feature.
+            * ``1`` means **GetMorganFingerprintAsBitVect()**. \
+                    It returns an explicit bit vector of size ``length`` \
+                    (hashed fingerprint), where 0s and 1s represent the \
+                    presence or absence of a given feature, respectively.
+            * ``2`` means **GetHashedMorganFingerprint()**. \
+                    It returns a sparse int vector ``length`` elements \
+                    long (hashed fingerprint) containing the occurrence \
+                    number of each feature.
+            * ``3`` means **GetMorganFingerprint()**. \
+                    It returns a sparse int vector 2^32 elements long \
+                    containing the occurrence number of each feature.
 
             The default value is ``2``.
 
@@ -180,11 +199,15 @@ class FingerprintGenerator():
         Parameters
         ----------
         sig_factory : RDKit :class:`~rdkit.Chem.Pharm2D.SigFactory`, optional
-            Factory object for producing signatures. The default signature factory is defined as shown below:
+            Factory object for producing signatures. The default signature
+            factory is defined as shown below:
 
-            >>> feat_factory = ChemicalFeatures.BuildFeatureFactory(MIN_FDEF_FILE)
-            >>> sig_factory = SigFactory(feat_factory, minPointCount=2,
-            ...                          maxPointCount=3, trianglePruneBins=False)
+            >>> feat_factory = \
+ChemicalFeatures.BuildFeatureFactory(MIN_FDEF_FILE)
+            >>> sig_factory = SigFactory(feat_factory,
+            ...                          minPointCount=2,
+            ...                          maxPointCount=3,
+            ...                          trianglePruneBins=False)
             >>> sig_factory.SetBins([(0, 2), (2, 5), (5, 8)])
             >>> sig_factory.Init()
 
@@ -199,11 +222,13 @@ class FingerprintGenerator():
             return Generate.Gen2DFingerprint(self._rdmol, sig_factory)
         except Exception as e:
             logger.exception(e)
-            raise FingerprintNotCreated("The fingerprint could not be created.")
+            raise FingerprintNotCreated("The fingerprint could not "
+                                        "be created.")
 
 
 def available_fp_functions():
-    """Return a list of all fingerprints available at `FingerprintGenerator`."""
+    """Return a list of all fingerprints available at
+    `FingerprintGenerator`."""
     regex = re.compile(".*([a-zA-Z]+)_fp", flags=0)
     funcs = list(filter(regex.match, dir(FingerprintGenerator)))
     return funcs
@@ -254,33 +279,40 @@ def generate_fp_for_mols(mols, fp_function=None, fp_opt=None, critical=False):
 
     Parameters
     ----------
-    mols : iterable of :class:`~luna.wrappers.base.MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`
+    mols : iterable of :class:`~luna.wrappers.base.MolWrapper`, \
+                :class:`rdkit.Chem.rdchem.Mol`, or \
+                :class:`openbabel.pybel.Molecule`
         A sequence of molecules.
     fp_function : str
         The fingerprint function to use. The default value is 'pharm2d_fp'.
 
-        To check out the list of available functions, call the function :py:meth:`available_fp_functions`.
+        To check out the list of available functions, call the function
+        :py:meth:`available_fp_functions`.
     fp_opt : dict, optional
         A set of parameters to pass to ``fp_function``.
     critical : bool
-        If True, raises any exceptions caught during the generation of fingerprints.
-        Otherwise, ignores all exceptions (the default). The error messages are always printed to the logging output.
+        If True, raises any exceptions caught during the generation of
+        fingerprints.Otherwise, ignores all exceptions (the default).
+        The error messages are always printed to the logging output.
 
     Returns
     -------
      : list of dict
-        A list of dictionaries where each item contains the molecule name and its fingerprint.
+        A list of dictionaries where each item contains the molecule name
+        and its fingerprint.
 
         The dict is defined as follows:
 
             * ``mol`` (str): the molecule name;
-            * ``fp`` (RDKit :class:`~rdkit.DataStructs.cDataStructs.ExplicitBitVect` \
-            or :class:`~rdkit.DataStructs.cDataStructs.SparseBitVect`): the fingerprint;
+            * ``fp`` (RDKit \
+:class:`~rdkit.DataStructs.cDataStructs.ExplicitBitVect` \
+or :class:`~rdkit.DataStructs.cDataStructs.SparseBitVect`): the fingerprint;
 
     Raises
     ------
     IllegalArgumentError
-        If ``fp_function`` is not a function available in `FingerprintGenerator`.
+        If ``fp_function`` is not a function available in
+        `FingerprintGenerator`.
 
     Examples
     --------
@@ -292,16 +324,20 @@ def generate_fp_for_mols(mols, fp_function=None, fp_opt=None, critical=False):
     ...         MolWrapper.from_smiles("C[C@@H](C(=O)O)N"),
     ...         MolWrapper.from_smiles("C1=CC(=CC=C1CC(C(=O)O)N)O")]
 
-    Now, you can generate fingerprints for these molecules using the function :meth:`generate_fp_for_mols`.
-    For example, let's create count ECFP4 fingerprints of size 1,024 for the above molecules.
+    Now, you can generate fingerprints for these molecules using the function
+    :meth:`generate_fp_for_mols`. For example, let's create count ECFP4
+    fingerprints of size 1,024 for the above molecules.
 
     >>> from luna.mol.fingerprint import generate_fp_for_mols
-    >>> fps = generate_fp_for_mols(mols, fp_function="morgan_fp", fp_opt={"length": 1024})
+    >>> fps = generate_fp_for_mols(mols,
+    ...                            fp_function="morgan_fp",
+    ...                            fp_opt={"length": 1024})
 
     Then, you can loop through the results as shown below:
 
     >>> for d in fps:
-    >>>     print(f"{d['mol'].ljust(25)} - {len(d['fp'].GetNonzeroElements())}")
+    >>>     print(f"{d['mol'].ljust(25)} - \
+{len(d['fp'].GetNonzeroElements())}")
     N[C@@H](CCC(N)=O)C(O)=O   - 19
     C[C@@H](C(=O)O)N          - 12
     C1=CC(=CC=C1CC(C(=O)O)N)O - 24

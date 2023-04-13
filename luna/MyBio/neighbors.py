@@ -50,7 +50,6 @@ def get_residue_neighbors(residue, select=Select(), verbose=True):
                      if select.accept_atom(atm)}
 
     if residue.is_residue():
-
         if "N" not in trgt_res_atms and verbose:
             logger.debug("There is a missing N in the residue %s. It may have "
                          "been filtered out by the provided selection "

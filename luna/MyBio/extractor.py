@@ -13,8 +13,10 @@ class Extractor():
 
     Parameters
     ----------
-    entity : :class:`~luna.MyBio.PDB.Entity.Model` or :class:`~luna.MyBio.PDB.Entity.Chain`
-        A model or chain object from where chains and residues will be extracted, respectively.
+    entity : :class:`~luna.MyBio.PDB.Entity.Model` or \
+                :class:`~luna.MyBio.PDB.Entity.Chain`
+        A model or chain object from where chains and residues
+        will be extracted, respectively.
     """
 
     def __init__(self, entity):
@@ -27,7 +29,8 @@ class Extractor():
     @entity.setter
     def entity(self, entity):
         if not isinstance(entity, (Model, Chain)):
-            raise TypeError("Only objects of type %s or %s are accepted." % (Model.__module__, Chain.__module__))
+            raise TypeError("Only objects of type %s or %s are accepted." %
+                            (Model.__module__, Chain.__module__))
         self._entity = entity
 
     def extract_chains(self, chains, output_file):
@@ -51,7 +54,9 @@ class Extractor():
                     logger.warning("Chain %s does not exist." % chain)
 
             if len(chain_sel) > 0:
-                save_to_file(self.entity, output_file, ChainSelector(chain_sel))
+                save_to_file(self.entity, 
+                             output_file,
+                             ChainSelector(chain_sel))
             else:
                 logger.warning("No valid chain to extract.")
 

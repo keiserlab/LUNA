@@ -741,8 +741,10 @@ class Project:
         inter_config = self.inter_calc.inter_config
         radius = inter_config.get("cache_cutoff",
                                   BOUNDARY_CONFIG["cache_cutoff"])
-        nb_pairs = get_contacts_with(structure[0], ligand,
-                                     level='R', radius=radius)
+        nb_pairs = get_contacts_with(ligand,
+                                     entity=structure[0],
+                                     radius=radius,
+                                     level='R')
         nb_compounds = set([p[1] for p in nb_pairs
                             if not p[1].is_target()])
 
@@ -781,7 +783,10 @@ class Project:
         inter_config = self.inter_calc.inter_config
         radius = inter_config.get("bsite_cutoff",
                                   BOUNDARY_CONFIG["bsite_cutoff"])
-        nb_pairs = get_contacts_with(entity, ligand, level='R', radius=radius)
+        nb_pairs = get_contacts_with(ligand,
+                                     entity=entity,
+                                     radius=radius,
+                                     level='R')
 
         mol_objs_dict = {}
         if isinstance(entry, MolFileEntry):

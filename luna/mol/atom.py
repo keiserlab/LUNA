@@ -6,7 +6,8 @@ logger = logging.getLogger()
 
 
 class AtomData:
-    """Store atomic data (atomic number, coordinates, bond type, and serial number).
+    """Store atomic data (atomic number, coordinates, bond type,
+    and serial number).
 
     Parameters
     ----------
@@ -33,9 +34,15 @@ class AtomData:
         The atom serial number.
     """
 
-    def __init__(self, atomic_num, coord, bond_type, full_id=None, serial_number=None):
+    def __init__(self,
+                 atomic_num,
+                 coord,
+                 bond_type,
+                 full_id=None,
+                 serial_number=None):
         self.atomic_num = atomic_num
-        # Standardize all coordinate data to the same Numpy data type for consistence.
+        # Standardize all coordinate data to the same Numpy data type
+        # for consistence.
         self._coord = np.array(coord, "f")
         self.bond_type = bond_type
         self.full_id = full_id
@@ -63,7 +70,8 @@ class AtomData:
 
     @coord.setter
     def coord(self, xyz):
-        # Standardize all coordinate data to the same Numpy data type for consistence.
+        # Standardize all coordinate data to the same Numpy data type for
+        # consistence.
         self._coord = np.array(xyz, "f")
 
     def __repr__(self):
@@ -78,8 +86,10 @@ class AtomData:
                 atom_name += "-%s" % self.full_id[4][1]
             full_atom_name += "/%s/%s" % (res_name, atom_name)
 
-        return ("<ExtendedAtomData: atomic number=%d, coord=(%.3f, %.3f, %.3f), atom='%s', serial number=%s>"
-                % (self.atomic_num, self.x, self.y, self.z, full_atom_name, str(self.serial_number)))
+        return ("<ExtendedAtomData: atomic number=%d, "
+                "coord=(%.3f, %.3f, %.3f), atom='%s', serial number=%s>"
+                % (self.atomic_num, self.x, self.y, self.z, full_atom_name,
+                   str(self.serial_number)))
 
     def __eq__(self, other):
         """Overrides the default implementation"""
@@ -102,14 +112,16 @@ class AtomData:
 
 
 class ExtendedAtom:
-    """Extend :class:`~luna.MyBio.PDB.Atom.Atom` with additional properties and methods.
+    """Extend :class:`~luna.MyBio.PDB.Atom.Atom` with additional properties
+    and methods.
 
     Parameters
     ----------
     atom : :class:`~luna.MyBio.PDB.Atom.Atom`
         An atom.
     nb_info : iterable of `AtomData`, optional
-        A sequence of `AtomData` containing information about atoms covalently bound to ``atom``.
+        A sequence of `AtomData` containing information about atoms covalently
+        bound to ``atom``.
     atm_grps : iterable of :class:`~luna.groups.AtomGroup`, optional
         A sequence of atom groups that contain ``atom``.
     invariants : list or tuple, optional
@@ -132,16 +144,18 @@ class ExtendedAtom:
         """list of `AtomData`, read-only: The list of `AtomData`
         containing information about atoms covalently bound to ``atom``.
 
-        To add or remove neighbors information from ``neighbors_info`` use :py:meth:`add_nb_info`
-        or :py:meth:`remove_nb_info`, respectively."""
+        To add or remove neighbors information from ``neighbors_info``
+        use :py:meth:`add_nb_info` or :py:meth:`remove_nb_info`,
+        respectively."""
         return self._nb_info
 
     @property
     def atm_grps(self):
-        """list of :class:`~luna.groups.AtomGroup`, read-only: The list of atom groups that contain ``atom``.
+        """list of :class:`~luna.groups.AtomGroup`, read-only: The list of
+        atom groups that contain ``atom``.
 
-        To add or remove atom groups from ``atm_grps`` use :py:meth:`add_atm_grps`
-        or :py:meth:`remove_atm_grps`, respectively."""
+        To add or remove atom groups from ``atm_grps`` use
+        :py:meth:`add_atm_grps` or :py:meth:`remove_atm_grps`, respectively."""
         return self._atm_grps
 
     @property
@@ -155,27 +169,32 @@ class ExtendedAtom:
 
     @property
     def atomic_num(self):
-        """int, read-only: This atom's atomic number. This information is obtained from Open Babel."""
+        """int, read-only: This atom's atomic number. This information is
+        obtained from Open Babel."""
         return ob.GetAtomicNum(self.element)
 
     @property
     def electronegativity(self):
-        """float, read-only: The Pauling electronegativity for this atom. This information is obtained from Open Babel."""
+        """float, read-only: The Pauling electronegativity for this atom.
+        This information is obtained from Open Babel."""
         return ob.GetElectroNeg(ob.GetAtomicNum(self.element))
 
     @property
     def full_id(self):
-        """tuple, read-only: The full id of an atom is the tuple (structure id, model id, chain id,
-        residue id, atom name, alternate location)."""
+        """tuple, read-only: The full id of an atom is the tuple (structure id,
+        model id, chain id, residue id, atom name, alternate location)."""
         return self._atom.get_full_id()
 
     @property
     def full_atom_name(self):
-        """str, read-only: The full name of an atom is composed by the structure id, model id,
-                chain id, residue name, residue id, atom name, and alternate location if available.
+        """str, read-only: The full name of an atom is composed by the
+                structure id, model id, chain id, residue name, residue id,
+                atom name, and alternate location if available.
                 Fields are slash-separated."""
         full_atom_name = "%s/%s/%s" % self.get_full_id()[0:3]
-        res_name = "%s/%d%s" % (self._atom.parent.resname, self._atom.parent.id[1], self._atom.parent.id[2].strip())
+        res_name = "%s/%d%s" % (self._atom.parent.resname,
+                                self._atom.parent.id[1],
+                                self._atom.parent.id[2].strip())
         atom_name = "%s" % self._atom.name
         if self.altloc != " ":
             atom_name += "-%s" % self.altloc
@@ -196,7 +215,8 @@ class ExtendedAtom:
         self._nb_info = list(set(self._nb_info) - set(nb_info))
 
     def remove_atm_grps(self, atm_grps):
-        """ Remove :class:`~luna.groups.AtomGroup` objects from ``atm_grps``."""
+        """ Remove :class:`~luna.groups.AtomGroup` objects from
+        ``atm_grps``."""
         self._atm_grps = list(set(self._atm_grps) - set(atm_grps))
 
     def get_neighbor_info(self, atom):
@@ -219,7 +239,8 @@ class ExtendedAtom:
             * ``model`` (str): model id;
             * ``chain`` (str): chain id;
             * ``res_name`` (str): residue name;
-            * ``res_id`` (tuple): residue id (hetflag, sequence identifier, insertion code);
+            * ``res_id`` (tuple): residue id (hetflag, sequence identifier, \
+                    insertion code);
             * ``name`` (tuple): atom name (atom name, alternate location).
 
         """
@@ -236,7 +257,8 @@ class ExtendedAtom:
         if hasattr(self._atom, attr):
             return getattr(self._atom, attr)
         else:
-            raise AttributeError("The attribute '%s' does not exist in the class %s." % (attr, self.__class__.__name__))
+            raise AttributeError("The attribute '%s' does not exist in the "
+                                 "class %s." % (attr, self.__class__.__name__))
 
     def __getstate__(self):
         return self.__dict__
@@ -262,7 +284,8 @@ class ExtendedAtom:
         return not self.__eq__(other)
 
     def __lt__(self, a2):
-        # It substitutes the residue id for its index in order to keep the same order as in the PDB.
+        # It substitutes the residue id for its index in order to keep
+        # the same order as in the PDB.
         full_id1 = self.full_id[0:2] + (self.parent.idx, ) + self.full_id[4:]
         full_id2 = a2.full_id[0:2] + (a2.parent.idx, ) + a2.full_id[4:]
 
