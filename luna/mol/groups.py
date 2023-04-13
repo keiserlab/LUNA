@@ -11,13 +11,14 @@ from Bio.KDTree import KDTree
 from luna.MyBio.selector import Selector, AtomSelector
 from luna.MyBio.util import biopython_entity_to_mol
 from luna.interaction.contact import get_proximal_compounds
+from luna.interaction.contact import get_contacts_with
 from luna.interaction.type import InteractionType
 from luna.mol.atom import ExtendedAtom, AtomData
 from luna.mol.charge_model import OpenEyeModel
 from luna.mol.features import ChemicalFeature
 from luna.wrappers.base import MolWrapper
 from luna.util.exceptions import MoleculeSizeError, IllegalArgumentError
-from luna.util.default_values import COV_SEARCH_RADIUS
+from luna.util.default_values import COV_SEARCH_RADIUS, METAL_COMPLEX_DIST
 from luna.util import math as im
 from luna.util.file import pickle_data, unpickle_data
 from luna.version import __version__
@@ -873,6 +874,8 @@ class AtomGroupPerceiver():
         # Initial compounds + border compounds
         target_compounds = set()
 
+        metals = set()
+
         while comp_queue:
             comp = comp_queue.pop()
 
@@ -882,7 +885,10 @@ class AtomGroupPerceiver():
                 continue
 
             # Add this compound to the binding site set.
-            target_compounds.add(comp)
+            if not comp.is_metal():
+                target_compounds.add(comp)
+            else:
+                metals.add(comp)
 
             if self.expand_selection:
                 # Remove the ligand from the list when
@@ -890,7 +896,11 @@ class AtomGroupPerceiver():
                 comp_list = [c for c in get_proximal_compounds(comp)
                              if c.id not in mol_objs_dict]
 
-                target_compounds.update(comp_list)
+                for prox_comp in comp_list:
+                    if not prox_comp.is_metal():
+                        target_compounds.add(prox_comp)
+                    else:
+                        metals.add(prox_comp)
 
                 # Expands the queue of compounds
                 # with any new border compound.
@@ -904,11 +914,47 @@ class AtomGroupPerceiver():
             else:
                 comp_list = [comp]
 
+        # Stores atoms involved in metal coordination as a dict of dict,
+        # where the first key is the residue and the second key is an atom.
+        # The values are sets of metals (Residue objects).
+        custom_dict = lambda: {"atm_idx": None, "metals": set()}
+        metals_coord = defaultdict(lambda: defaultdict(custom_dict))
+
+        for metal in metals:
+            # Identifies potential dative bonds with metals.
+            atm_pairs = get_contacts_with(metal, radius=METAL_COMPLEX_DIST)
+            for atm1, atm2 in atm_pairs:
+                if atm1.parent.is_metal() and not atm2.parent.is_metal():
+                    other_atm = atm2
+                elif not atm1.parent.is_metal() and atm2.parent.is_metal():
+                    other_atm = atm1
+                # Skip if the pair contains two metals or no metal.
+                else:
+                    continue
+
+                # Skip pairs whose non-metal compound is not
+                # in ``target_compounds``
+                if other_atm.parent not in target_compounds:
+                    continue
+
+                # Skip pairs whose atom is not an O, N, or S.
+                if other_atm.element not in ["O", "N", "S"]:
+                    continue
+
+                # Add this metal to the set of metals being
+                # coordinated by the non-metal atom.
+                other_atm.metal_coordination.add(metal)
+
+                # Add the pair to the dict 'metals_coord'.
+                metals_coord[other_atm.parent][other_atm]["metals"].add(metal)
+
         for comp, mol_obj in new_mol_objs_dict.items():
             target_atoms = self._get_atoms(comp)
             self._assign_properties(mol_obj, target_atoms)
 
-        mol_obj, target_atoms = self._get_mol_from_entity(target_compounds)
+        mol_obj, target_atoms = \
+            self._get_mol_from_entity(target_compounds,
+                                      metals_coord=metals_coord)
         self._assign_properties(mol_obj, target_atoms)
 
         # Remove atom groups not comprising the provided
@@ -938,15 +984,16 @@ class AtomGroupPerceiver():
 
             atm_map = {}
             trgt_atms = {}
+            ob_atms_map = {}
             for i, atm_obj in enumerate(atm_obj_list):
+                atm_key = target_atoms[i].get_full_id()
 
-                bio_atom = target_atoms[i].get_full_id()
+                atm_map[atm_obj.get_idx()] = atm_key
+                ob_atms_map[atm_key] = atm_obj
 
-                atm_map[atm_obj.get_idx()] = bio_atom
-
-                trgt_atms[bio_atom] = self._new_extended_atom(target_atoms[i])
+                trgt_atms[atm_key] = self._new_extended_atom(target_atoms[i])
                 # Update atomic invariants for new ExtendedAtoms created.
-                trgt_atms[bio_atom].invariants = \
+                trgt_atms[atm_key].invariants = \
                     atm_obj.get_atomic_invariants()
 
             # Set all neighbors, i.e., covalently bonded atoms.
@@ -955,23 +1002,35 @@ class AtomGroupPerceiver():
                 end_atm_obj = bond_obj.get_end_atom()
 
                 # At least one of the atoms must be a non-hydrogen atom.
-                if bgn_atm_obj.get_atomic_num() != 1 or end_atm_obj.get_atomic_num() != 1:
-                    # If the atom 1 is not a hydrogen, add atom 2 to its neighbor list.
+                if (bgn_atm_obj.get_atomic_num() != 1
+                        or end_atm_obj.get_atomic_num() != 1):
+
+                    # If the atom 1 is not a hydrogen, add atom 2 to its
+                    # neighbor list.
                     if bgn_atm_obj.get_atomic_num() != 1:
                         full_id = atm_map.get(end_atm_obj.get_idx())
-                        coord = mol_obj.get_atom_coord_by_id(end_atm_obj.get_id())
-                        atom_info = AtomData(end_atm_obj.get_atomic_num(), coord, bond_obj.get_bond_type(), full_id)
-                        trgt_atms[atm_map[bgn_atm_obj.get_idx()]].add_nb_info([atom_info])
+                        coord = \
+                            mol_obj.get_atom_coord_by_id(end_atm_obj.get_id())
+                        atom_info = AtomData(end_atm_obj.get_atomic_num(),
+                                             coord,
+                                             bond_obj.get_bond_type(),
+                                             full_id)
 
-                    # If the atom 2 is not a hydrogen, add atom 1 to its neighbor list.
+                        bgn_atm = atm_map[bgn_atm_obj.get_idx()]
+                        trgt_atms[bgn_atm].add_nb_info([atom_info])
+
+                    # If the atom 2 is not a hydrogen, add atom 1 to its
+                    # neighbor list.
                     if end_atm_obj.get_atomic_num() != 1:
                         full_id = atm_map.get(bgn_atm_obj.get_idx())
-                        coord = mol_obj.get_atom_coord_by_id(bgn_atm_obj.get_id())
+                        coord = \
+                            mol_obj.get_atom_coord_by_id(bgn_atm_obj.get_id())
                         atom_info = AtomData(bgn_atm_obj.get_atomic_num(),
                                              coord,
                                              bond_obj.get_bond_type(),
                                              full_id)
-                        trgt_atms[atm_map[end_atm_obj.get_idx()]].add_nb_info([atom_info])
+                        end_atm = atm_map[end_atm_obj.get_idx()]
+                        trgt_atms[end_atm].add_nb_info([atom_info])
 
             # Perceive pharmacophoric properties and create AtomGroup objects.
             group_features = \
@@ -979,7 +1038,10 @@ class AtomGroupPerceiver():
             for key in group_features:
                 grp_obj = group_features[key]
                 atoms = [trgt_atms[i] for i in grp_obj["atm_ids"]]
+
                 self.atm_grps_mngr.new_atm_grp(atoms, grp_obj["features"])
+
+            self._fix_pharmacophoric_rules(ob_atms_map)
 
             # Update the graph in the AtomGroupsManager object
             # with the current network.
@@ -994,6 +1056,95 @@ class AtomGroupPerceiver():
 
             if self.critical:
                 raise
+
+    def _fix_pharmacophoric_rules(self, atms_map):
+        """ Fix atom groups where one of its atoms coordinate a metal
+        if necessary.
+
+        For example, an imidazole group may be perceived as a
+        positive ionizable group due to the set of pharmacophoric rules
+        even when its nitrogens are coordinating a metal. In this case,
+        we should not consider the group as ionizable as the N's lone
+        pairs are involved in the dative bond."""
+        for atm_grp1 in self.atm_grps_mngr:
+            atoms = atm_grp1.atoms
+
+            if not any([atm.has_metal_coordination() for atm in atoms]):
+                continue
+
+            is_imidazole = False
+            for atm in atoms:
+                if atm.element not in ["O", "N", "S"]:
+                    continue
+
+                invariants = atm.invariants
+                atm_obj = atms_map[atm.get_full_id()]
+
+                # Imidazole-like, but not tetrazoles.
+                tetrazole_smarts = \
+                    "$([nR1r5;$(n:n:n:n:c),$(n:n:n:c:n)])"
+                imidazole_smarts = \
+                    ("[$([n;H1]cn),$(nc[n;H1]),$([n;H0-1]cn);R1r5;"
+                     f"!{tetrazole_smarts}]")
+                is_imidazole = \
+                    atm_obj.matches_smarts(imidazole_smarts)
+
+                for atm_grp2 in atm.atm_grps:
+                    # Skip groups containing more than one atom.
+                    if len(atm_grp2.atoms) > 1:
+                        continue
+
+                    features = []
+                    for feature in atm_grp2.features:
+                        # If an atom is coordinating a metal
+                        # and it is a donor, but it has no H
+                        # bound to it, remove this feature.
+                        if (atm.has_metal_coordination()
+                                and feature.name == "Donor"
+                                and invariants[5] == 0):
+                            continue
+
+                        # If a N is coordinating a metal
+                        # and it is an acceptor, remove this
+                        # feature because its lone pair is already
+                        # being shared with the metal.
+                        if (atm.has_metal_coordination()
+                                and feature.name == "Acceptor"
+                                and atm.element == "N"):
+                            continue
+
+                        if (atm.has_metal_coordination()
+                                and feature.name == "PositivelyIonizable"
+                                and atm.element == "N"):
+                            continue
+
+                        # If the imidazole N having an H bound to
+                        # it (NH) is not coordinating a metal,
+                        # obligatory the other N is doing so,
+                        # otherwise this N would not reach this
+                        # part of the code.
+                        #
+                        # In this case, remove its feature
+                        # 'Acceptor' because the ring cannot form
+                        # tautomers anymore.
+                        if (not atm.has_metal_coordination()
+                                and feature.name == "Acceptor"
+                                and atm.element == "N"
+                                and is_imidazole):
+                            continue
+
+                        features.append(feature)
+
+                    # Update this atom group's features.
+                    atm_grp2.features = features
+
+            if is_imidazole:
+                features = []
+                for feature in atm_grp1.features:
+                    if feature.name == "PositivelyIonizable":
+                        continue
+                    features.append(feature)
+                atm_grp1.features = features
 
     def _apply_cache(self, compounds, model):
 
@@ -1071,7 +1222,8 @@ class AtomGroupPerceiver():
         return [atm for atm in compound.get_unpacked_list()
                 if selector.accept_atom(atm)]
 
-    def _get_mol_from_entity(self, compounds):
+    def _get_mol_from_entity(self, compounds, metals_coord=None):
+
         atoms = [atm
                  for comp in sorted(compounds,
                                     key=lambda c: (c.parent.parent.id,
@@ -1086,6 +1238,7 @@ class AtomGroupPerceiver():
             biopython_entity_to_mol(model, atom_selector,
                                     amend_mol=self.amend_mol,
                                     add_h=self.add_h, ph=self.ph,
+                                    metals_coord=metals_coord,
                                     tmp_path=self.tmp_path,
                                     keep_tmp_files=True)
 
