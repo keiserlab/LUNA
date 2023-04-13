@@ -1,11 +1,14 @@
+from os.path import exists
 from operator import xor
 from enum import Enum, auto
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 from luna.mol.precomp_data import DefaultResidueData
 from luna.wrappers.base import MolWrapper, BondType, OBBondType
 from luna.MyBio.neighbors import get_residue_neighbors
+from luna.mol.precomp_data import from_cif_file
 
+from openbabel.openbabel import OBSmartsPattern
 
 import logging
 
@@ -94,14 +97,19 @@ class Standardizer:
 
         self.res_data = res_data
 
-    def _validate_atoms_list(self, res, atom_names):
+    def _validate_atoms_list(self, res, atom_names, precomp_data=None):
         # Current list of atoms found in this residue.
         atom_names = set(atom_names)
 
+        precomp_data = precomp_data or self.res_data
+
         # Set of expected atom names.
-        data = self.res_data.get(res.resname, {})
+        data = precomp_data.get(res.resname, {})
         props = data.get("atoms", {})
         expected_atms = set([a for a in props if "," not in a])
+
+        if len(expected_atms) == 0:
+            return
 
         # Identify missing atoms, except OXT.
         missing_atoms = [a for a in expected_atms - atom_names
@@ -126,7 +134,7 @@ class Standardizer:
 
     def _resolve_resname(self, res):
 
-        atom_pairs = self.residues[res]
+        atom_pairs = self._comps[res]
 
         # Check if ASP is bound to metals.
         if res.resname == "ASP":
@@ -143,11 +151,16 @@ class Standardizer:
             # OD2 -- M.
             smarts2 = f"[OX2]({METAL_ATOM})[CX3]([#6])=[OX1]"
 
+            coords = self.metals_coord.get(res, {})
+            O_atms = [a.name for a in coords if a.name in ["OD1", "OD2"]]
+
             # If OD1 is bound to a metal, move the double bond to OD2.
-            if OD2_atm_obj.matches_smarts(smarts1):
+            if (OD2_atm_obj.matches_smarts(smarts1)
+                    or ("OD1" in O_atms and "OD2" not in O_atms)):
                 return "ASP_OD2"
             # If OD2 is bound to a metal, move the double bond to OD1.
-            elif OD2_atm_obj.matches_smarts(smarts2):
+            elif (OD2_atm_obj.matches_smarts(smarts2)
+                    or ("OD1" not in O_atms and "OD2" in O_atms)):
                 return "ASP_OD1"
             # Otherwise, return the ASP type defined by the user.
             return self.asp_type.name
@@ -162,8 +175,12 @@ class Standardizer:
                 # CYS type defined by the user.
                 return self.cys_type.name
 
+            coords = self.metals_coord.get(res, {})
+            trgt_atms = [a.name for a in coords if a.name in ["SG"]]
+
             # If SG is bound to a metal, deprotonate it.
-            if SG_atm_obj.matches_smarts(f"[S]{METAL_ATOM}"):
+            if (SG_atm_obj.matches_smarts(f"[S]{METAL_ATOM}")
+                    or "SG" in trgt_atms):
                 return "CYM"
             # Otherwise, return the CYS type defined by the user.
             return self.cys_type.name
@@ -183,11 +200,16 @@ class Standardizer:
             # OE2 -- M.
             smarts2 = f"[OX2]({METAL_ATOM})[CX3]([#6])=[OX1]"
 
+            coords = self.metals_coord.get(res, {})
+            O_atms = [a.name for a in coords if a.name in ["OE1", "OE2"]]
+
             # If OE1 is bound to a metal, move the double bond to OE2.
-            if OE2_atm_obj.matches_smarts(smarts1):
+            if (OE2_atm_obj.matches_smarts(smarts1)
+                    or "OE1" in O_atms):
                 return "GLU_OE2"
             # If OE2 is bound to a metal, move the double bond to OE1.
-            elif OE2_atm_obj.matches_smarts(smarts2):
+            elif (OE2_atm_obj.matches_smarts(smarts2)
+                    or "OE2" in O_atms):
                 return "GLU_OE1"
             # Otherwise, return the GLU type defined by the user.
             return self.glu_type.name
@@ -208,18 +230,23 @@ class Standardizer:
             # NE2 ---> M1
             smarts3 = f"[#7;R]~[#6;R]~[#7;R]{METAL_ATOM}"
 
+            coords = self.metals_coord.get(res, {})
+            N_atms = [a.name for a in coords if a.name in ["ND1", "NE2"]]
+
             # If both Ns are bound to the metal, deprotonate the HIS.
-            if ND1_atm_obj.matches_smarts(smarts1):
+            if (ND1_atm_obj.matches_smarts(smarts1)
+                    or len(N_atms) == 2):
                 return "HIS_D"
             # If ND1 is bound to the metal, the H is added to NE2.
-            elif ND1_atm_obj.matches_smarts(smarts2):
+            elif (ND1_atm_obj.matches_smarts(smarts2)
+                    or "ND1" in N_atms):
                 return "HIE"
             # If NE2 is bound to the metal, the H is added to ND1.
-            elif ND1_atm_obj.matches_smarts(smarts3):
+            elif (ND1_atm_obj.matches_smarts(smarts3)
+                    or "NE2" in N_atms):
                 return "HID"
             # Otherwise, return the HIS type defined by the user.
-            else:
-                return self.his_type.name
+            return self.his_type.name
 
         elif res.resname == "LYS":
             try:
@@ -230,23 +257,32 @@ class Standardizer:
                 # LYS type defined by the user.
                 return self.lys_type.name
 
+            coords = self.metals_coord.get(res, {})
+            trgt_atms = [a.name for a in coords if a.name in ["NZ"]]
+
             # If NZ is bound to a metal, deprotonate it.
-            if NZ_atm_obj.matches_smarts(f"[N]{METAL_ATOM}"):
+            if (NZ_atm_obj.matches_smarts(f"[N]{METAL_ATOM}")
+                    or "NZ" in trgt_atms):
                 return "LYN"
             # Otherwise, return the LYS type defined by the user.
             return self.lys_type.name
 
-        elif res.resname in ["SER", "THR", "TYR"]:
+        elif res.resname == "TYR":
             try:
                 OH_atm_obj = [atm_obj for atm_obj, pdb_atm in atom_pairs
-                              if pdb_atm.name in ["OG", "OG1", "OH"]][0]
+                              if pdb_atm.name == "OH"][0]
             except IndexError:
                 # In case OG/OG1/OH cannot be recovered, return the
                 # residue type defined by the user.
                 return res.resname
 
+            coords = self.metals_coord.get(res, {})
+            trgt_atms = [a.name for a in coords
+                         if a.name == "OH"]
+
             # If the oxygen is bound to a metal, deprotonate it.
-            if OH_atm_obj.matches_smarts(f"[O]{METAL_ATOM}"):
+            if (OH_atm_obj.matches_smarts(f"[O]{METAL_ATOM}")
+                    or "OH" in trgt_atms):
                 return res.resname + "_D"
             # Otherwise, return the residue type defined by the user.
             return res.resname
@@ -286,24 +322,26 @@ class Standardizer:
 
         # If this atom's partner cannot be identified, it is better
         # not to update this atom.
-        if partner_idx not in self._pdb_map:
+        if partner_idx not in self._pdb_mapping:
             self._events["ignore"].add(pdb_atm)
 
-            msg = ("Atom %s of residue %s will not be amended "
+            msg = ("The atom %s from %s will not be amended "
                    "because an unidentified atom is covalently bound "
-                   "to it." % (pdb_atm, pdb_atm.parent))
+                   "to it." % (pdb_atm.name, pdb_atm.parent.full_name))
             logger.error(msg)
 
             return None, None
 
-        partner_atm = self._pdb_map[partner_idx]
+        partner_atm = self._pdb_mapping[partner_idx]
 
         return partner_obj, partner_atm
 
-    def _resolve_bonds(self, resname, atm_obj, pdb_atm):
+    def _resolve_bonds(self, resname, atm_obj, pdb_atm, precomp_data=None):
+
+        precomp_data = precomp_data or self.res_data
 
         # All expected residue bonds.
-        res_dict = self.res_data.get(resname, {})
+        res_dict = precomp_data.get(resname, {})
         res_bonds = res_dict.get("bonds", {})
 
         # Add disulfide bridge as a standard bond to CYS.
@@ -337,7 +375,7 @@ class Standardizer:
                 continue
 
             # Break any bonds with water.
-            if pdb_atm.parent.is_water():
+            if pdb_atm.parent.is_water() or partner_atm.parent.is_water():
                 self._events["break"].add(((atm_obj, pdb_atm),
                                            (partner_obj, partner_atm),
                                            bond_obj))
@@ -349,6 +387,13 @@ class Standardizer:
                     and partner_atm.parent.is_residue(standard=False)
                     and bond_key not in res_bonds):
 
+                # In case there is a peptide bond between a residue and a
+                # non-standard residue, whose N has a name different than 'N',
+                # we can ignore it if the atom C formed an amide with the N.
+                if (pdb_atm.name == "C" and partner_obj.get_symbol() == "N"
+                        and atm_obj.matches_smarts("[$([CX3](=O)N)]")):
+                    continue
+
                 self._events["break"].add(((atm_obj, pdb_atm),
                                            (partner_obj, partner_atm),
                                            bond_obj))
@@ -356,12 +401,12 @@ class Standardizer:
                 if pdb_atm.parent == partner_atm.parent:
                     msg = ("An unexpected bond between atoms %s and %s from "
                            "%s was found. It will break the bond and "
-                           "standardise the atoms."
+                           "standardize the atoms."
                            % (pdb_atm, partner_atm, pdb_atm.parent))
                 else:
                     msg = ("An unexpected bond between atoms %s and %s from "
                            "residues %s and %s was found. It will break the "
-                           "bond and standardise the atoms."
+                           "bond and standardize the atoms."
                            % (pdb_atm, partner_atm,
                               pdb_atm.parent, partner_atm.parent))
                 logger.error(msg)
@@ -375,10 +420,12 @@ class Standardizer:
 
                 self._events["ignore"].add(pdb_atm)
 
-                msg = ("Atom %s of molecule %s will not be amended "
+                msg = ("The atom %s from %s will not be amended "
                        "because an unexpected atom (%s) from %s is covalently "
-                       "bound to it." % (pdb_atm, pdb_atm.parent,
-                                         partner_atm, partner_atm.parent))
+                       "bound to it." % (pdb_atm.name,
+                                         pdb_atm.parent.full_name,
+                                         partner_atm.name,
+                                         partner_atm.parent.full_name))
                 logger.error(msg)
                 return
 
@@ -442,8 +489,8 @@ class Standardizer:
                 trg_atm_pairs = []
                 # If the partner residue exists, search for the partner
                 # atom by name.
-                if partner_res in self.residues:
-                    atom_pairs = self.residues[partner_res]
+                if partner_res in self._comps:
+                    atom_pairs = self._comps[partner_res]
                     trg_atm_pairs = [(o, p) for o, p in atom_pairs
                                      if (p.parent == partner_res
                                          and p.name == partner_atm_name)]
@@ -460,7 +507,8 @@ class Standardizer:
                     msg = ("The bond '%s' was not found for residue %s. "
                            "However, it cannot be added because the atom %s "
                            "seems not to exist."
-                           % (bond_key, pdb_atm.parent, partner_atm_name))
+                           % (bond_key, pdb_atm.parent.full_name,
+                              partner_atm_name))
                     logger.error(msg)
                     continue
 
@@ -468,7 +516,7 @@ class Standardizer:
                 partner_obj, partner_atm = trg_atm_pairs[0]
                 # Bond type
                 bond_name = res_bonds[bond_key]["type"]
-                bond_type = OBBondType[bond_name].value
+                bond_type = OBBondType[bond_name]
                 # Bond aromaticity
                 is_aromatic = res_bonds[bond_key]["is_aromatic"]
 
@@ -478,66 +526,605 @@ class Standardizer:
                                               None, bond_type,
                                               is_aromatic))
 
-    def _resolve_invariants(self, resname, atm_obj, pdb_atm, atm_names=None):
+    def _resolve_carbox_invariants(self, trgt_atm_obj, trgt_pdb_atm):
+
+        smarts1 = "[OX1]=[CX3][OX1H0-,OX2H1]"
+        smarts2 = "[OX1H0-,OX2H1][CX3]=[OX1]"
+        if (not trgt_atm_obj.matches_smarts(smarts1)
+                and not trgt_atm_obj.matches_smarts(smarts2)):
+            return
+
+        bond_obj = trgt_atm_obj.get_bonds()[0]
+
+        C_atm_obj = bond_obj.get_partner_atom(trgt_atm_obj)
+
+        other_O_atm_obj = None
+        other_O_pdb_atm = None
+
+        for C_bond_obj in C_atm_obj.get_bonds():
+            C_partner_obj = \
+                C_bond_obj.get_partner_atom(C_atm_obj)
+
+            if (C_partner_obj.get_symbol() == "O"
+                    and C_partner_obj.get_id() != trgt_atm_obj.get_id()):
+
+                other_O_atm_obj = C_partner_obj
+                other_O_pdb_atm = self._pdb_mapping[C_partner_obj.get_idx()]
+
+        # If atomic data from the other carbox O were not found, return None.
+        if other_O_atm_obj is None or other_O_pdb_atm is None:
+            return
+
+        coords = self.metals_coord.get(trgt_pdb_atm.parent, {})
+
+        # M1 <--- O-C=O ---> M2
+        #
+        #   if both Os coordinate a metal, it's not necessary to
+        #   update their invariants.
+        #
+        if trgt_pdb_atm in coords and other_O_pdb_atm in coords:
+            return
+
+        #     V
+        # O-C=O ---> M
+        #
+        #   if the O with the double bond coordinates a metal,
+        #   update its invariant.
+        if (trgt_atm_obj.matches_smarts(smarts1)
+                and trgt_pdb_atm in coords):
+
+            # Fix the bond: double to single bond.
+            C_pdb_atm = self._pdb_mapping[C_atm_obj.get_idx()]
+            self._events["modbonds"].add(((trgt_atm_obj, trgt_pdb_atm),
+                                          (C_atm_obj, C_pdb_atm),
+                                          bond_obj, BondType["SINGLE"],
+                                          False))
+            return [1, 1, 8, 16, -1, 0, 0]
+
+        # V
+        # O-C=O ---> M
+        #
+        #   if the O with the single bond has a partner O coordinating
+        #   a metal, update its invariant.
+        elif (trgt_atm_obj.matches_smarts(smarts2)
+                and other_O_pdb_atm in coords):
+
+            # Fix the bond: single to double bond.
+            C_pdb_atm = self._pdb_mapping[C_atm_obj.get_idx()]
+            self._events["modbonds"].add(((trgt_atm_obj, trgt_pdb_atm),
+                                          (C_atm_obj, C_pdb_atm),
+                                          bond_obj, BondType["DOUBLE"],
+                                          False))
+            return [1, 2, 8, 16, 0, 0, 0]
+
+    def _resolve_imidazole_invariants(self, trgt_atm_obj, trgt_pdb_atm,
+                                      precomp_data=None):
+
+        # Imidazole-like, but not tetrazoles.
+        strict_smarts_rule = ("[$(nc[n;H1]);R1r5;"
+                              "!$([nR1r5;$(n:n:n:n:c),$(n:n:n:c:n)])]")
+
+        generic_smarts_rule = ("[$([#7]~[#6]~[#7]);R1r5;"
+                               "!$([nR1r5;$(n:n:n:n:c),$(n:n:n:c:n)])]")
+
+        if not trgt_atm_obj.matches_smarts(generic_smarts_rule):
+            return
+
+        C_atm_obj = None
+        C_bond_obj = None
+        for bond_obj in trgt_atm_obj.get_bonds():
+            partner_obj = bond_obj.get_partner_atom(trgt_atm_obj)
+
+            if partner_obj.matches_smarts("[$([#6](~[#7])~[#7])]"):
+                C_atm_obj = partner_obj
+                C_bond_obj = bond_obj
+                break
+
+        other_N_pdb_atm = None
+
+        for bond_obj in C_atm_obj.get_bonds():
+            C_partner_obj = \
+                bond_obj.get_partner_atom(C_atm_obj)
+
+            if (C_partner_obj.get_symbol() == "N"
+                    and C_partner_obj.get_id() != trgt_atm_obj.get_id()):
+
+                other_N_pdb_atm = self._pdb_mapping[C_partner_obj.get_idx()]
+
+        is_N_single = False
+        is_N_double = False
+        if trgt_atm_obj.matches_smarts(strict_smarts_rule):
+            if trgt_atm_obj.matches_smarts("[n+0X3H1]"):
+                is_N_single = True
+            elif trgt_atm_obj.matches_smarts("[n+1X3H1,n+0X2H0]"):
+                is_N_double = True
+
+        elif precomp_data is not None:
+            res_dict = precomp_data.get(trgt_pdb_atm.parent.resname, {})
+            bonds_count = Counter([res_dict["bonds"][b]["type"]
+                                   for b in res_dict["bonds"]
+                                   for a in b.split(",")
+                                   if a == trgt_pdb_atm.name])
+
+            if bonds_count["SINGLE"] == 2:
+                is_N_single = True
+            elif bonds_count["SINGLE"] == 1 and bonds_count["DOUBLE"] == 1:
+                is_N_double = True
+
+        # Both False or both True
+        if is_N_single == is_N_double:
+            return
+
+        coords = self.metals_coord.get(trgt_pdb_atm.parent, {})
+
+        # M1 <--- n1 ... n2 ---> M2.
+        #
+        #   if both Ns coordinate a metal, remove the Hs from both Ns.
+        if trgt_pdb_atm in coords and other_N_pdb_atm in coords:
+            if is_N_single:
+                return [2, 2, 7, 14, -1, 0, 1]
+            return [2, 3, 7, 14, 0, 0, 1]
+
+        #       v
+        #  n1-c=n2 ---> M1.
+        #
+        #   if the N with the double bond coordinates a metal and have a
+        #       H, fix its charge.
+        if trgt_pdb_atm in coords and is_N_double:
+            return [2, 3, 7, 14, 0, 0, 1]
+
+        #  v
+        #  n1-c=n2 ---> M1.
+        #
+        #   if the N with the single bond has a partner N coordinating
+        #       a metal, fix it if necessary.
+        if other_N_pdb_atm in coords and is_N_single:
+            return [2, 2, 7, 14, 0, 1, 1]
+
+        #       v
+        #  n2=c-n1 ---> M1.
+        #
+        #   if the N with the single bond coordinates a metal, move the
+        # double bond to it.
+        if trgt_pdb_atm in coords and is_N_single:
+            # Fix the bond: single to double bond.
+            C_pdb_atm = self._pdb_mapping[C_atm_obj.get_idx()]
+            self._events["modbonds"].add(((trgt_atm_obj, trgt_pdb_atm),
+                                          (C_atm_obj, C_pdb_atm),
+                                          C_bond_obj, BondType["DOUBLE"],
+                                          True))
+            return [2, 3, 7, 14, 0, 0, 1]
+
+        #  v
+        #  n2=c-n1 ---> M1.
+        #
+        #   if the N with the double bond has a partner N coordinating
+        #       a metal, move the single bond to it.
+        elif other_N_pdb_atm in coords and is_N_double:
+
+            # Fix the bond: double to single bond.
+            C_pdb_atm = self._pdb_mapping[C_atm_obj.get_idx()]
+            self._events["modbonds"].add(((trgt_atm_obj, trgt_pdb_atm),
+                                          (C_atm_obj, C_pdb_atm),
+                                          C_bond_obj, BondType["SINGLE"],
+                                          True))
+            return [2, 2, 7, 14, 0, 1, 1]
+
+    def _resolve_tetrazole_invariants(self, trgt_atm_obj, trgt_pdb_atm,
+                                      precomp_data=None):
+
+        precomp_data = precomp_data or {}
+
+        # Tetrazole-like.
+        strict_smarts_rule = ("[nR1r5;$(n:n:n:n:c),$(n:n:n:c:n)]")
+        generic_smarts_rule = ("[#7R1r5;$([#7]~[#7]~[#7]~[#7]~[#6]),"
+                               "$([#7]~[#7]~[#7]~[#6]~[#7])]")
+
+        if not trgt_atm_obj.matches_smarts(generic_smarts_rule):
+            return
+
+        # The next lines will verify if the current N contains
+        # a double bond or only single bonds.
+        is_N_single = False
+        is_N_double = False
+        if trgt_atm_obj.matches_smarts(strict_smarts_rule):
+            if trgt_atm_obj.matches_smarts("[n;X3H1+0,X2H0-1]"):
+                is_N_single = True
+            elif trgt_atm_obj.matches_smarts("[nX2H0+0]"):
+                is_N_double = True
+        elif precomp_data is not None:
+            res_dict = precomp_data.get(trgt_pdb_atm.parent.resname, {})
+            bonds_count = Counter([res_dict["bonds"][b]["type"]
+                                   for b in res_dict["bonds"]
+                                   for a in b.split(",")
+                                   if a == trgt_pdb_atm.name])
+
+            if bonds_count["SINGLE"] == 2:
+                is_N_single = True
+            elif bonds_count["SINGLE"] == 1 and bonds_count["DOUBLE"] == 1:
+                is_N_double = True
+
+        # Error: return if both False or both True.
+        if is_N_single == is_N_double:
+            return
+
+        # In the next line, it will capture the tetrazole group that contains
+        # the current atom.
+        ob_smart = OBSmartsPattern()
+        ob_smart.Init("[#6]1~[#7]~[#7]~[#7]~[#7H,#7-1]1")
+        ob_smart.Match(trgt_atm_obj.parent.unwrap())
+
+        atoms = []
+        matches = [x for x in ob_smart.GetMapList()]
+        if matches:
+            for match in matches:
+                trgt_grp_found = False
+                for idx in match:
+                    pdb_atm = self._pdb_mapping[idx]
+                    atoms.append(pdb_atm)
+
+                    if pdb_atm == trgt_pdb_atm:
+                        trgt_grp_found = True
+
+                if trgt_grp_found:
+                    break
+
+        # Error: if no atom group has been found by the previous
+        # SMARTS definition.
+        if not atoms:
+            return
+
+        # Count how many metals this tetrazole coordinates.
+        n_coords = len([a for a in atoms if a.has_metal_coordination()])
+
+        # If the tetrazole coordinates only one metal, move the negative
+        # charge to the N coordinating the metal.
+        if n_coords == 1:
+            # If the current atom is the one coordinating the metal.
+            if trgt_pdb_atm.has_metal_coordination():
+
+                # If the current atom contains a double bond, it will be
+                # necessary to standardize all bonds in the tetrazole.
+                if is_N_double:
+                    # Atoms in the opposite end to the current atom.
+                    opp_atm_obj, opp_pdb_atm = None, None
+                    # Set of imediate neighbors of the current atom.
+                    first_bonded_atms = set()
+                    for bond_obj1 in trgt_atm_obj.get_bonds():
+                        partner_obj1 = \
+                            bond_obj1.get_partner_atom(trgt_atm_obj)
+                        pdb_atm1 = self._pdb_mapping[partner_obj1.get_idx()]
+
+                        mod_bond = ((trgt_atm_obj, trgt_pdb_atm),
+                                    (partner_obj1, pdb_atm1),
+                                    bond_obj1,
+                                    BondType["SINGLE"], True)
+                        self._events["modbonds"].add(mod_bond)
+
+                        first_bonded_atms.add(pdb_atm1)
+
+                        for bond_obj2 in partner_obj1.get_bonds():
+                            partner_obj2 = \
+                                bond_obj2.get_partner_atom(partner_obj1)
+                            pdb_atm2 = \
+                                self._pdb_mapping[partner_obj2.get_idx()]
+
+                            if pdb_atm2 == trgt_pdb_atm:
+                                continue
+                            if pdb_atm2 not in atoms:
+                                continue
+
+                            if opp_atm_obj is None:
+                                opp_atm_obj = partner_obj2
+                                opp_pdb_atm = pdb_atm2
+
+                            mod_bond = ((partner_obj1, pdb_atm1),
+                                        (partner_obj2, pdb_atm2),
+                                        bond_obj2,
+                                        BondType["DOUBLE"], True)
+                            self._events["modbonds"].add(mod_bond)
+
+                    # Standardize the bonds in the opposite end.
+                    for bond_obj in opp_atm_obj.get_bonds():
+                        partner_obj = \
+                            bond_obj.get_partner_atom(opp_atm_obj)
+                        pdb_atm = self._pdb_mapping[partner_obj.get_idx()]
+
+                        if pdb_atm in first_bonded_atms:
+                            continue
+
+                        mod_bond = ((opp_atm_obj, opp_pdb_atm),
+                                    (partner_obj, pdb_atm),
+                                    bond_obj,
+                                    BondType["SINGLE"], True)
+                        self._events["modbonds"].add(mod_bond)
+                return [2, 2, 7, 14, -1, 0, 1]
+            return [2, 3, 7, 14, 0, 0, 1]
+
+        # If the tetrazole coordinates more than 1 metal, standardize it
+        # according to the PDB.
+        else:
+            self._resolve_bonds(trgt_pdb_atm.parent.resname,
+                                trgt_atm_obj,
+                                trgt_pdb_atm,
+                                precomp_data)
+
+            if is_N_double:
+                return [2, 3, 7, 14, 0, 0, 1]
+            return [2, 2, 7, 14, -1, 0, 1]
+
+    def _resolve_sulfur_groups_invariants(self, trgt_atm_obj, trgt_pdb_atm,
+                                          precomp_data=None):
+
+        precomp_data = precomp_data or {}
+        res_dict = precomp_data.get(trgt_pdb_atm.parent.resname, {})
+        res_bonds = res_dict.get("bonds", {})
+
+        if not res_bonds:
+            return
+
+        bad_sulf_acid_O_smarts = "[$([OH1]S([OH1])([OH1]))]"
+        if not trgt_atm_obj.matches_smarts(bad_sulf_acid_O_smarts):
+            return
+
+        bond_obj = trgt_atm_obj.get_bonds()[0]
+
+        S_atm_obj = bond_obj.get_partner_atom(trgt_atm_obj)
+        S_pdb_atm = self._pdb_mapping[S_atm_obj.get_idx()]
+
+        bond_key = ",".join(sorted([trgt_pdb_atm.name,
+                                    S_pdb_atm.name]))
+        bond_dict = res_bonds[bond_key]
+
+        if bond_dict["type"] == "SINGLE":
+            return [1, 1, 8, 16, -1, 0, 0]
+
+        if bond_dict["type"] == "DOUBLE":
+            return [1, 2, 8, 16, 0, 0, 0]
+
+    def _resolve_invariants(self, resname, atm_obj, pdb_atm,
+                            atm_names=None, precomp_data=None):
 
         if pdb_atm in self._events["ignore"]:
             return
 
         res = pdb_atm.parent
         atm_names = atm_names or []
+        precomp_data = precomp_data or self.res_data
 
         # Expected invariant.
         invariants = None
         # Define if this atom is aromatic.
         is_aromatic = None
 
-        if res.is_water():
-            smarts1 = f"[O]({METAL_ATOM}){METAL_ATOM}"
-            smarts2 = f"[O]{METAL_ATOM}"
-            if (pdb_atm.name == "O"
-                    and atm_obj.matches_smarts(smarts1)):
-                invariants = [0, 0, 8, 16, -2, 0, 0]
+        if res.is_hetatm() or res.is_nucleotide():
+            coords = self.metals_coord.get(res, {})
 
-            elif (pdb_atm.name == "O"
-                    and atm_obj.matches_smarts(smarts2)):
-                invariants = [0, 0, 8, 16, -1, 1, 0]
+            res_dict = precomp_data.get(resname, {})
+            res_props = res_dict.get("props", {})
 
-        elif pdb_atm.name in ["C", "N"]:
-            nb_residues = get_residue_neighbors(res,
-                                                verbose=False)
+            # Check if the atom aromaticity is incorrect.
+            fix_atm_aromaticity = False
+            if (pdb_atm.name in res_props
+                    and "AROMATIC" in res_props[pdb_atm.name]["features"]
+                    and not atm_obj.is_aromatic()):
+                fix_atm_aromaticity = True
 
-            if (pdb_atm.name == "N"
-                    and nb_residues.predecessor not in self.residues):
+            # Currently, only standardization rules for O, N, and S were
+            # defined. For that reason, only these atoms pass the following
+            # condition or atoms whose aromaticity was incorrectly perceived.
+            if (atm_obj.get_symbol() not in ["O", "N", "S"]
+                    and not fix_atm_aromaticity):
+                return
 
-                invariants = [1, 1, 7, 14, 1, 3, 0]
-                if res.resname == "PRO":
-                    invariants = [2, 2, 7, 14, 1, 2, 1]
+            # Fix O atoms
+            if atm_obj.get_symbol() == "O":
 
-            elif (pdb_atm.name == "N"
-                    and atm_obj.matches_smarts(f"[N]{METAL_ATOM}")):
-                invariants = [2, 2, 7, 14, -1, 0, 0]
+                # Carbonate groups.
+                carbonate_smarts = \
+                    ("[$([OX1]=[CX3]([OX1H0-,OX2H1])[OX1H0-,OX2H1])"
+                     ",$([OX1H0-,OX2H1][CX3]([OX1H0-,OX2H1])=[OX1])]")
+                # Carboxylic acid, but not carbonate.
+                carbox_smarts = ("[$([OX1]=[CX3][OX1H0-,OX2H1])"
+                                 ",$([OX1H0-,OX2H1][CX3]=[OX1])"
+                                 ";!$(%s)]" % carbonate_smarts)
+                phosphate_smarts = "[$([OX2H1]P([OX2H1])([OX2H1])=[OX1])]"
+                # O from sulfuric or sulfonic acid perceived as OH.
+                bad_sulf_acid_O_smarts = "[$([OH1]S([OH1])([OH1]))]"
 
-            elif (pdb_atm.name == "C"
-                    and nb_residues.successor not in self.residues):
+                # Carboxylic group O coordinating a metal.
+                if atm_obj.matches_smarts(carbox_smarts):
+                    invariants = \
+                        self._resolve_carbox_invariants(atm_obj, pdb_atm)
 
-                n_heavy_atms = \
-                    atm_obj.get_neighbors_number(only_heavy_atoms=True)
+                # Force all OH from phosphates to be deprotonated.
+                elif atm_obj.matches_smarts(phosphate_smarts):
+                    invariants = [1, 1, 8, 16, -1, 0, 0]
 
-                # If it's a C-terminal residue and OXT exists,
-                # then C has no Hydrogen.
-                if "OXT" not in atm_names or n_heavy_atms != 3:
-                    invariants = [2, 3, 6, 12, 0, 1, 0]
+                # Phosphoric, phosphonic, or phosphinic acid O
+                # coordinating a metal.
+                elif (atm_obj.matches_smarts("[$([OX2H1]P(=[OX1]))]")
+                        and pdb_atm in coords):
+                    invariants = [1, 1, 8, 16, -1, 0, 0]
+
+                # Sulfuric acid O perceived as OH.
+                elif atm_obj.matches_smarts(bad_sulf_acid_O_smarts):
+                    invariants = \
+                        self._resolve_sulfur_groups_invariants(atm_obj,
+                                                               pdb_atm,
+                                                               precomp_data)
+                # Phenol O coordinating a metal as in TYR.
+                elif (atm_obj.matches_smarts("[OH+0]c")
+                        and pdb_atm in coords):
+                    invariants = [1, 1, 8, 16, -1, 0, 0]
+
+            # Fix N atoms.
+            elif atm_obj.get_symbol() == "N":
+
+                # Amines.
+                amine_smarts = "[$([NX4+;H3,H2,H1;!$(NC=O)][C])]"
+
+                # Tetrazole.
+                #
+                # This rule doesn't specify aromaticity because some aromatic
+                # rings may be perceived a simple cyclic ring by Open Babel.
+                generic_tetrazole_N_smarts = \
+                    ("[#7R1r5;$([#7]~[#7]~[#7]~[#7]~[#6]),"
+                     "$([#7]~[#7]~[#7]~[#6]~[#7])]")
+
+                # Tetrazole.
+                #
+                # With aromaticity correctly perceived.
+                tetrazole_N_smarts = "[nR1r5;$(n:n:n:n:c),$(n:n:n:c:n)]"
+
+                # Imidazole-like, but not tetrazoles.
+                #
+                # This rule doesn't specify aromaticity because some aromatic
+                # rings may be perceived a simple cyclic ring by Open Babel.
+                imidazole_smarts = ("[$([#7]~[#6]~[#7]~[#6]~[#6]);R1r5;"
+                                    f"!$({generic_tetrazole_N_smarts})]")
+
+                if atm_obj.matches_smarts(generic_tetrazole_N_smarts):
+                    if (atm_obj.matches_smarts(tetrazole_N_smarts)
+                            or fix_atm_aromaticity):
+                        invariants = \
+                            self._resolve_tetrazole_invariants(atm_obj,
+                                                               pdb_atm,
+                                                               precomp_data)
+                    if fix_atm_aromaticity:
+                        is_aromatic = True
+
+                # Imidazole N coordinating a metal.
+                elif atm_obj.matches_smarts(imidazole_smarts):
+                    if (atm_obj.matches_smarts('[$(nc[n;H1])]')
+                            or fix_atm_aromaticity):
+                        invariants = \
+                            self._resolve_imidazole_invariants(atm_obj,
+                                                               pdb_atm,
+                                                               precomp_data)
+                    if fix_atm_aromaticity:
+                        is_aromatic = True
+
+                # Amine N coordinating a metal.
+                elif (atm_obj.matches_smarts(amine_smarts)
+                        and pdb_atm in coords):
+                    invariants = atm_obj.get_atomic_invariants()
+                    invariants[4] = 0
+                    invariants[5] = invariants[5] - 1
+
+                # Amide N coordinating a metal.
+                #
+                # Note that only amide groups as in amino acid backbones
+                # are considered by this rule.
+                elif (atm_obj.matches_smarts("[$([#7;X3H1]C=O)]")
+                        and pdb_atm in coords):
+                    invariants = [2, 2, 7, 14, -1, 0, 0]
+
+                # Sulfonamide N coordinating a metal.
+                elif (atm_obj.matches_smarts("[$([N;H1,H2]S(=O)(=O))]")
+                        and pdb_atm in coords):
+                    invariants = atm_obj.get_atomic_invariants()
+                    invariants[4] = -1
+                    invariants[5] = invariants[5] - 1
+
+            # Fix S atoms
+            elif atm_obj.get_symbol() == "S":
+                # S from a sulfuric or sulfonic acid where all Os were
+                # perceived as OH.
+                bad_sulf_acid_S_smarts = "[$(S([OH1])([OH1])([OH1]))]"
+                if atm_obj.matches_smarts(bad_sulf_acid_S_smarts):
+                    self._resolve_bonds(resname, atm_obj, pdb_atm,
+                                        precomp_data)
+
+                # Thiol S coordinating a metal.
+                elif (atm_obj.matches_smarts("[SH+0]")
+                        and pdb_atm in coords):
+                    invariants = [1, 1, 16, 32, -1, 0, 0]
+
+            # Fix C atoms with incorrect aromaticity.
+            elif (atm_obj.get_symbol() == "C" and fix_atm_aromaticity
+                    and pdb_atm.name in res_props):
+
+                invariants = atm_obj.get_atomic_invariants()
+                # Set the correct degree.
+                invariants[1] = (res_props[pdb_atm.name]["degree"]
+                                 - res_props[pdb_atm.name]["n_Hs"])
+                # Set the proper number of Hs.
+                invariants[5] = res_props[pdb_atm.name]["n_Hs"]
+                # Set the aromaticity flag ON.
+                is_aromatic = True
+
+                # Don't update bonds from tetrazole carbons,
+                # because their bonds are updated when
+                # _resolve_tetrazole_invariants() are called.
+                generic_tetrazole_C_smarts = "[$([#6]~[#7]~[#7]~[#7]~[#7])]"
+                if not atm_obj.matches_smarts(generic_tetrazole_C_smarts):
+                    self._resolve_bonds(resname, atm_obj, pdb_atm,
+                                        precomp_data)
+
+        elif res.is_residue():
+            if pdb_atm.name in ["C", "N"]:
+                nb_residues = \
+                    get_residue_neighbors(res, verbose=False)
+
+                coords = self.metals_coord.get(res, {})
+                trgt_atms = [a.name for a in coords if a.name in ["N"]]
+
+                if (pdb_atm.name == "N"
+                        and nb_residues.predecessor not in self._comps):
+                    invariants = [1, 1, 7, 14, 1, 3, 0]
+                    if res.resname == "PRO":
+                        invariants = [2, 2, 7, 14, 1, 2, 1]
+
+                elif (pdb_atm.name == "N"
+                        and atm_obj.matches_smarts(f"[N]{METAL_ATOM}")
+                        or "N" in trgt_atms):
+                    invariants = [2, 2, 7, 14, -1, 0, 0]
+
+                elif (pdb_atm.name == "C"
+                        and nb_residues.successor not in self._comps):
+
+                    n_heavy_atms = \
+                        atm_obj.get_neighbors_number(only_heavy_atoms=True)
+
+                    # The following rule accounts for amide bonds between
+                    # residues and non-standard residues. That's because the
+                    # function get_residue_neighbors() only considers peptide
+                    # bonds formed between an atom 'C' and an atom 'N'.
+                    # That means the function would ignore a non-standard
+                    # residue forming the peptide if its N has a different
+                    # name (e.g., N3 as in SNN).
+                    if (nb_residues.successor is None and n_heavy_atms == 3
+                            and atm_obj.matches_smarts("[$([CX3](=O)N)]")):
+                        invariants = [3, 4, 6, 12, 0, 0, 0]
+
+                    # If it's a C-terminal residue and OXT doesn't exist,
+                    # then C has one Hydrogen.
+                    elif "OXT" not in atm_names or n_heavy_atms != 3:
+                        invariants = [2, 3, 6, 12, 0, 1, 0]
+
+            # CYS:SG in disulfide bridges.
+            elif pdb_atm.name == "SG" and atm_obj.matches_smarts("[$(S(C)S)]"):
+                invariants = [2, 2, 16, 32, 0, 0, 0]
+
+        # Skip any hetatm and nucleotide if 'invariants' is None.
+        #
+        # Residues/Water/Metal can pass because their invariants are
+        # predefined in the default definition file.
+        if (res.is_hetatm() or res.is_nucleotide()) and invariants is None:
+            return
 
         # Load the invariants from the definition file.
         if invariants is None:
-            props = self.res_data[resname]["atoms"]
+            props = precomp_data[resname]["atoms"]
             invariants = props[pdb_atm.name]["invariants"]
             invariants = [int(i) for i in invariants.split(",")]
             is_aromatic = props[pdb_atm.name]["is_aromatic"]
 
         # Add a new event to modify the atom in case the invariants
         # don't match.
-        if atm_obj.get_atomic_invariants() != invariants:
+        if (atm_obj.get_atomic_invariants() != invariants
+                or is_aromatic is not None):
             self._events["modatms"].add(((atm_obj, pdb_atm),
                                          tuple(invariants),
                                          is_aromatic))
@@ -637,13 +1224,13 @@ class Standardizer:
     def _apply_modifications(self):
 
         processed_bonds = set()
-
         for data in self._events["break"]:
             atm_obj, pdb_atm = data[0]
             partner_obj, partner_atm = data[1]
             bond_to_break = data[2]
 
             bond_key = tuple(sorted([pdb_atm, partner_atm]))
+
             if bond_key in processed_bonds:
                 continue
             if pdb_atm in self._events["ignore"]:
@@ -653,13 +1240,15 @@ class Standardizer:
                    partner_atm.parent.is_metal()):
 
                 if pdb_atm.parent.is_metal():
-                    key = (partner_obj.get_idx(), partner_atm)
-                    val = atm_obj
+                    key, idx = partner_atm, partner_obj.get_idx()
+                    val = pdb_atm.parent
                 else:
-                    key = (atm_obj.get_idx(), pdb_atm)
-                    val = partner_obj
+                    key, idx = pdb_atm, atm_obj.get_idx()
+                    val = partner_atm.parent
 
-                self.bound_to_metals[key].append(val)
+                coords_dict = self.metals_coord[key.parent][key]
+                coords_dict["atm_idx"] = idx
+                coords_dict["metals"].add(val)
 
             obmol = atm_obj.parent.unwrap()
             obmol.DeleteBond(bond_to_break.unwrap())
@@ -681,7 +1270,7 @@ class Standardizer:
             else:
                 obmol = atm_obj.parent
                 new_bond = [(atm_obj.get_idx(), partner_obj.get_idx(),
-                             new_bond_type, is_aromatic)]
+                             new_bond_type.value, is_aromatic)]
                 self._add_bonds(obmol, new_bond)
 
         for data in self._events["modatms"]:
@@ -704,52 +1293,19 @@ class Standardizer:
                            is_aromatic=is_aromatic,
                            in_ring=in_ring)
 
-    def _standardize_residue(self, res):
-        atom_pairs = self.residues[res]
-        atm_names = [pdb_atm.name
-                     for atm_obj, pdb_atm in atom_pairs]
-        self._validate_atoms_list(res, atm_names)
-
-        resname = self._resolve_resname(res)
-        for atm_obj, pdb_atm in atom_pairs:
-            self._resolve_bonds(resname, atm_obj, pdb_atm)
-            self._resolve_invariants(resname, atm_obj, pdb_atm, atm_names)
-
-    def _standardize_water(self, res):
-        atom_pairs = self.residues[res]
-
-        if len(atom_pairs) != 1:
-            logger.error("The water molecule %s contains %d "
-                         "heavy atom(s), while one is expected."
-                         % (res, len(atom_pairs)))
-            return
-
-        atm_obj, pdb_atm = atom_pairs[0]
-
-        self._resolve_bonds("HOH", atm_obj, pdb_atm)
-        self._resolve_invariants("HOH", atm_obj, pdb_atm)
-
-    def _standardize_metal(self, res):
-        atom_pairs = self.residues[res]
-
-        if len(atom_pairs) != 1:
-            logger.error("The metal %s contains %d "
-                         "heavy atom(s), while one is expected."
-                         % (res, len(atom_pairs)))
-            return
-
-        atm_obj, pdb_atm = atom_pairs[0]
-
-        resname = self._resolve_metal_name(pdb_atm, atm_obj)
-
-        self._resolve_bonds(res.resname, atm_obj, pdb_atm)
-        self._resolve_invariants(resname, atm_obj, pdb_atm)
+    def _get_precomp_data_from_cif_file(self, res):
+        return {}
 
     def _check_mol(self, res):
-        atom_pairs = self.residues[res]
+        atom_pairs = self._comps[res]
         atm_names = [pdb_atm.name
                      for atm_obj, pdb_atm in atom_pairs]
-        self._validate_atoms_list(res, atm_names)
+
+        precomp_data = None
+        if res.is_hetatm() or res.is_nucleotide():
+            precomp_data = self._get_precomp_data_from_cif_file(res)
+
+        self._validate_atoms_list(res, atm_names, precomp_data)
 
         resname = res.resname
         if res.is_residue():
@@ -761,28 +1317,32 @@ class Standardizer:
             if res.is_metal():
                 self._check_metal_coordination(atm_obj, pdb_atm)
 
-            self._resolve_bonds(resname, atm_obj, pdb_atm)
-            self._resolve_invariants(resname, atm_obj, pdb_atm, atm_names)
+            if not res.is_hetatm() and not res.is_nucleotide():
+                self._resolve_bonds(resname, atm_obj, pdb_atm)
 
-    def standardize(self, atom_pairs):
+            self._resolve_invariants(resname, atm_obj, pdb_atm,
+                                     atm_names, precomp_data)
 
-        self.bound_to_metals = defaultdict(list)
+    def standardize(self, atom_pairs, metals_coord=None):
 
-        self.metals = {}
-        self.events = []
+        if not metals_coord:
+            custom_dict = lambda: {"atm_idx": None, "metals": set()}
+            metals_coord = defaultdict(lambda: defaultdict(custom_dict))
+        self.metals_coord = metals_coord
 
-        self.residues = defaultdict(list)
-        self._pdb_map = {}
-
+        self._comps = defaultdict(list)
         self._events = defaultdict(set)
+        self._pdb_mapping = {}
 
         for atm_obj, pdb_atm in atom_pairs:
-            self._pdb_map[atm_obj.get_idx()] = pdb_atm
-            self.residues[pdb_atm.parent].append((atm_obj, pdb_atm))
+            self._pdb_mapping[atm_obj.get_idx()] = pdb_atm
+            self._comps[pdb_atm.parent].append((atm_obj, pdb_atm))
 
-        for res in self.residues:
-            if res.is_hetatm():
-                continue
+            coords = self.metals_coord.get(pdb_atm.parent, {})
+            if pdb_atm in coords:
+                coords[pdb_atm]["atm_idx"] = atm_obj.get_idx()
+
+        for res in self._comps:
             self._check_mol(res)
 
         self._apply_modifications()
