@@ -112,7 +112,7 @@ def parse_from_file(pdb_id, file):
 
 
 def save_to_file(entity, output_file, select=Select(), write_conects=True,
-                 write_end=True, preserve_atom_numbering=True):
+                 write_end=True, preserve_atom_numbering=True, sort=False):
     """Write a Structure object (or a subset of a
     :class:`~luna.MyBio.PDB.Structure.Structure` object) into a file.
 
@@ -139,7 +139,9 @@ def save_to_file(entity, output_file, select=Select(), write_conects=True,
         io.save(output_file, select=select,
                 write_conects=write_conects,
                 write_end=write_end,
-                preserve_atom_numbering=preserve_atom_numbering)
+                preserve_atom_numbering=preserve_atom_numbering,
+                sort=sort)
+
     except Exception as e:
         logger.exception(e)
         raise FileNotCreated("PDB file '%s' could not be created."
@@ -243,9 +245,16 @@ def get_entity_from_entry(entity, entry, model=0):
     return target_entity
 
 
-def biopython_entity_to_mol(entity, select=Select(), amend_mol=True,
-                            template=None, add_h=False, ph=None,
-                            wrapped=True, openbabel=OPENBABEL, tmp_path=None,
+def biopython_entity_to_mol(entity,
+                            select=Select(),
+                            amend_mol=True,
+                            template=None,
+                            add_h=False,
+                            ph=None,
+                            metals_coord=None,
+                            wrapped=True,
+                            openbabel=OPENBABEL,
+                            tmp_path=None,
                             keep_tmp_files=False):
     """Convert an object :class:`~luna.MyBio.PDB.Entity.Entity` to a
     molecular object (:class:`~luna.wrappers.base.MolWrapper`,
@@ -315,7 +324,11 @@ def biopython_entity_to_mol(entity, select=Select(), amend_mol=True,
     # CONECTS containing serial numbers with more than 4 digits.
     # E.g.: 1OZH:A:HE3:1406, line CONECT162811627916282.
     # By setting preserve_atom_numbering to False, it solves the problem.
-    save_to_file(entity, pdb_file, select, preserve_atom_numbering=False)
+    save_to_file(entity,
+                 pdb_file,
+                 select,
+                 preserve_atom_numbering=False,
+                 sort=True)
 
     ini_input_file = pdb_file
     if template is not None:
@@ -400,11 +413,14 @@ def biopython_entity_to_mol(entity, select=Select(), amend_mol=True,
         for i, atm_obj in enumerate(atm_obj_list):
             atom_pairs.append((atm_obj, target_atoms[i]))
 
+        updated_metals_coord = {}
         # If there is something to be standardised.
         if atom_pairs:
             rs = Standardizer()
             mol_obj.unwrap().DeleteHydrogens()
-            rs.standardize(atom_pairs)
+            rs.standardize(atom_pairs, metals_coord=metals_coord)
+
+            updated_metals_coord = rs.metals_coord
 
             # After standardizing residues, we need to recreate the Mol
             # file, otherwise implicit hydrogens will not be included
@@ -435,7 +451,7 @@ def biopython_entity_to_mol(entity, select=Select(), amend_mol=True,
             if not keep_tmp_files:
                 remove_files([new_mol_file])
 
-        mv = MolValidator(bound_to_metals=rs.bound_to_metals)
+        mv = MolValidator(metals_coord=updated_metals_coord)
         is_valid = mv.validate_mol(mol_obj)
         logger.debug('Validation finished!!!')
 
