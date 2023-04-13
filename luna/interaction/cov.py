@@ -13,9 +13,11 @@ def is_covalently_bound(atm1, atm2):
 
     # Distance atom-atom
     dist = atm1 - atm2
-    # Covalent radius
-    cov1 = ob.GetCovalentRad(ob.GetAtomicNum(atm1.element))
-    cov2 = ob.GetCovalentRad(ob.GetAtomicNum(atm2.element))
+    # Covalent radius.
+    #   Note that we call title() to format atoms' symbol as in Open Babel.
+    #   E.g.: ZN becomes Zn.
+    cov1 = ob.GetCovalentRad(ob.GetAtomicNum(atm1.element.title()))
+    cov2 = ob.GetCovalentRad(ob.GetAtomicNum(atm2.element.title()))
 
     # OpenBabel thresholds.
     if 0.4 <= dist <= cov1 + cov2 + 0.45:
