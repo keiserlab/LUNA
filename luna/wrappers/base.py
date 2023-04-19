@@ -438,16 +438,20 @@ class AtomWrapper:
         """
         if self.is_rdkit_obj():
             # TODO
-            raise NotImplementedError("Currently, there is no function in RDKit to define if an atom belongs to a ring or not. "
-                                      "Please, use Open Babel instead.")
+            error_msg = ("Currently, there is no function in RDKit to define "
+                         "if an atom belongs to a ring or not. Please, use "
+                         "Open Babel instead.")
+            raise NotImplementedError(error_msg)
 
         elif self.is_openbabel_obj():
             self._atm_obj.SetInRing(in_ring)
 
     def matches_smarts(self, smarts):
-        """Check if this atom matches the substructure through a SMARTS substructure search.
+        """Check if this atom matches the substructure through a SMARTS
+        substructure search.
 
-        **Note:** currently, this function only works with molecules read with Open Babel.
+        **Note:** currently, this function only works with molecules
+        read with Open Babel.
 
         Parameters
         ----------
@@ -457,7 +461,8 @@ class AtomWrapper:
         Returns
         -------
          : bool or None
-            Whether matches occurred. Return None if the molecule was read with RDKit.
+            Whether matches occurred. Return None if the molecule was read
+            with RDKit.
 
         Examples
         --------
@@ -485,8 +490,9 @@ class AtomWrapper:
         """
         if self.is_rdkit_obj():
             # TODO: Implement
-            raise NotImplementedError("Currently, matches_smarts() does not support RDKit objects. "
-                                      "Please, use Open Babel objects instead.")
+            error_msg = ("Currently, matches_smarts() does not support RDKit "
+                         "objects. Please, use Open Babel objects instead.")
+            raise NotImplementedError(error_msg)
 
         elif self.is_openbabel_obj():
             ob_smart = ob.OBSmartsPattern()
@@ -549,9 +555,12 @@ class BondWrapper:
         if isinstance(bond_obj, self.__class__):
             bond_obj = bond_obj.unwrap()
 
-        if not isinstance(bond_obj, RDBond) and not isinstance(bond_obj, ob.OBBond):
-            logger.exception("Objects of type '%s' are not currently accepted." % bond_obj.__class__)
-            raise BondObjectTypeError("Objects of type '%s' are not currently accepted." % bond_obj.__class__)
+        if (not isinstance(bond_obj, RDBond)
+                and not isinstance(bond_obj, ob.OBBond)):
+            error_msg = ("Objects of type '%s' are not currently accepted."
+                         % bond_obj.__class__)
+            logger.exception(error_msg)
+            raise BondObjectTypeError(error_msg)
 
         self._bond_obj = bond_obj
 
@@ -562,9 +571,12 @@ class BondWrapper:
 
     @bond_obj.setter
     def bond_obj(self, bond_obj):
-        if not isinstance(bond_obj, RDBond) and not isinstance(bond_obj, ob.OBBond):
-            logger.exception("Objects of type '%s' are not currently accepted." % bond_obj.__class__)
-            raise AtomObjectTypeError("Objects of type '%s' are not currently accepted." % bond_obj.__class__)
+        if (not isinstance(bond_obj, RDBond)
+                and not isinstance(bond_obj, ob.OBBond)):
+            error_msg = ("Objects of type '%s' are not currently accepted."
+                         % bond_obj.__class__)
+            logger.exception(error_msg)
+            raise AtomObjectTypeError(error_msg)
         else:
             self._bond_obj = bond_obj
 
@@ -573,14 +585,16 @@ class BondWrapper:
 
         Parameters
         ----------
-        atm : `AtomWrapper`, :py:class:`rdkit.Chem.rdchem.Atom`, or :class:`openbabel.OBAtom`
+        atm : `AtomWrapper`, :py:class:`rdkit.Chem.rdchem.Atom`, \
+                    or :class:`openbabel.OBAtom`
             Get the partner of this atom.
         wrapped : bool
             If True, wrap the partner atom with `AtomWrapper`.
 
         Returns
         -------
-         : `AtomWrapper`, :py:class:`rdkit.Chem.rdchem.Atom`, or :class:`openbabel.OBAtom`
+         : `AtomWrapper`, :py:class:`rdkit.Chem.rdchem.Atom`, \
+                or :class:`openbabel.OBAtom`
         """
         if isinstance(atm, AtomWrapper):
             atm = atm.unwrap()

@@ -13,12 +13,17 @@ class Selector(Select):
         If True (default), keeps all hydrogens. Otherwise, filter them out.
         Hydrogens are atoms whose element is either "H" or "D" (deuterium).
     keep_altloc : bool
-        If True (default), keeps all atoms. Otherwise, keeps only atoms whose alternate location is in the list ``altloc``.
+        If True (default), keeps all atoms. Otherwise, keeps only atoms whose
+        alternate location is in the list ``altloc``.
     altloc : iterable
-        List of valid alternate location identifiers. The default valid values are "A" and "1".
+        List of valid alternate location identifiers. 
+        The default valid values are "A" and "1".
     """
 
-    def __init__(self, keep_hydrog=True, keep_altloc=True, altloc=DEFAULT_ALTLOC):
+    def __init__(self, 
+                 keep_hydrog=True, 
+                 keep_altloc=True, 
+                 altloc=DEFAULT_ALTLOC):
         self.keep_hydrog = keep_hydrog
         self.keep_altloc = keep_altloc
         self.altloc = altloc

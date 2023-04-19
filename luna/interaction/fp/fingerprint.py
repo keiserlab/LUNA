@@ -4,7 +4,8 @@ from scipy.sparse import issparse, csr_matrix
 from collections import defaultdict
 from rdkit import DataStructs
 
-from luna.util.exceptions import (BitsValueError, InvalidFingerprintType, IllegalArgumentError, FingerprintCountsError)
+from luna.util.exceptions import (BitsValueError, InvalidFingerprintType,
+                                  IllegalArgumentError, FingerprintCountsError)
 from luna.version import __version__
 
 
@@ -25,26 +26,34 @@ class Fingerprint:
     indices : array_like of int
         Indices of "on" bits.
     fp_length : int
-        The fingerprint length (total number of bits). The default value is :math:`2^{32}`.
+        The fingerprint length (total number of bits).
+        The default value is :math:`2^{32}`.
     unfolded_fp : `Fingerprint` or None
         The unfolded version of this fingerprint.
         If None, this fingerprint may have not been folded yet.
     unfolding_map : dict, optional
-        A mapping between current indices and indices from the unfolded version of this fingerprint
-        what makes it possible to trace folded bits back to the original shells (features).
+        A mapping between current indices and indices from the unfolded version
+        of this fingerprint what makes it possible to trace folded bits back to
+        the original shells (features).
     props: dict, optional
-        Custom properties of the fingerprint, consisting of a string keyword and
-        some value. It can be used, for instance, to save the ligand name
+        Custom properties of the fingerprint, consisting of a string keyword
+        and some value. It can be used, for instance, to save the ligand name
         and parameters used to generate shells (IFP features).
     """
 
-    def __init__(self, indices, fp_length=DEFAULT_FP_LENGTH, unfolded_fp=None, unfolding_map=None, props=None):
+    def __init__(self,
+                 indices,
+                 fp_length=DEFAULT_FP_LENGTH,
+                 unfolded_fp=None,
+                 unfolding_map=None,
+                 props=None):
 
         indices = np.asarray(indices, dtype=np.long)
 
         if np.any(np.logical_or(indices < 0, indices >= fp_length)):
-            logger.exception("Provided indices are in a different bit scale.")
-            raise BitsValueError("Provided indices are in a different bit scale.")
+            error_msg = "Provided indices are in a different bit scale."
+            logger.exception(error_msg)
+            raise BitsValueError(error_msg)
 
         self._indices = np.unique(indices)
         self._fp_length = fp_length
@@ -63,7 +72,8 @@ class Fingerprint:
         indices : array_like of int
             Indices of "on" bits.
         fp_length : int
-            The fingerprint length (total number of bits). The default value is :math:`2^{32}`.
+            The fingerprint length (total number of bits).
+            The default value is :math:`2^{32}`.
         **kwargs : dict, optional
             Extra arguments to `Fingerprint`. Refer to the documentation for a
             list of all possible arguments.
@@ -100,7 +110,8 @@ class Fingerprint:
             Array of bits.
         fp_length : int, optional
             The fingerprint length (total number of bits).
-            If not provided, the fingerprint length will be defined based on the ``vector`` shape.
+            If not provided, the fingerprint length will be defined based on
+            the ``vector`` shape.
         **kwargs : dict, optional
             Extra arguments to `Fingerprint`. Refer to the documentation for a
             list of all possible arguments.
@@ -147,7 +158,8 @@ class Fingerprint:
             String of 0s and 1s.
         fp_length : int, optional
             The fingerprint length (total number of bits).
-            If not provided, the fingerprint length will be defined based on the string length.
+            If not provided, the fingerprint length will be defined based on
+            the string length.
         **kwargs : dict, optional
             Extra arguments to `Fingerprint`. Refer to the documentation for a
             list of all possible arguments.
@@ -177,7 +189,8 @@ class Fingerprint:
 
         Parameters
         ----------
-        rdkit_fp : :class:`~rdkit.DataStructs.cDataStructs.ExplicitBitVect` or :class:`~rdkit.DataStructs.cDataStructs.SparseBitVect`
+        rdkit_fp : :class:`~rdkit.DataStructs.cDataStructs.ExplicitBitVect` or\
+                        :class:`~rdkit.DataStructs.cDataStructs.SparseBitVect`
             An existing RDKit fingerprint.
         **kwargs : dict, optional
             Extra arguments to `Fingerprint`. Refer to the documentation for a
@@ -187,9 +200,12 @@ class Fingerprint:
         -------
          : `Fingerprint`
         """
-        if not (isinstance(rdkit_fp, ExplicitBitVect) or isinstance(rdkit_fp, SparseBitVect)):
-            logger.exception("Invalid fingerprint type. RDKit only accepts a SparseBitVect or ExplicitBitVect object.")
-            raise TypeError("Invalid fingerprint type. RDKit only accepts a SparseBitVect or ExplicitBitVect object.")
+        if (not (isinstance(rdkit_fp, ExplicitBitVect)
+                 or isinstance(rdkit_fp, SparseBitVect))):
+            error_msg = ("Invalid fingerprint type. RDKit only accepts a "
+                         "SparseBitVect or ExplicitBitVect object.")
+            logger.exception(error_msg)
+            raise TypeError(error_msg)
 
         fp_length = rdkit_fp.GetNumBits()
         indices = np.asarray(rdkit_fp.GetOnBits(), dtype=np.long)
@@ -213,14 +229,21 @@ class Fingerprint:
          : `Fingerprint`
         """
         if not isinstance(fp, Fingerprint):
-            logger.exception("Informed fingerprint is not an instance of %s." % (cls.__class__))
-            raise InvalidFingerprintType("Informed fingerprint is not an instance of %s." % (cls.__class__))
+            error_msg = ("Informed fingerprint is not an instance of %s."
+                         % (cls.__class__))
+            logger.exception(error_msg)
+            raise InvalidFingerprintType(error_msg)
 
-        unfolded_fp = fp.__class__.from_fingerprint(fp.unfolded_fp) if fp.unfolded_fp is not None else None
+        unfolded_fp = (fp.__class__.from_fingerprint(fp.unfolded_fp)
+                       if fp.unfolded_fp is not None else None)
         unfolding_map = dict(fp.unfolding_map)
         props = dict(fp.props)
 
-        return cls.from_indices(fp.indices, fp.fp_length, unfolded_fp=unfolded_fp, unfolding_map=unfolding_map, props=props)
+        return cls.from_indices(fp.indices,
+                                fp.fp_length,
+                                unfolded_fp=unfolded_fp,
+                                unfolding_map=unfolding_map,
+                                props=props)
 
     @property
     def indices(self):
@@ -299,8 +322,9 @@ class Fingerprint:
 
     @property
     def radius_step(self):
-        """float: The property 'radius_step' used to generate this fingerprint \
-        (see :class:`~luna.interaction.fp.shell.ShellGenerator`). \
+        """float: The property 'radius_step' used to generate this
+        fingerprint (see \
+        :class:`~luna.interaction.fp.shell.ShellGenerator`). \
         If it was not provided, then return None."""
         return self.props.get("radius_step", None)
 
@@ -356,8 +380,9 @@ class Fingerprint:
         elif index >= 0 and index < self.fp_length:
             return 0
         else:
-            logger.exception("The provided index is in a different bit scale.")
-            raise BitsValueError("The provided index is in a different bit scale.")
+            error_msg = "The provided index is in a different bit scale."
+            logger.exception(error_msg)
+            raise BitsValueError(error_msg)
 
     def get_on_bits(self):
         """Get "on" bits.
@@ -372,14 +397,16 @@ class Fingerprint:
         """Convert this fingerprint to a vector of bits/counts.
 
         .. warning::
-            This function may raise a `MemoryError` exception when using huge indices vectors.
-            If you found this issue, you may want to try a different data type
-            or apply a folding operation before calling `to_vector`.
+            This function may raise a `MemoryError` exception when using
+            huge indices vectors. If you found this issue, you may want
+            to try a different data type or apply a folding operation
+            before calling `to_vector`.
 
         Parameters
         -------
         compressed : bool
-            If True, build a compressed sparse matrix (scipy.sparse.csr_matrix).
+            If True, build a compressed sparse matrix
+            (scipy.sparse.csr_matrix).
         dtype : data-type
             The default value is np.int32.
 
@@ -387,13 +414,15 @@ class Fingerprint:
         -------
          : :class:`numpy.ndarray` or :class:`scipy.sparse.csr_matrix`
             Vector of bits/counts.
-            Return a compressed sparse matrix (`scipy.sparse.csr_matrix`) if ``compressed`` is True.
-            Otherwise, return a Numpy array (:class:`numpy.ndarray`)
+            Return a compressed sparse matrix (`scipy.sparse.csr_matrix`)
+            if ``compressed`` is True. Otherwise, return a Numpy array
+            (:class:`numpy.ndarray`)
 
         Raises
         ------
         BitsValueError
-            If some of the fingerprint indices are greater than the fingerprint length.
+            If some of the fingerprint indices are greater than the
+            fingerprint length.
         MemoryError
             If the operation ran out of memory.
         """
@@ -402,24 +431,31 @@ class Fingerprint:
             try:
                 row = np.zeros(self.bit_count)
                 col = self.indices
-                vector = csr_matrix((data, (row, col)), shape=(1, self.fp_length), dtype=dtype)
+                vector = csr_matrix((data, (row, col)),
+                                    shape=(1, self.fp_length),
+                                    dtype=dtype)
             except ValueError as e:
                 logger.exception(e)
-                raise BitsValueError("Sparse matrix construction failed. Invalid indices or input data.")
+                raise BitsValueError("Sparse matrix construction failed. "
+                                     "Invalid indices or input data.")
         else:
             try:
-                # This function is causing a MemoryError exception when using a 2**32 vector.
+                # This function is causing a MemoryError exception
+                # when using a 2**32 vector.
                 vector = np.zeros(self.fp_length, dtype=dtype)
             except MemoryError as e:
                 logger.exception(e)
-                raise MemoryError("Huge indices vector detected. An operation ran out of memory. "
-                                  "Use a different data type or apply a folding operation.")
+                raise MemoryError("Huge indices vector detected. "
+                                  "An operation ran out of memory. "
+                                  "Use a different data type or apply a "
+                                  "folding operation.")
 
             try:
                 vector[self.indices] = data
             except IndexError as e:
                 logger.exception(e)
-                raise BitsValueError("Some of the provided indices are greater than the fingerprint length.")
+                raise BitsValueError("Some of the provided indices are "
+                                     "greater than the fingerprint length.")
 
         return vector
 
@@ -427,38 +463,44 @@ class Fingerprint:
         """Convert this fingerprint to a vector of bits.
 
         .. warning::
-            This function may raise a `MemoryError` exception when using huge indices vectors.
-            If you found this issue, you may want to try a different data type
-            or apply a folding operation before calling `to_bit_vector`.
+            This function may raise a `MemoryError` exception when using huge
+            indices vectors. If you found this issue, you may want to try a
+            different data type or apply a folding operation before calling
+            `to_bit_vector`.
 
         Parameters
         -------
         compressed : bool
-            If True, build a compressed sparse matrix (scipy.sparse.csr_matrix).
+            If True, build a compressed sparse matrix
+            (scipy.sparse.csr_matrix).
 
         Returns
         -------
          : :class:`numpy.ndarray` or :class:`scipy.sparse.csr_matrix`
             Vector of bits/counts.
-            Return a compressed sparse matrix (`scipy.sparse.csr_matrix`) if ``compressed`` is True.
-            Otherwise, return a Numpy array (:class:`numpy.ndarray`)
+            Return a compressed sparse matrix (`scipy.sparse.csr_matrix`)
+            if ``compressed`` is True. Otherwise, return a Numpy array
+            (:class:`numpy.ndarray`)
 
         Raises
         ------
         BitsValueError
-            If some of the fingerprint indices are greater than the fingerprint length.
+            If some of the fingerprint indices are greater than the
+            fingerprint length.
         MemoryError
             If the operation ran out of memory.
         """
-        return self.to_vector(compressed=compressed, dtype=np.bool_).astype(np.int8)
+        return self.to_vector(compressed=compressed,
+                              dtype=np.bool_).astype(np.int8)
 
     def to_bit_string(self):
         """Convert this fingerprint to a string of bits.
 
         .. warning::
-            This function may raise a `MemoryError` exception when using huge indices vectors.
-            If you found this issue, you may want to try a different data type
-            or apply a folding operation before calling `to_bit_string`.
+            This function may raise a `MemoryError` exception when using huge
+            indices vectors. If you found this issue, you may want to try a
+            different data type or apply a folding operation before calling
+            `to_bit_string`.
 
         Returns
         -------
@@ -470,20 +512,23 @@ class Fingerprint:
             If the operation ran out of memory.
         """
         try:
-            # This function is causing a MemoryError exception when using a 2**32 vector.
+            # This function is causing a MemoryError exception
+            # when using a 2**32 vector.
             bit_vector = self.to_bit_vector(compressed=False).astype(np.int8)
             return "".join(map(str, bit_vector))
         except MemoryError as e:
             logger.exception(e)
-            raise MemoryError("Huge indices vector detected. An operation ran out of memory. "
-                              "Use a different data type or apply a folding operation.")
+            raise MemoryError("Huge indices vector detected. An operation ran "
+                              "out of memory. Use a different data type or "
+                              "apply a folding operation.")
 
     def to_rdkit(self, rdkit_fp_cls=None):
         """Convert this fingerprint to an RDKit fingerprint.
 
         .. note::
-            If the fingerprint length exceeds the maximum RDKit fingerprint length (:math:`2^{31} - 1`),
-            this fingerprint will be folded to length :math:`2^{31} - 1` before conversion.
+            If the fingerprint length exceeds the maximum RDKit fingerprint
+            length (:math:`2^{31} - 1`), this fingerprint will be folded to
+            length :math:`2^{31} - 1` before conversion.
 
         Returns
         -------
@@ -492,24 +537,27 @@ class Fingerprint:
             Otherwise, :class:`~rdkit.DataStructs.cDataStructs.SparseBitVect` is used.
         """
         if rdkit_fp_cls is None:
-            # Classes to store explicit bit vectors: ExplicitBitVect or SparseBitVect.
-            # ExplicitBitVect is most useful for situations where the size of the vector is
-            # relatively small (tens of thousands or smaller).
+            # Classes to store explicit bit vectors: ExplicitBitVect or
+            #    SparseBitVect.
+            # ExplicitBitVect is most useful for situations where the size of
+            # the vector is relatively small (tens of thousands or smaller).
             # For larger vectors, use the _SparseBitVect_ class instead.
             if self.fp_length < 1e5:
                 rdkit_fp_cls = ExplicitBitVect
             else:
                 rdkit_fp_cls = SparseBitVect
 
-        # RDKit data structure defines fingerprints as a std:set composed of ints (signed int).
-        # Since we always have values higher than 0 and since the data structure contains only signed ints,
-        # then the max length for a RDKit fingerprint is 2^31 - 1.
+        # RDKit data structure defines fingerprints as a std:set composed of
+        # ints (signed int). Since we always have values higher than 0 and
+        # since the data structure contains only signed ints, then the max
+        # length for a RDKit fingerprint is 2^31 - 1.
         # C signed int (32 bit) ranges: [-2^31, 2^31-1].
         max_rdkit_fp_length = 2**31 - 1
         fp_length = self.fp_length
         if max_rdkit_fp_length < fp_length:
-            logger.warning("The current fingerprint will be folded as its size is higher than the maximum "
-                           "size accepted by RDKit, which is 2**31 - 1.")
+            logger.warning("The current fingerprint will be folded as its "
+                           "size is higher than the maximum size accepted "
+                           "by RDKit, which is 2**31 - 1.")
             fp_length = max_rdkit_fp_length
         indices = self.indices % max_rdkit_fp_length
 
@@ -523,7 +571,8 @@ class Fingerprint:
         Parameters
         ----------
         new_length : int
-            Length of the new fingerprint, ideally multiple of 2. The default value is 4096.
+            Length of the new fingerprint, ideally multiple of 2.
+            The default value is 4096.
 
         Returns
         -------
@@ -533,7 +582,8 @@ class Fingerprint:
         Raises
         ------
         BitsValueError
-            If the new fingerprint length is not a multiple of 2 or is greater than the existing fingerprint length.
+            If the new fingerprint length is not a multiple of 2 or is greater
+            than the existing fingerprint length.
 
         Examples
         --------
@@ -557,13 +607,15 @@ class Fingerprint:
         [1 0 0 1 1 1 0 1]
         """
         if new_length > self.fp_length:
-            error_msg = ("The new fingerprint length must be smaller than the existing fingerprint length.")
+            error_msg = ("The new fingerprint length must be smaller than the "
+                         "existing fingerprint length.")
             logger.exception(error_msg)
             raise BitsValueError(error_msg)
 
         if not np.log2(self.fp_length / new_length).is_integer():
-            error_msg = ("It is not possible to fold the current fingerprint into the informed new length. "
-                         "The current length divided by the new one is not a power of 2 number.")
+            error_msg = ("It is not possible to fold the current fingerprint "
+                         "into the informed new length. The current length "
+                         "divided by the new one is not a power of 2 number.")
             logger.exception(error_msg)
             raise BitsValueError(error_msg)
 
@@ -576,8 +628,11 @@ class Fingerprint:
         props = dict(self.props)
         if "fp_length" in props:
             props["fp_length"] = new_length
-        new_fp = self.__class__(indices=folded_indices, fp_length=new_length,
-                                unfolded_fp=self, unfolding_map=unfolding_map, props=props)
+        new_fp = self.__class__(indices=folded_indices,
+                                fp_length=new_length,
+                                unfolded_fp=self,
+                                unfolding_map=unfolding_map,
+                                props=props)
 
         return new_fp
 
@@ -605,8 +660,10 @@ class Fingerprint:
             If the fingerprints have different lengths.
         """
         if not isinstance(other, Fingerprint):
-            logger.exception("The informed fingerprint is not an instance of %s." % (other.__class__))
-            raise InvalidFingerprintType("The informed fingerprint is not an instance of %s." % (other.__class__))
+            error_msg = ("The informed fingerprint is not an instance of %s."
+                         % (other.__class__))
+            logger.exception(error_msg)
+            raise InvalidFingerprintType(error_msg)
 
         if self.fp_length != other.fp_length:
             raise BitsValueError("Fingerprints are in a different bit scale")
@@ -628,8 +685,10 @@ class Fingerprint:
             If the fingerprints have different lengths.
         """
         if not isinstance(other, Fingerprint):
-            logger.exception("Informed fingerprint is not an instance of %s." % (other.__class__))
-            raise InvalidFingerprintType("Informed fingerprint is not an instance of %s." % (other.__class__))
+            error_msg = ("Informed fingerprint is not an instance of %s."
+                         % (other.__class__))
+            logger.exception(error_msg)
+            raise InvalidFingerprintType(error_msg)
 
         if self.fp_length != other.fp_length:
             raise BitsValueError("Fingerprints are in a different bit scale")
@@ -651,8 +710,10 @@ class Fingerprint:
             If the fingerprints have different lengths.
         """
         if not isinstance(other, Fingerprint):
-            logger.exception("Informed fingerprint is not an instance of %s." % (other.__class__))
-            raise InvalidFingerprintType("Informed fingerprint is not an instance of %s." % (other.__class__))
+            error_msg = ("Informed fingerprint is not an instance of %s."
+                         % (other.__class__))
+            logger.exception(error_msg)
+            raise InvalidFingerprintType(error_msg)
 
         if self.fp_length != other.fp_length:
             raise BitsValueError("Fingerprints are in a different bit scale")
@@ -674,8 +735,10 @@ class Fingerprint:
             If the fingerprints have different lengths.
         """
         if not isinstance(other, Fingerprint):
-            logger.exception("Informed fingerprint is not an instance of %s." % (other.__class__))
-            raise InvalidFingerprintType("Informed fingerprint is not an instance of %s." % (other.__class__))
+            error_msg = ("Informed fingerprint is not an instance of %s."
+                         % (other.__class__))
+            logger.exception(error_msg)
+            raise InvalidFingerprintType(error_msg)
 
         if self.fp_length != other.fp_length:
             raise BitsValueError("Fingerprints are in a different bit scale")
@@ -683,7 +746,8 @@ class Fingerprint:
         return np.setxor1d(self.indices, other.indices, assume_unique=True)
 
     def calc_similarity(self, other):
-        """Calculates the Tanimoto similarity between this fingeprint and ``other``.
+        """Calculates the Tanimoto similarity between this fingeprint
+        and ``other``.
 
         Returns
         -------
@@ -697,17 +761,22 @@ class Fingerprint:
         >>> print(fp1.calc_similarity(fp2))
         0.625
         """
-        return DataStructs.FingerprintSimilarity(self.to_rdkit(), other.to_rdkit())
+        return DataStructs.FingerprintSimilarity(self.to_rdkit(),
+                                                 other.to_rdkit())
 
     def __repr__(self):
         return ("<%s: indices=%s length=%d>" %
-                (self.__class__, repr(self.indices).replace('\n', '').replace(' ', ''), self.fp_length))
+                (self.__class__,
+                 repr(self.indices).replace('\n', '').replace(' ', ''),
+                 self.fp_length))
 
     def __eq__(self, other):
         if isinstance(other, Fingerprint):
             return (self.__class__ == other.__class__
                     and self.fp_length == other.fp_length
-                    and np.all(np.in1d(self.indices, other.indices, assume_unique=True)))
+                    and np.all(np.in1d(self.indices,
+                                       other.indices,
+                                       assume_unique=True)))
         return False
 
     def __ne__(self, other):
@@ -738,16 +807,18 @@ class CountFingerprint(Fingerprint):
         Mapping between each index in ``indices`` to the number of counts.
         If not provided, the default count value of 1 will be used instead.
     fp_length : int
-        The fingerprint length (total number of bits). The default value is :math:`2^{32}`.
+        The fingerprint length (total number of bits).
+        The default value is :math:`2^{32}`.
     unfolded_fp : `Fingerprint` or None
         The unfolded version of this fingerprint.
         If None, this fingerprint may have not been folded yet.
     unfolding_map : dict, optional
-        A mapping between current indices and indices from the unfolded version of this fingerprint
-        what makes it possible to trace folded bits back to the original shells (features).
+        A mapping between current indices and indices from the unfolded version
+        of this fingerprint what makes it possible to trace folded bits back to
+        the original shells (features).
     props: dict, optional
-        Custom properties of the fingerprint, consisting of a string keyword and
-        some value. It can be used, for instance, to save the ligand name
+        Custom properties of the fingerprint, consisting of a string keyword
+        and some value. It can be used, for instance, to save the ligand name
         and parameters used to generate shells (IFP features).
     """
 
@@ -762,8 +833,9 @@ class CountFingerprint(Fingerprint):
             indices = np.asarray(indices, dtype=np.long)
 
             if np.any(np.logical_or(indices < 0, indices >= fp_length)):
-                logger.exception("Provided indices are in a different bit scale.")
-                raise BitsValueError("Provided indices are in a different bit scale.")
+                error_msg = "Provided indices are in a different bit scale."
+                logger.exception(error_msg)
+                raise BitsValueError(error_msg)
 
             if counts is None:
                 indices, counts = np.unique(indices, return_counts=True)
@@ -771,23 +843,33 @@ class CountFingerprint(Fingerprint):
             else:
                 indices = np.unique(indices)
                 if not np.all([x in indices for x in counts]):
-                    logger.exception("At least one index from 'counts' is not in 'indices'.")
-                    raise FingerprintCountsError("At least one index from 'counts' is not in 'indices'.")
+                    error_msg = ("At least one index from 'counts' is not in "
+                                 "'indices'.")
+                    logger.exception(error_msg)
+                    raise FingerprintCountsError(error_msg)
+
                 if len(set(indices).symmetric_difference(counts)) > 0:
-                    logger.exception("At least one index in 'indices' is not in 'counts'.")
-                    raise FingerprintCountsError("At least one index in 'indices' is not in 'counts'.")
+                    error_msg = ("At least one index in 'indices' is not "
+                                 "in 'counts'.")
+                    logger.exception(error_msg)
+                    raise FingerprintCountsError(error_msg)
         else:
             indices = np.asarray(sorted(counts.keys()), dtype=np.long)
 
             if np.any(np.logical_or(indices < 0, indices >= fp_length)):
-                logger.exception("Provided indices are in a different bit scale.")
-                raise BitsValueError("Provided indices are in a different bit scale.")
+                error_msg = ("Provided indices are in a different bit scale.")
+                logger.exception(error_msg)
+                raise BitsValueError(error_msg)
 
         self._counts = counts
         super().__init__(indices, fp_length, unfolded_fp, unfolding_map, props)
 
     @classmethod
-    def from_indices(cls, indices=None, counts=None, fp_length=DEFAULT_FP_LENGTH, **kwargs):
+    def from_indices(cls,
+                     indices=None,
+                     counts=None,
+                     fp_length=DEFAULT_FP_LENGTH,
+                     **kwargs):
         """Initialize from an array of indices.
 
         Parameters
@@ -798,10 +880,11 @@ class CountFingerprint(Fingerprint):
             Mapping between each index in ``indices`` to the number of counts.
             If not provided, the default count value of 1 will be used instead.
         fp_length : int
-            The fingerprint length (total number of bits). The default value is :math:`2^{32}`.
+            The fingerprint length (total number of bits).
+            The default value is :math:`2^{32}`.
         **kwargs : dict, optional
-            Extra arguments to `CountFingerprint`. Refer to the documentation for a
-            list of all possible arguments.
+            Extra arguments to `CountFingerprint`. Refer to the documentation
+            for a list of all possible arguments.
 
         Returns
         -------
@@ -835,10 +918,11 @@ class CountFingerprint(Fingerprint):
         counts : dict
             Mapping between each index in ``indices`` to the number of counts.
         fp_length : int
-            The fingerprint length (total number of bits). The default value is :math:`2^{32}`.
+            The fingerprint length (total number of bits).
+            The default value is :math:`2^{32}`.
         **kwargs : dict, optional
-            Extra arguments to `CountFingerprint`. Refer to the documentation for a
-            list of all possible arguments.
+            Extra arguments to `CountFingerprint`. Refer to the documentation
+            for a list of all possible arguments.
 
         Returns
         -------
@@ -864,7 +948,11 @@ class CountFingerprint(Fingerprint):
         return cls(counts=counts, fp_length=fp_length, **kwargs)
 
     @classmethod
-    def from_bit_string(cls, bit_string, counts=None, fp_length=None, **kwargs):
+    def from_bit_string(cls,
+                        bit_string,
+                        counts=None,
+                        fp_length=None,
+                        **kwargs):
         """Initialize from a bit string (e.g. '0010100110').
 
         Parameters
@@ -876,7 +964,8 @@ class CountFingerprint(Fingerprint):
             If not provided, the default count value of 1 will be used instead.
         fp_length : int, optional
             The fingerprint length (total number of bits).
-            If not provided, the fingerprint length will be defined based on the string length.
+            If not provided, the fingerprint length will be defined based on
+            the string length.
         **kwargs : dict, optional
             Extra arguments to `Fingerprint`. Refer to the documentation for a
             list of all possible arguments.
@@ -911,7 +1000,8 @@ class CountFingerprint(Fingerprint):
             Array of counts.
         fp_length : int, optional
             The fingerprint length (total number of bits).
-            If not provided, the fingerprint length will be defined based on the ``vector`` shape.
+            If not provided, the fingerprint length will be defined based on
+            the ``vector`` shape.
         **kwargs : dict, optional
             Extra arguments to `Fingerprint`. Refer to the documentation for a
             list of all possible arguments.
@@ -968,11 +1058,14 @@ class CountFingerprint(Fingerprint):
          : `CountFingerprint`
         """
         if not isinstance(fp, Fingerprint):
-            logger.exception("Informed fingerprint is not an instance of %s." % (cls.__class__))
-            raise InvalidFingerprintType("Informed fingerprint is not an instance of %s." % (cls.__class__))
+            error_msg = ("Informed fingerprint is not an instance of %s."
+                         % (cls.__class__))
+            logger.exception(error_msg)
+            raise InvalidFingerprintType(error_msg)
 
         counts = dict([(i, c) for i, c in fp.counts.items() if c > 0])
-        unfolded_fp = fp.__class__.from_fingerprint(fp.unfolded_fp) if fp.unfolded_fp is not None else None
+        unfolded_fp = (fp.__class__.from_fingerprint(fp.unfolded_fp)
+                       if fp.unfolded_fp is not None else None)
         unfolding_map = dict(fp.unfolding_map)
         props = dict(fp.props)
 
@@ -996,7 +1089,8 @@ class CountFingerprint(Fingerprint):
         Parameters
         ----------
         new_length : int
-            Length of the new fingerprint, ideally multiple of 2. The default value is 4096.
+            Length of the new fingerprint, ideally multiple of 2.
+            The default value is 4096.
 
         Returns
         -------
@@ -1039,12 +1133,17 @@ class CountFingerprint(Fingerprint):
 
     def __repr__(self):
         return ("<%s: counts={%s} length=%d>" %
-                (self.__class__, tuple([(k, v) for k, v in self.counts.items()]), self.fp_length))
+                (self.__class__,
+                 tuple([(k, v)
+                        for k, v in self.counts.items()]),
+                 self.fp_length))
 
     def __eq__(self, other):
         if isinstance(other, Fingerprint):
             return (self.__class__ == other.__class__
                     and self.counts == other.counts
                     and self.fp_length == other.fp_length
-                    and np.all(np.in1d(self.indices, other.indices, assume_unique=True)))
+                    and np.all(np.in1d(self.indices,
+                                       other.indices,
+                                       assume_unique=True)))
         return False

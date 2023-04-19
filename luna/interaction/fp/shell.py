@@ -7,7 +7,8 @@ import mmh3
 from luna.version import __version__
 from luna.util.exceptions import ShellCenterNotFound
 from luna.util.default_values import CHEMICAL_FEATURE_IDS, INTERACTION_IDS
-from luna.interaction.fp.fingerprint import DEFAULT_FP_LENGTH, Fingerprint, CountFingerprint
+from luna.interaction.fp.fingerprint import (DEFAULT_FP_LENGTH, Fingerprint,
+                                             CountFingerprint)
 from luna.interaction.fp.type import IFPType
 from luna.mol.groups import PseudoAtomGroup, AtomGroupNeighborhood
 from luna.mol.features import ChemicalFeature
@@ -40,8 +41,8 @@ class ShellManager:
         The maximum number of iterations for fingerprint generation.
     radius_step : float
         The multiplier used to increase shell size at each iteration.
-        At iteration 0, shell radius is 0 * ``radius_step``, at iteration 1, radius is
-        1 * ``radius_step``, etc.
+        At iteration 0, shell radius is 0 * ``radius_step``, at iteration 1,
+        radius is 1 * ``radius_step``, etc.
     fp_length : int
         The fingerprint length (total number of bits).
     ifp_type : :class:`~luna.interaction.fp.type.IFPType`
@@ -49,8 +50,8 @@ class ShellManager:
     shells : iterable of :class:`Shell`, optional
         An initial sequence of :class:`Shell` objects (fingerprint features).
     verbose : bool
-        If True, warnings issued during the usage of this `ShellManager` will be displayed.
-        The default value is False.
+        If True, warnings issued during the usage of this `ShellManager` will
+        be displayed. The default value is False.
 
     Attributes
     ----------
@@ -69,17 +70,25 @@ class ShellManager:
     version : str
         The LUNA's version with which shells were generated.
     levels : dict of {int: list of `Shell`}
-        Register shells by level, where keys are levels and values are lists of `Shell` objects.
+        Register shells by level, where keys are levels and values are
+        lists of `Shell` objects.
 
         .. note::
             Levels are 0-indexed. So, the first level is 0, second is 1, etc.
             That means if ``num_levels`` is 5, the last level will be 4.
     centers : dict of dict of {int: `Shell`}
-        Register shells by center, where keys are :class:`~luna.mol.groups.AtomGroup` objects and
-        values are dict that store all shells generated for that center at each iteration (level).
+        Register shells by center, where keys are \
+        :class:`~luna.mol.groups.AtomGroup` objects and values are dict that
+        store all shells generated for that center at each iteration (level).
     """
 
-    def __init__(self, num_levels, radius_step, fp_length, ifp_type, shells=None, verbose=False):
+    def __init__(self,
+                 num_levels,
+                 radius_step,
+                 fp_length,
+                 ifp_type,
+                 shells=None,
+                 verbose=False):
         self.num_levels = num_levels
         self.radius_step = radius_step
         self.fp_length = fp_length
@@ -110,7 +119,8 @@ class ShellManager:
     def find_similar_shell(self, shell):
         """Find a shell in ``shells`` similar to ``shell``.
 
-        Two shells are similar if they represent the same substructural information.
+        Two shells are similar if they represent the same substructural
+        information.
 
         Parameters
         ----------
@@ -122,7 +132,8 @@ class ShellManager:
             Return a similar shell or None if it does not find any.
         """
         for added_shell in self.shells:
-            # For each group of similar shells, it will exist only one valid shell.
+            # For each group of similar shells, it will exist only
+            # one valid shell.
             if added_shell.is_valid():
                 if shell.is_similar(added_shell):
                     return added_shell
@@ -136,7 +147,8 @@ class ShellManager:
         shell : `Shell`
         """
 
-        # Any new shell without interactions from level 1 onwards will be automatically considered invalid.
+        # Any new shell without interactions from level 1 onwards will be
+        # automatically considered invalid.
         if shell.level > 0 and len(shell.interactions) == 0:
             shell.valid = False
         else:
@@ -146,7 +158,8 @@ class ShellManager:
                 if found_shell.level < shell.level:
                     shell.valid = False
 
-                elif found_shell.level == shell.level and found_shell.identifier <= shell.identifier:
+                elif (found_shell.level == shell.level
+                        and found_shell.identifier <= shell.identifier):
                     shell.valid = False
 
                 else:
@@ -159,14 +172,15 @@ class ShellManager:
     def get_valid_shells(self):
         """Return only valid shells.
 
-        A shell is considered invalid if, by the time it is added in ``shells``, there is another
-        shell representing the same substructural information.
-        That means this shell is not unique and does not contributes to any new information.
+        A shell is considered invalid if, by the time it is added in
+        ``shells``, there is another shell representing the same
+        substructural information. That means this shell is not unique
+        and does not contributes to any new information.
 
-        On the other hand, if the shell contributes by adding new information to ``shells``,
-        then it will be considered valid and unique.
-        So, the first shell of a series of shells containing the same information is considered
-        valid and the others invalid.
+        On the other hand, if the shell contributes by adding new information
+        to ``shells``, then it will be considered valid and unique. So, the
+        first shell of a series of shells containing the same information is
+        considered valid and the others invalid.
 
         Returns
         -------
@@ -183,14 +197,16 @@ class ShellManager:
             The shell identifier.
         unique_shells : bool
             If True, return only unique shells.
-            Otherwise, return all shells having the identifier ``identifier`` (the default).
+            Otherwise, return all shells having the identifier
+            ``identifier`` (the default).
 
         Returns
         -------
          : list of `Shell`
         """
         if unique_shells:
-            return [s for s in self.shells if s.identifier == identifier and s.is_valid()]
+            return [s for s in self.shells
+                    if s.identifier == identifier and s.is_valid()]
         else:
             return [s for s in self.shells if s.identifier == identifier]
 
@@ -226,10 +242,12 @@ class ShellManager:
         Parameters
         ----------
         center : :class:`~luna.mol.groups.AtomGroup`
-            The center of a shell, which consists of an :class:`~luna.mol.groups.AtomGroup` object.
+            The center of a shell, which consists of an
+            :class:`~luna.mol.groups.AtomGroup` object.
         unique_shells : bool
             If True, return only unique shells.
-            Otherwise, return all shells generated for center ``center`` (the default).
+            Otherwise, return all shells generated for center
+            ``center`` (the default).
 
 
         Returns
@@ -241,7 +259,8 @@ class ShellManager:
 
         if center in self.centers:
             if unique_shells:
-                shells = {i: s for i, s in self.centers[center].items() if s.is_valid()}
+                shells = {i: s for i, s in self.centers[center].items()
+                          if s.is_valid()}
             else:
                 shells = self.centers[center]
         elif self.verbose:
@@ -249,19 +268,24 @@ class ShellManager:
 
         return shells
 
-    def get_shell_by_center_and_level(self, center, level, unique_shells=False):
+    def get_shell_by_center_and_level(self,
+                                      center,
+                                      level,
+                                      unique_shells=False):
         """Get the shell generated for center ``center``
-        (:class:`~luna.mol.groups.AtomGroup` object) at level (iteration) ``level``.
+        (:class:`~luna.mol.groups.AtomGroup` object) at level (iteration)
+        ``level``.
 
         Parameters
         ----------
         center : :class:`~luna.mol.groups.AtomGroup`
-            The center of a shell, which consists of an :class:`~luna.mol.groups.AtomGroup` object.
+            The center of a shell, which consists of an
+            :class:`~luna.mol.groups.AtomGroup` object.
         level : int
             The target level (iteration).
         unique_shells : bool
-            If True, return the `Shell` object if it is unique and None otherwise.
-            The default value is False.
+            If True, return the `Shell` object if it is unique and None
+            otherwise. The default value is False.
 
         Returns
         -------
@@ -272,29 +296,35 @@ class ShellManager:
         shell = self.centers.get(center, {}).get(level)
 
         if shell is None and self.verbose:
-            logger.warning("The informed center '%s' does not exist in the level '%d'." % (center, level))
+            logger.warning("The informed center '%s' does not exist in "
+                           "the level '%d'." % (center, level))
 
         if unique_shells:
             shell = shell if shell.is_valid() else None
             if shell is None and self.verbose:
-                logger.warning("The shell found with center '%s' and level '%d' is not unique." % (center, level))
+                logger.warning("The shell found with center '%s' and level "
+                               "'%d' is not unique." % (center, level))
 
         return shell
 
     def get_previous_shell(self, center, curr_level, unique_shells=False):
-        """Get the last shell having center ``center`` that was generated before level ``curr_level``.
-        For instance, if the current level (iteration) is 5 and the last valid shell generated for
-        center :math:`C` was at level 4, then :meth:`get_previous_shell` would return that shell at level 4.
+        """Get the last shell having center ``center`` that was generated
+        before level ``curr_level``. For instance, if the current level
+        (iteration) is 5 and the last valid shell generated for center
+        :math:`C` was at level 4, then :meth:`get_previous_shell` would
+        return that shell at level 4.
 
         Parameters
         ----------
         center : :class:`~luna.mol.groups.AtomGroup`
-            The center of a shell, which consists of an :class:`~luna.mol.groups.AtomGroup` object.
+            The center of a shell, which consists of an
+            :class:`~luna.mol.groups.AtomGroup` object.
         curr_level : int
             The current level (iteration).
         unique_shells : bool
-            If True, ignore non-valid shells and go down to inferior levels until a valid shell is found.
-            If level 0 was reached and no valid shell was found, then return None.
+            If True, ignore non-valid shells and go down to inferior
+            levels until a valid shell is found. If level 0 was reached
+            and no valid shell was found, then return None.
             The default value is False.
 
         Returns
@@ -305,12 +335,14 @@ class ShellManager:
         shell = None
         while curr_level != 0 and shell is None:
             level = curr_level - 1
-            shell = self.get_shell_by_center_and_level(center, level, unique_shells)
+            shell = self.get_shell_by_center_and_level(center,
+                                                       level,
+                                                       unique_shells)
             curr_level = level
 
         if shell is None and self.verbose:
-            logger.warning("No previous shell centered on '%s' departing from the level '%d' was found."
-                           % (center, level))
+            logger.warning("No previous shell centered on '%s' departing from "
+                           "the level '%d' was found." % (center, level))
 
         return shell
 
@@ -320,16 +352,18 @@ class ShellManager:
         Parameters
         ----------
         center : :class:`~luna.mol.groups.AtomGroup`
-            The center of a shell, which consists of an :class:`~luna.mol.groups.AtomGroup` object.
+            The center of a shell, which consists of an
+            :class:`~luna.mol.groups.AtomGroup` object.
         unique_shells : bool
             If True, ignore non-valid shells.
-            That means shells generated at superior levels may be ignored if they are not valid.
-            The default value is False.
+            That means shells generated at superior levels may be ignored
+            if they are not valid. The default value is False.
 
         Returns
         -------
          : `Shell` or None
-            The last shell generated for center ``center`` or None if no valid shell was found.
+            The last shell generated for center ``center`` or None if
+            no valid shell was found.
         """
         shell = None
 
@@ -350,7 +384,8 @@ class ShellManager:
         level : int, optional
             If provided, only return identifiers of shells at level ``level``.
         unique_shells : bool
-            If True, ignore identifiers of non-valid shells. The default value is False.
+            If True, ignore identifiers of non-valid shells.
+            The default value is False.
 
         Returns
         -------
@@ -358,18 +393,25 @@ class ShellManager:
         """
         if level is not None:
             if unique_shells:
-                identifiers = [s.identifier for s in self.get_shells_by_level(level) if s.is_valid()]
+                identifiers = [s.identifier
+                               for s in self.get_shells_by_level(level)
+                               if s.is_valid()]
             else:
-                identifiers = [s.identifier for s in self.get_shells_by_level(level)]
+                identifiers = [s.identifier
+                               for s in self.get_shells_by_level(level)]
         else:
             if unique_shells:
-                identifiers = [s.identifier for s in self.shells if s.is_valid()]
+                identifiers = [s.identifier for s in self.shells
+                               if s.is_valid()]
             else:
                 identifiers = [s.identifier for s in self.shells]
 
         return sorted(identifiers)
 
-    def to_fingerprint(self, fold_to_length=None, count_fp=False, unique_shells=False):
+    def to_fingerprint(self,
+                       fold_to_length=None,
+                       count_fp=False,
+                       unique_shells=False):
         """Encode shells into an interaction fingerprint.
 
         Parameters
@@ -377,10 +419,13 @@ class ShellManager:
         fold_to_length : int, optional
             If provided, fold the fingerprint to length ``fold_to_length``.
         count_fp : bool
-            If True, create a count fingerprint (:class:`~luna.interaction.fp.fingerprint.CountFingerprint`).
-            Otherwise, return a bit fingerprint (:class:`~luna.interaction.fp.fingerprint.Fingerprint`).
+            If True, create a count fingerprint
+            (:class:`~luna.interaction.fp.fingerprint.CountFingerprint`).
+            Otherwise, return a bit fingerprint
+            (:class:`~luna.interaction.fp.fingerprint.Fingerprint`).
         unique_shells : bool
-            If True, only unique shells are used to create the fingerprint. The default value is False.
+            If True, only unique shells are used to create the fingerprint.
+            The default value is False.
 
         Returns
         -------
@@ -392,21 +437,30 @@ class ShellManager:
                  "radius_step": self.radius_step}
 
         if count_fp:
-            fp = CountFingerprint(indices, fp_length=self.fp_length, props=props)
+            fp = CountFingerprint(indices,
+                                  fp_length=self.fp_length,
+                                  props=props)
         else:
-            fp = Fingerprint(indices, fp_length=self.fp_length, props=props)
+            fp = Fingerprint(indices,
+                             fp_length=self.fp_length,
+                             props=props)
 
         if fold_to_length:
             return fp.fold(fold_to_length)
         return fp
 
-    def trace_back_feature(self, feature_id, ifp, unique_shells=False):
-        """Trace a feature from a fingerprint back to the shells that originated that feature.
+    def trace_back_feature(self,
+                           feature_id, ifp,
+                           unique_shells=False):
+        """Trace a feature from a fingerprint back to the shells
+        that originated that feature.
 
         .. note::
-            Due to fingerprint folding, multiple substructures may end up encoded in the same bit,
-            the so-called collision problem. So, if the provided feature contains collisions,
-            shells representing different substructures may be returned by :meth:`trace_back_feature`.
+            Due to fingerprint folding, multiple substructures may end up
+            encoded in the same bit, the so-called collision problem.
+            So, if the provided feature contains collisions, shells
+            representing different substructures may be returned by
+            :meth:`trace_back_feature`.
 
         Parameters
         ----------
@@ -415,7 +469,8 @@ class ShellManager:
         ifp : `Fingerprint`
             The fingerprint containing the feature ``feature_id``.
         unique_shells : bool
-            If True, ignore identifiers of non-valid shells. The default value is False.
+            If True, ignore identifiers of non-valid shells.
+            The default value is False.
 
         Yields
         -------

@@ -417,7 +417,12 @@ class AtomGroup():
         The `AtomGroupsManager` object that contains this `AtomGroup` object.
     """
 
-    def __init__(self, atoms, features=None, interactions=None, recursive=True, manager=None):
+    def __init__(self,
+                 atoms,
+                 features=None,
+                 interactions=None,
+                 recursive=True,
+                 manager=None):
         self._atoms = sorted(atoms)
 
         # Atom properties
@@ -448,8 +453,8 @@ class AtomGroup():
     def compounds(self):
         """set of :class:`~luna.MyBio.PDB.Residue.Residue`, read-only: The set of unique compounds that contain the atoms in ``atoms``.
 
-        As an atom group can be formed by the union of two or more compounds (e.g., amide of peptide bonds), it may return
-        more than one compound.
+        As an atom group can be formed by the union of two or more compounds
+        (e.g., amide of peptide bonds), it may return more than one compound.
         """
         return set([a.parent for a in self._atoms])
 
@@ -515,7 +520,9 @@ class AtomGroup():
         if isinstance(manager, AtomGroupsManager):
             self._manager = manager
         else:
-            raise IllegalArgumentError("The informed atom group manager must be an instance of '%s'." % AtomGroupsManager)
+            raise IllegalArgumentError("The informed atom group manager must "
+                                       "be an instance of '%s'."
+                                       % AtomGroupsManager)
 
     @property
     def size(self):
@@ -540,10 +547,11 @@ class AtomGroup():
         """Check if the atom group ``atm_grp`` is a subset of this atom group.
 
         For example, consider the benzene molecule.
-        Its aromatic ring itself forms an `AtomGroup` object composed of all of its six atoms.
-        Consider now any subset of carbons in the benzene molecule.
-        This subset forms an `AtomGroup` object that is part of the group formed by the aromatic ring.
-        Therefore, in this example, :meth:`contain_group` will return True because the aromatic ring
+        Its aromatic ring itself forms an `AtomGroup` object composed of all of
+        its six atoms. Consider now any subset of carbons in the benzene
+        molecule. This subset forms an `AtomGroup` object that is part of the
+        group formed by the aromatic ring. Therefore, in this example,
+        :meth:`contain_group` will return True because the aromatic ring
         contains the subset of hydrophobic atoms.
 
         Parameters
@@ -566,7 +574,8 @@ class AtomGroup():
         return sorted(set([a.get_parent_by_level("C").id for a in self.atoms]))
 
     def get_interactions_with(self, atm_grp):
-        """Get all interactions that an atom group establishes with another atom group ``atm_grp``.
+        """Get all interactions that an atom group establishes with another
+        atom group ``atm_grp``.
 
         Returns
         -------
@@ -581,21 +590,25 @@ class AtomGroup():
         return target_interactions
 
     def get_shortest_path_length(self, trgt_grp, cutoff=None):
-        """Compute the shortest path length between this atom group to another atom group ``trgt_grp``.
+        """Compute the shortest path length between this atom group to another
+        atom group ``trgt_grp``.
 
-        The shortest path between two atom groups is defined as the shortest path between any of their atoms,
-        which are calculated using Dijkstra’s algorithm.
+        The shortest path between two atom groups is defined as the shortest
+        path between any of their atoms, which are calculated using
+        Dijkstra’s algorithm.
 
         If ``manager`` is not provided, None is returned.
 
-        If there is not any path between ``src_grp`` and ``trgt_grp``, infinite is returned.
+        If there is not any path between ``src_grp`` and ``trgt_grp``,
+        infinite is returned.
 
         Parameters
         ----------
         trgt_grp : `AtomGroup`
             The target atom group to calculate the shortest path.
         cutoff : int, optional
-            Only paths of length <= ``cutoff`` are returned. If None, all path lengths are considered.
+            Only paths of length <= ``cutoff`` are returned.
+            If None, all path lengths are considered.
 
         Returns
         -------
@@ -603,43 +616,52 @@ class AtomGroup():
             The shortest path.
         """
         if self.manager is not None:
-            return self.manager.get_shortest_path_length(self, trgt_grp, cutoff)
+            return self.manager.get_shortest_path_length(self,
+                                                         trgt_grp,
+                                                         cutoff)
         return None
 
     def add_features(self, features):
-        """ Add :class:`~luna.mol.features.ChemicalFeature` objects to ``features``."""
+        """ Add :class:`~luna.mol.features.ChemicalFeature` objects
+        to ``features``."""
         self._features = sorted(set(self.features + list(features)))
         # Reset hash.
         self._hash_cache = None
 
     def remove_features(self, features):
-        """ Remove :class:`~luna.mol.features.ChemicalFeature` objects from ``features``."""
+        """ Remove :class:`~luna.mol.features.ChemicalFeature` objects
+        from ``features``."""
         self._features = sorted(set(self.features) - set(features))
         # Reset hash.
         self._hash_cache = None
 
     def add_interactions(self, interactions):
-        """ Add :class:`~luna.interaction.type.InteractionType` objects to ``interactions``."""
+        """ Add :class:`~luna.interaction.type.InteractionType` objects
+        to ``interactions``."""
         self._interactions = list(set(self.interactions + list(interactions)))
 
     def remove_interactions(self, interactions):
-        """ Remove :class:`~luna.interaction.type.InteractionType` objects from ``interactions``."""
+        """ Remove :class:`~luna.interaction.type.InteractionType` objects
+        from ``interactions``."""
         self._interactions = list(set(self.interactions) - set(interactions))
 
     def is_water(self):
-        """Return True if all atoms in the atom group belong to water molecules."""
+        """Return True if all atoms in the atom group belong to water
+        molecules."""
         return all([a.parent.is_water() for a in self.atoms])
 
     def is_hetatm(self):
-        """Return True if all atoms in the atom group belong to hetero group, i.e., non-standard residues of proteins,
-        DNAs, or RNAs, as well as atoms in other kinds of groups, such as carbohydrates,
-        substrates, ligands, solvent, and metal ions.
+        """Return True if all atoms in the atom group belong to hetero group,
+        i.e., non-standard residues of proteins, DNAs, or RNAs, as well as
+        atoms in other kinds of groups, such as carbohydrates, substrates,
+        ligands, solvent, and metal ions.
 
         Hetero groups are designated by the flag HETATM in the PDB format."""
         return all([a.parent.is_hetatm() for a in self.atoms])
 
     def is_residue(self):
-        """Return True if all atoms in the atom group belong to standard residues of proteins."""
+        """Return True if all atoms in the atom group belong to standard
+        residues of proteins."""
         return all([a.parent.is_residue() for a in self.atoms])
 
     def is_nucleotide(self):
@@ -647,35 +669,41 @@ class AtomGroup():
         return all([a.parent.is_nucleotide() for a in self.atoms])
 
     def is_mixed(self):
-        """Return True if the atoms in the atom group belong to different compound classes
-        (water, hetero group, residue, or nucleotide)."""
+        """Return True if the atoms in the atom group belong to different
+        compound classes (water, hetero group, residue, or nucleotide)."""
         return len(set([a.parent.get_class() for a in self.atoms])) > 1
 
     def has_water(self):
-        """Return True if at least one atom in the atom group belongs to a water molecule."""
+        """Return True if at least one atom in the atom group belongs to a
+        water molecule."""
         return any([a.parent.is_water() for a in self.atoms])
 
     def has_hetatm(self):
-        """Return True if at least one atom in the atom group belongs to a hetero group, i.e., non-standard residues of proteins,
-        DNAs, or RNAs, as well as atoms in other kinds of groups, such as carbohydrates,
+        """Return True if at least one atom in the atom group belongs to a
+        hetero group, i.e., non-standard residues of proteins, DNAs, or RNAs,
+        as well as atoms in other kinds of groups, such as carbohydrates,
         substrates, ligands, solvent, and metal ions."""
         return any([a.parent.is_hetatm() for a in self.atoms])
 
     def has_residue(self):
-        """Return True if at least one atom in the atom group belongs to a standard residue of proteins."""
+        """Return True if at least one atom in the atom group belongs to a
+        standard residue of proteins."""
         return any([a.parent.is_residue() for a in self.atoms])
 
     def has_nucleotide(self):
-        """Return True if at least one atom in the atom group belongs to a nucleotide."""
+        """Return True if at least one atom in the atom group belongs to a
+        nucleotide."""
         return any([a.parent.is_nucleotide() for a in self.atoms])
 
     def has_target(self):
-        """Return True if at least one compound is the target of LUNA's analysis"""
+        """Return True if at least one compound is the target of LUNA's
+        analysis"""
         return any([a.parent.is_target() for a in self.atoms])
 
     def as_json(self):
         """Represent the atom group as a dict containing the atoms, compounds,
-        features, and compound classes (water, hetero group, residue, or nucleotide).
+        features, and compound classes (water, hetero group, residue,
+        or nucleotide).
 
         The dict is defined as follows:
 
@@ -687,14 +715,15 @@ class AtomGroup():
         grp_obj = {}
         grp_obj["atoms"] = [atm.as_json() for atm in self.atoms]
         grp_obj["compounds"] = [comp.as_json() for comp in self.compounds]
-        grp_obj["features"] = [feat.name for feat in self.features if feat.name != "Atom"]
+        grp_obj["features"] = [feat.name for feat in self.features
+                               if feat.name != "Atom"]
         grp_obj["classes"] = [comps.get_class() for comps in self.compounds]
 
         return grp_obj
 
     def clear_refs(self):
-        """References to this `AtomGroup` instance will be removed from the list of atom groups of
-        each atom in ``atoms``."""
+        """References to this `AtomGroup` instance will be removed from the
+        list of atom groups of each atom in ``atoms``."""
         if self._recursive:
             for atm in self.atoms:
                 atm.remove_atm_grps([self])
@@ -705,7 +734,8 @@ class AtomGroup():
     def __eq__(self, other):
         """Overrides the default implementation"""
         if type(self) == type(other):
-            return self.atoms == other.atoms and self.features == other.features
+            return (self.atoms == other.atoms
+                    and self.features == other.features)
         return False
 
     def __ne__(self, other):
@@ -1283,9 +1313,11 @@ class AtomGroupNeighborhood:
         self.kdt.set_coords(self.coords)
 
     def search(self, center, radius):
-        """Return all atom groups in ``atm_grps`` that is up to a maximum of ``radius`` away (measured in Å) of ``center``.
+        """Return all atom groups in ``atm_grps`` that is up to a maximum of
+        ``radius`` away (measured in Å) of ``center``.
 
-        For atom groups with more than one atom, their centroid is used as a reference.
+        For atom groups with more than one atom, their centroid is used as a
+        reference.
         """
         self.kdt.search(center, radius)
         indices = self.kdt.get_indices()

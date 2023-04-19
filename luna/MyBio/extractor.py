@@ -54,7 +54,7 @@ class Extractor():
                     logger.warning("Chain %s does not exist." % chain)
 
             if len(chain_sel) > 0:
-                save_to_file(self.entity, 
+                save_to_file(self.entity,
                              output_file,
                              ChainSelector(chain_sel))
             else:
@@ -81,6 +81,8 @@ class Extractor():
                     logger.warning("Residue %s does not exist." % str(res))
 
             if len(res_sel) > 0:
-                save_to_file(self.entity, output_file, ResidueSelector(res_sel))
+                save_to_file(self.entity, 
+                             output_file,
+                             ResidueSelector(res_sel))
             else:
                 logger.warning("No valid residue to extract.")
