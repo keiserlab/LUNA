@@ -34,7 +34,7 @@ def mol_to_svg(infile, output, opts=None):
     output : str
         Save the SVG to this file.
     opts : dict
-        A set of depiction options. Check `Open Babel <http://openbabel.org/docs/dev/FileFormats/SVG_depiction.html>`_ \
+        A set of depiction options. Check `Open Babel <http://openbabel.org/docs/dev/FileFormats/SVG_depiction.html>`_
         to discover which options are available.
 
     Examples
@@ -95,7 +95,8 @@ def convert_molecule(infile, output, infile_format=None,
     opts : dict
         A set of convertion options. Check `Open Babel <https://openbabel.org/docs/dev/Command-line_tools/babel.html>`_ to discover which options are available.
     openbabel : str, optional
-        The Open Babel binary location. If not provided, the default binary ('obabel') will be used.
+        The Open Babel binary location.
+        If not provided, the default binary ('obabel') will be used.
 
     Raises
     ------
@@ -105,8 +106,9 @@ def convert_molecule(infile, output, infile_format=None,
     Examples
     --------
 
-    In this example, we will convert the molecule ZINC000007786517 from the format MOL to MOL2
-    and add hydrogens to it considering a pH of 7 (option "p").
+    In this example, we will convert the molecule ZINC000007786517 from the
+    format MOL to MOL2 and add hydrogens to it considering a pH of 7
+    (option "p").
 
     >>> from luna.util.default_values import LUNA_PATH
     >>> from luna.wrappers.obabel import convert_molecule
@@ -121,25 +123,30 @@ def convert_molecule(infile, output, infile_format=None,
         validate_file(infile)
 
         if infile_format is None:
-            logger.debug("Input file format not defined. It will assume the format from the file extension.")
+            logger.debug("Input file format not defined. It will assume the "
+                         "format from the file extension.")
             infile_format = get_file_format(infile)
 
         if infile_format not in informats:
-            raise InvalidFileFormat("Infile format '%s' does not exist." % infile_format)
+            raise InvalidFileFormat("Infile format '%s' does not exist."
+                                    % infile_format)
 
         logger.debug("Input format: %s" % infile_format)
 
         if output_format is None:
-            logger.debug("Output file format not defined. It will assume the format by the file extension.")
+            logger.debug("Output file format not defined. It will assume the "
+                         "format by the file extension.")
             output_format = get_file_format(output, 1)
 
         if output_format not in outformats:
-            raise InvalidFileFormat("Infile format '%s' does not exist." % output_format)
+            raise InvalidFileFormat("Infile format '%s' does not exist."
+                                    % output_format)
 
         logger.debug("Output format: %s" % output_format)
 
         opt_list = _prep_opts(opts)
-        args = [openbabel, "-i", infile_format, infile, "-o", output_format, "-O", output] + opt_list
+        args = [openbabel, "-i", infile_format, infile,
+                "-o", output_format, "-O", output] + opt_list
 
         p = Popen(args, stdout=PIPE, stderr=PIPE)
         try:

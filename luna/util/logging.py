@@ -52,7 +52,7 @@ class CompressedRotatingFileHandler(logging.handlers.RotatingFileHandler):
         self.stream = self._open()
 
 
-def new_logging_file(filename, logging_level=logging.INFO, 
+def new_logging_file(filename, logging_level=logging.INFO,
                      logger_name=None, propagate=True,
                      log_format=None, mode='a'):
     # Set the LOG file at the working path
@@ -64,12 +64,13 @@ def new_logging_file(filename, logging_level=logging.INFO,
 
     ch = logging.StreamHandler()
     console_format = log_format or CONSOLE_FORMAT
-    console_formatter = colorlog.ColoredFormatter(console_format, '%Y-%m-%d %H:%M:%S',
-                                                  log_colors={'DEBUG': 'cyan',
-                                                              'INFO': 'green',
-                                                              'WARNING': 'yellow',
-                                                              'ERROR': 'red',
-                                                              'CRITICAL': 'bold_red'})
+    console_formatter = \
+        colorlog.ColoredFormatter(console_format, '%Y-%m-%d %H:%M:%S',
+                                  log_colors={'DEBUG': 'cyan',
+                                              'INFO': 'green',
+                                              'WARNING': 'yellow',
+                                              'ERROR': 'red',
+                                              'CRITICAL': 'bold_red'})
     ch.setFormatter(console_formatter)
     ch.setLevel(logging_level)
 

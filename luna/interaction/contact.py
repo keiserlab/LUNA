@@ -30,8 +30,10 @@ def get_all_contacts(entity,
 
     Returns
     -------
-     : list of tuple of (:class:`~luna.MyBio.PDB.Residue.Residue` or :class:`~luna.MyBio.PDB.Atom.Atom`, \
-      :class:`~luna.MyBio.PDB.Residue.Residue` or :class:`~luna.MyBio.PDB.Atom.Atom`)
+     : list of tuple of (:class:`~luna.MyBio.PDB.Residue.Residue` or \
+                :class:`~luna.MyBio.PDB.Atom.Atom`, \
+                :class:`~luna.MyBio.PDB.Residue.Residue` or \
+                :class:`~luna.MyBio.PDB.Atom.Atom`)
         Each tuple contains either a pair of residues or atoms in contact.
 
     Raises
@@ -48,7 +50,8 @@ def get_all_contacts(entity,
     >>> from luna.util.default_values import LUNA_PATH
     >>> from luna.MyBio.PDB.PDBParser import PDBParser
     >>> pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True)
-    >>> structure = pdb_parser.get_structure("Protein", f"{LUNA_PATH}/tutorial/inputs/3QQK.pdb")
+    >>> structure = pdb_parser.get_structure("Protein", \
+f"{LUNA_PATH}/tutorial/inputs/3QQK.pdb")
 
     Then, to recover all residue-residue contacts within 2.5 Å use
     :meth:`get_all_contacts` with ``level`` set to 'R' and radius set to 2.5.
@@ -110,8 +113,10 @@ def get_contacts_with(source,
 
     Returns
     -------
-     : set of tuple of (:class:`~luna.MyBio.PDB.Residue.Residue` or :class:`~luna.MyBio.PDB.Atom.Atom`, \
-    :class:`~luna.MyBio.PDB.Residue.Residue` or :class:`~luna.MyBio.PDB.Atom.Atom`)
+     : set of tuple of (:class:`~luna.MyBio.PDB.Residue.Residue` or \
+            :class:`~luna.MyBio.PDB.Atom.Atom`, \
+            :class:`~luna.MyBio.PDB.Residue.Residue` or \
+            :class:`~luna.MyBio.PDB.Atom.Atom`)
         Each tuple contains two items:\
             the first corresponds to a residue/atom from the ``source``,\
             and the second corresponds to a residue/atom in contact
@@ -133,7 +138,8 @@ def get_contacts_with(source,
     >>> from luna.util.default_values import LUNA_PATH
     >>> from luna.MyBio.PDB.PDBParser import PDBParser
     >>> pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True)
-    >>> structure = pdb_parser.get_structure("Protein", f"{LUNA_PATH}/tutorial/inputs/3QQK.pdb")
+    >>> structure = pdb_parser.get_structure("Protein", \
+f"{LUNA_PATH}/tutorial/inputs/3QQK.pdb")
 
     Now, we define the target ligand.
 
@@ -143,13 +149,20 @@ def get_contacts_with(source,
     :meth:`get_contacts_with` with ``level`` set to 'R'.
 
     >>> from luna.interaction.contact import get_contacts_with
-    >>> contacts = sorted(get_contacts_with(ligand, entity=structure, radius=3, level="R"))
+    >>> contacts = sorted(get_contacts_with(ligand,
+    ...                                     entity=structure,
+    ...                                     radius=3,
+    ...                                     level="R"))
     >>> for pair in contacts:
     ...     print(pair)
-    (<Residue X02 het=H_X02 resseq=497 icode= >, <Residue GLU het=  resseq=81 icode= >)
-    (<Residue X02 het=H_X02 resseq=497 icode= >, <Residue LEU het=  resseq=83 icode= >)
-    (<Residue X02 het=H_X02 resseq=497 icode= >, <Residue X02 het=H_X02 resseq=497 icode= >)
-    (<Residue X02 het=H_X02 resseq=497 icode= >, <Residue HOH het=W resseq=321 icode= >)
+    (<Residue X02 het=H_X02 resseq=497 icode= >, \
+<Residue GLU het=  resseq=81 icode= >)
+    (<Residue X02 het=H_X02 resseq=497 icode= >, \
+<Residue LEU het=  resseq=83 icode= >)
+    (<Residue X02 het=H_X02 resseq=497 icode= >, \
+<Residue X02 het=H_X02 resseq=497 icode= >)
+    (<Residue X02 het=H_X02 resseq=497 icode= >, \
+<Residue HOH het=W resseq=321 icode= >)
 
 
     **Example 2)** In this example, we will identify atom-atom contacts
@@ -160,18 +173,24 @@ def get_contacts_with(source,
     >>> from luna.util.default_values import LUNA_PATH
     >>> from luna.MyBio.PDB.PDBParser import PDBParser
     >>> pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True)
-    >>> structure = pdb_parser.get_structure("Protein", f"{LUNA_PATH}/tutorial/inputs/3QQK.pdb")
+    >>> structure = pdb_parser.get_structure("Protein", \
+f"{LUNA_PATH}/tutorial/inputs/3QQK.pdb")
 
     Now, we define the target ligand and residue.
 
     >>> ligand = structure[0]["A"][('H_X02', 497, ' ')]
     >>> residue = structure[0]["A"][(' ', 81, ' ')]
 
-    Then, to recover contacts between these compounds we use :meth:`get_contacts_with`.
-    As we need atom-wise contacts, set ``level`` to 'A'.
+    Then, to recover contacts between these compounds we use
+    :meth:`get_contacts_with`. As we need atom-wise contacts, set ``level``
+    to 'A'.
 
     >>> from luna.interaction.contact import get_contacts_with
-    >>> contacts = sorted(get_contacts_with(ligand, target=residue, entity=structure, radius=4, level="A"))
+    >>> contacts = sorted(get_contacts_with(ligand,
+    ...                   target=residue,
+    ...                   entity=structure,
+    ...                   radius=4,
+    ...                   level="A"))
     >>> for pair in contacts:
     ...     print(pair)
     (<Atom C7>, <Atom O>)
@@ -250,7 +269,8 @@ def get_proximal_compounds(source, radius=COV_SEARCH_RADIUS):
     >>> from luna.util.default_values import LUNA_PATH
     >>> from luna.MyBio.PDB.PDBParser import PDBParser
     >>> pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True)
-    >>> structure = pdb_parser.get_structure("Protein", f"{LUNA_PATH}/tutorial/inputs/3QQK.pdb")
+    >>> structure = pdb_parser.get_structure("Protein", \
+f"{LUNA_PATH}/tutorial/inputs/3QQK.pdb")
 
     Now, we select the residue of our interest.
 
@@ -287,9 +307,9 @@ def get_cov_contacts_with(source, target=None, entity=None):
 
     .. math:: 0.4 <= \overrightarrow{\|AB\|} <= A_{cov} + B_{cov} + 0.45
 
-    Where :math:`\overrightarrow{\|AB\|}` is the distance between
-    atoms A and B, and :math:`A_{cov}` and :math:`B_{cov}` are the
-    covalent radius of atoms A and B, respectively.
+    Where :math:`\overrightarrow{\|AB\|}` is the distance
+    between atoms A and B, and :math:`A_{cov}` and :math:`B_{cov}`
+    are the covalent radius of atoms A and B, respectively.
 
     Parameters
     ----------
@@ -320,7 +340,8 @@ def get_cov_contacts_with(source, target=None, entity=None):
     >>> from luna.util.default_values import LUNA_PATH
     >>> from luna.MyBio.PDB.PDBParser import PDBParser
     >>> pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True)
-    >>> structure = pdb_parser.get_structure("Protein", f"{LUNA_PATH}/tutorial/inputs/3QQK.pdb")
+    >>> structure = pdb_parser.get_structure("Protein", \
+f"{LUNA_PATH}/tutorial/inputs/3QQK.pdb")
 
     Now, we select the residue of our interest.
 
@@ -332,10 +353,16 @@ def get_cov_contacts_with(source, target=None, entity=None):
     together with the atom name.
 
     >>> from luna.interaction.contact import get_cov_contacts_with
-    >>> cov_bonds = sorted(get_cov_contacts_with(residue, entity=structure), key=lambda x: (x[0].serial_number, x[1].serial_number))
+    >>> cov_bonds = sorted(get_cov_contacts_with(residue, entity=structure),
+    ...                    key=lambda x: (x[0].serial_number,
+    ...                                   x[1].serial_number))
     >>> for atm1, atm2 in cov_bonds:
-    >>>     pair = ("%s%d/%s" % (atm1.parent.resname, atm1.parent.id[1], atm1.name),
-    ...             "%s%d/%s" % (atm2.parent.resname, atm2.parent.id[1], atm2.name))
+    >>>     pair = ("%s%d/%s" % (atm1.parent.resname,
+    ...                          atm1.parent.id[1],
+    ...                          atm1.name),
+    ...             "%s%d/%s" % (atm2.parent.resname,
+    ...                          atm2.parent.id[1],
+    ...                          atm2.name))
     >>>     print(pair)
     ('PHE80/C', 'GLU81/N')
     ('GLU81/N', 'GLU81/CA')

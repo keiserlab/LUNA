@@ -26,13 +26,14 @@ class ProgressData:
         The output data produced by a given task.
         The data type is the same as the executed function's return.
     exception : :py:class:`Exception`, optional
-        If an exception was raised, then ``exception`` stores an Exception object.
-        Otherwise, ``exception`` will be set to None.
+        If an exception was raised, then ``exception`` stores an
+        Exception object. Otherwise, ``exception`` will be set to None.
     func : function, optional
         The executed function for reference.
     """
 
-    def __init__(self, input_data, proc_time, output_data=None, exception=None, func=None):
+    def __init__(self, input_data, proc_time,
+                 output_data=None, exception=None, func=None):
 
         self.input_data = input_data
         self.output_data = output_data
@@ -43,8 +44,8 @@ class ProgressData:
 
 class ProgressResult:
     """
-    Custom iterable class to store `ProgressData` objects as they are produced during the
-    execution of a set of tasks.
+    Custom iterable class to store `ProgressData` objects as they are produced
+    during the execution of a set of tasks.
 
     This class implements append() and __iter__() by default.
 
@@ -61,34 +62,43 @@ class ProgressResult:
 
     def __init__(self, results=None):
         if results and not isinstance(results, list):
-            raise TypeError("A list was expected but a different data type was provided.")
+            raise TypeError("A list was expected but a different data type "
+                            "was provided.")
         self.results = results or []
 
     @property
     def inputs(self):
-        """list: Inputs from each `ProgressData` object stored in ``results``."""
+        """list: Inputs from each `ProgressData` object stored in \
+        ``results``."""
         try:
             return [r.input_data for r in self.results]
         except AttributeError:
-            raise TypeError("An invalid object was found in 'results'. Only ProgressData objects are valid.")
+            raise TypeError("An invalid object was found in 'results'. "
+                            "Only ProgressData objects are valid.")
 
     @property
     def outputs(self):
-        """list of tuple: Outputs from each `ProgressData` object stored in ``results``.
-        Each tuple contains the input and the output produced for that input."""
+        """list of tuple: Outputs from each `ProgressData` object stored in
+        ``results``. Each tuple contains the input and the output produced for
+        that input."""
         try:
             return [(r.input_data, r.output_data) for r in self.results]
         except AttributeError:
-            raise TypeError("An invalid object was found in 'results'. Only ProgressData objects are valid.")
+            raise TypeError("An invalid object was found in 'results'. "
+                            "Only ProgressData objects are valid.")
 
     @property
     def errors(self):
-        """list of tuple: Errors from each `ProgressData` object stored in ``results``.
-        Each tuple contains the input and the exception raised during the execution of a task with that input."""
+        """list of tuple: Errors from each `ProgressData` object stored in \
+        ``results``.
+        Each tuple contains the input and the exception raised during the
+        execution of a task with that input."""
         try:
-            return [(r.input_data, r.exception) for r in self.results if r.exception is not None]
+            return [(r.input_data, r.exception) for r in self.results
+                    if r.exception is not None]
         except AttributeError:
-            raise TypeError("An invalid object was found in 'results'. Only ProgressData objects are valid.")
+            raise TypeError("An invalid object was found in 'results'. "
+                            "Only ProgressData objects are valid.")
 
     def append(self, r):
         """Add a new `ProgressData` object to ``results``"""
@@ -156,12 +166,19 @@ class ProgressTracker:
         if self.task_name:
             task_name = " - %s" % self.task_name
 
-        msg = '%s%% [%s] %d/%d [Avg: %.2fs/task; Errors: %d]%s.' % (int(perc), ("\u25A0" * int(perc / 2)).ljust(50, ' '),
-                                                                    p, self.ntasks, self.avg_running_time, self.nerrors, task_name)
+        msg = ('%s%% [%s] %d/%d [Avg: %.2fs/task; Errors: %d]%s.'
+               % (int(perc), ("\u25A0" * int(perc / 2)).ljust(50, ' '),
+                  p, self.ntasks, self.avg_running_time,
+                  self.nerrors, task_name))
 
         format_str = '\r[%s]    %s%s %s%s  %s'
-        progress_str = format_str % (time.strftime('%Y-%m-%d %H:%M:%S'), parse_colors("purple"),
-                                     "PROGRESS".ljust(10, " "), escape_codes["reset"], "".rjust(26, " "), msg)
+        progress_str = \
+            (format_str % (time.strftime('%Y-%m-%d %H:%M:%S'),
+             parse_colors("purple"),
+             "PROGRESS".ljust(10, " "),
+             escape_codes["reset"],
+             "".rjust(26, " "),
+             msg))
 
         sys.stdout.write(progress_str)
         sys.stdout.flush()
@@ -171,14 +188,16 @@ class ProgressTracker:
 
         while True:
             while not q.full():
-                # Stops the loop if function end() is called before the queue gets full.
+                # Stops the loop if function end() is called before the queue
+                # gets full.
                 if e.is_set():
                     break
                 # wait for more progress to be made
                 time.sleep(0.1)
 
             # If our event is set and there is any progress in the queue,
-            # break out of the infinite loop and prepare to terminate this thread
+            # break out of the infinite loop and prepare to terminate this
+            # thread
             if e.is_set() and q.full() is False:
                 break
 
@@ -218,7 +237,9 @@ class ProgressTracker:
     def avg_running_time(self):
         """float: Average running time."""
         if self._running_times:
-            return round(sum(self._running_times) / len(self._running_times), 2)
+            total = sum(self._running_times)
+            count = len(self._running_times)
+            return round(total / count, 2)
         else:
             return 0
 

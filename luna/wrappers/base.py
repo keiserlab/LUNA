@@ -65,25 +65,32 @@ class AtomWrapper:
 
     Parameters
     ----------
-    atm_obj : :class:`AtomWrapper`, :class:`rdkit.Chem.rdchem.Atom`, or :class:`openbabel.OBAtom`
+    atm_obj : :class:`AtomWrapper`, :class:`rdkit.Chem.rdchem.Atom`, \
+                    or :class:`openbabel.OBAtom`
         An atom to wrap.
-    mol_obj : `MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, :class:`openbabel.pybel.Molecule`, or None
-        The molecule that contains the atom ``atom``. If None, the molecule is recovered directly from the atom object.
+    mol_obj : `MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, \
+                    :class:`openbabel.pybel.Molecule`, or None
+        The molecule that contains the atom ``atom``. If None, the molecule is
+        recovered directly from the atom object.
 
     Raises
     ------
     AtomObjectTypeError
         If the atom object is not an instance
-            of `MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`.
+            of `MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or
+            :class:`openbabel.pybel.Molecule`.
     """
 
     def __init__(self, atm_obj, mol_obj=None):
         if isinstance(atm_obj, self.__class__):
             atm_obj = atm_obj.unwrap()
 
-        if not isinstance(atm_obj, RDAtom) and not isinstance(atm_obj, ob.OBAtom):
-            logger.exception("Objects of type '%s' are not currently accepted." % atm_obj.__class__)
-            raise AtomObjectTypeError("Objects of type '%s' are not currently accepted." % atm_obj.__class__)
+        if (not isinstance(atm_obj, RDAtom)
+                and not isinstance(atm_obj, ob.OBAtom)):
+            error_msg = ("Objects of type '%s' are not currently accepted."
+                         % atm_obj.__class__)
+            logger.exception(error_msg)
+            raise AtomObjectTypeError(error_msg)
 
         self._atm_obj = atm_obj
         self._parent = None
@@ -94,20 +101,26 @@ class AtomWrapper:
 
     @property
     def atm_obj(self):
-        """:class:`rdkit.Chem.rdchem.Atom` or :class:`openbabel.OBAtom`: The wrapped atom object."""
+        """:class:`rdkit.Chem.rdchem.Atom` or :class:`openbabel.OBAtom`: \
+                The wrapped atom object."""
         return self._atm_obj
 
     @atm_obj.setter
     def atm_obj(self, atm_obj):
-        if not isinstance(atm_obj, RDAtom) and not isinstance(atm_obj, ob.OBAtom):
-            logger.exception("Objects of type '%s' are not currently accepted." % atm_obj.__class__)
-            raise AtomObjectTypeError("Objects of type '%s' are not currently accepted." % atm_obj.__class__)
+        if (not isinstance(atm_obj, RDAtom)
+                and not isinstance(atm_obj, ob.OBAtom)):
+            error_msg = ("Objects of type '%s' are not currently accepted."
+                         % atm_obj.__class__)
+            logger.exception(error_msg)
+            raise AtomObjectTypeError(error_msg)
         else:
             self._atm_obj = atm_obj
 
     @property
     def parent(self):
-        """`MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`: The molecule that contains this atom."""
+        """`MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, \
+                or :class:`openbabel.pybel.Molecule`: \
+            The molecule that contains this atom."""
         return self.get_parent()
 
     @parent.setter
@@ -121,12 +134,15 @@ class AtomWrapper:
         -------
          : int
         """
-        return self._atm_obj.GetIdx()  # Both RDKit and Open Babel have the same function name.
+
+        # Both RDKit and Open Babel have the same function name.
+        return self._atm_obj.GetIdx()
 
     def get_id(self):
         """Get this atom's unique id.
 
-        When using RDKit, :py:meth:`get_id` and :py:meth:`get_idx` returns the same value.
+        When using RDKit, :py:meth:`get_id` and :py:meth:`get_idx` returns
+        the same value.
 
         Returns
         -------
@@ -143,11 +159,13 @@ class AtomWrapper:
         Parameters
         ----------
         wrapped : bool
-            If True, wrap the molecule with :class:`~luna.wrappers.base.MolWrapper`.
+            If True, wrap the molecule with
+            :class:`~luna.wrappers.base.MolWrapper`.
 
         Returns
         -------
-         : `MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`
+         : `MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, \
+                            or :class:`openbabel.pybel.Molecule`
         """
         if self._parent is None:
             if self.is_rdkit_obj():
@@ -256,11 +274,13 @@ class AtomWrapper:
         Parameters
         ----------
         wrapped : bool
-            If True, wrap each atom with :class:`~luna.wrappers.base.AtomWrapper`.
+            If True, wrap each atom with
+            :class:`~luna.wrappers.base.AtomWrapper`.
 
         Returns
         -------
-         : iterable of `AtomWrapper`, :py:class:`rdkit.Chem.rdchem.Atom`, or :class:`openbabel.OBAtom`
+         : iterable of `AtomWrapper`, :py:class:`rdkit.Chem.rdchem.Atom`, \
+                or :class:`openbabel.OBAtom`
         """
         atoms = []
         if self.is_rdkit_obj():
@@ -314,7 +334,8 @@ class AtomWrapper:
         Parameters
         ----------
         wrapped : bool
-            If True, wrap each bond with :class:`~luna.wrappers.base.BondWrapper`.
+            If True, wrap each bond with
+            :class:`~luna.wrappers.base.BondWrapper`.
 
         Returns
         -------
@@ -387,9 +408,12 @@ class AtomWrapper:
             If the informed bond type is not an instance of `BondType`.
         """
         if isinstance(bond_type, BondType):
-            return any([bond_obj.get_bond_type() == bond_type for bond_obj in self.get_bonds()])
+            return any([bond_obj.get_bond_type() == bond_type
+                        for bond_obj in self.get_bonds()])
         else:
-            raise IllegalArgumentError("The informed bond type must be an instance of '%s'." % BondType)
+            msg = ("The informed bond type must be an instance of '%s'."
+                   % BondType)
+            raise IllegalArgumentError(msg)
 
     def has_only_bond_type(self, bond_type):
         """Check if this atom has only bonds of type ``bond_type``.
@@ -404,9 +428,12 @@ class AtomWrapper:
             If the informed bond type is not an instance of `BondType`.
         """
         if isinstance(bond_type, BondType):
-            return all([bond_obj.get_bond_type() == bond_type for bond_obj in self.get_bonds()])
+            return all([bond_obj.get_bond_type() == bond_type
+                        for bond_obj in self.get_bonds()])
         else:
-            raise IllegalArgumentError("The informed bond type must be an instance of '%s'." % BondType)
+            msg = ("The informed bond type must be an instance of '%s'."
+                   % BondType)
+            raise IllegalArgumentError(msg)
 
     def set_charge(self, charge):
         """Set the formal charge of this atom.
@@ -415,7 +442,9 @@ class AtomWrapper:
         ----------
         charge : int
         """
-        self._atm_obj.SetFormalCharge(charge)  # Both RDKit and Open Babel have the same function name.
+
+        # Both RDKit and Open Babel have the same function name.
+        self._atm_obj.SetFormalCharge(charge)
 
     def set_as_aromatic(self, is_aromatic):
         """Set whether this atom is aromatic or not.
@@ -469,14 +498,18 @@ class AtomWrapper:
         First, let's read a molecule (glutamine) using Open Babel.
 
         >>> from luna.wrappers.base import MolWrapper
-        >>> mol_obj = MolWrapper.from_smiles("N[C@@H](CCC(N)=O)C(O)=O", mol_obj_type="openbabel")
+        >>> mol_obj = MolWrapper.from_smiles("N[C@@H](CCC(N)=O)C(O)=O",
+        ...                                  mol_obj_type="openbabel")
 
-        Now, we'll loop over the list of atoms in the glutamine and check which atom is the amide's carbon.
-        To do so, we can call the function :py:meth:`MolWrapper.get_atoms`, which, by default,
-        returns `AtomWrapper` objects and then call :py:meth:`matches_smarts`.
+        Now, we'll loop over the list of atoms in the glutamine and check which
+        atom is the amide's carbon. To do so, we can call the function
+        :py:meth:`MolWrapper.get_atoms`, which, by default, returns
+        `AtomWrapper` objects and then call :py:meth:`matches_smarts`.
 
         >>> for atm in mol_obj.get_atoms():
-        >>>     print("%d\t%s\t%s" % (atm.get_idx(), atm.get_symbol(), atm.matches_smarts("C(N)(C)=O")))
+        >>>     print("%d\t%s\t%s" % (atm.get_idx(),
+        ...                           atm.get_symbol(),
+        ...                           atm.matches_smarts("C(N)(C)=O")))
         1   N   False
         2   C   False
         3   C   False
@@ -541,14 +574,16 @@ class BondWrapper:
 
     Parameters
     ----------
-    bond_obj : `BondWrapper`, :py:class:`rdkit.Chem.rdchem.Bond`, or :py:class:`openbabel.OBBond`
+    bond_obj : `BondWrapper`, :py:class:`rdkit.Chem.rdchem.Bond`, \
+            or :py:class:`openbabel.OBBond`
         A bond to wrap.
 
     Raises
     ------
     BondObjectTypeError
         If the bond object is not an instance
-            of `BondWrapper`, :class:`rdkit.Chem.rdchem.Bond`, or :class:`openbabel.pybel.OBBond`.
+            of `BondWrapper`, :class:`rdkit.Chem.rdchem.Bond`, \
+                or :class:`openbabel.pybel.OBBond`.
     """
 
     def __init__(self, bond_obj):
@@ -566,7 +601,8 @@ class BondWrapper:
 
     @property
     def bond_obj(self):
-        """:class:`rdkit.Chem.rdchem.Bond` or :class:`openbabel.OBBond`: The wrapped bond object."""
+        """:class:`rdkit.Chem.rdchem.Bond` or :class:`openbabel.OBBond`: \
+                The wrapped bond object."""
         return self._bond_obj
 
     @bond_obj.setter
@@ -619,7 +655,8 @@ class BondWrapper:
 
         Returns
         -------
-         : `AtomWrapper`, :py:class:`rdkit.Chem.rdchem.Atom`, or :class:`openbabel.OBAtom`
+         : `AtomWrapper`, :py:class:`rdkit.Chem.rdchem.Atom`, \
+                or :class:`openbabel.OBAtom`
         """
 
         # Both RDKit and Open Babel have the same function name.
@@ -637,7 +674,8 @@ class BondWrapper:
 
         Returns
         -------
-         : `AtomWrapper`, :py:class:`rdkit.Chem.rdchem.Atom`, or :class:`openbabel.OBAtom`
+         : `AtomWrapper`, :py:class:`rdkit.Chem.rdchem.Atom`, \
+                or :class:`openbabel.OBAtom`
         """
 
         # Both RDKit and Open Babel have the same function name.
@@ -750,14 +788,16 @@ class MolWrapper:
 
     Parameters
     ----------
-    mol_obj : `MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`
+    mol_obj : `MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, \
+                    or :class:`openbabel.pybel.Molecule`
         A molecule to wrap.
 
     Raises
     ------
     MoleculeObjectTypeError
         If the molecular object is not an instance
-            of `MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`.
+            of `MolWrapper`, :class:`rdkit.Chem.rdchem.Mol`, \
+                or :class:`openbabel.pybel.Molecule`.
     """
 
     def __init__(self, mol_obj):
@@ -766,9 +806,12 @@ class MolWrapper:
         elif isinstance(mol_obj, PybelMol):
             mol_obj = mol_obj.OBMol
 
-        if not isinstance(mol_obj, RDMol) and not isinstance(mol_obj, ob.OBMol):
-            logger.exception("Objects of type '%s' are not currently accepted." % mol_obj.__class__)
-            raise MoleculeObjectTypeError("Objects of type '%s' are not currently accepted." % mol_obj.__class__)
+        if (not isinstance(mol_obj, RDMol)
+                and not isinstance(mol_obj, ob.OBMol)):
+            msg = ("Objects of type '%s' are not currently accepted."
+                   % mol_obj.__class__)
+            logger.exception(msg)
+            raise MoleculeObjectTypeError(msg)
 
         self._mol_obj = mol_obj
 
@@ -781,10 +824,11 @@ class MolWrapper:
         block : str
             The molecular string block.
         mol_format : str
-            Define the format in which the molecule is represented (e.g., 'mol2' or 'mol').
+            Define the format in which the molecule is represented
+            (e.g., 'mol2' or 'mol').
         mol_obj_type : {'rdkit', 'openbabel'}
-            Define which library (RDKit or Open Babel) to use to parse the molecular block.
-            The default value is RDKit.
+            Define which library (RDKit or Open Babel) to use to parse the
+            molecular block. The default value is RDKit.
 
         Returns
         -------
@@ -803,10 +847,11 @@ class MolWrapper:
         ----------
         smiles : str
             The SMILES string.
-            Define the format in which the molecule is represented (e.g., 'mol2' or 'mol').
+            Define the format in which the molecule is represented
+            (e.g., 'mol2' or 'mol').
         mol_obj_type : {'rdkit', 'openbabel'}
-            Define which library (RDKit or Open Babel) to use to parse the molecular block.
-            The default value is RDKit.
+            Define which library (RDKit or Open Babel) to use to parse the
+            molecular block. The default value is RDKit.
         name : str, optional
             A name to identify the molecule.
 
@@ -823,7 +868,9 @@ class MolWrapper:
         --------
 
         >>> from luna.wrappers.base import MolWrapper
-        >>> mol_obj = MolWrapper.from_smiles("N[C@@H](CCC(N)=O)C(O)=O", mol_obj_type="openbabel", name="Glutamine")
+        >>> mol_obj = MolWrapper.from_smiles("N[C@@H](CCC(N)=O)C(O)=O",
+        ...                                  mol_obj_type="openbabel",
+        ...                                  name="Glutamine")
 
         """
         if mol_obj_type == "rdkit":
@@ -833,7 +880,9 @@ class MolWrapper:
 
         # Raise an error if the molecule could not be created.
         if mol is None:
-            raise MoleculeObjectError("It could not create a molecule from the provided SMILES '%s'." % smiles)
+            msg = ("It could not create a molecule from the "
+                   "provided SMILES '%s'." % smiles)
+            raise MoleculeObjectError(msg)
 
         mol = cls(mol)
         mol.set_name(name or smiles)
@@ -842,7 +891,9 @@ class MolWrapper:
 
     @property
     def mol_obj(self):
-        """:class:`rdkit.Chem.rdchem.Mol` or :class:`openbabel.pybel.Molecule`: The wrapped molecular object."""
+        """:class:`rdkit.Chem.rdchem.Mol` or \
+                :class:`openbabel.pybel.Molecule`: \
+            The wrapped molecular object."""
         return self._mol_obj
 
     @mol_obj.setter
@@ -850,27 +901,34 @@ class MolWrapper:
         if isinstance(mol_obj, PybelMol):
             mol_obj = mol_obj.OBMol
 
-        if not isinstance(mol_obj, RDMol) and not isinstance(mol_obj, ob.OBMol):
-            logger.exception("Objects of type '%s' are not currently accepted." % mol_obj.__class__)
-            raise MoleculeObjectTypeError("Objects of type '%s' are not currently accepted." % mol_obj.__class__)
+        if (not isinstance(mol_obj, RDMol)
+                and not isinstance(mol_obj, ob.OBMol)):
+            msg = ("Objects of type '%s' are not currently accepted."
+                   % mol_obj.__class__)
+            logger.exception(msg)
+            raise MoleculeObjectTypeError(msg)
 
         self._mol_obj = mol_obj
 
     def as_rdkit(self):
-        """If the molecule is an Open Babel object, convert it to an RDKit object."""
+        """If the molecule is an Open Babel object, convert it to an
+        RDKit object."""
         if self.is_rdkit_obj():
             return self._mol_obj
         elif self.is_openbabel_obj():
-            new_mol = MolWrapper.from_smiles(self.to_smiles(), mol_obj_type="rdkit")
+            new_mol = MolWrapper.from_smiles(self.to_smiles(),
+                                             mol_obj_type="rdkit")
             new_mol.set_name(self.get_name())
             return new_mol.unwrap()
 
     def as_openbabel(self):
-        """If the molecule is an RDKit object, convert it to an Open Babel object."""
+        """If the molecule is an RDKit object, convert it to an
+        Open Babel object."""
         if self.is_openbabel_obj():
             return self._mol_obj
         elif self.is_rdkit_obj():
-            new_mol = MolWrapper.from_smiles(self.to_smiles(), mol_obj_type="openbabel")
+            new_mol = MolWrapper.from_smiles(self.to_smiles(),
+                                             mol_obj_type="openbabel")
             new_mol.set_name(self.get_name())
             return new_mol.unwrap()
 
@@ -898,7 +956,8 @@ class MolWrapper:
 
         Returns
         -------
-         : iterable of `AtomWrapper`, :py:class:`rdkit.Chem.rdchem.Atom`, or :class:`openbabel.OBAtom`
+         : iterable of `AtomWrapper`, :py:class:`rdkit.Chem.rdchem.Atom`, \
+                or :class:`openbabel.OBAtom`
         """
         atoms = []
         if self.is_rdkit_obj():
@@ -931,7 +990,8 @@ class MolWrapper:
 
         Returns
         -------
-         : iterable of `BondWrapper`, :class:`rdkit.Chem.rdchem.Bond`, or :class:`openbabel.OBBond`
+         : iterable of `BondWrapper`, :class:`rdkit.Chem.rdchem.Bond`, \
+                or :class:`openbabel.OBBond`
         """
         bonds = []
         if self.is_rdkit_obj():
@@ -1045,7 +1105,8 @@ class MolWrapper:
         return getattr(self._mol_obj, attr)
 
     def __getstate__(self):
-        # Creates a copy of the class' dictionary in case we need to modify the molecular object to pickle it.
+        # Creates a copy of the class' dictionary in case we need to modify the
+        # molecular object to pickle it.
         my_dict = self.__dict__.copy()
         if self.is_openbabel_obj():
             my_dict["_mol_block"] = self.to_mol_block()
@@ -1055,7 +1116,9 @@ class MolWrapper:
 
     def __setstate__(self, state):
         if "_mol_obj_type" in state and "_mol_block" in state:
-            state["_mol_obj"] = self.from_mol_block(state["_mol_block"], "mol", "openbabel").unwrap()
+            state["_mol_obj"] = \
+                self.from_mol_block(state["_mol_block"], 
+                                    "mol", "openbabel").unwrap()
             del state["_mol_obj_type"]
             del state["_mol_block"]
 

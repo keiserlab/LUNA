@@ -262,7 +262,8 @@ class Fingerprint:
 
     @property
     def counts(self):
-        """dict, read-only: Mapping between each index in ``indices`` to the number of counts, which is always 1 for bit fingerprints."""
+        """dict, read-only: Mapping between each index in ``indices`` to the \
+        number of counts, which is always 1 for bit fingerprints."""
         return dict([(k, 1) for k in self.indices])
 
     @property
@@ -272,7 +273,8 @@ class Fingerprint:
 
     @property
     def unfolded_fp(self):
-        """`Fingerprint` or None, read-only: The unfolded version of this fingerprint. If None, this fingerprint may have not been folded yet."""
+        """`Fingerprint` or None, read-only: The unfolded version of this \
+        fingerprint. If None, this fingerprint may have not been folded yet."""
         if self._unfolded_fp is None:
             logger.warning("This fingerprint was not previously folded.")
             return None
@@ -280,7 +282,8 @@ class Fingerprint:
 
     @property
     def unfolded_indices(self):
-        """array_like of int, read-only: Indices of "on" bits in the unfolded fingerprint."""
+        """array_like of int, read-only: Indices of "on" bits in the unfolded \
+        fingerprint."""
         if self._unfolding_map is None:
             logger.warning("This fingerprint was not previously folded.")
             return None
@@ -288,8 +291,9 @@ class Fingerprint:
 
     @property
     def unfolding_map(self):
-        """dict, read-only: The mapping between current indices and indices from the unfolded version of this fingerprint
-        what makes it possible to trace folded bits back to the original shells (features)."""
+        """dict, read-only: The mapping between current indices and indices \
+        from the unfolded version of this fingerprint what makes it possible \
+        to trace folded bits back to the original shells (features)."""
         if self._unfolding_map is None:
             logger.warning("This fingerprint was not previously folded.")
             return None
@@ -302,7 +306,8 @@ class Fingerprint:
 
     @property
     def name(self):
-        """str: The property 'name'. If it was not provided, then return an empty string."""
+        """str: The property 'name'. If it was not provided, then return an \
+        empty string."""
         return self.props.get("name", "")
 
     @name.setter
@@ -532,9 +537,12 @@ class Fingerprint:
 
         Returns
         -------
-         : :class:`~rdkit.DataStructs.cDataStructs.ExplicitBitVect` or :class:`~rdkit.DataStructs.cDataStructs.SparseBitVect`
-            If ``fp_length`` is less than :math:`1e5`, :class:`~rdkit.DataStructs.cDataStructs.ExplicitBitVect` is used.
-            Otherwise, :class:`~rdkit.DataStructs.cDataStructs.SparseBitVect` is used.
+         : :class:`~rdkit.DataStructs.cDataStructs.ExplicitBitVect` or \
+                :class:`~rdkit.DataStructs.cDataStructs.SparseBitVect`
+            If ``fp_length`` is less than :math:`1e5`,
+            :class:`~rdkit.DataStructs.cDataStructs.ExplicitBitVect` is used.
+            Otherwise, :class:`~rdkit.DataStructs.cDataStructs.SparseBitVect`
+            is used.
         """
         if rdkit_fp_cls is None:
             # Classes to store explicit bit vectors: ExplicitBitVect or
@@ -897,17 +905,22 @@ class CountFingerprint(Fingerprint):
         >>> np.random.seed(0)
         >>> on_bits = 8
         >>> fp_length = 32
-        >>> indices, counts = np.unique(np.random.randint(0, fp_length, on_bits), return_counts=True)
+        >>> indices, counts = np.unique(np.random.randint(0, \
+fp_length, on_bits), return_counts=True)
         >>> counts = dict(zip(indices, counts))
         >>> print(counts)
         {0: 1, 3: 2, 7: 1, 12: 1, 15: 1, 21: 1, 27: 1}
-        >>> fp = CountFingerprint.from_indices(indices, counts=counts, fp_length=fp_length)
+        >>> fp = CountFingerprint.from_indices(indices, counts=counts, \
+fp_length=fp_length)
         >>> print(fp.indices)
         [ 0  3  7 12 15 21 27]
         >>> print(fp.to_vector(compressed=False))
         [1 0 0 2 0 0 0 1 0 0 0 0 1 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0]
         """
-        return cls(indices=indices, counts=counts, fp_length=fp_length, **kwargs)
+        return cls(indices=indices, 
+                   counts=counts,
+                   fp_length=fp_length,
+                   **kwargs)
 
     @classmethod
     def from_counts(cls, counts, fp_length=DEFAULT_FP_LENGTH, **kwargs):
@@ -1076,11 +1089,13 @@ class CountFingerprint(Fingerprint):
 
     @property
     def counts(self):
-        """dict, read-only: Mapping between each index in ``indices`` to the number of counts."""
+        """dict, read-only: Mapping between each index in ``indices`` \
+        to the number of counts."""
         return self._counts
 
     def get_count(self, index):
-        """Get the count value at index ``index``. Return 0 if index is not in ``counts``."""
+        """Get the count value at index ``index``. Return 0 if index \
+        is not in ``counts``."""
         return self.counts.get(index, 0)
 
     def fold(self, new_length=DEFAULT_FOLDED_FP_LENGTH):
@@ -1100,7 +1115,8 @@ class CountFingerprint(Fingerprint):
         Raises
         ------
         BitsValueError
-            If the new fingerprint length is not a multiple of 2 or is greater than the existing fingerprint length.
+            If the new fingerprint length is not a multiple of 2 or is greater
+            than the existing fingerprint length.
 
         Examples
         --------
