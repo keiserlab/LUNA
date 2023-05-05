@@ -14,6 +14,7 @@ from luna.interaction.contact import get_proximal_compounds
 from luna.interaction.contact import get_contacts_with
 from luna.interaction.type import InteractionType
 from luna.mol.atom import ExtendedAtom, AtomData
+from luna.mol.precomp_data import DefaultResidueData
 from luna.mol.charge_model import OpenEyeModel
 from luna.mol.features import ChemicalFeature
 from luna.wrappers.base import MolWrapper
@@ -28,6 +29,8 @@ logger = logging.getLogger()
 
 
 SS_BOND_FEATURES = ["Atom", "Acceptor", "ChalcogenDonor", "Hydrophobic"]
+
+DEFAULT_RES_DATA = DefaultResidueData()
 
 
 class AtomGroupsManager():
@@ -65,8 +68,9 @@ class AtomGroupsManager():
 
     @property
     def atm_grps(self):
-        """iterable of `AtomGroup`, read-only: The sequence of `AtomGroup` objects.\
-        Additional objects should be added using the method :py:meth:`add_atm_grps`."""
+        """iterable of `AtomGroup`, read-only: The sequence of `AtomGroup`
+        objects. Additional objects should be added using the method
+        :py:meth:`add_atm_grps`."""
         return self._atm_grps
 
     @property
@@ -77,10 +81,12 @@ class AtomGroupsManager():
 
     @property
     def child_dict(self):
-        """dict, read-only: Mapping between atoms (`ExtendedAtom`) and atom groups (`AtomGroup`).
+        """dict, read-only: Mapping between atoms (`ExtendedAtom`) and atom
+        groups (`AtomGroup`).
 
-        The mapping is a dict of {tuple of `ExtendedAtom` instances : `AtomGroup`} and is automatically
-        updated when :py:meth:`add_atm_grps` is called."""
+        The mapping is a dict of {tuple of `ExtendedAtom` instances :
+        `AtomGroup`} and is automatically updated when :py:meth:`add_atm_grps`
+        is called."""
         return self._child_dict
 
     @property
@@ -90,7 +96,8 @@ class AtomGroupsManager():
 
     @property
     def summary(self):
-        """dict, read-only: The number of physicochemical features in ``atm_grps``."""
+        """dict, read-only: The number of physicochemical features in
+        ``atm_grps``."""
         summary = defaultdict(int)
         for grp in self.atm_grps:
             for feature in grp.features:
@@ -104,19 +111,22 @@ class AtomGroupsManager():
         Returns
         -------
          : `AtomGroup` or None
-            An atom group object or None if ``atoms`` is not in the ``child_dict`` mapping.
+            An atom group object or None if ``atoms`` is not in the
+            ``child_dict`` mapping.
         """
         return self.child_dict.get(tuple(sorted(atoms)), None)
 
     def get_all_interactions(self):
-        """Return all interactions established by the atom groups in ``atm_grps``.
+        """Return all interactions established by the atom groups in
+        ``atm_grps``.
 
         Returns
         -------
          : set of :class:`~luna.interactions.type.InteractionType`
             All interactions.
         """
-        return set(chain.from_iterable([atm_grp.interactions for atm_grp in self.atm_grps]))
+        return set(chain.from_iterable([atm_grp.interactions
+                                        for atm_grp in self.atm_grps]))
 
     def apply_filter(self, func):
         """Apply a filtering function over the atom groups in ``atm_grps`.
@@ -124,7 +134,8 @@ class AtomGroupsManager():
         Parameters
         ----------
         func : callable
-            A filtering function that returns True case an `AtomGroup` object is valid and False otherwise.
+            A filtering function that returns True case an `AtomGroup`
+            object is valid and False otherwise.
 
         Yields
         ------
@@ -143,8 +154,9 @@ class AtomGroupsManager():
         types : iterable of str
             A sequence of physicochemical features.
         must_contain_all : bool
-            If True, an `AtomGroup` object should contain all physicochemical features in ``types`` to be accepted.
-            Otherwise, it will be filtered out.
+            If True, an `AtomGroup` object should contain all physicochemical
+            features in ``types`` to be accepted. Otherwise, it will be
+            filtered out.
 
         Yields
         ------
@@ -160,7 +172,8 @@ class AtomGroupsManager():
                     yield atm_grp
 
     def add_atm_grps(self, atm_grps):
-        """Add one or more `AtomGroup` objects to ``atm_grps`` and automatically update ``child_dict``."""
+        """Add one or more `AtomGroup` objects to ``atm_grps`` and
+        automatically update ``child_dict``."""
 
         atm_grps = atm_grps or []
 
@@ -172,15 +185,18 @@ class AtomGroupsManager():
             atm_grp.manager = self
 
     def remove_atm_grps(self, atm_grps):
-        """Remove one or more `AtomGroup` objects from ``atm_grps`` and automatically update ``child_dict``.
+        """Remove one or more `AtomGroup` objects from ``atm_grps`` and
+        automatically update ``child_dict``.
 
         Any recursive references to the removed objects will also be cleared.
         """
         self._atm_grps = list(set(self._atm_grps) - set(atm_grps))
 
         for atm_grp in atm_grps:
-            # ExtendedAtom objects keep a list of all AtomGroup objects to which they belong to. So, if we don't clear the references
-            # directly, the AtomGroup objects will still exist in the ExtendedAtom list even when they were already removed from an
+            # ExtendedAtom objects keep a list of all AtomGroup objects to
+            # which they belong to. So, if we don't clear the references
+            # directly, the AtomGroup objects will still exist in the
+            # ExtendedAtom list even when they were already removed from an
             # instance of AtomGroupsManager().
             atm_grp.clear_refs()
 
@@ -190,17 +206,22 @@ class AtomGroupsManager():
                 del self.child_dict[key]
 
     def new_atm_grp(self, atoms, features=None, interactions=None):
-        """Create a new `AtomGroup` object for ``atoms`` if one does not exist yet.
-        Otherwise, return the existing `AtomGroup` object.
+        """Create a new `AtomGroup` object for ``atoms`` if one does not exist
+        yet. Otherwise, return the existing `AtomGroup` object, and add
+        any new features and interactions to it if provided.
 
         Parameters
         ----------
         atoms : iterable of :class:`~luna.mol.atom.ExtendedAtom`
             A sequence of atoms.
-        features : iterable of :class:`~luna.mol.features.ChemicalFeature`, optional
-            If provided, add ``features`` to a new or an already existing `AtomGroup` object.
-        interactions : iterable of :class:`~luna.interaction.type.InteractionType`, optional
-            If provided, add ``interactions`` to a new or an already existing `AtomGroup` object.
+        features : iterable of :class:`~luna.mol.features.ChemicalFeature`, \
+                        optional
+            If provided, add ``features`` to a new or an already existing
+            `AtomGroup` object.
+        interactions : iterable of \
+                :class:`~luna.interaction.type.InteractionType`, optional
+            If provided, add ``interactions`` to a new or an already existing
+            `AtomGroup` object.
 
         Returns
         -------
@@ -226,26 +247,30 @@ class AtomGroupsManager():
         return atm_grp
 
     def merge_hydrophobic_atoms(self, interactions_mngr):
-        """Create hydrophobic islands by merging covalently bonded hydrophobic atoms in ``atm_grps``.
-        Hydrophobic islands are atom groups having the feature `Hydrophobe`.
+        """Create hydrophobic islands by merging covalently bonded hydrophobic
+        atoms in ``atm_grps``. Hydrophobic islands are atom groups having the
+        feature `Hydrophobe`.
 
-        Atom-atom hydrophobic interactions in ``interactions_mngr`` are also converted to
-        island-island interactions.
+        Atom-atom hydrophobic interactions in ``interactions_mngr`` are also
+        converted to island-island interactions.
 
         Parameters
         ----------
         interactions_mngr : :class:`~luna.interaction.calc.InteractionsManager`
-            An :class:`~luna.interaction.calc.InteractionsManager` object from where
-            hydrophobic interactions are selected and convert from atom-atom to island-island interactions.
+            An :class:`~luna.interaction.calc.InteractionsManager` object from
+            where hydrophobic interactions are selected and convert from
+            atom-atom to island-island interactions.
         """
 
         # Only hydrophobic atom groups.
         hydrop_atm_grps = list(self.filter_by_types(["Hydrophobic"]))
 
-        # Hydrophobic islands dictionary. Keys are integer values and items are defined by a set of atom groups.
+        # Hydrophobic islands dictionary. Keys are integer values and items are
+        # defined by a set of atom groups.
         hydrop_islands = defaultdict(set)
 
-        # It stores a mapping of an atom (represented by its full id) and a hydrophobic island (defined by its keys).
+        # It stores a mapping of an atom (represented by its full id) and a
+        # hydrophobic island (defined by its keys).
         atm_mapping = {}
 
         island_id = 0
@@ -253,13 +278,19 @@ class AtomGroupsManager():
             # Hydrophobic atoms are defined always as only one atom.
             atm = atm_grp.atoms[0]
 
-            # Recover the groups of all neighbors of this atom (it will merge all existing islands).
-            nb_grps = set([atm_mapping[nbi.full_id] for nbi in atm.neighbors_info if nbi.full_id in atm_mapping])
+            # Recover the groups of all neighbors of this atom (it will merge
+            # all existing islands).
+            nb_grps = set([atm_mapping[nbi.full_id]
+                           for nbi in atm.neighbors_info
+                           if nbi.full_id in atm_mapping])
 
-            # Already there are hydrophobic islands formed by the neighbors of this atom.
+            # Already there are hydrophobic islands formed by the neighbors of
+            # this atom.
             if nb_grps:
                 # Merge all groups of the neighbors of this atom.
-                new_island = set(chain.from_iterable([hydrop_islands.pop(nb_grp_id) for nb_grp_id in nb_grps]))
+                new_island = \
+                    set(chain.from_iterable([hydrop_islands.pop(nb_grp_id)
+                                             for nb_grp_id in nb_grps]))
                 # Include this atom to the merged group.
                 new_island.add(atm)
 
@@ -277,19 +308,23 @@ class AtomGroupsManager():
 
         # Create AtomGroup objects for the hydrophobic islands
         for island_id in hydrop_islands:
-            # It will update an existing atom group or create a new one with the informed parameters.
-            hydrophobe = self.new_atm_grp(hydrop_islands[island_id], [ChemicalFeature("Hydrophobe")])
+            # It will update an existing atom group or create a new one
+            # with the informed parameters.
+            hydrophobe = self.new_atm_grp(hydrop_islands[island_id],
+                                          [ChemicalFeature("Hydrophobe")])
             # Update the island information
             hydrop_islands[island_id] = hydrophobe
 
-        hydrop_interactions = list(interactions_mngr.filter_by_types(["Hydrophobic"]))
+        hydrop_interactions = \
+            list(interactions_mngr.filter_by_types(["Hydrophobic"]))
         island_island_inter = defaultdict(set)
         for inter in hydrop_interactions:
             src_atm = inter.src_grp.atoms[0]
             trgt_atm = inter.trgt_grp.atoms[0]
 
             # The two island ids are used as key.
-            key = tuple(sorted([atm_mapping[src_atm.get_full_id()], atm_mapping[trgt_atm.get_full_id()]]))
+            key = tuple(sorted([atm_mapping[src_atm.get_full_id()],
+                                atm_mapping[trgt_atm.get_full_id()]]))
 
             island_island_inter[key].add(inter)
 
@@ -309,11 +344,16 @@ class AtomGroupsManager():
 
             params = {"dist_hydrop_inter": cc_dist}
 
-            inter = InteractionType(hydrop_islands[k[0]], hydrop_islands[k[1]], "Hydrophobic",
-                                    src_interacting_atms=island_atms[k[0]], trgt_interacting_atms=island_atms[k[1]], params=params)
+            inter = InteractionType(hydrop_islands[k[0]],
+                                    hydrop_islands[k[1]],
+                                    "Hydrophobic",
+                                    src_interacting_atms=island_atms[k[0]],
+                                    trgt_interacting_atms=island_atms[k[1]],
+                                    params=params)
             interactions.add(inter)
 
-        # Update the list of interactions with the new island-island interactions.
+        # Update the list of interactions with the new island-island
+        # interactions.
         interactions_mngr.add_interactions(interactions)
         # Remove atom-atom hydrophobic interactions.
         interactions_mngr.remove_interactions(hydrop_interactions)
@@ -321,25 +361,31 @@ class AtomGroupsManager():
         for atm_grp in hydrop_atm_grps:
             features = [f for f in atm_grp.features if f.name != "Hydrophobic"]
 
-            # It may happen that a atom group ends up having no feature after the remotion of the feature "Hydrophobic".
-            # This is unlikely to occur as all atoms (by default) will have at least the feature 'Atom'. But, depending one the
-            # pharmacophore rules definition, it can occur.
+            # It may happen that a atom group ends up having no feature after
+            # the remotion of the feature "Hydrophobic". This is unlikely to
+            # occur as all atoms (by default) will have at least the feature
+            # 'Atom'. But, depending one the pharmacophore rules definition,
+            # it can occur.
             atm_grp.features = features
 
     def get_shortest_path_length(self, src_grp, trgt_grp, cutoff=None):
-        """Compute the shortest path length between two atom groups ``src_grp`` and ``trgt_grp``.
+        """Compute the shortest path length between two atom groups ``src_grp``
+        and ``trgt_grp``.
 
-        The shortest path between two atom groups is defined as the shortest path between any of their atoms,
-        which are calculated using Dijkstra’s algorithm and the graph ``graph``.
+        The shortest path between two atom groups is defined as the shortest
+        path between any of their atoms, which are calculated using Dijkstra’s
+        algorithm and the graph ``graph``.
 
-        If there is not any path between ``src_grp`` and ``trgt_grp``, infinite is returned.
+        If there is not any path between ``src_grp`` and ``trgt_grp``,
+        infinite is returned.
 
         Parameters
         ----------
         src_grp, trgt_grp : `AtomGroup`
             Two atom groups to calculate the shortest path.
         cutoff : int
-            Only paths of length <= ``cutoff`` are returned. If None, all path lengths are considered.
+            Only paths of length <= ``cutoff`` are returned.
+            If None, all path lengths are considered.
 
         Returns
         -------
@@ -350,7 +396,10 @@ class AtomGroupsManager():
         for src_atm in src_grp.atoms:
             for trgt_atm in trgt_grp.atoms:
                 try:
-                    dist, path = single_source_dijkstra(self.graph, src_atm, trgt_atm, cutoff=cutoff)
+                    dist, path = single_source_dijkstra(self.graph,
+                                                        src_atm,
+                                                        trgt_atm,
+                                                        cutoff=cutoff)
                     if dist < shortest_path_size:
                         shortest_path_size = dist
                 except Exception:
@@ -358,14 +407,16 @@ class AtomGroupsManager():
         return shortest_path_size
 
     def save(self, output_file, compressed=True):
-        """Write the pickled representation of the `AtomGroupsManager` object to the file ``output_file``.
+        """Write the pickled representation of the `AtomGroupsManager` object
+        to the file ``output_file``.
 
         Parameters
         ----------
         output_file : str
             The output file.
         compressed : bool, optional
-            If True (the default), compress the pickled representation as a gzip file (.gz).
+            If True (the default), compress the pickled representation as a
+            gzip file (.gz).
 
         Raises
         -------
@@ -376,12 +427,14 @@ class AtomGroupsManager():
 
     @staticmethod
     def load(input_file):
-        """Load the pickled representation of an `AtomGroupsManager` object saved at the file ``input_file``.
+        """Load the pickled representation of an `AtomGroupsManager` object
+        saved at the file ``input_file``.
 
         Returns
         ----------
          : `AtomGroupsManager`
-            The reconstituted `AtomGroupsManager` object, including its set of atom groups and interactions.
+            The reconstituted `AtomGroupsManager` object, including its set of
+            atom groups and interactions.
 
         Raises
         -------
@@ -401,18 +454,22 @@ class AtomGroupsManager():
 
 
 class AtomGroup():
-    """ Represent single atoms, chemical functional groups, or simply an arrangement of atoms as in hydrophobes.
+    """ Represent single atoms, chemical functional groups, or simply an
+    arrangement of atoms as in hydrophobes.
 
     Parameters
     ----------
     atoms : iterable of :class:`~luna.mol.atom.ExtendedAtom`
         A sequence of atoms.
-    features : iterable of :class:`~luna.mol.features.ChemicalFeature`, optional
+    features : iterable of :class:`~luna.mol.features.ChemicalFeature`, \
+                    optional
         A sequence of chemical features.
-    interactions : iterable of :class:`~luna.interaction.type.InteractionType`, optional
+    interactions : iterable of \
+                    :class:`~luna.interaction.type.InteractionType`, optional
         A sequence of interactions established by an atom group.
     recursive : bool
-        If True, add the new atom group to the list of atom groups of each atom in ``atoms``.
+        If True, add the new atom group to the list of atom groups of each atom
+        in ``atoms``.
     manager : `AtomGroupsManager`, optional
         The `AtomGroupsManager` object that contains this `AtomGroup` object.
     """
@@ -446,12 +503,14 @@ class AtomGroup():
 
     @property
     def atoms(self):
-        """iterable of :class:`~luna.mol.atom.ExtendedAtom`, read-only: The sequence of atoms that belong to an atom group."""
+        """iterable of :class:`~luna.mol.atom.ExtendedAtom`, read-only: \
+            The sequence of atoms that belong to an atom group."""
         return self._atoms
 
     @property
     def compounds(self):
-        """set of :class:`~luna.MyBio.PDB.Residue.Residue`, read-only: The set of unique compounds that contain the atoms in ``atoms``.
+        """set of :class:`~luna.MyBio.PDB.Residue.Residue`, read-only: \
+            The set of unique compounds that contain the atoms in ``atoms``.
 
         As an atom group can be formed by the union of two or more compounds
         (e.g., amide of peptide bonds), it may return more than one compound.
@@ -460,27 +519,32 @@ class AtomGroup():
 
     @property
     def coords(self):
-        """ array-like of floats : Atomic coordinates (x, y, z) of each atom in ``atoms``."""
+        """ array-like of floats : Atomic coordinates (x, y, z) of each \
+        atom in ``atoms``."""
         return self._coords
 
     @property
     def centroid(self):
-        """ array-like of floats, read-only: The centroid (x, y, z) of the atom group.
+        """ array-like of floats, read-only: The centroid (x, y, z) of the \
+        atom group.
 
-        If ``atoms`` contains only one atom, then ``centroid`` returns the same as ``coords``.
+        If ``atoms`` contains only one atom, then ``centroid`` returns the same
+        as ``coords``.
         """
         return self._centroid
 
     @property
     def normal(self):
-        """array-like of floats, read-only: The normal vector (x, y, z) of the points given by ``coords``."""
+        """array-like of floats, read-only: The normal vector (x, y, z) of \
+        the points given by ``coords``."""
         if self._normal is None:
             self._normal = im.calc_normal(self.coords)
         return self._normal
 
     @property
     def features(self):
-        """iterable of :class:`~luna.mol.features.ChemicalFeature`: A sequence of chemical features.
+        """iterable of :class:`~luna.mol.features.ChemicalFeature`: \
+                A sequence of chemical features.
 
         To add or remove a feature use :py:meth:`add_features`
         or :py:meth:`remove_features`, respectively."""
@@ -494,13 +558,14 @@ class AtomGroup():
 
     @property
     def feature_names(self):
-        """iterable of str: The name of each chemical feature in ``features``."""
+        """iterable of str: The name of each chemical feature in \
+        ``features``."""
         return [f.name for f in self.features]
 
     @property
     def interactions(self):
-        """iterable of :class:`~luna.interaction.type.InteractionType`: The sequence of interactions
-        established by an atom group.
+        """iterable of :class:`~luna.interaction.type.InteractionType`: \
+            The sequence of interactions established by an atom group.
 
         To add or remove an interaction use :py:meth:`add_interactions`
         or :py:meth:`remove_interactions`, respectively."""
@@ -512,7 +577,8 @@ class AtomGroup():
 
     @property
     def manager(self):
-        """`AtomGroupsManager`: The `AtomGroupsManager` object that contains an `AtomGroup` object."""
+        """`AtomGroupsManager`: The `AtomGroupsManager` object that contains \
+        an `AtomGroup` object."""
         return self._manager
 
     @manager.setter
@@ -659,6 +725,10 @@ class AtomGroup():
         Hetero groups are designated by the flag HETATM in the PDB format."""
         return all([a.parent.is_hetatm() for a in self.atoms])
 
+    def is_metal(self):
+        """Return True if all atoms in the atom group are metal ions."""
+        return all([a.parent.is_metal() for a in self.atoms])
+
     def is_residue(self):
         """Return True if all atoms in the atom group belong to standard
         residues of proteins."""
@@ -685,6 +755,10 @@ class AtomGroup():
         substrates, ligands, solvent, and metal ions."""
         return any([a.parent.is_hetatm() for a in self.atoms])
 
+    def has_metal(self):
+        """Return True if at least one atom in the atom group is a metal."""
+        return any([a.parent.is_metal() for a in self.atoms])
+
     def has_residue(self):
         """Return True if at least one atom in the atom group belongs to a
         standard residue of proteins."""
@@ -707,10 +781,15 @@ class AtomGroup():
 
         The dict is defined as follows:
 
-            * ``atoms`` (iterable of :class:`~luna.mol.atom.ExtendedAtom`): the list of atoms comprising the atom group;
-            * ``compounds`` (iterable of :class:`~luna.MyBio.PDB.Residue.Residue`): the list of unique compounds that contain the atoms;
+            * ``atoms`` (iterable of :class:`~luna.mol.atom.ExtendedAtom`): \
+                    the list of atoms comprising the atom group;
+            * ``compounds`` (iterable of \
+                    :class:`~luna.MyBio.PDB.Residue.Residue`): the list of \
+                    unique compounds that contain the atoms;
             * ``classes`` (iterable of str): the list of compound classes;
-            * ``features`` (iterable of :class:`~luna.mol.features.ChemicalFeature`): the atom group's list of chemical features.
+            * ``features`` (iterable of \
+                    :class:`~luna.mol.features.ChemicalFeature`): the atom \
+                    group's list of chemical features.
         """
         grp_obj = {}
         grp_obj["atoms"] = [atm.as_json() for atm in self.atoms]
@@ -776,9 +855,11 @@ class PseudoAtomGroup(AtomGroup):
         The atom group that contains the subset of atoms ``atoms``.
     atoms : iterable of :class:`~luna.mol.atom.ExtendedAtom`
         A sequence of atoms.
-    features : iterable of :class:`~luna.mol.features.ChemicalFeature`, optional
+    features : iterable of :class:`~luna.mol.features.ChemicalFeature`, \
+                optional
         A sequence of chemical features.
-    interactions : iterable of :class:`~luna.interaction.type.InteractionType`, optional
+    interactions : iterable of \
+                :class:`~luna.interaction.type.InteractionType`, optional
         A sequence of interactions established by an atom group.
     """
 
@@ -892,6 +973,11 @@ class AtomGroupPerceiver():
         compounds = set(compounds)
         init_comps_set = set(compounds)
 
+        if self.cache:
+            cached_compounds = set([c for c in compounds
+                                    if self.cache.is_compound_cached(c)])
+            compounds = compounds - cached_compounds
+
         # Controls which compounds are allowed to expand
         # when 'expand_selection' is set ON.
         pruned_comps = set()
@@ -900,10 +986,9 @@ class AtomGroupPerceiver():
 
         # Map Residue objects to a MolWrapper object.
         new_mol_objs_dict = {}
-
-        # Initial compounds + border compounds
+        # Initial compounds + border compounds.
         target_compounds = set()
-
+        # Metals are prepared separatelly.
         metals = set()
 
         while comp_queue:
@@ -947,6 +1032,44 @@ class AtomGroupPerceiver():
         # Stores atoms involved in metal coordination as a dict of dict,
         # where the first key is the residue and the second key is an atom.
         # The values are sets of metals (Residue objects).
+        metals_coord = self._find_metal_coordination(target_compounds, metals)
+
+        # Assign properties for ligands provided as external MOL files.
+        for comp, mol_obj in new_mol_objs_dict.items():
+            target_atoms = self._get_atoms(comp)
+            self._assign_properties(mol_obj, target_atoms)
+
+        # Assign properties for molecules from PDB files.
+        if target_compounds:
+            mol_obj, target_atoms = \
+                self._get_mol_from_entity(target_compounds,
+                                          metals_coord=metals_coord)
+            self._assign_properties(mol_obj, target_atoms)
+
+        # Assign properties to metals.
+        if metals:
+            self._assing_metal_properties(metals)
+
+        # Apply cache.
+        if self.cache and cached_compounds:
+            print("\n\nSetting cache...\n\n")
+            self._apply_cache(cached_compounds, comp.get_parent_by_level("M"))
+
+        # Remove atom groups not comprising the provided
+        # compound list (parameter 'compounds').
+        remove_atm_grps = []
+        for atm_grp in self.atm_grps_mngr:
+            if any([c in init_comps_set for c in atm_grp.compounds]) is False:
+                remove_atm_grps.append(atm_grp)
+        self.atm_grps_mngr.remove_atm_grps(remove_atm_grps)
+
+        return self.atm_grps_mngr
+
+    def _find_metal_coordination(self, compounds, metals):
+
+        # Stores atoms involved in metal coordination as a dict of dict,
+        # where the first key is the residue and the second key is an atom.
+        # The values are sets of metals (Residue objects).
         custom_dict = lambda: {"atm_idx": None, "metals": set()}
         metals_coord = defaultdict(lambda: defaultdict(custom_dict))
 
@@ -964,7 +1087,7 @@ class AtomGroupPerceiver():
 
                 # Skip pairs whose non-metal compound is not
                 # in ``target_compounds``
-                if other_atm.parent not in target_compounds:
+                if other_atm.parent not in compounds:
                     continue
 
                 # Skip pairs whose atom is not an O, N, or S.
@@ -978,27 +1101,9 @@ class AtomGroupPerceiver():
                 # Add the pair to the dict 'metals_coord'.
                 metals_coord[other_atm.parent][other_atm]["metals"].add(metal)
 
-        for comp, mol_obj in new_mol_objs_dict.items():
-            target_atoms = self._get_atoms(comp)
-            self._assign_properties(mol_obj, target_atoms)
-
-        mol_obj, target_atoms = \
-            self._get_mol_from_entity(target_compounds,
-                                      metals_coord=metals_coord)
-        self._assign_properties(mol_obj, target_atoms)
-
-        # Remove atom groups not comprising the provided
-        # compound list (parameter 'compounds').
-        remove_atm_grps = []
-        for atm_grp in self.atm_grps_mngr:
-            if any([c in init_comps_set for c in atm_grp.compounds]) is False:
-                remove_atm_grps.append(atm_grp)
-        self.atm_grps_mngr.remove_atm_grps(remove_atm_grps)
-
-        return self.atm_grps_mngr
+        return metals_coord
 
     def _assign_properties(self, mol_obj, target_atoms=None):
-
         try:
             # Create a new MolWrapper object.
             mol_obj = MolWrapper(mol_obj)
@@ -1086,6 +1191,41 @@ class AtomGroupPerceiver():
 
             if self.critical:
                 raise
+
+    def _get_default_invariants(self, pdb_atm):
+        # Metal properties.
+        data = DEFAULT_RES_DATA.get(pdb_atm.parent.resname, {})
+        props = data.get("atoms", {})
+
+        invariants = None
+        if pdb_atm.name in props:
+            invariants = props[pdb_atm.name]["invariants"]
+            invariants = [int(i) for i in invariants.split(",")]
+        return invariants
+
+    def _assing_metal_properties(self, metals):
+        for metal in metals:
+            atms = self._get_atoms(metal)
+
+            if len(atms) == 0:
+                logger.error("No atom has been found for residue %s."
+                             % metal.full_name)
+                continue
+
+            if len(atms) > 1:
+                logger.error("An unexpected number of atoms (%d) has been "
+                             "found for residue %s, while 1 was expected."
+                             % (len(atms), metal.full_name))
+                continue
+
+            # Create/recover an extended atom object
+            # and set its atomic invariant.
+            atm = self._new_extended_atom(atms[0])
+            atm.invariants = self._get_default_invariants(atm)
+
+            # Define a new group and add it to 'atm_grps_mngr'.
+            feats = [ChemicalFeature("Atom"), ChemicalFeature("Metal")]
+            self.atm_grps_mngr.new_atm_grp([atm], feats)
 
     def _fix_pharmacophoric_rules(self, atms_map):
         """ Fix atom groups where one of its atoms coordinate a metal
@@ -1198,6 +1338,7 @@ class AtomGroupPerceiver():
             ext_atm.invariants = ref_atm.invariants
 
             # Add neighbors' information to the new ExtendedAtom.
+            ext_atm.neighbors_info = []
             for nbi in ref_atm.neighbors_info:
                 atom_info = AtomData(nbi.atomic_num,
                                      nbi.coord, nbi.bond_type,
@@ -1218,9 +1359,12 @@ class AtomGroupPerceiver():
                     ext_atm = copy_atom(atm, force_update=True)
                     atoms.append(ext_atm)
 
-                # Create the new atom group.
+                # Current features.
                 features = atm_grp.features
-                self.atm_grps_mngr.new_atm_grp(atoms, features)
+
+                # Create the new atom group.
+                atm_grp = self.atm_grps_mngr.new_atm_grp(atoms)
+                atm_grp.features = features
 
         for edge in sorted(self.cache.atm_grps_mngr.graph.edges):
             # Skip already existing edges.
@@ -1282,10 +1426,12 @@ class AtomGroupPerceiver():
 
         return mol_obj, target_atoms
 
+
 class AtomGroupNeighborhood:
     """ Class for fast neighbor atom groups searching.
 
-    ``AtomGroupNeighborhood`` makes use of a KD Tree implemented in C, so it's fast.
+    ``AtomGroupNeighborhood`` makes use of a KD Tree implemented in C,
+    so it's fast.
 
     Parameters
     ----------
