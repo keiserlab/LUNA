@@ -3,6 +3,7 @@ from operator import xor
 from enum import Enum, auto
 from collections import defaultdict, Counter
 
+from Bio.PDB.Polypeptide import is_aa
 from luna.mol.precomp_data import DefaultResidueData
 from luna.wrappers.base import MolWrapper, BondType, OBBondType
 from luna.MyBio.neighbors import get_residue_neighbors
@@ -117,20 +118,20 @@ class Standardizer:
 
         # Warn about the missing atoms.
         if missing_atoms:
-            logger.error("The following atoms were not found for "
-                         "residue %s: %s."
-                         % (res.full_name,
-                            ", ".join(sorted(missing_atoms))))
+            logger.warning("The following atoms were not found for "
+                           "residue %s: %s."
+                           % (res.full_name,
+                              ", ".join(sorted(missing_atoms))))
 
         # Unexpected atoms found in this residue.
         other_atoms = [a for a in atom_names - expected_atms]
 
         # Warn about the unexpected atom names identified.
         if other_atoms:
-            logger.error("The following unexpected atoms were found "
-                         "for residue %s: %s."
-                         % (res.full_name,
-                            ", ".join(sorted(other_atoms))))
+            logger.warning("The following unexpected atoms were found "
+                           "for residue %s: %s."
+                           % (res.full_name,
+                              ", ".join(sorted(other_atoms))))
 
     def _resolve_resname(self, res):
 
@@ -313,7 +314,7 @@ class Standardizer:
         if n_heavy_atoms not in coords:
             msg = ("An unexpected coordination number (%d) has been "
                    "found for metal %s.")
-            logger.error(msg % (n_heavy_atoms, pdb_atm.full_name))
+            logger.warning(msg % (n_heavy_atoms, pdb_atm.full_name))
 
     def _get_partner_atm(self, atm_obj, pdb_atm, bond_obj):
         partner_obj = \
@@ -328,7 +329,7 @@ class Standardizer:
             msg = ("The atom %s from %s will not be amended "
                    "because an unidentified atom is covalently bound "
                    "to it." % (pdb_atm.name, pdb_atm.parent.full_name))
-            logger.error(msg)
+            logger.warning(msg)
 
             return None, None
 
@@ -381,18 +382,30 @@ class Standardizer:
                                            bond_obj))
                 continue
 
-            # If an unexpected bond between residue atoms
-            # is found, break it.
-            if (pdb_atm.parent.is_residue()
-                    and partner_atm.parent.is_residue(standard=False)
+            # If an unexpected bond between residue atoms is found, break it.
+            if (is_aa(pdb_atm.parent) and is_aa(partner_atm.parent)
                     and bond_key not in res_bonds):
 
                 # In case there is a peptide bond between a residue and a
                 # non-standard residue, whose N has a name different than 'N',
                 # we can ignore it if the atom C formed an amide with the N.
-                if (pdb_atm.name == "C" and partner_obj.get_symbol() == "N"
-                        and atm_obj.matches_smarts("[$([CX3](=O)N)]")):
-                    continue
+                if pdb_atm.name == "C" and partner_obj.get_symbol() == "N":
+                    # Correct amide group.
+                    if atm_obj.matches_smarts("[$([CX3](=O)N)]"):
+                        continue
+
+                    # Fix C-N bond from an amide group incorrectly parsed by
+                    # Open Babel.
+                    elif atm_obj.matches_smarts("[$([CX3](O)=N)]"):
+                        bond_type = BondType["SINGLE"]
+                        # Add a new modification event for this bond.
+                        self._events["modbonds"].add(((atm_obj,
+                                                       pdb_atm),
+                                                      (partner_obj,
+                                                       partner_atm),
+                                                      bond_obj, bond_type,
+                                                      False))
+                        continue
 
                 self._events["break"].add(((atm_obj, pdb_atm),
                                            (partner_obj, partner_atm),
@@ -409,13 +422,12 @@ class Standardizer:
                            "bond and standardize the atoms."
                            % (pdb_atm, partner_atm,
                               pdb_atm.parent, partner_atm.parent))
-                logger.error(msg)
+                logger.warning(msg)
                 continue
 
-            # If this atom's partner is not a residue, it is better
-            # not to update this atom.
-            elif ((pdb_atm.parent.is_residue()
-                    and not partner_atm.parent.is_residue(standard=False))
+            # If this atom's partner is not a residue, it is better not to
+            # update this atom.
+            elif ((is_aa(pdb_atm.parent) and not is_aa(partner_atm.parent))
                     or bond_key not in res_bonds):
 
                 self._events["ignore"].add(pdb_atm)
@@ -426,7 +438,7 @@ class Standardizer:
                                          pdb_atm.parent.full_name,
                                          partner_atm.name,
                                          partner_atm.parent.full_name))
-                logger.error(msg)
+                logger.warning(msg)
                 return
 
             # Update the sets with the new identified pair.
@@ -509,7 +521,7 @@ class Standardizer:
                            "seems not to exist."
                            % (bond_key, pdb_atm.parent.full_name,
                               partner_atm_name))
-                    logger.error(msg)
+                    logger.warning(msg)
                     continue
 
                 # Partner atom's object
@@ -601,7 +613,7 @@ class Standardizer:
                                       precomp_data=None):
 
         # Imidazole-like, but not tetrazoles.
-        strict_smarts_rule = ("[$(nc[n;H1]);R1r5;"
+        strict_smarts_rule = ("[$(nc[n;H1]),$([n;H1]cn);R1r5;"
                               "!$([nR1r5;$(n:n:n:n:c),$(n:n:n:c:n)])]")
 
         generic_smarts_rule = ("[$([#7]~[#6]~[#7]);R1r5;"
@@ -996,12 +1008,14 @@ class Standardizer:
 
                 # Imidazole N coordinating a metal.
                 elif atm_obj.matches_smarts(imidazole_smarts):
-                    if (atm_obj.matches_smarts('[$(nc[n;H1])]')
+                    if (atm_obj.matches_smarts('[$(nc[n;H1]),$([n;H1]cn)]')
                             or fix_atm_aromaticity):
+
                         invariants = \
                             self._resolve_imidazole_invariants(atm_obj,
                                                                pdb_atm,
                                                                precomp_data)
+
                     if fix_atm_aromaticity:
                         is_aromatic = True
 
@@ -1019,6 +1033,11 @@ class Standardizer:
                 elif (atm_obj.matches_smarts("[$([#7;X3H1]C=O)]")
                         and pdb_atm in coords):
                     invariants = [2, 2, 7, 14, -1, 0, 0]
+
+                # Broken amide from residues (including non-standard ones).
+                elif (is_aa(pdb_atm.parent)
+                        and atm_obj.matches_smarts("[$(N=[CX3]O)]")):
+                    invariants = [2, 2, 7, 14, 0, 1, 0]
 
                 # Sulfonamide N coordinating a metal.
                 elif (atm_obj.matches_smarts("[$([N;H1,H2]S(=O)(=O))]")
@@ -1046,6 +1065,7 @@ class Standardizer:
                     and pdb_atm.name in res_props):
 
                 invariants = atm_obj.get_atomic_invariants()
+
                 # Set the correct degree.
                 invariants[1] = (res_props[pdb_atm.name]["degree"]
                                  - res_props[pdb_atm.name]["n_Hs"])
@@ -1063,6 +1083,7 @@ class Standardizer:
                                         precomp_data)
 
         elif res.is_residue():
+
             if pdb_atm.name in ["C", "N"]:
                 nb_residues = \
                     get_residue_neighbors(res, verbose=False)
@@ -1094,8 +1115,9 @@ class Standardizer:
                     # That means the function would ignore a non-standard
                     # residue forming the peptide if its N has a different
                     # name (e.g., N3 as in SNN).
+                    amide_like = "[$([CX3](=,-O)=,-N)]"
                     if (nb_residues.successor is None and n_heavy_atms == 3
-                            and atm_obj.matches_smarts("[$([CX3](=O)N)]")):
+                            and atm_obj.matches_smarts(amide_like)):
                         invariants = [3, 4, 6, 12, 0, 0, 0]
 
                     # If it's a C-terminal residue and OXT doesn't exist,
@@ -1294,6 +1316,7 @@ class Standardizer:
                            in_ring=in_ring)
 
     def _get_precomp_data_from_cif_file(self, res):
+        # TODO
         return {}
 
     def _check_mol(self, res):

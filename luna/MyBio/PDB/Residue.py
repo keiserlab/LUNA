@@ -195,9 +195,9 @@ class Residue(Entity):
 
     # MODBY: Alexandre Fassio
     # Check if a residue is an amino acid.
-    def is_residue(self, standard=True):
+    def is_residue(self):
         """Return True if the residue is an amino acid."""
-        return is_aa(self.resname, standard=standard)
+        return self.get_id()[0] == " " and is_aa(self.resname)
 
     # MODBY: Alexandre Fassio
     # Check if a residue is a nucleotide.
