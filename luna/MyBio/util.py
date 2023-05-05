@@ -410,8 +410,11 @@ def biopython_entity_to_mol(entity,
         # Pairs of AtomWrapper and Atom (Biopython) objects
         # to standardize.
         atom_pairs = []
+        pdb_mapping = {}
         for i, atm_obj in enumerate(atm_obj_list):
             atom_pairs.append((atm_obj, target_atoms[i]))
+
+            pdb_mapping[atm_obj.get_idx()] = target_atoms[i]
 
         updated_metals_coord = {}
         # If there is something to be standardised.
@@ -452,7 +455,7 @@ def biopython_entity_to_mol(entity,
                 remove_files([new_mol_file])
 
         mv = MolValidator(metals_coord=updated_metals_coord)
-        is_valid = mv.validate_mol(mol_obj)
+        is_valid = mv.validate_mol(mol_obj, pdb_mapping)
         logger.debug('Validation finished!!!')
 
         if not is_valid:
@@ -464,6 +467,7 @@ def biopython_entity_to_mol(entity,
             aux_mol = (PybelWrapper(mol_obj.unwrap())
                        if isinstance(mol_obj, MolWrapper)
                        else mol_obj)
+
             # The sanitization is set off. We will apply it in the next step.
             aux_mol = MolFromMolBlock(aux_mol.write('mol'),
                                       sanitize=False, removeHs=False)

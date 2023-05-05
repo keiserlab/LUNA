@@ -1413,8 +1413,7 @@ class AtomGroupPerceiver():
                                     amend_mol=self.amend_mol,
                                     add_h=self.add_h, ph=self.ph,
                                     metals_coord=metals_coord,
-                                    tmp_path=self.tmp_path,
-                                    keep_tmp_files=True)
+                                    tmp_path=self.tmp_path)
 
         # If the add_h property is set to False, the code will not remove any
         # existing hydrogens from the PDB structure. In these situations, the
