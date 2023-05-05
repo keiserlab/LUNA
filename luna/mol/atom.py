@@ -149,6 +149,10 @@ class ExtendedAtom:
         respectively."""
         return self._nb_info
 
+    @neighbors_info.setter
+    def neighbors_info(self, nb_info):
+        self._nb_info = nb_info
+
     @property
     def atm_grps(self):
         """list of :class:`~luna.groups.AtomGroup`, read-only: The list of
