@@ -24,6 +24,7 @@ BOUNDARY_CONFIG = InteractionConfig({"bsite_cutoff": 6.2,
 NMR_METHODS = ["SOLID-STATE NMR", "SOLUTION NMR"]
 
 COV_SEARCH_RADIUS = 2.2
+METAL_COMPLEX_DIST = 2.8
 
 IFP_LENGTH = 4096
 
@@ -120,7 +121,8 @@ INTERACTION_IDS = {
     "Double bond": 40,
     "Triple bond": 41,
     "Aromatic bond": 42,
-    "Other bond": 43
+    "Other bond": 43,
+    "Metal coordination": 44,
 }
 
 INTERACTION_SHORT_NAMES = {
@@ -168,6 +170,7 @@ INTERACTION_SHORT_NAMES = {
     "Triple bond": "triple-bond",
     "Aromatic bond": "aromatic-bond",
     "Other bond": "other-bond",
+    "Metal coordination": "metal-coord",
 }
 
 PYMOL_INTERACTION_COLOR = ColorPallete({
@@ -215,6 +218,7 @@ PYMOL_INTERACTION_COLOR = ColorPallete({
     "Triple bond": "black",
     "Aromatic bond": "black",
     "Other bond": "black",
+    "Metal coordination": "olive"
 }, "white")
 
 PYMOL_INTERACTION_COLOR_AS_RGB = ColorPallete({
@@ -262,6 +266,7 @@ PYMOL_INTERACTION_COLOR_AS_RGB = ColorPallete({
     "Triple bond": (0.0, 0.0, 0.0),
     "Aromatic bond": (0.0, 0.0, 0.0),
     "Other bond": (0.0, 0.0, 0.0),
+    "Metal coordination": (0.0, 0.0, 0.0)
 }, (1.0, 1.0, 1.0))
 
 
