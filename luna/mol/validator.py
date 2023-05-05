@@ -42,17 +42,23 @@ class MolValidator:
         If True, fix charges on basis of the charge model ``charge_model``.
     """
 
-    def __init__(self, charge_model=OpenEyeModel(), fix_nitro=True,
-                 fix_amidine_and_guanidine=True, fix_valence=True,
-                 fix_charges=True, metals_coord=None):
+    def __init__(self,
+                 charge_model=OpenEyeModel(),
+                 fix_nitro=True,
+                 fix_amidine_and_guanidine=True,
+                 fix_valence=True,
+                 fix_charges=True,
+                 fix_in_ring=True,
+                 metals_coord=None):
         self.charge_model = charge_model
         self.fix_nitro = fix_nitro
         self.fix_amidine_and_guanidine = fix_amidine_and_guanidine
         self.fix_valence = fix_valence
         self.fix_charges = fix_charges
+        self.fix_in_ring = fix_in_ring
         self.metals_coord = metals_coord or []
 
-    def validate_mol(self, mol_obj):
+    def validate_mol(self, mol_obj, pdb_mapping):
         """Validate molecule ``mol_obj``.
 
         It will first try to fix the provided molecule according to the
@@ -92,6 +98,14 @@ class MolValidator:
         # Check if the molecule has errors...
         is_valid = True
         for atm_obj in mol_obj.get_atoms():
+
+            pdb_atm = (pdb_mapping[atm_obj.get_idx()]
+                       if atm_obj.get_idx() in pdb_mapping
+                       else None)
+
+            if not self._is_in_ring_valid(atm_obj, pdb_atm):
+                is_valid = False
+
             if not self._is_valence_valid(atm_obj):
                 is_valid = False
 
@@ -116,7 +130,6 @@ class MolValidator:
         # Iterate over each residue and that has a dative bond
         # with a metal to evaluate if its charge is incorrect.
         for res in self.metals_coord:
-
             for pdb_atm, data in self.metals_coord[res].items():
 
                 if data["atm_idx"] is None:
@@ -282,6 +295,47 @@ class MolValidator:
             if ob_smart.Match(mol_obj.unwrap()):
                 logger.debug("Invalid amidine/guanidine substructures were "
                              "correctly charged.")
+
+    def _is_in_ring_valid(self, atm_obj, pdb_atm):
+
+        if not isinstance(atm_obj, AtomWrapper):
+            atm_obj = AtomWrapper(atm_obj)
+
+        if pdb_atm is None:
+            return True
+
+        in_ring = set([('HIS', 'CD2'), ('HIS', 'CE1'), ('HIS', 'CG'),
+                       ('HIS', 'ND1'), ('HIS', 'NE2'), ('PHE', 'CD1'),
+                       ('PHE', 'CD2'), ('PHE', 'CE1'), ('PHE', 'CE2'),
+                       ('PHE', 'CG'), ('PHE', 'CZ'), ('PRO', 'CA'),
+                       ('PRO', 'CB'), ('PRO', 'CD'), ('PRO', 'CG'),
+                       ('PRO', 'N'), ('TRP', 'CD1'), ('TRP', 'CD2'),
+                       ('TRP', 'CE2'), ('TRP', 'CE3'), ('TRP', 'CG'),
+                       ('TRP', 'CH2'), ('TRP', 'CZ2'), ('TRP', 'CZ3'),
+                       ('TRP', 'NE1'), ('TYR', 'CD1'), ('TYR', 'CD2'),
+                       ('TYR', 'CE1'), ('TYR', 'CE2'), ('TYR', 'CG'),
+                       ('TYR', 'CZ')])
+
+        key = (pdb_atm.parent.resname, pdb_atm.name)
+
+        # If Open Babel perceives the current atom as belonging to a ring,
+        #   why it shouldn't, try to fix it.
+        if (pdb_atm.parent.is_residue() and atm_obj.is_in_ring()
+                and key not in in_ring):
+
+            logger.debug("Atom #%d has been incorrectly perceived as part of "
+                         "a ring." % atm_obj.get_idx())
+
+            if self.fix_in_ring:
+                logger.debug("'Fix in ring' option is set on. It will "
+                             "set the atom #%d as not part of a ring."
+                             % atm_obj.get_idx())
+
+                atm_obj.set_in_ring(False)
+
+                return True
+            return False
+        return True
 
     def _is_valence_valid(self, atm_obj):
         if not isinstance(atm_obj, AtomWrapper):
