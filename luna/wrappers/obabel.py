@@ -158,7 +158,8 @@ def convert_molecule(infile, output, infile_format=None,
         output_lines = stderr.decode().strip().split("\n")
         is_mol_converted = output_lines[-1] != "0 molecule converted"
         if not is_file_valid(output) or not is_mol_converted:
-            raise FileNotCreated("File '%s' not converted to '%s'." % (infile, output))
+            raise FileNotCreated("File '%s' not converted to '%s'." %
+                                 (infile, output))
         else:
             logger.debug("File '%s' converted to '%s'." % (infile, output))
     except Exception:

@@ -3,8 +3,10 @@ from pymol import util
 
 
 from luna.wrappers.cgo_arrow import cgo_arrow
-from luna.util.exceptions import PymolSessionNotInitialized, IllegalArgumentError
-from luna.util.default_values import PYMOL_INTERACTION_COLOR, INTERACTION_SHORT_NAMES
+from luna.util.exceptions import (PymolSessionNotInitialized,
+                                  IllegalArgumentError)
+from luna.util.default_values import (PYMOL_INTERACTION_COLOR,
+                                      INTERACTION_SHORT_NAMES)
 from luna.util.file import get_filename, get_file_format
 
 from Bio.Data.SCOPData import protein_letters_3to1
@@ -178,7 +180,8 @@ class PymolWrapper:
         return cmd.get_coords(selection)
 
     def distance(self, name, sel1, sel2):
-        """Create a new distance object between two atoms given by their selection-expressions.
+        """Create a new distance object between two atoms given by their
+        selection-expressions.
 
         Parameters
         ----------
@@ -192,7 +195,8 @@ class PymolWrapper:
         cmd.distance(name, sel1, sel2)
 
     def arrow(self, name, atm_sel1, atm_sel2, opts=None):
-        """Draw an arrow object between two atoms given by their selection-expressions.
+        """Draw an arrow object between two atoms given by their
+        selection-expressions.
 
         Parameters
         ----------
@@ -204,7 +208,8 @@ class PymolWrapper:
             The expression to select the second atom.
         opts : dict
             A set of options to create the arrow.
-            Check `Pymol <https://pymolwiki.org/index.php/Cgo_arrow>`_ to discover which options are available.
+            Check `Pymol <https://pymolwiki.org/index.php/Cgo_arrow>`_ to
+            discover which options are available.
         """
         opts = opts or {}
         cgo_arrow(atm_sel1, atm_sel2, name=name, **opts)
@@ -223,7 +228,8 @@ class PymolWrapper:
         dpi : float
             Dots-per-inch. The default value is 100.
         ray : {0, 1}
-            If ``1`` (the default), run ray first to make high-resolution photos.
+            If ``1`` (the default), run ray first to make high-resolution
+            photos.
         """
         cmd.png(output_file, width, height, dpi, ray)
 
@@ -245,7 +251,8 @@ class PymolWrapper:
         Parameters
         ----------
         tuples : iterable of tuple
-            Each tuple should contain a color (e.g., 'red') and a selection (e.g., 'hetatm').
+            Each tuple should contain a color (e.g., 'red') and a selection
+            (e.g., 'hetatm').
         """
         for color, selection in tuples:
             cmd.color(color, selection)
@@ -256,15 +263,19 @@ class PymolWrapper:
         Parameters
         ----------
         selections : iterable of str
-            A sequence of selections to define which atoms will be colored by element.
-        c_color : {'green', 'cyan', 'light magenta', 'yellow', 'salmon', 'white', 'slate', 'bright orange', 'purple', 'pink'}
+            A sequence of selections to define which atoms will be colored by
+            element.
+        c_color : {'green', 'cyan', 'light magenta', 'yellow', 'salmon', \
+                    'white', 'slate', 'bright orange', 'purple', 'pink'}
             The carbon color. The default value is 'green'.
         """
 
-        valid_colors = ['green', 'cyan', 'light magenta', 'yellow', 'salmon', 'white',
-                        'slate', 'bright orange', 'purple', 'pink']
+        valid_colors = ['green', 'cyan', 'light magenta', 'yellow', 'salmon',
+                        'white', 'slate', 'bright orange', 'purple', 'pink']
         if c_color.lower() not in valid_colors:
-            raise IllegalArgumentError("Invalid color '%s'. The accepted colors are: %s." % (c_color, ", ".join(valid_colors)))
+            raise IllegalArgumentError("Invalid color '%s'. The accepted "
+                                       "colors are: %s."
+                                       % (c_color, ", ".join(valid_colors)))
 
         c_color = c_color.lower()
 
@@ -299,11 +310,14 @@ class PymolWrapper:
             The group name to create or update.
         members : iterable of str
             The objects to include in the group.
-        action : {'add', 'remove', 'open', 'close', 'toggle', 'auto', 'empty', 'purge', 'excise'}, optional
-            An action to take. If not provided, the default value 'auto' will be used instead.
-            The description of the actions are described below (source: Pymol documentation):
+        action : {'add', 'remove', 'open', 'close', 'toggle', 'auto', \
+                    'empty', 'purge', 'excise'}, optional
+            An action to take. If not provided, the default value
+            'auto' will be used instead. The description of the actions
+            are described below (source: Pymol documentation):
                 * add:     add members to group.
-                * remove:  remove members from group (members will be ungrouped).
+                * remove:  remove members from group (members will be \
+                    ungrouped).
                 * empty:   remove all members from group.
                 * purge:   remove all members from group and delete them.
                 * excise:  remove all members from group and delete group.
@@ -321,8 +335,8 @@ class PymolWrapper:
     def create(self, name, selection):
         """Create a new molecular object from a selection.
 
-        Note that the selected atoms won't be extracted from the original object.
-        Instead, a copy of them will be created in the new object.
+        Note that the selected atoms won't be extracted from the original
+        object. Instead, a copy of them will be created in the new object.
 
         Parameters
         ----------
@@ -341,8 +355,9 @@ class PymolWrapper:
         selection : str
             The expression to select atoms.
         expression : str
-            Expression in Python language to define which properties should be modified.
-            This can be used, for instance, to rename an atom or chain.
+            Expression in Python language to define which properties should be
+            modified. This can be used, for instance, to rename an atom or
+            chain.
 
         Examples
         --------
@@ -367,7 +382,9 @@ class PymolWrapper:
         value : str
             The new setting value.
         opts : dict
-            A set of options. Check `Pymol <https://pymolwiki.org/index.php/Pseudoatom>`_ to discover which options are available.
+            A set of options.
+            Check `Pymol <https://pymolwiki.org/index.php/Pseudoatom>`_
+            to discover which options are available.
         """
         opts = opts or {}
         cmd.set(name, value, **opts)
@@ -382,7 +399,9 @@ class PymolWrapper:
         target : str
             The target structure given by an atomic selection.
         opts : dict
-            Alignment options. Check `Pymol <https://pymolwiki.org/index.php/Align>`_ to discover which options are available.
+            Alignment options.
+            Check `Pymol <https://pymolwiki.org/index.php/Align>`_
+            to discover which options are available.
         """
         opts = opts or {}
         cmd.align(mobile, target, **opts)
@@ -411,13 +430,15 @@ class PymolWrapper:
             cmd.remove(selection)
 
     def extract(self, tuples):
-        """Perform multiple extractions, i.e., extract atoms from an object to another object.
+        """Perform multiple extractions, i.e., extract atoms from an object to
+        another object.
 
         Parameters
         ----------
         tuples : iterable of tuple
-            Each tuple should contain the object name to where atoms will be added
-            and the selection itself that defines which atoms will be extracted (e.g., 'hetatm').
+            Each tuple should contain the object name to where atoms will be
+            added and the selection itself that defines which atoms will be
+            extracted (e.g., 'hetatm').
         """
         for name, selection in tuples:
             cmd.extract(name, selection)
@@ -461,7 +482,8 @@ class PymolWrapper:
         Parameters
         ----------
         commands : iterable of tuple
-            Each tuple should contain a Pymol command and its parameters. See :meth:`run` to more details.
+            Each tuple should contain a Pymol command and its parameters.
+            See :meth:`run` to more details.
         """
 
         for func_name, opts in commands:
@@ -471,14 +493,18 @@ class PymolWrapper:
 class PymolSessionManager:
 
     """Class to start, manage, and save Pymol sessions.
-    This class provides useful built-in functions to load PDB/Mol files and show interactions.
+    This class provides useful built-in functions to load PDB/Mol files and
+    show interactions.
 
     .. note::
-        This class is not intended to be used directly because :meth:`set_view` is not implemented by default.
-        Instead, you should use a class that inherits from `PymolSessionManager` and implements :meth:`set_view`.
-        An example is the class :class:`~luna.interaction.view.InteractionViewer` that implements a custom
-        :meth:`set_view` to show interactions.
-        Therefore, you should define your own logic beyond :meth:`set_view` to save a Pymol session that meets your goals.
+        This class is not intended to be used directly because :meth:`set_view`
+        is not implemented by default. Instead, you should use a class that
+        inherits from `PymolSessionManager` and implements :meth:`set_view`.
+        An example is the class
+        :class:`~luna.interaction.view.InteractionViewer` that implements a
+        custom :meth:`set_view` to show interactions. Therefore, you should
+        define your own logic beyond :meth:`set_view` to save a Pymol session
+        that meets your goals.
 
     Parameters
     ----------
@@ -486,21 +512,29 @@ class PymolSessionManager:
         If True, show the protein structure as cartoons.
     bg_color : str
         The background color. The default value is "white".
-        Check `Pymol <https://pymolwiki.org/index.php/Color_Values>`_ to discover which colors are available.
+        Check `Pymol <https://pymolwiki.org/index.php/Color_Values>`_
+        to discover which colors are available.
     add_directional_arrows : bool
-        If True, show arrows for directional interactions (e.g., hydrogen bonds and multipolar interactions).
+        If True, show arrows for directional interactions (e.g., hydrogen bonds
+        and multipolar interactions).
     show_res_labels : bool
         If True (the default), show residue labels.
     inter_color : :class:`~luna.util.ColorPallete`
         A Pymol-compatible color scheme for interactions.
-        The default value is :const:`~luna.util.default_values.PYMOL_INTERACTION_COLOR`.
+        The default value is
+        :const:`~luna.util.default_values.PYMOL_INTERACTION_COLOR`.
     pse_export_version : str
-        Define a legacy format for saving Pymol sessions (PSE files). The default value os '1.8'.
+        Define a legacy format for saving Pymol sessions (PSE files).
+        The default value os '1.8'.
     """
 
-    def __init__(self, show_cartoon=False, bg_color="white",
-                 add_directional_arrows=True, show_res_labels=True,
-                 inter_color=PYMOL_INTERACTION_COLOR, pse_export_version="1.8"):
+    def __init__(self,
+                 show_cartoon=False,
+                 bg_color="white",
+                 add_directional_arrows=True,
+                 show_res_labels=True,
+                 inter_color=PYMOL_INTERACTION_COLOR,
+                 pse_export_version="1.8"):
 
         self.show_cartoon = show_cartoon
         self.bg_color = bg_color
@@ -542,11 +576,13 @@ class PymolSessionManager:
         self.wrapper.set("internal_gui_width", 370)
 
     def set_view(self, data):
-        """Set the session view. However, this method is not implemented by default.
-        Instead, you should use a class that inherits from `PymolSessionManager` and
-        implements :meth:`set_view`. An example is the class :class:`~luna.interaction.view.InteractionViewer`
-        that implements a custom :meth:`set_view` to show interactions.
-        Therefore, you should define your own logic beyond :meth:`set_view` to save a Pymol session that meets your goals.
+        """Set the session view. However, this method is not implemented by
+        default. Instead, you should use a class that inherits from
+        `PymolSessionManager` and implements :meth:`set_view`. An example is
+        the class :class:`~luna.interaction.view.InteractionViewer` that
+        implements a custom :meth:`set_view` to show interactions.
+        Therefore, you should define your own logic beyond :meth:`set_view` to
+        save a Pymol session that meets your goals.
 
         Parameters
         ----------
@@ -555,12 +591,17 @@ class PymolSessionManager:
         """
         raise NotImplementedError("Use a class that implements this method.")
 
-    def load_pdb(self, pdb_file, pdb_obj, mol_block=None, is_ftmap_output=False):
+    def load_pdb(self,
+                 pdb_file,
+                 pdb_obj,
+                 mol_block=None,
+                 is_ftmap_output=False):
         """Load molecules from PDB files to the current Pymol session.
 
-        Optionally, ligands can also be loaded from a separate molecular string block.
-        This is especially useful when working with docked molecules in which the
-        protein structure is in a PDB file and ligands are in a separate molecular file.
+        Optionally, ligands can also be loaded from a separate molecular string
+        block. This is especially useful when working with docked molecules in
+        which the protein structure is in a PDB file and ligands are in a
+        separate molecular file.
 
         Parameters
         ----------
@@ -586,7 +627,9 @@ class PymolSessionManager:
                 if obj == "protein":
                     to_merge.append(obj)
 
-                    sel = "protein and not resn %s" % " and not resn ".join(protein_letters_3to1.keys())
+                    sel = \
+                        ("protein and not resn %s"
+                         % " and not resn ".join(protein_letters_3to1.keys()))
                     self.wrapper.alter(sel, "type='HETATM'")
 
                 elif obj.endswith(".pdb"):
@@ -596,10 +639,12 @@ class PymolSessionManager:
             self.wrapper.create(prot_obj, " | ".join(to_merge))
             self.wrapper.delete(objs)
 
-        self.wrapper.extract([("%s.hets" % pdb_obj, "hetatm and %s" % prot_obj)])
+        self.wrapper.extract([("%s.hets" % pdb_obj,
+                               "hetatm and %s" % prot_obj)])
 
         if mol_block is not None:
-            self.wrapper.load_mol_from_pdb_block(mol_block, "%s.hets" % pdb_obj)
+            self.wrapper.load_mol_from_pdb_block(mol_block,
+                                                 "%s.hets" % pdb_obj)
 
         self.wrapper.color_by_element([pdb_obj])
         self.wrapper.hide([("everything", pdb_obj)])
@@ -607,17 +652,22 @@ class PymolSessionManager:
         if self.show_cartoon:
             self.wrapper.show([("cartoon", pdb_obj)])
 
-    def set_interactions_view(self, interactions, main_grp, secondary_grp=None):
+    def set_interactions_view(self,
+                              interactions,
+                              main_grp,
+                              secondary_grp=None):
         """Display molecular interactions.
 
         Parameters
         ----------
-        interactions : iterable of :class:`~luna.interaction.type.InteractionType`
+        interactions : iterable of \
+                :class:`~luna.interaction.type.InteractionType`
             A sequence of interactions to show.
         main_grp : str
             Main Pymol object to store atom groups.
         secondary_grp : str, optional
-            Secondary Pymol object to store interactions. If not provided, ``main_grp`` will be used instead.
+            Secondary Pymol object to store interactions.
+            If not provided, ``main_grp`` will be used instead.
         """
 
         residue_selections = set()
@@ -629,22 +679,34 @@ class PymolSessionManager:
             #
             # Centroid 1
             #
-            obj1_name = "%s.centroids.%s" % (main_grp, hash(tuple(sorted(inter.src_interacting_atms))))
+            centroid_hash1 = hash(tuple(sorted(inter.src_interacting_atms)))
+            obj1_name = "%s.centroids.%s" % (main_grp, centroid_hash1)
             centroid_obj1 = inter.src_centroid
             centroid_obj1_visible = True
-            # Define the centroid in a nucleophile with two atoms as the position of its more electronegative atom.
-            # Remember that the position in the interaction object matters. We have defined that the first group is always
-            # the nucleophile for both dipole-dipole and ion-dipole interactions.
-            if inter.type in NUCLEOPHILE_INTERS and len(inter.src_grp.atoms) == 2:
-                dipole_atm = inter.src_grp.atoms[0] if (inter.src_grp.atoms[0].electronegativity
-                                                        > inter.src_grp.atoms[1].electronegativity) else inter.src_grp.atoms[1]
+            # Define the centroid in a nucleophile with two atoms as the
+            # position of its more electronegative atom. Remember that
+            # the position in the interaction object matters. We have
+            # defined that the first group is always the nucleophile for
+            # both dipole-dipole and ion-dipole interactions.
+            if (inter.type in NUCLEOPHILE_INTERS
+                    and len(inter.src_grp.atoms) == 2):
+                dipole_atm = \
+                    (inter.src_grp.atoms[0]
+                     if (inter.src_grp.atoms[0].electronegativity
+                         > inter.src_grp.atoms[1].electronegativity)
+                     else inter.src_grp.atoms[1])
                 obj1_name += "_%s" % hash(dipole_atm.name)
                 centroid_obj1 = dipole_atm.coord
                 centroid_obj1_visible = False
-            # For unfavorable multipolar interactions, it may happen that the first atom group is an electrophile as well.
-            elif inter.type == "Unfavorable electrophile-electrophile" and len(inter.src_grp.atoms) == 2:
-                dipole_atm = inter.src_grp.atoms[0] if (inter.src_grp.atoms[0].electronegativity
-                                                        < inter.src_grp.atoms[1].electronegativity) else inter.src_grp.atoms[1]
+            # For unfavorable multipolar interactions, it may happen that the
+            # first atom group is an electrophile as well.
+            elif (inter.type == "Unfavorable electrophile-electrophile"
+                    and len(inter.src_grp.atoms) == 2):
+                dipole_atm = \
+                    (inter.src_grp.atoms[0]
+                     if (inter.src_grp.atoms[0].electronegativity
+                         < inter.src_grp.atoms[1].electronegativity)
+                     else inter.src_grp.atoms[1])
                 obj1_name += "_%s" % hash(dipole_atm.name)
                 centroid_obj1 = dipole_atm.coord
                 centroid_obj1_visible = False
@@ -652,24 +714,34 @@ class PymolSessionManager:
             #
             # Centroid 2
             #
-            obj2_name = "%s.centroids.%s" % (main_grp, hash(tuple(sorted(inter.trgt_interacting_atms))))
+            centroid_hash2 = hash(tuple(sorted(inter.trgt_interacting_atms)))
+            obj2_name = "%s.centroids.%s" % (main_grp, centroid_hash2)
             centroid_obj2 = inter.trgt_centroid
             centroid_obj2_visible = True
             # Define the centroid in an electrophile with two atoms as
-            # the position of its less electronegative atom. Remember that 
+            # the position of its less electronegative atom. Remember that
             # the position in the interaction object matters. We have defined
-            # that the second group is always the electrophile for both 
+            # that the second group is always the electrophile for both
             # dipole-dipole and ion-dipole interactions.
-            if inter.type in ELECTROPHILE_INTERS and len(inter.trgt_grp.atoms) == 2:
-                dipole_atm = inter.trgt_grp.atoms[0] if (inter.trgt_grp.atoms[0].electronegativity
-                                                         < inter.trgt_grp.atoms[1].electronegativity) else inter.trgt_grp.atoms[1]
+            if (inter.type in ELECTROPHILE_INTERS
+                    and len(inter.trgt_grp.atoms) == 2):
+                dipole_atm = \
+                    (inter.trgt_grp.atoms[0]
+                     if (inter.trgt_grp.atoms[0].electronegativity
+                         < inter.trgt_grp.atoms[1].electronegativity)
+                     else inter.trgt_grp.atoms[1])
                 obj2_name += "_%s" % hash(dipole_atm.name)
                 centroid_obj2 = dipole_atm.coord
                 centroid_obj2_visible = False
-            # For unfavorable multipolar interactions, it may happen that the second atom group is a nucleophile as well.
-            elif inter.type == "Unfavorable nucleophile-nucleophile" and len(inter.trgt_grp.atoms) == 2:
-                dipole_atm = inter.trgt_grp.atoms[0] if (inter.trgt_grp.atoms[0].electronegativity
-                                                         > inter.trgt_grp.atoms[1].electronegativity) else inter.trgt_grp.atoms[1]
+            # For unfavorable multipolar interactions, it may happen that the
+            # second atom group is a nucleophile as well.
+            elif (inter.type == "Unfavorable nucleophile-nucleophile"
+                    and len(inter.trgt_grp.atoms) == 2):
+                dipole_atm = \
+                    (inter.trgt_grp.atoms[0]
+                     if (inter.trgt_grp.atoms[0].electronegativity
+                         > inter.trgt_grp.atoms[1].electronegativity)
+                     else inter.trgt_grp.atoms[1])
                 obj2_name += "_%s" % hash(dipole_atm.name)
                 centroid_obj2 = dipole_atm.coord
                 centroid_obj2_visible = False
@@ -684,19 +756,24 @@ class PymolSessionManager:
                                             {"vdw": 1,
                                              "pos": list(centroid_obj2)})
 
-            # Set the representation for each compound in the groups involved in the interaction.
-            for compound in inter.src_grp.compounds.union(inter.trgt_grp.compounds):
-                if compound.is_water():
+            # Set the representation for each compound in the groups involved
+            # in the interaction.
+            compounds = inter.src_grp.compounds.union(inter.trgt_grp.compounds)
+            for compound in compounds:
+                if compound.is_water() or compound.is_metal():
                     comp_repr = "sphere"
                 elif compound.is_hetatm():
-                    if len(compound.child_list) == 1 or len([atm for atm in compound.child_list if atm.element != "H"]) == 1:
+                    if (len(compound.child_list) == 1
+                            or len([atm for atm in compound.child_list
+                                    if atm.element != "H"]) == 1):
                         comp_repr = "sphere"
                     else:
                         comp_repr = "sticks"
                 else:
                     comp_repr = "sticks"
 
-                comp_sel = "%s and %s" % (main_grp, mybio_to_pymol_selection(compound))
+                comp_sel = ("%s and %s"
+                            % (main_grp, mybio_to_pymol_selection(compound)))
                 self.wrapper.show([(comp_repr, comp_sel)])
                 carb_color = "green" if compound.is_target() else "gray"
                 self.wrapper.color([(carb_color, comp_sel + " AND elem C")])
@@ -706,12 +783,16 @@ class PymolSessionManager:
 
                     # Show residue label if required.
                     if self.show_res_labels:
-                        self.wrapper.label([("%s AND name CA" % comp_sel, '"%s-%s" % (resn, resi)')])
+                        self.wrapper.label([("%s AND name CA" % comp_sel,
+                                             '"%s-%s" % (resn, resi)')])
 
-            # Check if the interaction involves the same compound: intramolecular interactions.
+            # Check if the interaction involves the same
+            # compound: intramolecular interactions.
             inter_grp = "intra" if inter.is_intramol_interaction() else "inter"
 
-            src_grp_name = "+".join(["%s-%s-%d%s" % (c.parent.id, c.resname, c.id[1], c.id[2].strip())
+            src_grp_name = "+".join(["%s-%s-%d%s"
+                                     % (c.parent.id, c.resname,
+                                        c.id[1], c.id[2].strip())
                                      for c in sorted(inter.src_grp.compounds)])
 
             trgt_grp_name = \
@@ -729,8 +810,11 @@ class PymolSessionManager:
             self.wrapper.distance(inter_name, obj1_name, obj2_name)
             self.wrapper.hide([("label", inter_name)])
 
+            inter_color = self.inter_color.get_color(inter.type)
+
             # Set styles to the interactions.
-            self.wrapper.color([(self.inter_color.get_color(inter.type), inter_name)])
+            self.wrapper.color([(inter_color,
+                                 inter_name)])
 
             if self.add_directional_arrows:
 
@@ -740,17 +824,28 @@ class PymolSessionManager:
 
                     square_name = "%s.block" % inter_grp
 
-                    arrow_opts = {"radius": 0.03, "gap": 0.9, "hlength": 0.5, "hradius": 0.2,
-                                  "color": self.inter_color.get_color(inter.type)}
-                    square_opts = {"radius": 0.3, "gap": 1.5, "hlength": 0, "hradius": 0,
-                                   "color": self.inter_color.get_color(inter.type)}
+                    arrow_opts = {"radius": 0.03, "gap": 0.9,
+                                  "hlength": 0.5, "hradius": 0.2,
+                                  "color": inter_color}
+                    square_opts = {"radius": 0.3,
+                                   "gap": 1.5, "hlength": 0,
+                                   "hradius": 0, "color": inter_color}
 
                     # Two arrows in different directions
-                    self.wrapper.arrow(arrow_name1, obj1_name, obj2_name, arrow_opts)
+                    self.wrapper.arrow(arrow_name1,
+                                       obj1_name,
+                                       obj2_name,
+                                       arrow_opts)
 
                     if not inter.is_directional():
-                        self.wrapper.arrow(arrow_name2, obj2_name, obj1_name, arrow_opts)
-                    self.wrapper.arrow(arrow_name2, obj2_name, obj1_name, arrow_opts)
+                        self.wrapper.arrow(arrow_name2,
+                                           obj2_name,
+                                           obj1_name,
+                                           arrow_opts)
+                    self.wrapper.arrow(arrow_name2,
+                                       obj2_name,
+                                       obj1_name,
+                                       arrow_opts)
 
                     # Add a square-like object
                     self.wrapper.arrow(square_name, obj1_name,
@@ -760,29 +855,33 @@ class PymolSessionManager:
                 # represent directional interactions
                 elif inter.is_directional():
                     arrow_name = "%s.arrow" % inter_grp
-
-                    inter_color = self.inter_color.get_color(inter.type)
                     arrow_opts = {"radius": 0.03, "gap": 0.9,
                                   "hlength": 0.5, "hradius": 0.2,
                                   "color": inter_color}
-
-                    self.wrapper.arrow(arrow_name, obj1_name, obj2_name, arrow_opts)
+                    self.wrapper.arrow(arrow_name,
+                                       obj1_name,
+                                       obj2_name,
+                                       arrow_opts)
 
             # If a group object contains more than one atom.
             if inter.src_grp.size > 1 and centroid_obj1_visible:
-                # Add the centroids to the group "centroids" and append them to the main group
+                # Add the centroids to the group "centroids" and append them
+                # to the main group
                 self._set_centroid_style(obj1_name)
-            # Otherwise, just remove the centroid as it will not add any new information (the atom represented
-            # by the centroid is already the atom itself).
+            # Otherwise, just remove the centroid as it will not add any new
+            # information (the atom represented by the centroid is already the
+            # atom itself).
             else:
                 self.wrapper.delete([obj1_name])
 
             # If a group object contains more than one atom.
             if inter.trgt_grp.size > 1 and centroid_obj2_visible:
-                # Add the centroids to the group "centroids" and append them to the main group
+                # Add the centroids to the group "centroids" and append them
+                # to the main group
                 self._set_centroid_style(obj2_name)
-            # Otherwise, just remove the centroid as it will not add any new information (the atom represented
-            # by the centroid is already been displayed).
+            # Otherwise, just remove the centroid as it will not add any new
+            # information (the atom represented by the centroid is already
+            # been displayed).
             else:
                 self.wrapper.delete([obj2_name])
 
@@ -795,8 +894,9 @@ class PymolSessionManager:
         self.wrapper.set("sphere_scale", 0.2, {"selection": centroid})
 
     def set_last_details_to_view(self):
-        """This method can be called to apply final modifications to the Pymol session.
-        In its default version, the following modifications are applied:
+        """This method can be called to apply final modifications to the
+        Pymol session. In its default version, the following modifications
+        are applied:
             * Dash radius for interactions is set to 0.08;
             * Labels are set to bold and their size is set to 20;
             * Atomic spheres' scale is set to 0.3;
@@ -806,7 +906,8 @@ class PymolSessionManager:
         self.wrapper.set("dash_radius", 0.08)
         self.wrapper.set("label_font_id", "13")
         self.wrapper.set("label_size", "20")
-        self.wrapper.set("sphere_scale", "0.3", {"selection": "visible and not name PS*"})
+        self.wrapper.set("sphere_scale", "0.3",
+                         {"selection": "visible and not name PS*"})
         self.wrapper.hide([("everything", "elem H+D")])
         self.wrapper.center("visible")
 
@@ -827,8 +928,9 @@ class PymolSessionManager:
 
 
 def mybio_to_pymol_selection(entity):
-    """Transform an :class:`~luna.MyBio.PDB.Entity.Entity` instance into a Pymol selection-expression,
-    which can then be used to select atoms in a Pymol session.
+    """Transform an :class:`~luna.MyBio.PDB.Entity.Entity` instance into a
+    Pymol selection-expression, which can then be used to select atoms in a
+    Pymol session.
 
     Parameters
     ----------
@@ -848,7 +950,9 @@ def mybio_to_pymol_selection(entity):
     >>> from luna.util.default_values import LUNA_PATH
     >>> from luna.MyBio.PDB.PDBParser import PDBParser
     >>> pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True)
-    >>> structure = pdb_parser.get_structure("Protein", f"{LUNA_PATH}/tutorial/inputs/3QQK.pdb")
+    >>> structure = pdb_parser.get_structure("Protein",
+    ...                                      f"{LUNA_PATH}/tutorial/\
+inputs/3QQK.pdb")
 
     Now, let's get the Pymol selection-expression for the chain A.
 
