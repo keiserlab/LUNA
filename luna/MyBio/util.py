@@ -361,7 +361,7 @@ def biopython_entity_to_mol(entity,
             ob_opt["p"] = ph
         else:
             ob_opt["h"] = ""
-    convert_molecule(ini_input_file, mol_file,
+    convert_molecule(ini_input_file, output_file=mol_file,
                      opts=ob_opt, openbabel=openbabel)
 
     # Currently, ignored atoms are only metals.
@@ -437,8 +437,8 @@ def biopython_entity_to_mol(entity,
             # Overwrite mol_file by converting the new molecular file using
             # the user specified parameters. Note that right now it will add
             # explicit hydrogens to the molecules according to the provided pH.
-            convert_molecule(new_mol_file, mol_file, opts=ob_opt,
-                             openbabel=OPENBABEL)
+            convert_molecule(new_mol_file, output_file=mol_file, 
+                             opts=ob_opt, openbabel=OPENBABEL)
 
             # Let's finally read the correct and standardized molecular file.
             try:
