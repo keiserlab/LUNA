@@ -1,4 +1,3 @@
-from os.path import exists
 from operator import xor
 from enum import Enum, auto
 from collections import defaultdict, Counter
@@ -7,7 +6,6 @@ from Bio.PDB.Polypeptide import is_aa
 from luna.mol.precomp_data import DefaultResidueData
 from luna.wrappers.base import MolWrapper, BondType, OBBondType
 from luna.MyBio.neighbors import get_residue_neighbors
-from luna.mol.precomp_data import from_cif_file
 
 from openbabel.openbabel import OBSmartsPattern
 

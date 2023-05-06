@@ -8,15 +8,13 @@
 *.pkl.gz
 *.output
 *.csv
-
 *\.fuse_hidden*
-
 .project
 .pydevproject
 
 # Remove entire directories:
-
 tmp/
+tests/projects
 www/system
 www/application/config
 www/data
