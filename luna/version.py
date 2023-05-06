@@ -8,7 +8,7 @@
 
        - PATCH stands for backward compatible bug fixes.
 """
-version_info = (0, 12, 0)
+version_info = (0, 13, 0)
 version = '.'.join(str(c) for c in version_info)
 __version__ = version
 
