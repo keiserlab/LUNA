@@ -106,7 +106,7 @@ class Fingerprint:
 
         Parameters
         ----------
-        vector : :class:`numpy.ndarray` or :class:`scipy.sparse.csr_matrix`
+        vector : :class:`numpy.ndarray` or `scipy.sparse.csr_matrix`
             Array of bits.
         fp_length : int, optional
             The fingerprint length (total number of bits).
@@ -316,8 +316,8 @@ class Fingerprint:
 
     @property
     def num_levels(self):
-        """int: The property 'num_levels' used to generate this fingerprint \
-        (see :class:`~luna.interaction.fp.shell.ShellGenerator`). \
+        """int: The property `num_levels` used to generate this fingerprint
+        (see :class:`~luna.interaction.fp.shell.ShellGenerator`).
         If it was not provided, then return None."""
         return self.props.get("num_levels", None)
 
@@ -339,8 +339,8 @@ class Fingerprint:
 
     @property
     def num_shells(self):
-        """int: The property 'num_shells' \
-        (see :class:`~luna.interaction.fp.shell.ShellGenerator`). \
+        """int: The property `num_shells`
+        (see :class:`~luna.interaction.fp.shell.ShellGenerator`).
         If it was not provided, then return None."""
         return self.props.get("num_shells", None)
 
@@ -417,7 +417,7 @@ class Fingerprint:
 
         Returns
         -------
-         : :class:`numpy.ndarray` or :class:`scipy.sparse.csr_matrix`
+         : :class:`numpy.ndarray` or `scipy.sparse.csr_matrix`
             Vector of bits/counts.
             Return a compressed sparse matrix (`scipy.sparse.csr_matrix`)
             if ``compressed`` is True. Otherwise, return a Numpy array
@@ -481,7 +481,7 @@ class Fingerprint:
 
         Returns
         -------
-         : :class:`numpy.ndarray` or :class:`scipy.sparse.csr_matrix`
+         : :class:`numpy.ndarray` or `scipy.sparse.csr_matrix`
             Vector of bits/counts.
             Return a compressed sparse matrix (`scipy.sparse.csr_matrix`)
             if ``compressed`` is True. Otherwise, return a Numpy array
@@ -948,11 +948,13 @@ fp_length=fp_length)
         >>> np.random.seed(0)
         >>> on_bits = 8
         >>> fp_length = 32
-        >>> counts = dict(zip(*np.unique(np.random.randint(0, fp_length, on_bits),
+        >>> counts = dict(zip(*np.unique(np.random.randint(0, fp_length, \
+on_bits),
         ...                              return_counts=True)))
         >>> print(counts)
         {0: 1, 3: 2, 7: 1, 12: 1, 15: 1, 21: 1, 27: 1}
-        >>> fp = CountFingerprint.from_counts(counts=counts, fp_length=fp_length)
+        >>> fp = CountFingerprint.from_counts(counts=counts,
+        ...                                   fp_length=fp_length)
         >>> print(fp.indices)
         [ 0  3  7 12 15 21 27]
         >>> print(fp.to_vector(compressed=False))
@@ -991,7 +993,8 @@ fp_length=fp_length)
         --------
         >>> from luna.interaction.fp.fingerprint import CountFingerprint
         >>> fp = CountFingerprint.from_bit_string("0010100110000010",
-        ...                                       counts={2: 5, 4: 1, 7: 3, 8: 1, 14: 2})
+        ...                                       counts={2: 5, 4: 1, 7: 3, \
+8: 1, 14: 2})
         >>> print(fp.indices)
         [ 2  4  7  8 14]
         >>> print(fp.counts)
@@ -1009,7 +1012,7 @@ fp_length=fp_length)
 
         Parameters
         ----------
-        vector : :class:`numpy.ndarray` or :class:`scipy.sparse.csr_matrix`
+        vector : :class:`numpy.ndarray` or `scipy.sparse.csr_matrix`
             Array of counts.
         fp_length : int, optional
             The fingerprint length (total number of bits).
@@ -1029,14 +1032,16 @@ fp_length=fp_length)
         >>> import numpy as np
         >>> np.random.seed(0)
         >>> fp_length = 32
-        >>> vector = np.random.choice(5, size=(fp_length,), p=[0.76, 0.1, 0.1, 0.02, 0.02])
+        >>> vector = np.random.choice(5, size=(fp_length,),
+        ...                           p=[0.76, 0.1, 0.1, 0.02, 0.02])
         >>> print(vector)
         [0 0 0 0 2 3 0 1 0 0 2 0 0 0 1 1 2 3 1 0 1 0 0 0 2 0 0 0 1 0 0 0]
         >>> fp = CountFingerprint.from_vector(vector)
         >>> print(fp.indices)
         [ 4  5  7 10 14 15 16 17 18 20 24 28]
         >>> print(fp.counts)
-        {4: 2, 5: 3, 7: 1, 10: 2, 14: 1, 15: 1, 16: 2, 17: 3, 18: 1, 20: 1, 24: 2, 28: 1}
+        {4: 2, 5: 3, 7: 1, 10: 2, 14: 1, 15: 1, 16: 2, 17: 3, 18: 1, 20: 1, \
+24: 2, 28: 1}
         """
         if fp_length is None:
             try:
@@ -1125,11 +1130,14 @@ fp_length=fp_length)
         >>> np.random.seed(0)
         >>> on_bits = 8
         >>> fp_length = 32
-        >>> indices, counts = np.unique(np.random.randint(0, fp_length, on_bits), return_counts=True)
+        >>> indices, counts = np.unique(np.random.randint(0, fp_length, \
+on_bits),
+        ...                             return_counts=True)
         >>> counts = dict(zip(indices, counts))
         >>> print(counts)
         {0: 1, 3: 2, 7: 1, 12: 1, 15: 1, 21: 1, 27: 1}
-        >>> fp = CountFingerprint.from_indices(indices, counts=counts, fp_length=fp_length)
+        >>> fp = CountFingerprint.from_indices(indices, counts=counts,
+        ...                                    fp_length=fp_length)
         >>> print(fp.indices)
         [ 0  3  7 12 15 21 27]
         >>> print(fp.to_vector(compressed=False))
@@ -1142,8 +1150,10 @@ fp_length=fp_length)
         """
         new_fp = super().fold(new_length)
 
-        new_fp._counts = dict([(folded_idx, sum([self.get_count(x) for x in unfolded_set]))
-                               for folded_idx, unfolded_set in new_fp.unfolding_map.items()])
+        new_fp._counts = dict([(folded_idx, sum([self.get_count(x)
+                                                 for x in unfolded_set]))
+                               for folded_idx, unfolded_set
+                               in new_fp.unfolding_map.items()])
 
         return new_fp
 

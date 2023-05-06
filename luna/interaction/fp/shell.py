@@ -323,10 +323,9 @@ class ShellManager:
         curr_level : int
             The current level (iteration).
         unique_shells : bool
-            If True, ignore non-valid shells and go down to inferior
-            levels until a valid shell is found. If level 0 was reached
-            and no valid shell was found, then return None.
-            The default value is False.
+            If True, ignore non-valid shells and go down to inferior levels
+            until a valid shell is found. If level 0 was reached and no valid
+            shell was found, then return None. The default value is False.
 
         Returns
         -------
@@ -363,8 +362,8 @@ class ShellManager:
         Returns
         -------
          : `Shell` or None
-            The last shell generated for center ``center`` or None if
-            no valid shell was found.
+            The last shell generated for center ``center`` or None if no valid
+            shell was found.
         """
         shell = None
 
@@ -402,8 +401,8 @@ class ShellManager:
                                for s in self.get_shells_by_level(level)]
         else:
             if unique_shells:
-                identifiers = [s.identifier for s in self.shells
-                               if s.is_valid()]
+                identifiers = [s.identifier
+                               for s in self.shells if s.is_valid()]
             else:
                 identifiers = [s.identifier for s in self.shells]
 
@@ -877,10 +876,16 @@ class Shell:
 
             # Add padding to np_classes
             if np_data.shape[1] > np_classes.shape[0]:
-                np_classes = np.pad(np_classes, (0, (np_data.shape[1] - np_classes.shape[0])), 'constant', constant_values=PAD_DEFAULT)
+                np_classes = np.pad(np_classes,
+                                    (0, (np_data.shape[1]
+                                         - np_classes.shape[0])),
+                                    'constant', constant_values=PAD_DEFAULT)
             # Add padding to np_data.
             elif np_data.shape[1] < np_classes.shape[0]:
-                np_data = np.pad(np_data, ((0, 0), (0, np_classes.shape[0] - np_data.shape[1])), 'constant', constant_values=PAD_DEFAULT)
+                np_data = np.pad(np_data,
+                                 ((0, 0),
+                                  (0, np_classes.shape[0] - np_data.shape[1])),
+                                 'constant', constant_values=PAD_DEFAULT)
 
             data = np.vstack((np_data, np_classes))
 
@@ -984,15 +989,21 @@ class ShellGenerator:
 
             >>> fp = sm.to_fingerprint(fold_to_length=1024)
             >>> print(fp.indices)
-            [   2   19   22   23   34   37   39   45   54   67   71   75   83   84
-               93  109  138  140  157  162  181  182  186  187  191  194  206  209
-              211  237  246  251  263  271  281  296  304  315  323  358  370  374
-              388  392  399  400  419  439  476  481  487  509  519  527  532  578
-              587  592  604  605  629  635  645  661  668  698  711  713  732  736
-              740  753  764  795  813  815  820  824  825  831  836  855  873  882
+            [   2   19   22   23   34   37   39   45   54   67   71   75   \
+83   84
+               93  109  138  140  157  162  181  182  186  187  191  194  \
+206  209
+              211  237  246  251  263  271  281  296  304  315  323  358  \
+370  374
+              388  392  399  400  419  439  476  481  487  509  519  527  \
+532  578
+              587  592  604  605  629  635  645  661  668  698  711  713  \
+732  736
+              740  753  764  795  813  815  820  824  825  831  836  855  \
+873  882
               911  926  967  975  976  984  990  996 1020]
 
-        * Visualize substructural information in Pymol\:
+        * Visualize substructural information in Pymol:
 
             >>> from luna.interaction.fp.view import ShellViewer
             >>> shell_tuples = [(atm_grps_mngr.entry,
@@ -1103,6 +1114,10 @@ class ShellGenerator:
                         logger.exception(error_msg)
                         raise ShellCenterNotFound(error_msg)
 
+                        error_msg = ("There are no shells initialized to the "
+                                     "atom group '%s'." % atm_grp)
+                        raise ShellCenterNotFound(error_msg)
+
                     prev_atm_grps = prev_shell.neighborhood
                     prev_interactions = prev_shell.interactions
 
@@ -1115,30 +1130,41 @@ class ShellGenerator:
                     for prev_atm_grp in sorted(prev_atm_grps):
                         # Include the partner's derived groups to the set of
                         # all derived groups.
-                        all_derived_atm_grps.update(self._get_derived_grps(prev_atm_grp, pseudo_grps_mapping))
+                        derived_grps = \
+                            self._get_derived_grps(prev_atm_grp,
+                                                   pseudo_grps_mapping)
+                        all_derived_atm_grps.update(derived_grps)
 
                         for inter in prev_atm_grp.interactions:
                             # Only PseudoAtomGroup objects should deal with
                             # hydrophobic interactions.
-                            if isinstance(prev_atm_grp, PseudoAtomGroup) is False and inter.type == "Hydrophobic":
+                            if (isinstance(prev_atm_grp,
+                                           PseudoAtomGroup) is False
+                                    and inter.type == "Hydrophobic"):
                                 continue
 
-                            partner_grp = self._recover_partner_grp(prev_atm_grp, inter, pseudo_grps_mapping)
+                            partner_grp = \
+                                self._recover_partner_grp(prev_atm_grp,
+                                                          inter,
+                                                          pseudo_grps_mapping)
 
                             if partner_grp is not None:
-                                if inter not in interactions_to_add and partner_grp in nb_atm_grps:
+                                if (inter not in interactions_to_add
+                                        and partner_grp in nb_atm_grps):
                                     new_tuple = (inter, partner_grp)
 
                                     # Ignore interactions that already exists
                                     # in the previous shell to avoid
-                                    # duplications in the list of interactions.
-                                    # For example, without this control, an
-                                    # interaction I between atom A1 and A2
-                                    # would appear twice in the list: (I, A1)
-                                    # and (I, A2). Thus, it keeps only the
-                                    # first interaction that appears while
-                                    # increasing the shell.
-                                    if inter in prev_interactions and new_tuple not in prev_shell.inter_tuples:
+                                    # duplications in the list of
+                                    # interactions. For example, without this
+                                    # control, an interaction I between atom
+                                    # A1 and A2 would appear twice in the
+                                    # list: (I, A1) and (I, A2). Thus, it
+                                    # keeps only the first interaction that
+                                    # appears while increasing the shell.
+                                    if (inter in prev_interactions
+                                            and new_tuple
+                                            not in prev_shell.inter_tuples):
                                         continue
 
                                     inter_tuples.add(new_tuple)
@@ -1179,20 +1205,27 @@ class ShellGenerator:
                 # current centroid (atom group) was reached.
                 if last_shell:
                     # The limit will be reached when the last shell already
-                    # contains all interactions established by the atom
-                    # groups inside the shell. In this case, expanding the
-                    # radius will not result in any new shell because a shell
-                    # is only created when the atoms inside the last shell
-                    # establish interactions with the atom groups found after
-                    # increasing the radius.
-                    all_nb_interactions = set(chain.from_iterable([g.interactions for g in last_shell.neighborhood]))
+                    # contains all interactions established by the atom groups
+                    # inside the shell. In this case, expanding the radius
+                    # will not result in any new shell because a shell is only
+                    # created when the atoms inside the last shell establish
+                    # interactions with the atom groups found after increasing
+                    # the radius.
+                    neighborhood = last_shell.neighborhood
+                    all_nb_interactions = \
+                        set(chain.from_iterable([g.interactions
+                                                 for g in neighborhood]))
+
                     # It considers only interactions whose atom groups exist in
                     # the neighborhood.
-                    valid_interactions = set([i for i in all_nb_interactions if i.src_grp in neighborhood and i.trgt_grp in neighborhood])
+                    valid_interactions = set([i for i in all_nb_interactions
+                                              if i.src_grp in neighborhood
+                                              and i.trgt_grp in neighborhood])
 
                     # It identifies if the convergence for the interactions
                     # was reached.
-                    interactions_converged = valid_interactions == last_shell.interactions
+                    interactions_converged = \
+                        valid_interactions == last_shell.interactions
 
                     # It identifies if the convergence for the expansion of
                     # atom groups was reached, which happens when all derived
@@ -1202,15 +1235,18 @@ class ShellGenerator:
                     # groups were included in the centroid neighborhood.
                     # Thus, the second test provides a chance to all of these
                     # recently discovered groups to expand.
-                    grp_expansions_converged = all_derived_atm_grps == last_shell.neighborhood and len(unique_derived_atm_grps) == 0
+                    grp_expansions_converged = \
+                        (all_derived_atm_grps == last_shell.neighborhood
+                         and len(unique_derived_atm_grps) == 0)
 
                     # The local convergence is reached when no atom group
                     # inside the current sphere can expand or all of its
                     # interactions were already included to the sphere.
                     local_convergence = \
                         interactions_converged and grp_expansions_converged
-                    # The global convergence occurs when all interactions in
-                    # the binding site were already included in the sphere.
+
+                    # The global convergence occurs when all interactions
+                    # in the binding site were already included in the sphere.
                     global_convergence = \
                         all_interactions == last_shell.interactions
 
@@ -1248,8 +1284,10 @@ class ShellGenerator:
                 if inter.type != "Hydrophobic" or inter in mapped_interactions:
                     continue
 
-                src_tuple = (inter.src_grp, tuple(sorted(inter.src_interacting_atms)))
-                trgt_tuple = (inter.trgt_grp, tuple(sorted(inter.trgt_interacting_atms)))
+                src_tuple = (inter.src_grp,
+                             tuple(sorted(inter.src_interacting_atms)))
+                trgt_tuple = (inter.trgt_grp,
+                              tuple(sorted(inter.trgt_interacting_atms)))
 
                 for atm_grp, atms in [src_tuple, trgt_tuple]:
                     # It will get a pseudo-group already created or create

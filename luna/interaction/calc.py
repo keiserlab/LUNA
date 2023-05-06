@@ -882,29 +882,38 @@ inter_config=custom_config)
                 # If a nucleophile has 2 atoms, it will select the partially
                 # negative atom based on the electronegativity.
                 if len(inter.src_grp.atoms) == 2:
-                    atm1 = inter.src_grp.atoms[0] if (inter.src_grp.atoms[0].electronegativity
-                                                      > inter.src_grp.atoms[1].electronegativity) else inter.src_grp.atoms[1]
+                    atm1 = (inter.src_grp.atoms[0]
+                            if (inter.src_grp.atoms[0].electronegativity
+                                > inter.src_grp.atoms[1].electronegativity)
+                            else inter.src_grp.atoms[1])
 
                 # A nucleophile may have only 1 atom (water oxygen).
                 atm2 = inter.trgt_grp.atoms[0]
                 # If a nucleophile has 2 atoms, it will select the partially
                 # negative atom based on the electronegativity.
                 if len(inter.trgt_grp.atoms) == 2:
-                    atm2 = inter.trgt_grp.atoms[0] if (inter.trgt_grp.atoms[0].electronegativity
-                                                       > inter.trgt_grp.atoms[1].electronegativity) else inter.trgt_grp.atoms[1]
+                    atm2 = (inter.trgt_grp.atoms[0]
+                            if (inter.trgt_grp.atoms[0].electronegativity
+                                > inter.trgt_grp.atoms[1].electronegativity)
+                            else inter.trgt_grp.atoms[1])
                 key = (atm1, atm2)
                 if (atm2, atm1) in hbond_inconsistences:
                     key = (atm2, atm1)
                 hbond_inconsistences[key].append(inter)
             elif inter.type == "Unfavorable anion-nucleophile":
-                nucl_grp = inter.src_grp if any([f.name == "Nucleophile" for f in inter.src_grp.features]) else inter.trgt_grp
+                nucl_grp = (inter.src_grp
+                            if any([f.name == "Nucleophile"
+                                    for f in inter.src_grp.features])
+                            else inter.trgt_grp)
                 # A nucleophile may have only 1 atom (water oxygen).
                 nucl_atm = nucl_grp.atoms[0]
                 # If a nucleophile has 2 atoms, it will select the partially
                 # negative atom based on the electronegativity.
                 if len(nucl_grp.atoms) == 2:
-                    nucl_atm = nucl_grp.atoms[0] if (nucl_grp.atoms[0].electronegativity
-                                                     > nucl_grp.atoms[1].electronegativity) else nucl_grp.atoms[1]
+                    nucl_atm = (nucl_grp.atoms[0]
+                                if (nucl_grp.atoms[0].electronegativity
+                                    > nucl_grp.atoms[1].electronegativity)
+                                else nucl_grp.atoms[1])
                 anion_grp = inter.get_partner(nucl_grp)
                 for anion_atm in anion_grp.atoms:
                     key = (nucl_atm, anion_atm)
@@ -920,31 +929,43 @@ inter_config=custom_config)
                     key = (atm2, atm1)
                 hbond_inconsistences[key].append(inter)
             elif inter.type == "Amide-aromatic stacking":
-                amide_grp = inter.src_grp if any([f.name == "Amide" for f in inter.src_grp.features]) else inter.trgt_grp
+                amide_grp = (inter.src_grp
+                             if any([f.name == "Amide"
+                                     for f in inter.src_grp.features])
+                             else inter.trgt_grp)
                 arom_grp = inter.get_partner(amide_grp)
                 for amide_atm in amide_grp.atoms:
                     amide_inconsistences[(amide_atm, arom_grp)].append(inter)
             elif inter.type == "Unfavorable cation-electrophile":
-                elect_grp = inter.src_grp if any([f.name == "Nucleophile" for f in inter.src_grp.features]) else inter.trgt_grp
+                elect_grp = (inter.src_grp
+                             if any([f.name == "Nucleophile"
+                                     for f in inter.src_grp.features])
+                             else inter.trgt_grp)
                 # A nucleophile may have only 1 atom (water oxygen).
                 elect_atm = elect_grp.atoms[0]
                 # If a nucleophile has 2 atoms, it will select the partially
                 # negative atom based on the electronegativity.
                 if len(elect_grp.atoms) == 2:
-                    elect_atm = elect_grp.atoms[0] if (elect_grp.atoms[0].electronegativity
-                                                       > elect_grp.atoms[1].electronegativity) else elect_grp.atoms[1]
+                    elect_atm = (elect_grp.atoms[0]
+                                 if (elect_grp.atoms[0].electronegativity
+                                     > elect_grp.atoms[1].electronegativity)
+                                 else elect_grp.atoms[1])
 
                 cation_grp = inter.get_partner(elect_grp)
                 amide_inconsistences[(elect_atm, cation_grp)].append(inter)
 
         inconsistencies = set()
         for (atm1, atm2), inters in hbond_inconsistences.items():
-            if len(inters) > 1 and any([i.type == "Hydrogen bond" for i in inters]):
-                inconsistencies.update([i for i in inters if i.type != "Hydrogen bond"])
+            if (len(inters) > 1
+                    and any([i.type == "Hydrogen bond" for i in inters])):
+                inconsistencies.update([i for i in inters
+                                        if i.type != "Hydrogen bond"])
 
         for (amide_atm, arom_grp), inters in amide_inconsistences.items():
             if len(inters) > 1:
-                inconsistencies.update([i for i in inters if i.type != "Amide-aromatic stacking"])
+                inter_name = "Amide-aromatic stacking"
+                inconsistencies.update([i for i in inters
+                                        if i.type != inter_name])
 
         interactions -= inconsistencies
 
@@ -1081,7 +1102,7 @@ inter_config=custom_config)
                 # Proximal, covalent, vdw, clash
                 ("Atom", "Atom"): [self.calc_atom_atom, self.calc_proximal]}
 
-        # TODO: Incluir:
+        # TODO: Include:
 
         # Anion - pi system
 
@@ -1127,7 +1148,9 @@ inter_config=custom_config)
         cc_dist = im.euclidean_distance(group1.centroid, group2.centroid)
 
         if (self.is_within_boundary(cc_dist, "bsite_cutoff", le)
-                and self.is_within_boundary(cc_dist, "max_dist_cation_pi_inter", le)):
+                and self.is_within_boundary(cc_dist,
+                                            "max_dist_cation_pi_inter",
+                                            le)):
             params = {"dist_cation_pi_inter": cc_dist}
             inter = InteractionType(group1, group2, "Cation-pi", params=params)
 
@@ -1164,7 +1187,8 @@ inter_config=custom_config)
         cc_dist = im.euclidean_distance(ring1.centroid, ring2.centroid)
 
         if (self.is_within_boundary(cc_dist, "bsite_cutoff", le)
-                and self.is_within_boundary(cc_dist, "max_cc_dist_pi_pi_inter", le)):
+                and self.is_within_boundary(cc_dist, "max_cc_dist_pi_pi_inter",
+                                            le)):
 
             dihedral_angle = im.to_quad1(im.angle(ring1.normal, ring2.normal))
 
@@ -1188,24 +1212,40 @@ inter_config=custom_config)
             # all interactions will be Pi-stacking.
             if any([c not in self.inter_config for c in criteria]):
                 inter_type = "Pi-stacking"
-            elif self.is_within_boundary(min_disp_angle, "min_disp_ang_offset_pi_pi_inter", le):
-                if self.is_within_boundary(dihedral_angle, "min_dihed_ang_slope_pi_pi_inter", le):
+            elif self.is_within_boundary(min_disp_angle,
+                                         "min_disp_ang_offset_pi_pi_inter",
+                                         le):
+                if self.is_within_boundary(dihedral_angle,
+                                           "min_dihed_ang_slope_pi_pi_inter",
+                                           le):
                     inter_type = "Face-to-face pi-stacking"
-                elif self.is_within_boundary(dihedral_angle, "max_dihed_ang_slope_pi_pi_inter", ge):
+                elif self.is_within_boundary(dihedral_angle,
+                                             "max_dihed_ang_slope_pi_pi_inter",
+                                             ge):
                     inter_type = "Face-to-edge pi-stacking"
                 else:
                     inter_type = "Face-to-slope pi-stacking"
-            elif self.is_within_boundary(min_disp_angle, "max_disp_ang_offset_pi_pi_inter", ge):
-                if self.is_within_boundary(dihedral_angle, "min_dihed_ang_slope_pi_pi_inter", le):
+            elif self.is_within_boundary(min_disp_angle,
+                                         "max_disp_ang_offset_pi_pi_inter",
+                                         ge):
+                if self.is_within_boundary(dihedral_angle,
+                                           "min_dihed_ang_slope_pi_pi_inter",
+                                           le):
                     inter_type = "Edge-to-edge pi-stacking"
-                elif self.is_within_boundary(dihedral_angle, "max_dihed_ang_slope_pi_pi_inter", ge):
+                elif self.is_within_boundary(dihedral_angle,
+                                             "max_dihed_ang_slope_pi_pi_inter",
+                                             ge):
                     inter_type = "Edge-to-face pi-stacking"
                 else:
                     inter_type = "Edge-to-slope pi-stacking"
             else:
-                if self.is_within_boundary(dihedral_angle, "min_dihed_ang_slope_pi_pi_inter", le):
+                if self.is_within_boundary(dihedral_angle,
+                                           "min_dihed_ang_slope_pi_pi_inter",
+                                           le):
                     inter_type = "Displaced face-to-face pi-stacking"
-                elif self.is_within_boundary(dihedral_angle, "max_dihed_ang_slope_pi_pi_inter", ge):
+                elif self.is_within_boundary(dihedral_angle,
+                                             "max_dihed_ang_slope_pi_pi_inter",
+                                             ge):
                     inter_type = "Displaced face-to-edge pi-stacking"
                 else:
                     inter_type = "Displaced face-to-slope pi-stacking"
@@ -1337,7 +1377,8 @@ inter_config=custom_config)
         # Verify if the groups contain the required number of atoms to
         # form a valid surface.
         if (not self.is_within_boundary(len(group1.atoms), "min_surf_size", ge)
-                or not self.is_within_boundary(len(group2.atoms), "min_surf_size", ge)):
+                or not self.is_within_boundary(len(group2.atoms),
+                                               "min_surf_size", ge)):
             return []
 
         interacting_atms_in_surf1 = set()
@@ -1360,7 +1401,8 @@ inter_config=custom_config)
             return []
 
         if (self.is_within_boundary(min_cc_dist, "bsite_cutoff", le)
-                and self.is_within_boundary(min_cc_dist, "max_dist_hydrop_inter", le)):
+                and self.is_within_boundary(min_cc_dist,
+                                            "max_dist_hydrop_inter", le)):
 
             params = {"dist_hydrop_inter": min_cc_dist}
             inter = InteractionType(group1,
@@ -1439,20 +1481,29 @@ inter_config=custom_config)
         # If a nucleophile has 2 atoms, it will select the partially negative
         # atom based on the electronegativity.
         if len(dipole_grp.atoms) == 2 and dipole_type == "Nucleophile":
-            part_charged_atm = dipole_grp.atoms[0] if (dipole_grp.atoms[0].electronegativity
-                                                       > dipole_grp.atoms[1].electronegativity) else dipole_grp.atoms[1]
+            part_charged_atm = \
+                (dipole_grp.atoms[0]
+                 if (dipole_grp.atoms[0].electronegativity
+                     > dipole_grp.atoms[1].electronegativity)
+                 else dipole_grp.atoms[1])
 
         # If an electrophile has two atoms. It will select the partially
         # negative atom based on the electronegativity.
         elif len(dipole_grp.atoms) == 2 and dipole_type == "Electrophile":
-            part_charged_atm = dipole_grp.atoms[0] if (dipole_grp.atoms[0].electronegativity
-                                                       < dipole_grp.atoms[1].electronegativity) else dipole_grp.atoms[1]
+            part_charged_atm = \
+                (dipole_grp.atoms[0]
+                 if (dipole_grp.atoms[0].electronegativity
+                     < dipole_grp.atoms[1].electronegativity)
+                 else dipole_grp.atoms[1])
 
         # Distance between the ion and the dipole.
-        id_dist = im.euclidean_distance(part_charged_atm.coord, ion_grp.centroid)
+        id_dist = im.euclidean_distance(part_charged_atm.coord,
+                                        ion_grp.centroid)
 
         if (self.is_within_boundary(id_dist, "bsite_cutoff", le)
-                and self.is_within_boundary(id_dist, "max_id_dist_ion_multipole_inter", le)):
+                and self.is_within_boundary(id_dist,
+                                            "max_id_dist_ion_multipole_inter",
+                                            le)):
 
             idy_angle = -1
             if len(dipole_grp.atoms) == 2:
@@ -1468,13 +1519,18 @@ inter_config=custom_config)
             # checking the angle IDY.
             if len(dipole_grp.atoms) == 1 or self.is_within_boundary(idy_angle, "min_idy_ang_ion_multipole_inter", ge):
 
-                dipole_nb_coords = [nbi.coord for nbi in part_charged_atm.neighbors_info if nbi.atomic_num != 1]
+                dipole_nb_coords = [nbi.coord
+                                    for nbi in part_charged_atm.neighbors_info
+                                    if nbi.atomic_num != 1]
                 params = {}
                 if len(dipole_nb_coords) > 1:
-                    dipole_normal = im.calc_normal(dipole_nb_coords + [part_charged_atm.coord])
+                    dipole_normal \
+                        = im.calc_normal(dipole_nb_coords
+                                         + [part_charged_atm.coord])
                     disp_angle = im.to_quad1(im.angle(dipole_normal, di_vect))
 
-                    if self.is_within_boundary(disp_angle, "max_disp_ang_ion_multipole_inter", le):
+                    prop_name = "max_disp_ang_ion_multipole_inter"
+                    if self.is_within_boundary(disp_angle, prop_name, le):
                         params = {"id_dist_ion_multipole_inter": id_dist,
                                   "idy_ang_ion_multipole_inter": idy_angle,
                                   "disp_ang_ion_multipole_inter": disp_angle}
@@ -1485,16 +1541,25 @@ inter_config=custom_config)
 
                 if params:
                     if dipole_type == "Nucleophile" and ion_type == "Cation":
-                        inter = InteractionType(dipole_grp, ion_grp, "Cation-nucleophile", params=params)
+                        inter = InteractionType(dipole_grp, ion_grp,
+                                                "Cation-nucleophile",
+                                                params=params)
                         interactions.append(inter)
                     elif dipole_type == "Nucleophile" and ion_type == "Anion":
-                        inter = InteractionType(dipole_grp, ion_grp, "Unfavorable anion-nucleophile", params=params)
+                        inter_name = "Unfavorable anion-nucleophile"
+                        inter = InteractionType(dipole_grp, ion_grp,
+                                                inter_name, params=params)
                         interactions.append(inter)
                     elif dipole_type == "Electrophile" and ion_type == "Anion":
-                        inter = InteractionType(ion_grp, dipole_grp, "Anion-electrophile", params=params)
+                        inter = InteractionType(ion_grp, dipole_grp,
+                                                "Anion-electrophile",
+                                                params=params)
                         interactions.append(inter)
-                    elif dipole_type == "Electrophile" and ion_type == "Cation":
-                        inter = InteractionType(ion_grp, dipole_grp, "Unfavorable cation-electrophile", params=params)
+                    elif (dipole_type == "Electrophile"
+                            and ion_type == "Cation"):
+                        inter_name = "Unfavorable cation-electrophile"
+                        inter = InteractionType(ion_grp, dipole_grp,
+                                                inter_name, params=params)
                         interactions.append(inter)
         return interactions
 
@@ -1592,26 +1657,37 @@ inter_config=custom_config)
         # If it has 2 atoms, it will select the nucleophilic atom based on the
         # electronegativity.
         if len(dipole_grp1.atoms) == 2 and dipole_type1 == "Nucleophile":
-            dipole_atm1 = dipole_grp1.atoms[0] if (dipole_grp1.atoms[0].electronegativity
-                                                   > dipole_grp1.atoms[1].electronegativity) else dipole_grp1.atoms[1]
-        # Or, it will select the nucleophilic atom based on the electronegativity.
+            dipole_atm1 = (dipole_grp1.atoms[0]
+                           if (dipole_grp1.atoms[0].electronegativity
+                               > dipole_grp1.atoms[1].electronegativity)
+                           else dipole_grp1.atoms[1])
+        # Or, it will select the nucleophilic atom based on the
+        # electronegativity.
         elif len(dipole_grp1.atoms) == 2 and dipole_type1 == "Electrophile":
-            dipole_atm1 = dipole_grp1.atoms[0] if (dipole_grp1.atoms[0].electronegativity
-                                                   < dipole_grp1.atoms[1].electronegativity) else dipole_grp1.atoms[1]
+            dipole_atm1 = (dipole_grp1.atoms[0]
+                           if (dipole_grp1.atoms[0].electronegativity
+                               < dipole_grp1.atoms[1].electronegativity)
+                           else dipole_grp1.atoms[1])
 
         # Atom 2 => Dipole 2
         #
         # An electrophile may have only 1 atom. E.g.: NH4, although by default
         # we consider it as an ion.
         dipole_atm2 = dipole_grp2.atoms[0]
-        # If it has 2 atoms, it will select the nucleophilic atom based on the electronegativity.
+        # If it has 2 atoms, it will select the nucleophilic atom based on the
+        # electronegativity.
         if len(dipole_grp2.atoms) == 2 and dipole_type2 == "Nucleophile":
-            dipole_atm2 = dipole_grp2.atoms[0] if (dipole_grp2.atoms[0].electronegativity
-                                                   > dipole_grp2.atoms[1].electronegativity) else dipole_grp2.atoms[1]
-        # Or, it will select the nucleophilic atom based on the electronegativity.
+            dipole_atm2 = (dipole_grp2.atoms[0]
+                           if (dipole_grp2.atoms[0].electronegativity
+                               > dipole_grp2.atoms[1].electronegativity)
+                           else dipole_grp2.atoms[1])
+        # Or, it will select the nucleophilic atom based on the
+        # electronegativity.
         elif len(dipole_grp2.atoms) == 2 and dipole_type2 == "Electrophile":
-            dipole_atm2 = dipole_grp2.atoms[0] if (dipole_grp2.atoms[0].electronegativity
-                                                   < dipole_grp2.atoms[1].electronegativity) else dipole_grp2.atoms[1]
+            dipole_atm2 = (dipole_grp2.atoms[0]
+                           if (dipole_grp2.atoms[0].electronegativity
+                               < dipole_grp2.atoms[1].electronegativity)
+                           else dipole_grp2.atoms[1])
 
         # Model for favorable interactions: A-N ... E-Y
         # Model for unfavorable interactions: A-N ... N-A, Y-E ... E-Y.
@@ -1624,7 +1700,9 @@ inter_config=custom_config)
         ne_dist = im.euclidean_distance(dipole_atm1.coord, dipole_atm2.coord)
 
         if (self.is_within_boundary(ne_dist, "bsite_cutoff", le)
-                and self.is_within_boundary(ne_dist, "max_ne_dist_multipolar_inter", le)):
+                and self.is_within_boundary(ne_dist,
+                                            "max_ne_dist_multipolar_inter",
+                                            le)):
 
             # No angle can be calculated if the electrophile (dipole 2) has
             # only one atom.
@@ -1635,8 +1713,10 @@ inter_config=custom_config)
                           "an_ey_ang_multipolar_inter": -1}
 
                 inter_type = ("Multipolar" if not dipole_type1 == dipole_type2
-                              else "Unfavorable %s-%s" % (dipole_type1.lower(), dipole_type2.lower()))
-                inter = InteractionType(dipole_grp1, dipole_grp2, inter_type, directional=True, params=params)
+                              else "Unfavorable %s-%s"
+                              % (dipole_type1.lower(), dipole_type2.lower()))
+                inter = InteractionType(dipole_grp1, dipole_grp2, inter_type,
+                                        directional=True, params=params)
                 interactions.append(inter)
 
             else:
@@ -1662,14 +1742,24 @@ inter_config=custom_config)
                     ey_vect = y_atm.coord - dipole_atm2.coord
                     ney_angle = im.angle(en_vect, ey_vect)
 
-                    if (self.is_within_boundary(ney_angle, "min_ney_ang_multipolar_inter", ge)
-                            and self.is_within_boundary(ney_angle, "max_ney_ang_multipolar_inter", le)):
+                    prop_name1 = "min_ney_ang_multipolar_inter"
+                    prop_name2 = "max_ney_ang_multipolar_inter"
+                    if (self.is_within_boundary(ney_angle, prop_name1, ge)
+                            and self.is_within_boundary(ney_angle,
+                                                        prop_name2, le)):
 
-                        elect_nb_coords = [nbi.coord for nbi in dipole_atm2.neighbors_info if nbi.atomic_num != 1]
-                        elect_normal = im.calc_normal(elect_nb_coords + [dipole_atm2.coord])
-                        disp_angle = im.to_quad1(im.angle(elect_normal, en_vect))
+                        elect_nb_coords = \
+                            [nbi.coord
+                             for nbi in dipole_atm2.neighbors_info
+                             if nbi.atomic_num != 1]
+                        elect_normal = \
+                            im.calc_normal(elect_nb_coords
+                                           + [dipole_atm2.coord])
+                        disp_angle = im.to_quad1(im.angle(elect_normal,
+                                                          en_vect))
 
-                        if self.is_within_boundary(disp_angle, "max_disp_ang_multipolar_inter", le):
+                        prop_name = "max_disp_ang_multipolar_inter"
+                        if self.is_within_boundary(disp_angle, prop_name, le):
 
                             # If the nucleophile has two atoms, then we will be
                             # able to calculate the angle between the vectors AN
@@ -1677,37 +1767,78 @@ inter_config=custom_config)
                             # orientation of the dipole.
                             if len(dipole_grp1.atoms) == 2:
                                 # Model: A-N ... E-Y
-                                a_atm = dipole_grp1.atoms[1] if dipole_grp1.atoms[0] == dipole_atm1 else dipole_grp1.atoms[0]
+                                a_atm = (dipole_grp1.atoms[1]
+                                         if dipole_grp1.atoms[0] == dipole_atm1
+                                         else dipole_grp1.atoms[0])
                                 an_vect = dipole_atm1.coord - a_atm.coord
                                 # Angle between vectors AN and EY
                                 an_ey_vect_angle = im.angle(an_vect, ey_vect)
 
-                                params = {"ne_dist_multipolar_inter": ne_dist,
-                                          "ney_ang_multipolar_inter": ney_angle,
-                                          "disp_ang_multipolar_inter": disp_angle,
-                                          "an_ey_ang_multipolar_inter": an_ey_vect_angle}
+                                params = \
+                                    {"ne_dist_multipolar_inter": ne_dist,
+                                     "ney_ang_multipolar_inter": ney_angle,
+                                     "disp_ang_multipolar_inter": disp_angle,
+                                     "an_ey_ang_multipolar_inter": an_ey_vect_angle}
 
                                 if not dipole_type1 == dipole_type2:
-                                    if self.is_within_boundary(an_ey_vect_angle, "max_an_ey_ang_para_multipolar_inter", le):
-                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Parallel multipolar",
-                                                                directional=True, params=params)
+                                    if self.is_within_boundary(an_ey_vect_angle,
+                                                               "max_an_ey_ang_para_multipolar_inter",
+                                                               le):
+                                        inter_name = "Parallel multipolar"
+                                        inter = \
+                                            InteractionType(dipole_grp1,
+                                                            dipole_grp2,
+                                                            inter_name,
+                                                            directional=True,
+                                                            params=params)
                                         interactions.append(inter)
-                                    elif self.is_within_boundary(an_ey_vect_angle, "min_an_ey_ang_antipara_multipolar_inter", ge):
-                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Antiparallel multipolar",
-                                                                directional=True, params=params)
+
+                                    elif self.is_within_boundary(an_ey_vect_angle,
+                                                                 "min_an_ey_ang_antipara_multipolar_inter",
+                                                                 ge):
+                                        inter_name = "Antiparallel multipolar"
+                                        inter = \
+                                            InteractionType(dipole_grp1,
+                                                            dipole_grp2,
+                                                            inter_name,
+                                                            directional=True,
+                                                            params=params)
                                         interactions.append(inter)
-                                    elif (self.is_within_boundary(an_ey_vect_angle, "min_an_ey_ang_ortho_multipolar_inter", ge)
-                                            and self.is_within_boundary(an_ey_vect_angle, "max_an_ey_ang_ortho_multipolar_inter", le)):
-                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Orthogonal multipolar",
-                                                                directional=True, params=params)
+
+                                    elif (self.is_within_boundary(an_ey_vect_angle,
+                                                                  "min_an_ey_ang_ortho_multipolar_inter",
+                                                                  ge)
+                                            and self.is_within_boundary(an_ey_vect_angle,
+                                                                        "max_an_ey_ang_ortho_multipolar_inter",
+                                                                        le)):
+                                        inter_name = "Orthogonal multipolar"
+                                        inter = \
+                                            InteractionType(dipole_grp1,
+                                                            dipole_grp2,
+                                                            inter_name,
+                                                            directional=True,
+                                                            params=params)
                                         interactions.append(inter)
+
                                     else:
-                                        inter = InteractionType(dipole_grp1, dipole_grp2, "Tilted multipolar",
-                                                                directional=True, params=params)
+                                        inter_name = "Tilted multipolar"
+                                        inter = \
+                                            InteractionType(dipole_grp1,
+                                                            dipole_grp2,
+                                                            inter_name,
+                                                            directional=True,
+                                                            params=params)
                                         interactions.append(inter)
+
                                 else:
-                                    inter_type = "Unfavorable %s-%s" % (dipole_type1.lower(), dipole_type2.lower())
-                                    inter = InteractionType(dipole_grp1, dipole_grp2, inter_type, directional=True, params=params)
+                                    inter_type = ("Unfavorable %s-%s"
+                                                  % (dipole_type1.lower(),
+                                                     dipole_type2.lower()))
+                                    inter = InteractionType(dipole_grp1,
+                                                            dipole_grp2,
+                                                            inter_type,
+                                                            directional=True,
+                                                            params=params)
                                     interactions.append(inter)
 
                             # Otherwise, ignore the angle AN and EY and add a
@@ -1715,13 +1846,22 @@ inter_config=custom_config)
                             # specific definition of the orientation. It will
                             # happen only with Water molecules.
                             else:
-                                params = {"ne_dist_multipolar_inter": ne_dist,
-                                          "ney_ang_multipolar_inter": ney_angle,
-                                          "disp_ang_multipolar_inter": disp_angle,
-                                          "an_ey_ang_multipolar_inter": -1}
-                                inter_type = ("Multipolar" if not dipole_type1 == dipole_type2
-                                              else "Unfavorable %s-%s" % (dipole_type1.lower(), dipole_type2.lower()))
-                                inter = InteractionType(dipole_grp1, dipole_grp2, inter_type, directional=True, params=params)
+                                params = \
+                                    {"ne_dist_multipolar_inter": ne_dist,
+                                     "ney_ang_multipolar_inter": ney_angle,
+                                     "disp_ang_multipolar_inter": disp_angle,
+                                     "an_ey_ang_multipolar_inter": -1}
+                                inter_type = \
+                                    ("Multipolar"
+                                     if (not dipole_type1 == dipole_type2)
+                                     else "Unfavorable %s-%s"
+                                     % (dipole_type1.lower(),
+                                        dipole_type2.lower()))
+                                inter = InteractionType(dipole_grp1,
+                                                        dipole_grp2,
+                                                        inter_type,
+                                                        directional=True,
+                                                        params=params)
                                 interactions.append(inter)
 
         return interactions
@@ -1769,12 +1909,14 @@ inter_config=custom_config)
         xa_dist = im.euclidean_distance(donor_grp.centroid, ring_grp.centroid)
 
         if (self.is_within_boundary(xa_dist, "bsite_cutoff", le)
-                and self.is_within_boundary(xa_dist, "max_xc_dist_xbond_inter", le)):
+                and self.is_within_boundary(xa_dist,
+                                            "max_xc_dist_xbond_inter", le)):
 
             ax_vect = donor_grp.centroid - ring_grp.centroid
             disp_angle = im.to_quad1(im.angle(ring_grp.normal, ax_vect))
 
-            if (self.is_within_boundary(disp_angle, "max_disp_ang_xbond_inter", le)):
+            if (self.is_within_boundary(disp_angle,
+                                        "max_disp_ang_xbond_inter", le)):
                 # Interaction model: C-X ---- A
                 # XA vector is always the same
                 xa_vect = ring_grp.centroid - donor_grp.centroid
@@ -1793,7 +1935,9 @@ inter_config=custom_config)
                     xc_vect = c_coord - donor_grp.centroid
                     cxa_angle = im.angle(xc_vect, xa_vect)
 
-                    if (self.is_within_boundary(cxa_angle, "min_cxa_ang_xbond_inter", ge)):
+                    if (self.is_within_boundary(cxa_angle,
+                                                "min_cxa_ang_xbond_inter",
+                                                ge)):
                         params = {"xc_dist_xbond_inter": xa_dist,
                                   "disp_ang_xbond_inter": disp_angle,
                                   "cxa_ang_xbond_inter": cxa_angle}
@@ -1857,7 +2001,8 @@ inter_config=custom_config)
                                         acceptor_grp.centroid)
 
         if (self.is_within_boundary(xa_dist, "bsite_cutoff", le)
-                and self.is_within_boundary(xa_dist, "max_xa_dist_xbond_inter", le)):
+                and self.is_within_boundary(xa_dist,
+                                            "max_xa_dist_xbond_inter", le)):
 
             # Interaction model: C-X ---- A-R
             # XA vector is always the same
@@ -1865,19 +2010,24 @@ inter_config=custom_config)
 
             # Defining the angle CXA
             # It may happen that X is covalently bound to more than one group.
-            # In such cases the halogen may also form more than one halogen bond.
-            # Ref: Cavallo, G. et al. The Halogen Bond. (2016).
-            carbon_coords = [nbi.coord for nbi in donor_atm.neighbors_info if nbi.atomic_num == 6]
+            # In such cases the halogen may also form more than one
+            # halogen bond. Ref: Cavallo, G. et al. The Halogen Bond. (2016).
+            carbon_coords = [nbi.coord
+                             for nbi in donor_atm.neighbors_info
+                             if nbi.atomic_num == 6]
 
             # Interaction model: C-X ---- A-R.
             # R coordinates, in which R is a heavy atom.
-            r_coords = [nbi.coord for nbi in acceptor_atm.neighbors_info if nbi.atomic_num != 1]
+            r_coords = [nbi.coord
+                        for nbi in acceptor_atm.neighbors_info
+                        if nbi.atomic_num != 1]
 
             for c_coord in carbon_coords:
                 xc_vect = c_coord - donor_grp.centroid
                 cxa_angle = im.angle(xc_vect, xa_vect)
 
-                if self.is_within_boundary(cxa_angle, "min_cxa_ang_xbond_inter", ge):
+                if self.is_within_boundary(cxa_angle,
+                                           "min_cxa_ang_xbond_inter", ge):
 
                     # If no heavy atom is bonded to the acceptor, it means that
                     # only hydrogens may be bound to it. Then, we do not
@@ -1907,15 +2057,19 @@ inter_config=custom_config)
                             xar_angle = im.angle(ax_vect, ar_vect)
 
                             # Update the XAR angle with the lowest value.
-                            if lowest_xar_angle is None or xar_angle < lowest_xar_angle:
+                            if (lowest_xar_angle is None
+                                    or xar_angle < lowest_xar_angle):
                                 lowest_xar_angle = xar_angle
 
-                        # The angle will be None when any R (heavy atom) atom was found.
-                        # In this case, the criteria must always fail.
+                        # The angle will be None when any R (heavy atom) atom
+                        # was found. In this case, the criteria must always
+                        # fail.
                         if lowest_xar_angle is None:
                             lowest_xar_angle = -1
 
-                        if self.is_within_boundary(lowest_xar_angle, "min_xar_ang_xbond_inter", ge):
+                        prop_name = "min_xar_ang_xbond_inter"
+                        if self.is_within_boundary(lowest_xar_angle,
+                                                   prop_name, ge):
                             params = {"xa_dist_xbond_inter": xa_dist,
                                       "cxa_ang_xbond_inter": cxa_angle,
                                       "xar_ang_xbond_inter": lowest_xar_angle}
@@ -1979,16 +2133,20 @@ inter_config=custom_config)
         ya_dist = im.euclidean_distance(donor_grp.centroid,
                                         acceptor_grp.centroid)
 
+        prop_name = "max_ya_dist_ybond_inter"
         if (self.is_within_boundary(ya_dist, "bsite_cutoff", le)
-                and self.is_within_boundary(ya_dist, "max_ya_dist_ybond_inter", le)):
+                and self.is_within_boundary(ya_dist, prop_name, le)):
 
             # Interaction model: R-Y --- A-N
             # YA vector is always the same
             ya_vect = acceptor_grp.centroid - donor_grp.centroid
 
             # Defining the angle RYA
-            r_atms = [nbi for nbi in donor_atm.neighbors_info if nbi.atomic_num != 1]
-            r_elems = sorted([nbi.atomic_num for nbi in donor_atm.neighbors_info if nbi.atomic_num != 1])
+            r_atms = [nbi for nbi in donor_atm.neighbors_info
+                      if nbi.atomic_num != 1]
+            r_elems = sorted([nbi.atomic_num
+                              for nbi in donor_atm.neighbors_info
+                              if nbi.atomic_num != 1])
 
             # Isothiazoles have only one sigma-hole located on the oposite
             # site of the N. Therefore, we should only evaluate this
@@ -2014,7 +2172,8 @@ inter_config=custom_config)
                 yr_vect = r_atm.coord - donor_grp.centroid
                 rya_angle = im.angle(yr_vect, ya_vect)
 
-                if (self.is_within_boundary(rya_angle, "min_rya_ang_ybond_inter", ge)):
+                if (self.is_within_boundary(rya_angle,
+                                            "min_rya_ang_ybond_inter", ge)):
 
                     # If no heavy atom is bonded to the acceptor, it means that
                     # only hydrogens may be bound to it. Then, we do not
@@ -2044,15 +2203,19 @@ inter_config=custom_config)
                             yan_angle = im.angle(ay_vect, an_vect)
 
                             # Update the XAR angle with the lowest value.
-                            if lowest_yan_angle is None or yan_angle < lowest_yan_angle:
+                            if (lowest_yan_angle is None
+                                    or yan_angle < lowest_yan_angle):
                                 lowest_yan_angle = yan_angle
 
-                        # The angle will be None when any R (heavy atom) atom was found.
-                        # In this case, the criteria must always fail.
+                        # The angle will be None when any R (heavy atom)
+                        # atom was found. In this case, the criteria must
+                        # always fail.
                         if lowest_yan_angle is None:
                             lowest_yan_angle = -1
 
-                        if self.is_within_boundary(lowest_yan_angle, "min_yan_ang_ybond_inter", ge):
+                        prop_name = "min_yan_ang_ybond_inter"
+                        if self.is_within_boundary(lowest_yan_angle,
+                                                   prop_name, ge):
                             params = {"ya_dist_ybond_inter": ya_dist,
                                       "rya_ang_ybond_inter": rya_angle,
                                       "yan_ang_ybond_inter": lowest_yan_angle}
@@ -2108,19 +2271,24 @@ inter_config=custom_config)
         ya_dist = im.euclidean_distance(donor_grp.centroid, ring_grp.centroid)
 
         if (self.is_within_boundary(ya_dist, "bsite_cutoff", le)
-                and self.is_within_boundary(ya_dist, "max_yc_dist_ybond_inter", le)):
+                and self.is_within_boundary(ya_dist,
+                                            "max_yc_dist_ybond_inter", le)):
 
             ay_vect = donor_grp.centroid - ring_grp.centroid
             disp_angle = im.to_quad1(im.angle(ring_grp.normal, ay_vect))
 
-            if (self.is_within_boundary(disp_angle, "max_disp_ang_ybond_inter", le)):
+            if (self.is_within_boundary(disp_angle,
+                                        "max_disp_ang_ybond_inter", le)):
                 # Interaction model: R-Y ---- A, where A is the ring center
                 # YA vector is always the same
                 ya_vect = ring_grp.centroid - donor_grp.centroid
 
                 # Defining the angle RYA, where A is the ring center
-                r_atms = [nbi for nbi in donor_atm.neighbors_info if nbi.atomic_num != 1]
-                r_elems = sorted([nbi.atomic_num for nbi in donor_atm.neighbors_info if nbi.atomic_num != 1])
+                r_atms = [nbi for nbi in donor_atm.neighbors_info
+                          if nbi.atomic_num != 1]
+                r_elems = sorted([nbi.atomic_num
+                                  for nbi in donor_atm.neighbors_info
+                                  if nbi.atomic_num != 1])
 
                 # Isothiazoles have only one sigma-hole located on the oposite
                 # site of the N. Therefore, we should only evaluate this
@@ -2141,7 +2309,9 @@ inter_config=custom_config)
                     yr_vect = r_atm.coord - donor_grp.centroid
                     rya_angle = im.angle(yr_vect, ya_vect)
 
-                    if (self.is_within_boundary(rya_angle, "min_rya_ang_ybond_inter", ge)):
+                    if self.is_within_boundary(rya_angle,
+                                               "min_rya_ang_ybond_inter",
+                                               ge):
                         params = {"yc_dist_ybond_inter": ya_dist,
                                   "disp_ang_ybond_inter": disp_angle,
                                   "rya_ang_ybond_inter": rya_angle}
@@ -2205,7 +2375,8 @@ inter_config=custom_config)
                                         acceptor_grp.centroid)
 
         if (self.is_within_boundary(da_dist, "bsite_cutoff", le)
-                and self.is_within_boundary(da_dist, "max_da_dist_hb_inter", le)):
+                and self.is_within_boundary(da_dist,
+                                            "max_da_dist_hb_inter", le)):
 
             # Interaction model: D-H ---- A-R.
             # Recover only hydrogen coordinates bonded to the donor.
@@ -2238,7 +2409,8 @@ inter_config=custom_config)
                 # assumes the hydrogen to be located 1A away from the donor
                 # in a line formed by the donor and the acceptor.
                 ha_dist = da_dist - 1
-                if self.is_within_boundary(ha_dist, "max_ha_dist_hb_inter", le):
+                if self.is_within_boundary(ha_dist, "max_ha_dist_hb_inter",
+                                           le):
 
                     # If no heavy atom is bonded to the acceptor, it means that
                     # only hydrogens may be bound to it. Then, we do not
@@ -2307,8 +2479,11 @@ inter_config=custom_config)
                     ha_vect = acceptor_grp.centroid - h_coord
                     dha_angle = im.angle(hd_vect, ha_vect)
 
-                    if (self.is_within_boundary(ha_dist, "max_ha_dist_hb_inter", le)
-                            and self.is_within_boundary(dha_angle, "min_dha_ang_hb_inter", ge)):
+                    if (self.is_within_boundary(ha_dist,
+                                                "max_ha_dist_hb_inter", le)
+                            and self.is_within_boundary(dha_angle,
+                                                        "min_dha_ang_hb_inter",
+                                                        ge)):
 
                         # If no heavy atom is bonded to the acceptor, it means
                         # that only hydrogens may be bound to it. Then, we do
@@ -2355,22 +2530,31 @@ inter_config=custom_config)
                                 dar_angle = im.angle(ad_vect, ar_vect)
 
                                 # Update the HAR angle with the lowest value.
-                                if lowest_har_angle is None or har_angle < lowest_har_angle:
+                                if (lowest_har_angle is None
+                                        or har_angle < lowest_har_angle):
                                     lowest_har_angle = har_angle
                                 # Update the DAR angle with the lowest value.
-                                if lowest_dar_angle is None or dar_angle < lowest_dar_angle:
+                                if (lowest_dar_angle is None
+                                        or dar_angle < lowest_dar_angle):
                                     lowest_dar_angle = dar_angle
 
-                            # The angles will be None when any R (heavy atom) atom was found.
-                            # In this case, the criteria must always fail.
-                            if lowest_har_angle is None or lowest_dar_angle is None:
+                            # The angles will be None when any R (heavy atom)
+                            # atom was found. In this case, the criteria must
+                            # always fail.
+                            if (lowest_har_angle is None
+                                    or lowest_dar_angle is None):
                                 lowest_har_angle = -1
                                 lowest_dar_angle = -1
 
-                            if (self.is_within_boundary(lowest_har_angle, "min_har_ang_hb_inter", ge)
-                                    and self.is_within_boundary(lowest_dar_angle, "min_dar_ang_hb_inter", ge)):
+                            prop_name1 = "min_har_ang_hb_inter"
+                            prop_name2 = "min_dar_ang_hb_inter"
+                            if (self.is_within_boundary(lowest_har_angle,
+                                                        prop_name1, ge)
+                                    and self.is_within_boundary(lowest_dar_angle,
+                                                                prop_name2, ge)):
 
-                                # Only the lowest D-A-R and H-A-R angles are provided.
+                                # Only the lowest D-A-R and H-A-R angles
+                                # are provided.
                                 params = {"da_dist_hb_inter": da_dist,
                                           "ha_dist_hb_inter": ha_dist,
                                           "dha_ang_hb_inter": dha_angle,
@@ -2428,6 +2612,7 @@ inter_config=custom_config)
                                              or feat2.name == "WeakAcceptor")):
             donor_grp = group1
             acceptor_grp = group2
+
         else:
             logger.warning("Weak hydrogen bond requires a weak donor and an "
                            "(weak) acceptor groups. However, the informed "
@@ -2438,9 +2623,11 @@ inter_config=custom_config)
         donor_atm = donor_grp.atoms[0]
         acceptor_atm = acceptor_grp.atoms[0]
 
-        da_dist = im.euclidean_distance(donor_grp.centroid, acceptor_grp.centroid)
+        da_dist = im.euclidean_distance(donor_grp.centroid,
+                                        acceptor_grp.centroid)
         if (self.is_within_boundary(da_dist, "bsite_cutoff", le)
-                and self.is_within_boundary(da_dist, "max_da_dist_whb_inter", le)):
+                and self.is_within_boundary(da_dist,
+                                            "max_da_dist_whb_inter", le)):
 
             # Interaction model: D-H ---- A-R.
             # Recover only hydrogen coordinates bonded to the donor.
@@ -2470,7 +2657,8 @@ inter_config=custom_config)
                 # it assumes the hydrogen to be located 1A away from the donor
                 # in a line formed by the donor and the acceptor.
                 ha_dist = da_dist - 1
-                if self.is_within_boundary(ha_dist, "max_ha_dist_whb_inter", le):
+                if self.is_within_boundary(ha_dist,
+                                           "max_ha_dist_whb_inter", le):
 
                     # If no heavy atom is bonded to the acceptor, it means that
                     # only hydrogens may be bound to it. Then, we do not
@@ -2501,15 +2689,19 @@ inter_config=custom_config)
                             dar_angle = im.angle(ad_vect, ar_vect)
 
                             # Update the DAR angle with the lowest value.
-                            if lowest_dar_angle is None or dar_angle < lowest_dar_angle:
+                            if (lowest_dar_angle is None
+                                    or dar_angle < lowest_dar_angle):
                                 lowest_dar_angle = dar_angle
 
-                        # The angle will be None when any R (heavy atom) atom was found.
-                        # In this case, the criteria must always fail.
+                        # The angle will be None when any R (heavy atom) atom
+                        # was found. In this case, the criteria must always
+                        # fail.
                         if lowest_dar_angle is None:
                             lowest_dar_angle = -1
 
-                        if self.is_within_boundary(lowest_dar_angle, "min_dar_ang_whb_inter", ge):
+                        if self.is_within_boundary(lowest_dar_angle,
+                                                   "min_dar_ang_whb_inter",
+                                                   ge):
                             params = {"da_dist_whb_inter": da_dist,
                                       "ha_dist_whb_inter": -1,
                                       "dha_ang_whb_inter": -1,
@@ -2527,14 +2719,18 @@ inter_config=custom_config)
                 # hydrogen atom. In such cases, it's necessary to check the
                 # distances and angles for each atom.
                 for h_coord in hydrog_coords:
-                    ha_dist = im.euclidean_distance(h_coord, acceptor_grp.centroid)
+                    ha_dist = im.euclidean_distance(h_coord,
+                                                    acceptor_grp.centroid)
 
                     hd_vect = donor_grp.centroid - h_coord
                     ha_vect = acceptor_grp.centroid - h_coord
                     dha_angle = im.angle(hd_vect, ha_vect)
 
-                    if (self.is_within_boundary(ha_dist, "max_ha_dist_whb_inter", le)
-                            and self.is_within_boundary(dha_angle, "min_dha_ang_whb_inter", ge)):
+                    prop_name1 = "max_ha_dist_whb_inter"
+                    prop_name2 = "min_dha_ang_whb_inter"
+                    if (self.is_within_boundary(ha_dist, prop_name1, le)
+                            and self.is_within_boundary(dha_angle,
+                                                        prop_name2, ge)):
 
                         # If no heavy atom is bonded to the acceptor, it means
                         # that only hydrogens may be bound to it. Then, we do
@@ -2560,7 +2756,8 @@ inter_config=custom_config)
                             # AH vector is always the same.
                             ah_vect = h_coord - acceptor_grp.centroid
                             # AD vector is always the same.
-                            ad_vect = donor_grp.centroid - acceptor_grp.centroid
+                            ad_vect = (donor_grp.centroid
+                                       - acceptor_grp.centroid)
 
                             # Interaction model: D-H ---- A-R
                             # Check the angles formed at the acceptor.
@@ -2582,22 +2779,31 @@ inter_config=custom_config)
                                 dar_angle = im.angle(ad_vect, ar_vect)
 
                                 # Update the HAR angle with the lowest value.
-                                if lowest_har_angle is None or har_angle < lowest_har_angle:
+                                if (lowest_har_angle is None
+                                        or har_angle < lowest_har_angle):
                                     lowest_har_angle = har_angle
                                 # Update the DAR angle with the lowest value.
-                                if lowest_dar_angle is None or dar_angle < lowest_dar_angle:
+                                if (lowest_dar_angle is None
+                                        or dar_angle < lowest_dar_angle):
                                     lowest_dar_angle = dar_angle
 
-                            # The angles will be None when any R (heavy atom) atom was found.
-                            # In this case, the criteria must always fail.
-                            if lowest_har_angle is None or lowest_dar_angle is None:
+                            # The angles will be None when any R (heavy atom)
+                            # atom was found. In this case, the criteria must
+                            # always fail.
+                            if (lowest_har_angle is None
+                                    or lowest_dar_angle is None):
                                 lowest_har_angle = -1
                                 lowest_dar_angle = -1
 
-                            if (self.is_within_boundary(lowest_har_angle, "min_har_ang_whb_inter", ge)
-                                    and self.is_within_boundary(lowest_dar_angle, "min_dar_ang_whb_inter", ge)):
+                            prop_name1 = "min_har_ang_whb_inter"
+                            prop_name2 = "min_dar_ang_whb_inter"
+                            if (self.is_within_boundary(lowest_har_angle,
+                                                        prop_name1, ge)
+                                    and self.is_within_boundary(lowest_dar_angle,
+                                                                prop_name2, ge)):
 
-                                # Only the lowest D-A-R and H-A-R angles are provided.
+                                # Only the lowest D-A-R and H-A-R angles are
+                                # provided.
                                 params = {"da_dist_whb_inter": da_dist,
                                           "ha_dist_whb_inter": ha_dist,
                                           "dha_ang_whb_inter": dha_angle,
@@ -2649,6 +2855,7 @@ inter_config=custom_config)
                 and (feat1.name == "Donor" or feat1.name == "WeakDonor")):
             ring_grp = group2
             donor_grp = group1
+
         else:
             logger.warning("Hydrogen bond involving pi-systems requires an "
                            "aromatic and donor (weak donor) groups. However, "
@@ -2669,7 +2876,8 @@ inter_config=custom_config)
         # Interaction model: D-H ---- A, in which A is the ring center.
         da_dist = im.euclidean_distance(donor_grp.centroid, ring_grp.centroid)
         if (self.is_within_boundary(da_dist, "bsite_cutoff", le)
-                and self.is_within_boundary(da_dist, "max_dc_dist_whb_inter", le)):
+                and self.is_within_boundary(da_dist,
+                                            "max_dc_dist_whb_inter", le)):
 
             # Interaction model: D-H ---- A, in which A is the ring center.
             # Recover only hydrogen coordinates bonded to the donor.
@@ -2700,15 +2908,18 @@ inter_config=custom_config)
                 # assumes the hydrogen to be located 1A away from the donor
                 # in a line formed by the donor and the acceptor.
                 ha_dist = da_dist - 1
-                if self.is_within_boundary(ha_dist, "max_hc_dist_whb_inter", le):
+                if self.is_within_boundary(ha_dist,
+                                           "max_hc_dist_whb_inter", le):
 
                     # Interaction model: D-H ---- A, in which A is the ring
                     # center. Calculate the displacement angle formed between
                     # the ring normal and the vector Donor-Centroid.
                     ad_vect = donor_grp.centroid - ring_grp.centroid
-                    disp_angle = im.to_quad1(im.angle(ring_grp.normal, ad_vect))
+                    disp_angle = im.to_quad1(im.angle(ring_grp.normal,
+                                                      ad_vect))
 
-                    if (self.is_within_boundary(disp_angle, "max_disp_ang_whb_inter", le)):
+                    if (self.is_within_boundary(disp_angle,
+                                                "max_disp_ang_whb_inter", le)):
                         params = {"dc_dist_whb_inter": da_dist,
                                   "hc_dist_whb_inter": -1,
                                   "dhc_ang_whb_inter": -1,
@@ -2732,17 +2943,23 @@ inter_config=custom_config)
                     ha_vect = ring_grp.centroid - h_coord
                     dha_angle = im.angle(hd_vect, ha_vect)
 
-                    if (self.is_within_boundary(ha_dist, "max_hc_dist_whb_inter", le)
-                            and self.is_within_boundary(dha_angle, "min_dhc_ang_whb_inter", ge)):
+                    prop_name1 = "max_hc_dist_whb_inter"
+                    prop_name2 = "min_dhc_ang_whb_inter"
+                    if (self.is_within_boundary(ha_dist, prop_name1, le)
+                            and self.is_within_boundary(dha_angle,
+                                                        prop_name2, ge)):
 
                         # Interaction model: D-H ---- A, in which A is the ring
                         # center. Calculate the displacement angle formed
                         # between the ring normal and the vector
                         # Donor-Centroid.
                         ad_vect = donor_grp.centroid - ring_grp.centroid
-                        disp_angle = im.to_quad1(im.angle(ring_grp.normal, ad_vect))
+                        disp_angle = im.to_quad1(im.angle(ring_grp.normal,
+                                                          ad_vect))
 
-                        if (self.is_within_boundary(disp_angle, "max_disp_ang_whb_inter", le)):
+                        if (self.is_within_boundary(disp_angle,
+                                                    "max_disp_ang_whb_inter",
+                                                    le)):
                             params = {"dc_dist_whb_inter": da_dist,
                                       "hc_dist_whb_inter": ha_dist,
                                       "dhc_ang_whb_inter": dha_angle,
@@ -2785,7 +3002,8 @@ inter_config=custom_config)
 
         cc_dist = im.euclidean_distance(group1.centroid, group2.centroid)
         if (self.is_within_boundary(cc_dist, "bsite_cutoff", le)
-                and self.is_within_boundary(cc_dist, "max_dist_attract_inter", le)):
+                and self.is_within_boundary(cc_dist,
+                                            "max_dist_attract_inter", le)):
 
             params = {"dist_attract_inter": cc_dist}
             inter = InteractionType(group1, group2, "Ionic", params=params)
@@ -2822,7 +3040,8 @@ inter_config=custom_config)
 
         cc_dist = im.euclidean_distance(group1.centroid, group2.centroid)
         if (self.is_within_boundary(cc_dist, "bsite_cutoff", le)
-                and self.is_within_boundary(cc_dist, "max_dist_repuls_inter", le)):
+                and self.is_within_boundary(cc_dist,
+                                            "max_dist_repuls_inter", le)):
 
             params = {"dist_repuls_inter": cc_dist}
             inter = InteractionType(group1, group2, "Repulsive", params=params)
@@ -2996,7 +3215,9 @@ inter_config=custom_config)
                 # r1 + r2 - d < 0 => no clash
                 # r1 + r2 - d = 0 => in the limit, i.e., spheres are touching.
                 # r1 + r2 - d > 0 => clash.
-                if (rdw1 + rdw2 - cc_dist) >= self.inter_config.get("vdw_clash_tolerance", 0):
+                if ((rdw1 + rdw2 - cc_dist)
+                        >= self.inter_config.get("vdw_clash_tolerance", 0)):
+
                     # Ignore Van der Waals and clashes for atoms separated from
                     # each other by only N bonds. Covalent bonds keep atoms
                     # very tightly, producing distances lower than their sum of
@@ -3007,7 +3228,10 @@ inter_config=custom_config)
                     # It is better to keep this function inside the IFs to
                     # avoid the Dijkstra processing for pairs of atoms that
                     # wouldn't enter inside the IF.
-                    shortest_path_length = group1.get_shortest_path_length(group2, self.inter_config.get("min_bond_separation", 0))
+                    min_bond_sep = \
+                        self.inter_config.get("min_bond_separation", 0)
+                    shortest_path_length = \
+                        group1.get_shortest_path_length(group2, min_bond_sep)
 
                     # If get_shortest_path_length() returns any value that is
                     # not infinite (INF), it means these two groups contain a
@@ -3022,7 +3246,10 @@ inter_config=custom_config)
                                             params=params)
                     interactions.append(inter)
 
-                elif cc_dist <= rdw1 + rdw2 + self.inter_config.get("vdw_tolerance", 0):
+                elif (cc_dist
+                        <= (rdw1 + rdw2
+                            + self.inter_config.get("vdw_tolerance", 0))):
+
                     # Ignore Van der Waals and clashes for atoms separated from
                     # each other by only N bonds. Covalent bonds keep atoms
                     # very tightly, producing distances lower than their sum of
@@ -3033,7 +3260,10 @@ inter_config=custom_config)
                     # It is better to keep this function inside the IFs to
                     # avoid the Dijkstra processing for pairs of atoms that
                     # wouldn't enter inside the IF.
-                    shortest_path_length = group1.get_shortest_path_length(group2, self.inter_config.get("min_bond_separation", 0))
+                    min_bond_sep = \
+                        self.inter_config.get("min_bond_separation", 0)
+                    shortest_path_length = \
+                        group1.get_shortest_path_length(group2, min_bond_sep)
 
                     # If get_shortest_path_length() returns any value that is
                     # not infinite (INF), it means these two groups contain a

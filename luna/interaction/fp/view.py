@@ -19,8 +19,8 @@ class ShellViewer(PymolSessionManager):
     This class can be used to visualize multiple complexes into the same Pymol
     session, for instance, to compare binding modes and analyze similar shells.
     To do so, it is recommended that the protein structures are in the same
-    coordinate system, i.e., they should be aligned first. This can be
-    achieved with :func:`luna.align.tmalign.align_2struct` or any other tool of
+    coordinate system, i.e., they should be aligned first. This can be achieved
+    with :func:`luna.align.tmalign.align_2struct` or any other tool of
     your preference.
 
     Examples

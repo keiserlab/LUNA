@@ -15,6 +15,21 @@ from luna.util.exceptions import IllegalArgumentError
 
 class ProjectParams(dict):
 
+    """Define LUNA project parameters.
+
+    Parameters
+    ----------
+    params : dict
+        Set LUNA parameters from ``params``.
+
+    fill_defaults : bool
+        If True, initialize `ProjectParams` with default LUNA values.
+
+        .. note::
+            Any parameter provided in ``params`` will overwrite the
+            default values.
+    """
+
     def __init__(self, params=None, fill_defaults=False):
 
         params_to_parse = {}
@@ -45,6 +60,12 @@ class ProjectParams(dict):
 
     @classmethod
     def from_project_obj(cls, proj_obj):
+        """Initialize a `ProjectParams` from a `~luna.projects.Project` object.
+
+        Returns
+        -------
+         : `ProjectParams`
+        """
         params = {"add_h": proj_obj.add_h,
                   "amend_mol": proj_obj.amend_mol,
                   "append_mode": proj_obj.append_mode,
@@ -75,6 +96,84 @@ class ProjectParams(dict):
                   "working_path": proj_obj.working_path}
 
         return cls(params)
+
+    def save_config_file(self, config_file):
+        """Save the project parameters into a configuration file.
+
+        Parameters
+        ----------
+        config_file : str
+            The output configuration file.
+        """
+        with open(config_file, "w") as OUT:
+            OUT.write("[entries]\n")
+            for k, v in self._get_entry_params(config_file).items():
+                OUT.write(f"{k} = {v}\n")
+            OUT.write("\n")
+
+            OUT.write("[paths]\n")
+            OUT.write("working_path = %s\n" % self["working_path"])
+            OUT.write("pdb_path = %s\n" % self["pdb_path"])
+            OUT.write("overwrite_path = %s\n" % self["overwrite_path"])
+            OUT.write("\n")
+
+            OUT.write("[hydrogens]\n")
+            OUT.write("add_h = %s\n" % self["add_h"])
+            OUT.write("ph = %s\n" % self["ph"])
+            OUT.write("\n")
+
+            OUT.write("[standardization]\n")
+            OUT.write("amend_mol = %s\n" % self["amend_mol"])
+            OUT.write("\n")
+
+            OUT.write("[features]\n")
+            OUT.write("feat_cfg = %s\n" % self["atom_prop_file"])
+            OUT.write("\n")
+
+            OUT.write("[interactions]\n")
+            for k, v in self._get_inter_params(config_file).items():
+                OUT.write(f"{k} = {v}\n")
+            OUT.write("\n")
+
+            OUT.write("[binding_mode_filter]\n")
+            for k, v in self._get_binding_filter_params(config_file).items():
+                OUT.write(f"{k} = {v}\n")
+            OUT.write("\n")
+
+            OUT.write("[mfp]\n")
+            OUT.write("mfp = %s\n" % self["calc_mfp"])
+            OUT.write("mfp_output = %s\n" % self["mfp_output"])
+            OUT.write("\n")
+
+            OUT.write("[ifp]\n")
+            OUT.write("ifp = %s\n" % self["calc_ifp"])
+            OUT.write("ifp_num_levels = %s\n" % self["ifp_num_levels"])
+            OUT.write("ifp_radius_step = %s\n" % self["ifp_radius_step"])
+            OUT.write("ifp_length = %s\n" % self["ifp_length"])
+            OUT.write("ifp_count = %s\n" % self["ifp_count"])
+            OUT.write("ifp_type = %s\n" % self["ifp_type"].name)
+            OUT.write("ifp_diff_comp_classes = %s\n"
+                      % self["ifp_diff_comp_classes"])
+            OUT.write("ifp_output = %s\n" % self["ifp_output"])
+            OUT.write("ifp_sim_matrix_output = %s\n"
+                      % self["ifp_sim_matrix_output"])
+            OUT.write("\n")
+
+            OUT.write("[pse]\n")
+            OUT.write("pse = %s\n" % self["out_pse"])
+            OUT.write("pse_path = %s\n" % self["pse_path"])
+            OUT.write("\n")
+
+            verbosity = [k for k, v in VERBOSITY_LEVEL.items()
+                         if v == self["verbosity"]].pop()
+
+            OUT.write("[general]\n")
+            OUT.write("append_mode = %s\n" % self["append_mode"])
+            OUT.write("use_cache = %s\n" % self["use_cache"])
+            OUT.write("verbosity = %s\n" % verbosity)
+            OUT.write("logging_enabled = %s\n" % self["logging_enabled"])
+            OUT.write("nproc = %s\n" % self["nproc"])
+            OUT.write("\n")
 
     def _get_entry_params(self, config_file):
         sep = ":"
@@ -147,78 +246,6 @@ class ProjectParams(dict):
 
         return {"bind_cfg": bmf_cfg_file}
 
-    def save_config_file(self, config_file):
-
-        with open(config_file, "w") as OUT:
-            OUT.write("[entries]\n")
-            for k, v in self._get_entry_params(config_file).items():
-                OUT.write(f"{k} = {v}\n")
-            OUT.write("\n")
-
-            OUT.write("[paths]\n")
-            OUT.write("working_path = %s\n" % self["working_path"])
-            OUT.write("pdb_path = %s\n" % self["pdb_path"])
-            OUT.write("overwrite_path = %s\n" % self["overwrite_path"])
-            OUT.write("\n")
-
-            OUT.write("[hydrogens]\n")
-            OUT.write("add_h = %s\n" % self["add_h"])
-            OUT.write("ph = %s\n" % self["ph"])
-            OUT.write("\n")
-
-            OUT.write("[standardization]\n")
-            OUT.write("amend_mol = %s\n" % self["amend_mol"])
-            OUT.write("\n")
-
-            OUT.write("[features]\n")
-            OUT.write("feat_cfg = %s\n" % self["atom_prop_file"])
-            OUT.write("\n")
-
-            OUT.write("[interactions]\n")
-            for k, v in self._get_inter_params(config_file).items():
-                OUT.write(f"{k} = {v}\n")
-            OUT.write("\n")
-
-            OUT.write("[binding_mode_filter]\n")
-            for k, v in self._get_binding_filter_params(config_file).items():
-                OUT.write(f"{k} = {v}\n")
-            OUT.write("\n")
-
-            OUT.write("[mfp]\n")
-            OUT.write("mfp = %s\n" % self["calc_mfp"])
-            OUT.write("mfp_output = %s\n" % self["mfp_output"])
-            OUT.write("\n")
-
-            OUT.write("[ifp]\n")
-            OUT.write("ifp = %s\n" % self["calc_ifp"])
-            OUT.write("ifp_num_levels = %s\n" % self["ifp_num_levels"])
-            OUT.write("ifp_radius_step = %s\n" % self["ifp_radius_step"])
-            OUT.write("ifp_length = %s\n" % self["ifp_length"])
-            OUT.write("ifp_count = %s\n" % self["ifp_count"])
-            OUT.write("ifp_type = %s\n" % self["ifp_type"].name)
-            OUT.write("ifp_diff_comp_classes = %s\n"
-                      % self["ifp_diff_comp_classes"])
-            OUT.write("ifp_output = %s\n" % self["ifp_output"])
-            OUT.write("ifp_sim_matrix_output = %s\n"
-                      % self["ifp_sim_matrix_output"])
-            OUT.write("\n")
-
-            OUT.write("[pse]\n")
-            OUT.write("pse = %s\n" % self["out_pse"])
-            OUT.write("pse_path = %s\n" % self["pse_path"])
-            OUT.write("\n")
-
-            verbosity = [k for k, v in VERBOSITY_LEVEL.items()
-                         if v == self["verbosity"]].pop()
-
-            OUT.write("[general]\n")
-            OUT.write("append_mode = %s\n" % self["append_mode"])
-            OUT.write("use_cache = %s\n" % self["use_cache"])
-            OUT.write("verbosity = %s\n" % verbosity)
-            OUT.write("logging_enabled = %s\n" % self["logging_enabled"])
-            OUT.write("nproc = %s\n" % self["nproc"])
-            OUT.write("\n")
-
     def _get_value(self, params, param_name, dtype,
                    fallback=None, is_none_valid=True):
 
@@ -253,12 +280,17 @@ class ProjectParams(dict):
             pdb_id = self._get_value(params, "pdb_id", str)
             mol_file = self._get_value(params, "mol_file", str)
             entries_sep = self._get_value(params, "entries_sep", str)
-            fields_sep = self._get_value(params, "fields_sep", str,)
+            fields_sep = self._get_value(params, "fields_sep", str)
+
+            mol_obj_type = params["mol_obj_type"]
 
             entries = None
             if entries_file:
                 entries = list(Entry.from_file(entries_file, pdb_id, mol_file,
-                                               entries_sep, fields_sep))
+                                               entries_sep, fields_sep,
+                                               mol_obj_type=mol_obj_type))
+        except IllegalArgumentError:
+            raise
         except Exception:
             entries = self._get_value(params, "entries", list)
 

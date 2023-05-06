@@ -39,6 +39,17 @@ class InteractionConfig(dict):
 
     @classmethod
     def from_config_file(cls, config_file):
+        """Initialize from a configuration file.
+
+        Parameters
+        ----------
+        config_file : str
+            The configuration file pathname.
+
+        Returns
+        -------
+         : `InteractionConfig`
+        """
         if not path.exists(config_file):
             raise OSError("File '%s' does not exist." % config_file)
 
@@ -56,6 +67,13 @@ class InteractionConfig(dict):
         return cls(config, names_map)
 
     def save_config_file(self, config_file):
+        """Save the interaction parameters into a configuration file.
+
+        Parameters
+        ----------
+        config_file : str
+            The output configuration file.
+        """
         args_by_section = defaultdict(list)
         for k, v in self.items():
             section = self.names_map.get(k, "Other")

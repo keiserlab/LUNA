@@ -244,7 +244,7 @@ class ExtendedAtom:
             * ``chain`` (str): chain id;
             * ``res_name`` (str): residue name;
             * ``res_id`` (tuple): residue id (hetflag, sequence identifier, \
-                    insertion code);
+                                              insertion code);
             * ``name`` (tuple): atom name (atom name, alternate location).
 
         """

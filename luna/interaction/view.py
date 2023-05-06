@@ -24,7 +24,7 @@ class InteractionViewer(PymolSessionManager):
     Parameters
     ----------
     show_hydrop_surface : bool
-        If True, highlight hydrophobic surfaces. The default value is False
+        If True, highlight hydrophobic surfaces. The default value is False.
     **kwargs : dict, optional
         Extra arguments to `InteractionViewer`.
         Refer to :class:`~luna.wrappers.pymol.PymolSessionManager`
@@ -179,33 +179,57 @@ for im in proj_obj.interactions_mngrs]
                 atm_grp_mngr = interactions[0].src_grp.manager
                 if atm_grp_mngr is not None:
                     interacting_atms = set()
-                    for atm_grp in atm_grp_mngr.filter_by_types(["Hydrophobe", "Hydrophobic"], must_contain_all=False):
+                    for atm_grp in \
+                        atm_grp_mngr.filter_by_types(["Hydrophobe",
+                                                      "Hydrophobic"],
+                                                     must_contain_all=False):
 
-                        inters = [i for i in atm_grp.interactions if i.type == "Hydrophobic"]
+                        inters = [i for i in atm_grp.interactions
+                                  if i.type == "Hydrophobic"]
 
                         for comp in atm_grp.compounds:
-                            comp_sel = "%s and %s" % (main_grp, mybio_to_pymol_selection(comp))
+                            comp_sel = ("%s and %s"
+                                        % (main_grp,
+                                           mybio_to_pymol_selection(comp)))
                             self.wrapper.show([("sticks", comp_sel)])
 
                         if len(inters) > 0:
                             for inter in inters:
-                                for atm in inter.src_grp.atoms + inter.trgt_grp.atoms:
+                                for atm in (inter.src_grp.atoms
+                                            + inter.trgt_grp.atoms):
+                                    sel = mybio_to_pymol_selection(atm)
                                     if atm not in interacting_atms:
-                                        self.wrapper.color([("pink", "%s and %s" % (main_grp, mybio_to_pymol_selection(atm)))])
+                                        self.wrapper.color([("pink",
+                                                             "%s and %s"
+                                                             % (main_grp,
+                                                                sel))])
 
-                                for atm in inter.src_interacting_atms + inter.trgt_interacting_atms:
-                                    self.wrapper.color([("hotpink", "%s and %s" % (main_grp, mybio_to_pymol_selection(atm)))])
+                                for atm in (inter.src_interacting_atms
+                                            + inter.trgt_interacting_atms):
+                                    sel = mybio_to_pymol_selection(atm)
+                                    self.wrapper.color([("hotpink",
+                                                         "%s and %s"
+                                                         % (main_grp, sel))])
                                     interacting_atms.add(atm)
 
                         else:
                             for atm in atm_grp.atoms:
-                                self.wrapper.color([("wheat", "%s and %s" % (main_grp, mybio_to_pymol_selection(atm)))])
+                                sel = mybio_to_pymol_selection(atm)
+                                self.wrapper.color([("wheat",
+                                                     "%s and %s"
+                                                     % (main_grp, sel))])
 
-                    self.wrapper.hide([("sticks", "%s and not hetatm" % main_grp)])
-                    self.wrapper.show([("sticks", "%s.inter_residues" % main_grp)])
-                    self.wrapper.color([("white", "%s and not hetatm and not %s.inter_residues and !name PS*" % (main_grp, main_grp))])
+                    self.wrapper.hide([("sticks",
+                                        "%s and not hetatm" % main_grp)])
+                    self.wrapper.show([("sticks",
+                                        "%s.inter_residues" % main_grp)])
+                    self.wrapper.color([("white",
+                                         "%s and not hetatm and not "
+                                         "%s.inter_residues and !name PS*"
+                                         % (main_grp, main_grp))])
 
-                # Otherwise, it will display only hydrophobic groups comprising the interacting groups.
+                # Otherwise, it will display only hydrophobic groups comprising
+                # the interacting groups.
                 else:
                     interacting_atms = set()
                     for inter in interactions:
@@ -213,11 +237,17 @@ for im in proj_obj.interactions_mngrs]
                             continue
 
                         for atm in inter.src_grp.atoms + inter.trgt_grp.atoms:
+                            sel = mybio_to_pymol_selection(atm)
                             if atm not in interacting_atms:
-                                self.wrapper.color([("pink", "%s and %s" % (main_grp, mybio_to_pymol_selection(atm)))])
+                                self.wrapper.color([("pink", 
+                                                     "%s and %s"
+                                                     % (main_grp, sel))])
 
                         for atm in inter.src_interacting_atms + inter.trgt_interacting_atms:
-                            self.wrapper.color([("hotpink", "%s and %s" % (main_grp, mybio_to_pymol_selection(atm)))])
+                            sel = mybio_to_pymol_selection(atm)
+                            self.wrapper.color([("hotpink",
+                                                 "%s and %s"
+                                                 % (main_grp, sel))])
                             interacting_atms.add(atm)
 
         self.set_last_details_to_view()

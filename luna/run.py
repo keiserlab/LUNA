@@ -3,13 +3,7 @@ import os
 import shutil
 import configparser
 
-import sys
-scripts = '/media/data/Workspace/Keiser lab/LUNA'
-sys.path.append(scripts)
-
-
 from luna.projects import LocalProject, EntryResults
-from luna.version import __version__ as version
 from luna.config.params import ProjectParams
 from luna.interaction.view import InteractionViewer
 from luna.interaction.fp.type import IFPType
@@ -43,7 +37,7 @@ def get_parser():
                             "entries to process.")
     group.add_argument("-p", "--prot", dest="pdb_id",
                        type=str,
-                       help="the protein PDB id. "
+                       help="A local PDB filename. "
                             "Mandatory if there is at least one entry "
                             "containing only the ligand name. "
                             "This only applies to ligands to be read "

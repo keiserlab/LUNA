@@ -38,13 +38,21 @@
 .. |axen2017_doi| image:: https://img.shields.io/badge/doi-10.1021/acs.jmedchem.7b00696-blue.svg
     :target: http://dx.doi.org/10.1021/acs.jmedchem.7b00696
     :alt: Access the paper
-.. |axen2017| replace:: Axen SD, Huang XP, Caceres EL, Gendelev L, Roth BL, Keiser MJ. A Simple Representation Of Three-Dimensional Molecular Structure. *J. Med. Chem.* **60** (17): 7393–7409 (2017). |axen2017_doi| |bioRxiv| |F1000 recommended|
+.. |axen2017| replace:: Axen, S. D.; Huang, X.-P.; Cáceres, E. L.; Gendelev, L.; Roth, B. L.; Keiser, M. J. A Simple Representation of Three-Dimensional Molecular Structure. J. Med. Chem. 2017, 60 (17), 7393–7409. |axen2017_doi| |bioRxiv| |F1000 recommended|
+
 .. |rogers2010_doi| image:: https://img.shields.io/badge/doi-10.1021/ci100050t-blue.svg
     :target: http://dx.doi.org/10.1021/ci100050t
     :alt: Access the paper
-.. |rogers2010| replace:: Rogers D & Hahn M. Extended-connectivity fingerprints. *J. Chem. Inf. Model.* **50**: 742-54 (2010). |rogers2010_doi|
+.. |rogers2010| replace:: Rogers, D.; Hahn, M. Extended-Connectivity Fingerprints. J. Chem. Inf. Model. 2010, 50 (5), 742–754. |rogers2010_doi|
 
-.. |afassio2022| replace:: TO BE DEFINED (2022).
+
+.. |afassio2022_bioRxiv| image:: https://img.shields.io/badge/bioRxiv-136705-blue.svg
+    :target: https://doi.org/10.1101/2022.05.25.493419
+    :alt: Access the preprint on bioRxiv
+.. |afassio2022_doi| image:: https://img.shields.io/badge/doi-10.1021/acs.jmedchem.7b00696-blue.svg
+    :target: https://doi.org/10.1021/acs.jcim.2c00695
+    :alt: Access the paper
+.. |afassio2022| replace:: Fassio, A. V.; Shub, L.; Ponzoni, L.; McKinley, J.; O’Meara, M. J.; Ferreira, R. S.; Keiser, M. J.; de Melo Minardi, R. C. Prioritizing Virtual Screening with Interpretable Interaction Fingerprints. J. Chem. Inf. Model. 2022. |afassio2022_doi|  |afassio2022_bioRxiv|
 
 .. Misc
 .. |license| replace:: `MIT License`_

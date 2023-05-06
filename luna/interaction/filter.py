@@ -158,6 +158,66 @@ class InteractionFilter:
                    ignore_any_h2o=ignore_any_h2o,
                    ignore_self_inter=ignore_self_inter, **kwargs)
 
+    @classmethod
+    def from_config_file(cls, config_file):
+        """Initialize from a configuration file.
+
+        Parameters
+        ----------
+        config_file : str
+            The configuration file pathname.
+
+        Returns
+        -------
+         : `InteractionFilter`
+        """
+
+        if not path.exists(config_file):
+            raise OSError("File '%s' does not exist." % config_file)
+
+        params = Config(config_file)
+
+        inter_filter = None
+        if "default" in params.sections():
+            params_dict = params.get_section_map("default")
+            filter_type = params_dict.pop("type", None)
+
+            if filter_type is not None:
+                filter_type = filter_type.upper()
+
+                available_filters = ["PLI", "PPI", "PNI", "NNI", "NLI"]
+                if filter_type not in available_filters:
+                    raise KeyError("The accepted default filter types are: "
+                                   "%s." % ", ".join(available_filters))
+
+                if filter_type == "PLI":
+                    inter_filter = cls.new_pli_filter()
+
+                elif filter_type == "PPI":
+                    inter_filter = cls.new_ppi_filter()
+
+                elif filter_type == "PNI":
+                    inter_filter = cls.new_pni_filter()
+
+                elif filter_type == "NNI":
+                    inter_filter = cls.new_nni_filter()
+
+                elif filter_type == "NLI":
+                    inter_filter = cls.new_nli_filter()
+
+        if "ignore" in params.sections():
+            params_dict = params.get_section_map("ignore")
+            params_dict = {"ignore_" + k: v
+                           for k, v in params_dict.items()}
+
+            if inter_filter:
+                for prop, val in params_dict.items():
+                    setattr(inter_filter, prop, val)
+            else:
+                inter_filter = cls(**params_dict)
+
+        return inter_filter
+
     def is_valid_pair(self, src_grp, trgt_grp):
         """Evaluate if a pair of atom groups are valid according to the flags
         defined in this class.
@@ -283,56 +343,14 @@ class InteractionFilter:
 
         return True
 
-    @classmethod
-    def from_config_file(cls, config_file):
-
-        if not path.exists(config_file):
-            raise OSError("File '%s' does not exist." % config_file)
-
-        params = Config(config_file)
-
-        inter_filter = None
-        if "default" in params.sections():
-            params_dict = params.get_section_map("default")
-            filter_type = params_dict.pop("type", None)
-
-            if filter_type is not None:
-                filter_type = filter_type.upper()
-
-                available_filters = ["PLI", "PPI", "PNI", "NNI", "NLI"]
-                if filter_type not in available_filters:
-                    raise KeyError("The accepted default filter types are: "
-                                   "%s." % ", ".join(available_filters))
-
-                if filter_type == "PLI":
-                    inter_filter = cls.new_pli_filter()
-
-                elif filter_type == "PPI":
-                    inter_filter = cls.new_ppi_filter()
-
-                elif filter_type == "PNI":
-                    inter_filter = cls.new_pni_filter()
-
-                elif filter_type == "NNI":
-                    inter_filter = cls.new_nni_filter()
-
-                elif filter_type == "NLI":
-                    inter_filter = cls.new_nli_filter()
-
-        if "ignore" in params.sections():
-            params_dict = params.get_section_map("ignore")
-            params_dict = {"ignore_" + k: v
-                           for k, v in params_dict.items()}
-
-            if inter_filter:
-                for prop, val in params_dict.items():
-                    setattr(inter_filter, prop, val)
-            else:
-                inter_filter = cls(**params_dict)
-
-        return inter_filter
-
     def save_config_file(self, config_file):
+        """Save the interaction filter parameters into a configuration file.
+
+        Parameters
+        ----------
+        config_file : str
+            The output configuration file.
+        """
         with open(config_file, "w") as OUT:
             OUT.write("[ignore]\n")
             OUT.write("self_inter = %s\n" % self.ignore_self_inter)
@@ -365,9 +383,12 @@ class BindingModeCondition:
         Wildcards are accepted for each one of these fields.
         For example:
 
-            * '\*/HIS/\*/\*': represents all histidines' atoms from all chains.
-            * 'A/CBL/\*/\*' represents all ligands named CBL from chain A.
-            * 'B/HIS/\*/N\*' represents all histidines' nitrogens from chain B.
+            * '\\*/HIS/\\*/\\*': represents all histidines' \
+                                 atoms from all chains.
+            * 'A/CBL/\\*/\\*' represents all ligands named CBL \
+                            from chain A.
+            * 'B/HIS/\\*/N\\*' represents all histidines' nitrogens \
+                             from chain B.
 
     Attributes
     ----------
@@ -445,7 +466,7 @@ class BindingModeCondition:
                         error_msg = ("The informed compound number '%s' is "
                                      "invalid. It must be an integer."
                                      % str(comp_num))
-                        raise IllegalArgumentError()
+                        raise IllegalArgumentError(error_msg)
 
                     icode = (None if matched.group(2) == ""
                              else matched.group(2))
@@ -544,7 +565,7 @@ class BindingModeFilter:
 
         Parameters
         ----------
-        ``config_file`` : str
+        config_file : str
             The configuration file pathname.
 
         Returns
@@ -556,15 +577,22 @@ class BindingModeFilter:
 
         It follows an example of a configuration file::
 
-            ; To configurate an interaction type, create a new line and define the interaction: [New interaction].
-            ; Then you can define whether or not all interactions must be accepted by setting 'accept_only' to True or False.
+            ; To configurate an interaction type, create a new line and define
+            ; the interaction: [New interaction]. Then you can define whether
+            ; or not all interactions must be accepted by setting 'accept_only'
+            ; to True or False.
 
-            ; If you want to specify binding modes, use the variable 'accept_only', which expects a list of strings \
-            in the format: <CHAIN ID>/<COMPOUND NAME>/<COMPOUND NUMBER>/<ATOM>
+            ; If you want to specify binding modes, use the variable
+            ; 'accept_only', which expects a list of strings in the format:
+            ; <CHAIN ID>/<COMPOUND NAME>/<COMPOUND NUMBER>/<ATOM>.
+            ;
             ; Wildcards are accepted for the expected fields.
-            ; For example, "*/HIS/*/*" represents all histidines' atoms from all chains.
-            ;               "A/CBL/*/*" represents all ligands named CBL from chain A.
-            ;               "B/HIS/*/N*" represents all histidines' nitrogens from chain B.
+            ; For example, "*/HIS/*/*" represents all histidines' atoms from \
+all chains.
+            ;               "A/CBL/*/*" represents all ligands named CBL from \
+chain A.
+            ;               "B/HIS/*/N*" represents all histidines' nitrogens \
+from chain B.
 
             [Hydrogen bond]
             accept_only = ["A/LYS/245/*", "*/HIS/*/*"]
@@ -655,6 +683,14 @@ class BindingModeFilter:
         return False
 
     def save_config_file(self, config_file):
+        """Save the binding mode filter parameters into a
+        configuration file.
+
+        Parameters
+        ----------
+        config_file : str
+            The output configuration file.
+        """
         args_by_section = defaultdict(list)
 
         for inter, conditions in self.config.items():
