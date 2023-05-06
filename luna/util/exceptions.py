@@ -116,3 +116,7 @@ class MoleculeObjectTypeError(TypeError):
 
 class MoleculeObjectError(RuntimeError):
     pass
+
+
+class LicenseNotFoundError(RuntimeError):
+    pass

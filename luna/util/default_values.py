@@ -31,6 +31,9 @@ IFP_LENGTH = 4096
 ACCEPTED_MOL_OBJ_TYPES = ("rdkit", "openbabel")
 
 OPENBABEL = "obabel"
+ANTECHAMBER = "antechamber"
+DOCK6_PATH = "/opt/dock6"
+DOCK6 = f"{DOCK6_PATH}/bin/dock6"
 
 RECURSION_LIMIT = 600000
 
