@@ -4,19 +4,20 @@ from rdkit.Chem import Mol as RDMol
 from rdkit.Chem import Bond as RDBond
 from rdkit.Chem import BondType as RDBondType
 from rdkit.Chem import (MolFromSmiles, MolToSmiles, MolToPDBBlock,
-                        MolToMolBlock, GetPeriodicTable)
+                        MolToMolBlock, GetPeriodicTable, GetFormalCharge)
+from rdkit.Chem import rdFMCS
+
 from openbabel import openbabel as ob
 from openbabel.pybel import Molecule as PybelMol
-from openbabel.pybel import readstring
+from openbabel.pybel import readstring, readfile
 
-from luna.wrappers.rdkit import new_mol_from_block
+from luna.wrappers.rdkit import new_mol_from_block, read_mol_from_file
 from luna.util.math import euclidean_distance
 from luna.util.exceptions import (AtomObjectTypeError, BondObjectTypeError,
                                   IllegalArgumentError, MoleculeObjectError,
                                   MoleculeObjectTypeError)
 
 import logging
-
 logger = logging.getLogger()
 
 
@@ -816,6 +817,30 @@ class MolWrapper:
         self._mol_obj = mol_obj
 
     @classmethod
+    def from_mol_file(cls, file, mol_format, mol_obj_type="rdkit"):
+        """Initialize a molecule from a molecular file.
+
+        Parameters
+        ----------
+        file : str
+            The molecular file.
+        mol_format : str
+            Define the format in which the molecule is represented
+                (e.g., 'mol2' or 'mol').
+        mol_obj_type : {'rdkit', 'openbabel'}
+            Define which library (RDKit or Open Babel) to use to parse the
+            molecular block. The default value is RDKit.
+
+        Returns
+        -------
+         : `MolWrapper`
+        """
+        if mol_obj_type == "rdkit":
+            return cls(read_mol_from_file(file, mol_format))
+        elif mol_obj_type == "openbabel":
+            return cls(list(readfile(mol_format, file))[0])
+
+    @classmethod
     def from_mol_block(cls, block, mol_format, mol_obj_type="rdkit"):
         """Initialize a molecule from a string block.
 
@@ -1003,6 +1028,13 @@ class MolWrapper:
             return [BondWrapper(bond) for bond in bonds]
         return bonds
 
+    def get_total_charge(self):
+        """Get total molecular charge."""
+        if self.is_rdkit_obj():
+            return GetFormalCharge(self._mol_obj)
+        elif self.is_openbabel_obj():
+            return self._mol_obj.GetTotalCharge()
+
     def get_num_heavy_atoms(self):
         """Get the number of heavy atoms in this molecule."""
         if self.is_rdkit_obj():
@@ -1030,6 +1062,19 @@ class MolWrapper:
             return "rdkit"
         elif self.is_openbabel_obj():
             return "openbabel"
+
+    def find_mcs(self, other, match_valences=True,
+                 ring_matches_ring_only=True, complete_rings_only=True):
+        other = MolWrapper(other)
+        other = other.unwrap() if other.is_rdkit_obj() else other.as_rdkit()
+
+        mol_obj = self.unwrap() if self.is_rdkit_obj() else self.as_rdkit()
+
+        # Maximum Common Substructure.
+        return rdFMCS.FindMCS([other, mol_obj],
+                              matchValences=match_valences,
+                              ringMatchesRingOnly=ring_matches_ring_only,
+                              completeRingsOnly=complete_rings_only)
 
     def has_name(self):
         """Check if this molecule has a name."""
@@ -1117,7 +1162,7 @@ class MolWrapper:
     def __setstate__(self, state):
         if "_mol_obj_type" in state and "_mol_block" in state:
             state["_mol_obj"] = \
-                self.from_mol_block(state["_mol_block"], 
+                self.from_mol_block(state["_mol_block"],
                                     "mol", "openbabel").unwrap()
             del state["_mol_obj_type"]
             del state["_mol_block"]
