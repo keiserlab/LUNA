@@ -2,7 +2,8 @@ from subprocess import Popen, PIPE, TimeoutExpired
 
 from openbabel.pybel import informats, outformats
 
-from luna.util.exceptions import FileNotCreated, InvalidFileFormat
+from luna.util.exceptions import (FileNotCreated, InvalidFileFormat,
+                                  IllegalArgumentError, ProcessingFailed)
 from luna.util.default_values import OPENBABEL
 from luna.util.file import is_file_valid, validate_file, get_file_format
 
@@ -14,13 +15,16 @@ def _prep_opts(opts, prefix=""):
     opt_list = []
     if opts is not None:
         for key in opts:
-            if len(key) > 1:
-                opt_list.append("--%s%s" % (prefix, key))
+            if key == "x" and prefix == "":
+                opt_list.append("-%s%s" % (key, str(opts[key])))
             else:
-                opt_list.append("-%s%s" % (prefix, key))
+                if len(key) > 1:
+                    opt_list.append("--%s%s" % (prefix, key))
+                else:
+                    opt_list.append("-%s%s" % (prefix, key))
 
-            if opts[key] is not None:
-                opt_list.append(str(opts[key]))
+                if opts[key] is not None:
+                    opt_list.append(str(opts[key]))
     return opt_list
 
 
@@ -75,28 +79,43 @@ def mol_to_svg(infile, output, opts=None):
         raise
 
 
-def convert_molecule(infile, output, infile_format=None,
-                     output_format=None, opts=None, openbabel=OPENBABEL):
+def convert_molecule(mol_input, input_format=None,
+                     output_file=None, output_format=None,
+                     opts=None, openbabel=OPENBABEL):
     """Convert a molecular file to another format using Open Babel.
 
     Parameters
     ----------
 
-    infile : str
-        The pathname of the molecular file to be converted.
-    output : str
+    mol_input : str
+        The pathname of a molecular file or a SMILES string.
+    input_format : str, optional
+        The molecular format of ``mol_input``.
+        If not provided, the format will be defined by the file ``mol_input``
+        extension. If the extension could not be identified, an
+        `InvalidFileFormat` exception will be raised.
+    output_file : str or None
         Save the converted molecule to this file.
-    infile_format : str, optional
-        The molecular format of ``infile``.
-        If not provided, the format will be defined by the file extension.
+        If None, return the output molecule as string.
     output_format : str, optional
-        The molecular format of ``output``.
-        If not provided, the format will be defined by the file extension.
+        The molecular format of ``output_file``.
+        If not provided, the format will be defined by the ``output_file`` when
+        it is not None.
+        Otherwise, it will raise an `InvalidFileFormat` exception.
     opts : dict
-        A set of convertion options. Check `Open Babel <https://openbabel.org/docs/dev/Command-line_tools/babel.html>`_ to discover which options are available.
+        A set of convertion options.
+        Check `Open Babel <https://openbabel.org/docs/dev/Command-line_tools/babel.html>`_
+        to discover which options are available.
     openbabel : str, optional
         The Open Babel binary location.
         If not provided, the default binary ('obabel') will be used.
+
+
+    Returns
+    -------
+     : str or None
+        Return the converted molecule as a string if ``output_file`` is None.
+        Otherwise, return None.
 
     Raises
     ------
@@ -106,61 +125,92 @@ def convert_molecule(infile, output, infile_format=None,
     Examples
     --------
 
-    In this example, we will convert the molecule ZINC000007786517 from the
-    format MOL to MOL2 and add hydrogens to it considering a pH of 7
+    In this example, we will convert the molecule ZINC000007786517 from
+    the format MOL to MOL2 and add hydrogens to it considering a pH of 7
     (option "p").
 
     >>> from luna.util.default_values import LUNA_PATH
     >>> from luna.wrappers.obabel import convert_molecule
-    >>> convert_molecule(infile=f"{LUNA_PATH}/tutorial/inputs/ZINC000007786517.mol",
-    ...                  output="example.mol2",
+    >>> convert_molecule(mol_input=f"{LUNA_PATH}/tutorial/inputs/\
+ZINC000007786517.mol",
+    ...                  output_file="example.mol2",
     ...                  opts={"p": 7})
     """
-    logger.debug("Trying to convert the file '%s' to '%s'." % (infile, output))
+    logger.info("Molecule or file '%s' will be converted to format '%s'."
+                % (mol_input, input_format))
 
-    try:
-        # It raises an error if it is not valid.
-        validate_file(infile)
+    if is_file_valid(mol_input):
+        if input_format is None:
+            msg = ("Input file format not defined. "
+                   "It will assume the format from the file extension.")
+            logger.debug(msg)
+            input_format = get_file_format(mol_input)
 
-        if infile_format is None:
-            logger.debug("Input file format not defined. It will assume the "
-                         "format from the file extension.")
-            infile_format = get_file_format(infile)
+        if input_format not in informats:
+            msg = "Input format '%s' does not exist." % input_format
+            raise InvalidFileFormat(msg)
 
-        if infile_format not in informats:
-            raise InvalidFileFormat("Infile format '%s' does not exist."
-                                    % infile_format)
+        logger.debug("Input format: %s" % input_format)
 
-        logger.debug("Input format: %s" % infile_format)
+    else:
+        if input_format != "smi":
+            msg = ("File '%s' does not exist or is not a valid file."
+                   % mol_input)
+            raise OSError(msg)
 
+    if isinstance(output_file, str):
         if output_format is None:
-            logger.debug("Output file format not defined. It will assume the "
-                         "format by the file extension.")
-            output_format = get_file_format(output, 1)
+            msg = ("Output file format not defined. It will assume the format "
+                   "by the file extension.")
+            logger.debug(msg)
+            output_format = get_file_format(output_file, 1)
 
         if output_format not in outformats:
-            raise InvalidFileFormat("Infile format '%s' does not exist."
-                                    % output_format)
+            msg = "Output format '%s' does not exist." % output_format
+            raise InvalidFileFormat(msg)
 
         logger.debug("Output format: %s" % output_format)
 
-        opt_list = _prep_opts(opts)
-        args = [openbabel, "-i", infile_format, infile,
-                "-o", output_format, "-O", output] + opt_list
+    elif output_file is not None:
+        msg = "The 'output_file' should be a string or None."
+        raise IllegalArgumentError(msg)
 
-        p = Popen(args, stdout=PIPE, stderr=PIPE)
-        try:
-            stdout, stderr = p.communicate(timeout=30)
-        except TimeoutExpired:
-            p.kill()
-            raise
+    if output_format is None:
+        msg = "The output format could not be identified."
+        raise IllegalArgumentError(msg)
 
-        output_lines = stderr.decode().strip().split("\n")
-        is_mol_converted = output_lines[-1] != "0 molecule converted"
-        if not is_file_valid(output) or not is_mol_converted:
-            raise FileNotCreated("File '%s' not converted to '%s'." %
-                                 (infile, output))
-        else:
-            logger.debug("File '%s' converted to '%s'." % (infile, output))
-    except Exception:
+    if input_format == "smi":
+        input_list = [f'-:{mol_input}']
+    else:
+        input_list = ['-i', input_format, mol_input]
+
+    if output_file is None:
+        output_list = ['-o', output_format]
+    else:
+        output_list = ['-o', output_format, '-O', output_file]
+
+    opts = opts or {}
+
+    timeout = 30
+    if "gen3d" in opts or "minimize" in opts:
+        timeout = None
+
+    opt_list = _prep_opts(opts)
+    args = [openbabel] + input_list + output_list + opt_list
+
+    p = Popen(args, stdout=PIPE, stderr=PIPE)
+    try:
+        stdout, stderr = p.communicate(timeout=timeout)
+    except TimeoutExpired:
+        p.kill()
         raise
+
+    error_lines = stderr.decode().strip().split("\n")
+    if (error_lines[-1] == "0 molecules converted"
+            or error_lines[-1] == "0 molecule converted"):
+        raise ProcessingFailed("The provided molecule could not be converted.")
+
+    if output_file is None:
+        return stdout.decode().strip()
+
+    logger.debug("File '%s' created with success." % output_file)
