@@ -293,10 +293,12 @@ is_hetatm=True, sep="/")
                 This only applies to ligands that will be read from
                 multimolecular files.
         entries_sep : str
-            a separator for entries whose molecules lie all in the same PDB
-            file, not requiring, therefore, an additional molecular file.
-            Such entries cause the function to yield `ChainEntry` or
-            `MolEntry` objects. Default: ':'. E.g.: 3QQK:A:X02:497.
+            a separator for entries. For complexes where the ligand and the 
+            protein structure lie all in the same PDB file (e.g., complexes 
+            from the RCSB PDB), the separator must be the same used for 
+            entries provided at `input_file`. 
+            Default: ':'. E.g.: 3QQK:A:X02:497 or receptor:ZINC000649623159
+
         fields_sep : str
             a character used to separate fields in ``input_file`` for
             complexes whose protein structure is in a PDB file and
@@ -374,6 +376,7 @@ in ``mol_file``.
                         yield MolFileEntry.from_mol_file(pdb_id, args[0],
                                                          mol_file,
                                                          is_multimol_file=True,
+                                                         sep=entries_sep,
                                                          **kwargs)
 
                     elif len(args) == 2:
@@ -394,6 +397,7 @@ in ``mol_file``.
                     yield cls.from_mol_file(curr_pdb_id, curr_mol_id,
                                             curr_mol_file,
                                             is_multimol_file=is_multimol,
+                                            sep=entries_sep,
                                             **kwargs)
                 else:
                     has_error = True
