@@ -15,5 +15,7 @@ dependencies:
   - xopen
   - colorlog
   - networkx
+  - scipy
   - pip:
     - mmh3==2.5.1
+    - pdbecif

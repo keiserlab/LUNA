@@ -51,6 +51,7 @@ requirements = [
     'seaborn',
     'scipy',
     'xopen',
+    'pdbecif'
 ]
 
 test_requirements = ["pytest", "mock"]
