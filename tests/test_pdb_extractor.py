@@ -5,9 +5,9 @@ from os.path import dirname, abspath
 
 sys.path.append(dirname(dirname(abspath(__file__))))
 
-from luna.MyBio.PDB.Model import Model
-from luna.MyBio.PDB.Chain import Chain
-from luna.MyBio.extractor import Extractor
+from luna.pdb.core.model import Model
+from luna.pdb.core.chain import Chain
+from luna.pdb.io.extractor import Extractor
 
 
 class ExtractorTest(unittest.TestCase):

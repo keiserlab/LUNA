@@ -48,7 +48,7 @@ class Fingerprint:
                  unfolding_map=None,
                  props=None):
 
-        indices = np.asarray(indices, dtype=np.long)
+        indices = np.asarray(indices, dtype=np.int_)
 
         if np.any(np.logical_or(indices < 0, indices >= fp_length)):
             error_msg = "Provided indices are in a different bit scale."
@@ -142,9 +142,9 @@ class Fingerprint:
                 fp_length = vector.shape[0]
 
         if issparse(vector):
-            indices = vector.indices.astype(np.long)
+            indices = vector.indices.astype(np.int_)
         else:
-            indices = np.asarray(np.where(vector), dtype=np.long).flatten()
+            indices = np.asarray(np.where(vector), dtype=np.int_).flatten()
 
         return cls.from_indices(indices, fp_length, **kwargs)
 
@@ -208,7 +208,7 @@ class Fingerprint:
             raise TypeError(error_msg)
 
         fp_length = rdkit_fp.GetNumBits()
-        indices = np.asarray(rdkit_fp.GetOnBits(), dtype=np.long)
+        indices = np.asarray(rdkit_fp.GetOnBits(), dtype=np.int_)
 
         return cls.from_indices(indices, fp_length, **kwargs)
 
@@ -838,7 +838,7 @@ class CountFingerprint(Fingerprint):
             raise IllegalArgumentError("Indices or counts must be provided.")
 
         if indices is not None:
-            indices = np.asarray(indices, dtype=np.long)
+            indices = np.asarray(indices, dtype=np.int_)
 
             if np.any(np.logical_or(indices < 0, indices >= fp_length)):
                 error_msg = "Provided indices are in a different bit scale."
@@ -862,7 +862,7 @@ class CountFingerprint(Fingerprint):
                     logger.exception(error_msg)
                     raise FingerprintCountsError(error_msg)
         else:
-            indices = np.asarray(sorted(counts.keys()), dtype=np.long)
+            indices = np.asarray(sorted(counts.keys()), dtype=np.int_)
 
             if np.any(np.logical_or(indices < 0, indices >= fp_length)):
                 error_msg = ("Provided indices are in a different bit scale.")
@@ -1050,10 +1050,10 @@ on_bits),
                 fp_length = vector.shape[0]
 
         if issparse(vector):
-            indices = vector.indices.astype(np.long)
+            indices = vector.indices.astype(np.int_)
             counts = vector.data
         else:
-            indices = np.asarray(np.where(vector), dtype=np.long).flatten()
+            indices = np.asarray(np.where(vector), dtype=np.int_).flatten()
             counts = vector[indices]
         counts = dict(zip(indices, counts))
 

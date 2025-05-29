@@ -1,6 +1,6 @@
 import multiprocessing as mp
 import time
-from collections import Sequence
+from collections.abc import Sequence
 
 from luna.util.progress_tracker import ProgressData, ProgressTracker
 from luna.util.file import new_unique_filename

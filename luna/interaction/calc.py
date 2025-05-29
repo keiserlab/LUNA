@@ -13,7 +13,8 @@ from luna.analysis.summary import count_interaction_types
 import luna.util.math as im
 from luna.util.default_values import BOUNDARY_CONFIG
 from luna.util.exceptions import IllegalArgumentError
-from luna.mol.groups import AtomGroupNeighborhood
+from luna.pdb.neighbors.atom_group import AtomGroupNeighborhood
+
 from luna.util.file import pickle_data, unpickle_data
 from luna.version import __version__
 

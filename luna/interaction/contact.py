@@ -3,10 +3,14 @@ from itertools import product
 from luna.util.default_values import (COV_SEARCH_RADIUS, BOUNDARY_CONFIG)
 from luna.util.exceptions import EntityLevelError, IllegalArgumentError
 from luna.interaction.cov import is_covalently_bound
-from luna.MyBio.util import ENTITY_LEVEL_NAME
-from luna.MyBio.PDB.NeighborSearch import NeighborSearch
-from luna.MyBio.PDB import Selection
-from luna.MyBio.PDB.Residue import Residue
+
+
+from Bio.PDB import Selection
+
+from Bio.PDB.NeighborSearch import NeighborSearch
+
+from luna.pdb.core.residue import Residue
+from luna.pdb.util.traverse import ENTITY_LEVEL_NAME
 
 import logging
 

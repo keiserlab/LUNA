@@ -10,7 +10,9 @@ from Bio.SeqRecord import SeqRecord
 from Bio.Align import MultipleSeqAlignment
 from Bio.Alphabet import generic_protein
 
-from luna.MyBio.util import parse_from_file, save_to_file
+from luna.pdb.parser.helpers import load_from_file
+from luna.pdb.io.helpers import save_to_file
+
 from luna.util.exceptions import InvalidSuperpositionFileError
 from luna.util.file import is_directory_valid
 
@@ -53,7 +55,7 @@ def align_structures(pdb_to_align, ref_pdb, output_path=None, tmalign=None):
         recommended you extract the chains first and align them separately,
         otherwise the alignment may not produce the expected results.
 
-        To extract chains you can use :class:`~luna.MyBio.extractor.Extractor`.
+        To extract chains you can use :class:`~luna.pdb.io.extractor.Extractor`.
 
     Parameters
     ----------

@@ -10,7 +10,8 @@ from luna.util.default_values import CHEMICAL_FEATURE_IDS, INTERACTION_IDS
 from luna.interaction.fp.fingerprint import (DEFAULT_FP_LENGTH, Fingerprint,
                                              CountFingerprint)
 from luna.interaction.fp.type import IFPType
-from luna.mol.groups import PseudoAtomGroup, AtomGroupNeighborhood
+from luna.mol.groups import PseudoAtomGroup
+from luna.pdb.neighbors.atom_group import AtomGroupNeighborhood
 from luna.mol.features import ChemicalFeature
 
 

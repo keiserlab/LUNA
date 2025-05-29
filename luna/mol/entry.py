@@ -22,8 +22,8 @@ from luna.util.exceptions import (InvalidEntry,
                                   MoleculeObjectError,
                                   MoleculeObjectTypeError,
                                   MoleculeNotFoundError)
-from luna.MyBio.PDB.PDBParser import PDBParser, WATER_NAMES, DEFAULT_CHAIN_ID
-from luna.MyBio.PDB.Entity import Entity
+from luna.pdb.parser.base import PDBParser, WATER_NAMES, DEFAULT_CHAIN_ID
+from luna.pdb.core.entity import Entity
 
 
 logger = logging.getLogger()
@@ -64,8 +64,8 @@ class Entry:
     sep : str
         A separator character to format the entry string.
         The default value is ':'.
-    parser : :class:`~luna.MyBio.PDB.PDBParser.PDBParser` or \
-                :class:`~luna.MyBio.PDB.FTMapParser.FTMapParser`, optional
+    parser : :class:`~luna.pdb.parser.base.PDBParser` or \
+                :class:`~luna.pdb.parser.ftmap.FTMapParser`, optional
             Define a PDB parser object. If not provided, the default parser
             will be used.
 
@@ -1175,17 +1175,17 @@ not found in the
 
         Parameters
         ----------
-        entity : :class:`~luna.MyBio.PDB.Entity.Entity`, optional
+        entity : :class:`~luna.pdb.core.entity.Entity`, optional
             Append the molecular object to ``entity``.
-            If not provided, a new :class:`~luna.MyBio.PDB.Entity.Entity`
+            If not provided, a new :class:`~luna.pdb.core.entity.Entity`
             is created.
-        parser : :class:`~luna.MyBio.PDB.PDBParser.PDBParser`, optional
+        parser : :class:`~luna.pdb.parser.base.PDBParser`, optional
             Define a PDB parser object. If not provided, the default parser
             will be used.
 
         Returns
         -------
-         : :class:`~luna.MyBio.PDB.Entity.Entity`
+         : :class:`~luna.pdb.core.entity.Entity`
 
         Raises
         ------
@@ -1200,7 +1200,7 @@ not found in the
 
         First, let's parse the PDB file.
 
-        >>> from luna.MyBio.PDB.PDBParser import PDBParser
+        >>> from luna.pdb.parser.base.PDBParser import PDBParser
         >>> pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True)
         >>> pdb_file = "tutorial/inputs/D4.pdb"
         >>> structure = pdb_parser.get_structure("Protein", pdb_file)
@@ -1358,7 +1358,7 @@ def recover_entries_from_entity(entity, get_small_molecules=True,
 
     Parameters
     ----------
-    entity : :class:`~luna.MyBio.PDB.Entity.Entity`
+    entity : :class:`~luna.pdb.core.entity.Entity`
         An entity from where chains or small molecules will be recovered.
     get_small_molecules : bool
         If True, identify small molecules and return them as `MolEntry`
@@ -1372,10 +1372,10 @@ def recover_entries_from_entity(entity, get_small_molecules=True,
         TPO. The default value is True.
     by_cluster : bool
         If True, aggregate entries by cluster. Cluster ids are exclusive
-        to :class:`~luna.MyBio.PDB.Residue.Residue` instances and are
-        automatically set by :class:`~luna.MyBio.PDB.FTMapParser.FTMapParser`,
+        to :class:`~luna.pdb.core.residue.Residue` instances and are
+        automatically set by :class:`~luna.pdb.parser.ftmap.FTMapParser`,
         a parser for FTMap results. By default, the cluster id of
-        :class:`~luna.MyBio.PDB.Residue.Residue` instances are set to None,
+        :class:`~luna.pdb.core.residue.Residue` instances are set to None,
         therefore, if the cluster id is not explicitly defined, all entries
         will be aggregated to the same key ``None``.
     sep : str
@@ -1390,7 +1390,7 @@ def recover_entries_from_entity(entity, get_small_molecules=True,
         in which keys are clusters and values are lists of `ChainEntry`
         or `MolEntry` objects. When no cluster information is available, all
         entries are aggregated in a key of value ``None``. Cluster ids are
-        exclusive to :class:`~luna.MyBio.PDB.Residue.Residue` instances,
+        exclusive to :class:`~luna.pdb.core.residue.Residue` instances,
         therefore, `ChainEntry` objects are always placed in a key of
         value ``None``.
 
@@ -1399,7 +1399,7 @@ def recover_entries_from_entity(entity, get_small_molecules=True,
 
     First, let's parse a PDB file.
 
-    >>> from luna.MyBio.PDB.PDBParser import PDBParser
+    >>> from luna.pdb.parser.base.PDBParser import PDBParser
     >>> pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True)
     >>> pdb_file = "tutorial/inputs/3QQK.pdb"
     >>> structure = pdb_parser.get_structure("Protein", pdb_file)

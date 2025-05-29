@@ -1,0 +1,156 @@
+from Bio.PDB.Residue import Residue as BioResidue
+from Bio.PDB.Residue import DisorderedResidue as BioDisorderedResidue
+from Bio.PDB.Polypeptide import is_aa
+
+from luna.pdb.core.entity import Entity
+
+
+# List of metal residue names (based on PDB naming conventions)
+METALS = ["LI", "NA", "K", "RB", "CS", "MG", "CA", "SR", "BA", "V", "CR",
+          "MN", "MN3", "FE2", "FE", "CO", "3CO", "NI", "3NI", "CU1", "CU",
+          "CU3", "ZN", "AL", "GA", "ZR", "MO", "4MO", "6MO", "RU", "RH",
+          "RH3", "PD", "AG", "CD", "IN", "W", "RE", "OS", "OS4", "IR",
+          "IR3", "PT", "PT4", "AU", "AU3", "HG", "TL", "PB", "BS3", "0BE",
+          "4TI", "Y1", "YT3", "TA0"]
+
+
+class Residue(BioResidue, Entity):
+    """
+    Custom Residue subclass with support for indexing, classification,
+    hierarchical naming, and processing flags.
+
+    Parameters
+    ----------
+    res_id : tuple
+        Biopython residue ID (hetflag, resseq, icode).
+    resname : str
+        Residue name (e.g., "ALA", "HOH").
+    segid : str
+        Segment ID.
+    idx : int, optional
+        Index in parent chain.
+    at_line : int, optional
+        Line number in the original PDB.
+    """
+
+    def __init__(self, res_id, resname, segid, idx=None, at_line=None):
+        super().__init__(res_id, resname, segid)
+
+        # Store position within parent chain
+        self.idx = idx
+        # Optional PDB line number
+        self.at_line = at_line 
+
+        # Used by FTMapParser, optional.
+        self.cluster_id = None
+        
+        # By default: no residue is a target for processing.
+        self._is_target = False
+    
+    def __repr__(self):
+        return f"<Residue {self.get_resname()} idx={self.idx}>"
+
+    def __lt__(self, other):
+        return self.idx < other.idx
+
+    @property
+    def metal_coordination(self):
+        """
+        Return atoms in this residue that participate in metal coordination.
+
+        Returns
+        -------
+        dict
+            Atom → set of coordination partners.
+        """
+        return {
+            atom: atom.metal_coordination
+            for atom in self.get_atoms()
+            if getattr(atom, "has_metal_coordination", lambda: False)()
+        }
+
+    def is_target(self):
+        return self._is_target
+
+    def set_as_target(self, is_target=True):
+        self._is_target = is_target
+
+    def is_water(self):
+        """Return True if the residue is a water molecule."""
+        return self.get_id()[0] == "W"
+
+    def is_metal(self):
+        """Return True if the residue is a metal."""
+        return (self.get_id()[0].startswith("H_")
+                and self.resname in METALS)
+
+    def is_hetatm(self):
+        """Return True if the residue is an hetero group."""
+        return (self.get_id()[0].startswith("H_")
+                and not self.is_metal())
+
+    def is_residue(self):
+        """Return True if the residue is an amino acid."""
+        return self.get_id()[0] == " " and is_aa(self.resname)
+
+    def is_nucleotide(self):
+        """Return True if the residue is a nucleic acid."""
+        return self.get_id()[0] == " " and not self.is_residue()
+
+    def is_monoatom(self):
+        """Return True if the residue contains only one atom (or one non-hydrogen)."""
+        atoms = list(self.get_atoms())
+        return len(atoms) == 1 or len([a for a in atoms if getattr(a, "element", None) != "H"]) == 1
+
+    def get_class(self):
+        """Get the compound class."""
+        if self.is_water():
+            return "Water"
+        if self.is_hetatm():
+            return "Hetatm"
+        if self.is_residue():
+            return "Residue"
+        if self.is_nucleotide():
+            return "Nucleotide"
+        return "Unknown"
+
+    def get_flag(self):
+        """
+        Return a shorthand flag for residue classification.
+
+        Returns
+        -------
+        str
+            "H" for HETATM or metal, otherwise the original hetflag.
+        """
+        return "H" if self.get_id()[0].startswith("H_") else self.get_id()[0]
+
+    def as_json(self):
+        """
+        Serialize this residue to a compact dictionary representation.
+
+        Fields:
+            chain, name, number, icode, repr
+
+        'repr' will be 'sphere' for waters or monoatomic hetatms, 'stick' otherwise.
+        """
+        comp_repr = (
+            "sphere" if self.is_water() or (self.is_hetatm() and self.is_monoatom()) else "stick"
+        )
+        return {
+            "chain": self.get_parent().id,
+            "name": self.resname,
+            "number": self.id[1],
+            "icode": self.id[2],
+            "repr": comp_repr
+        }
+
+
+class DisorderedResidue(BioDisorderedResidue):
+    """
+    LUNA's DisorderedResidue placeholder.
+
+    Currently identical to Biopython's, but allows future extensions and consistent imports.
+    """
+    def __init__(self, id):
+        super().__init__(id)

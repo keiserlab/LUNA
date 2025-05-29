@@ -4,7 +4,8 @@ from luna.wrappers.pymol import (PymolWrapper, PymolSessionManager,
                                  mybio_to_pymol_selection)
 from luna.util.file import is_file_valid
 from luna.util.exceptions import PymolSessionNotInitialized
-from luna.MyBio.util import entity_to_string
+
+from luna.pdb.util import entity_to_string
 
 
 class InteractionViewer(PymolSessionManager):

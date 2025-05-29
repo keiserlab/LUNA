@@ -41,7 +41,7 @@ def get_readme():
 
 
 requirements = [
-    'biopython==1.72',
+    'biopython',
     'colorlog',
     'matplotlib',
     'mmh3>=2.5.1',

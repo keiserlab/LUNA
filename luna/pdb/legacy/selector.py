@@ -1,4 +1,4 @@
-from luna.MyBio.PDB.PDBIO import Select
+from luna.pdb.PDB.PDBIO import Select
 
 
 DEFAULT_ALTLOC = ("A", "1")

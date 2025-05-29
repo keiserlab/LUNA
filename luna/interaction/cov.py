@@ -1,7 +1,7 @@
 from itertools import combinations
 from openbabel import openbabel as ob
 
-from luna.MyBio.PDB.PDBIO import Select
+from Bio.PDB.PDBIO import Select
 
 import logging
 

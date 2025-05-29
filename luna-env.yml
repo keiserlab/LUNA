@@ -5,12 +5,12 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.7.6
+  - python
   - rdkit
   - seaborn
   - openbabel
   - pip
-  - biopython=1.72
+  - biopython
   - pymol
   - xopen
   - colorlog

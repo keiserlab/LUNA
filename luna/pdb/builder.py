@@ -1,31 +1,3 @@
-# Copyright (C) 2002, Thomas Hamelryck (thamelry@binf.ku.dk)
-# This code is part of the Biopython distribution and governed by its
-# license.  Please see the LICENSE file that should have been included
-# as part of this package.
-
-"""
-###################################################################
-
-# Modifications included by Alexandre Fassio (alexandrefassio@dcc.ufmg.br).
-# Date: 05/03/2018.
-
-# 1) Inherit inhouse modifications. Package: MyBio.
-# 2) StructureBuilder now keeps information of CONECT records.
-# 3) Identify hetero residues already added to a chain.
-     If a hetero residue id already exists, i.e., a target residue was already added to the
-     current chain, the algorithm checks if this residue has the same name as the already
-     existing one. If so, all atoms from the target residue will be included as part of the
-     already existing one, otherwise, a new residue will be created.
-
-# Date: 04/08/19
-# 1) Create a new residue passing the new property (idx) as parameter.
-
-# Each line or block with modifications contain a MODBY tag.
-
-###################################################################
-"""
-
-
 """Consumer class that builds a Structure object.
 
 This is used by the PDBParser and MMCIFparser classes.
@@ -33,32 +5,35 @@ This is used by the PDBParser and MMCIFparser classes.
 
 import warnings
 
-# MODBY: Alexandre Fassio
-# Inherit inhouse modifications. Package: MyBio.
-# SMCRA hierarchy
-from luna.MyBio.PDB.Structure import Structure
-from luna.MyBio.PDB.Model import Model
-from luna.MyBio.PDB.Chain import Chain
-from luna.MyBio.PDB.Residue import (Residue, DisorderedResidue)
-from luna.MyBio.PDB.Atom import Atom, DisorderedAtom
+from Bio.PDB.PDBExceptions import PDBConstructionException
+from Bio.PDB.PDBExceptions import PDBConstructionWarning
 
-from luna.MyBio.PDB.PDBExceptions import PDBConstructionException
-from luna.MyBio.PDB.PDBExceptions import PDBConstructionWarning
+# SMCRA hierarchy
+from luna.pdb.core.structure import Structure
+from luna.pdb.core.model import Model
+from luna.pdb.core.chain import Chain
+from luna.pdb.core.residue import Residue, DisorderedResidue
+from luna.pdb.core.atom import Atom, DisorderedAtom
 
 
 class StructureBuilder(object):
-    """Deals with contructing the Structure object.
+    """
+    A Biopython-compatible structure builder for LUNA.
 
-    The StructureBuilder class is used by the PDBParser classes to
-    translate a file to a Structure object.
+    Responsible for constructing the SMCRA hierarchy (Structure, Model, Chain,
+    Residue, Atom) from parsed data. Includes additional features like:
+
+    - CONECT record storage
+    - Residue merging logic (for OpenBabel cleanup)
+    - Disordered residue and atom handling
+    - Residue indexing (idx) and line tracking
     """
 
     def __init__(self):
         self.line_counter = 0
         self.header = {}
 
-        # MODBY: Alexandre Fassio
-        # StructureBuilder now keeps information of CONECT records.
+        # StructureBuilder now keeps CONECT records.
         self.conects = {}
 
     def _is_completely_disordered(self, residue):
@@ -73,52 +48,71 @@ class StructureBuilder(object):
     # Public methods called by the Parser classes
 
     def set_header(self, header):
+        """
+        Set the PDB header block.
+
+        Parameters
+        ----------
+        header : dict
+            Header dictionary parsed from the PDB file.
+        """
         self.header = header
 
-    # MODBY: Alexandre Fassio
-    # StructureBuilder now keeps information of CONECT records.
     def set_conects(self, conects):
+        """
+        Store CONECT records parsed from the PDB file.
+
+        Parameters
+        ----------
+        conects : dict
+            Mapping of atom serial numbers to bonded atom serial numbers.
+        """
         self.conects = conects
 
     def set_line_counter(self, line_counter):
-        """Tracks line in the PDB file that is being parsed.
+        """
+        Track the current line being parsed (for error reporting).
 
-        Arguments:
-         - line_counter - int
-
+        Parameters
+        ----------
+        line_counter : int
+            Current PDB file line number.
         """
         self.line_counter = line_counter
 
-    # MODBY: Alexandre Fassio
-    # New parameter: the PDB file
     def init_structure(self, structure_id, pdb_file=None):
-        """Initiate a new Structure object with given id.
-
-        Arguments:
-         - id - string
-
         """
-        # MODBY: Alexandre Fassio
-        # Now it pass the PDB file as a parameter to the Structure constructor.
-        self.structure = Structure(structure_id, pdb_file)
+        Initialize a new Structure object.
+
+        Parameters
+        ----------
+        structure_id : str
+            Unique identifier for the structure.
+        """
+        self.structure = Structure(structure_id)
 
     def init_model(self, model_id, serial_num=None):
-        """Initiate a new Model object with given id.
+        """
+        Initialize a new Model object and add it to the structure.
 
-        Arguments:
-         - id - int
-         - serial_num - int
-
+        Parameters
+        ----------
+        model_id : int
+            Model index.
+        serial_num : int, optional
+            PDB serial number.
         """
         self.model = Model(model_id, serial_num)
         self.structure.add(self.model)
 
     def init_chain(self, chain_id):
-        """Initiate a new Chain object with given id.
+        """
+        Initialize a new Chain object and add it to the current model.
 
-        Arguments:
-         - chain_id - string
-
+        Parameters
+        ----------
+        chain_id : str
+            Chain identifier.
         """
         if self.model.has_id(chain_id):
             self.chain = self.model[chain_id]
@@ -130,30 +124,40 @@ class StructureBuilder(object):
             self.model.add(self.chain)
 
     def init_seg(self, segid):
-        """Flag a change in segid.
+        """
+        Set the current segment ID.
 
-        Arguments:
-         - segid - string
-
+        Parameters
+        ----------
+        segid : str
+            Segment ID (used by PDB files).
         """
         self.segid = segid
 
     def init_residue(self, resname, field, resseq, icode):
-        """Initiate a new Residue object.
+        """
+        Initialize a new Residue (or DisorderedResidue) object.
 
-        Arguments:
-         - resname - string, e.g. "ASN"
-         - field - hetero flag, "W" for waters, "H" for
-           hetero residues, otherwise blank.
-         - resseq - int, sequence identifier
-         - icode - string, insertion code
+        Merges with existing residue if applicable, handles alternate conformations
+        and OpenBabel artifacts.
 
+        Parameters
+        ----------
+        resname : str
+            Residue name (e.g., "GLY").
+        field : str
+            Hetero flag (" ", "W", or "H" / "H_"...).
+        resseq : int
+            Residue sequence number.
+        icode : str
+            Insertion code.
         """
         if field != " ":
             if field == "H":
                 # The hetero field consists of H_ + the residue name (e.g. H_FUC)
                 field = "H_" + resname
         res_id = (field, resseq, icode)
+
         if field == " ":
             if self.chain.has_id(res_id):
                 # There already is a residue with the id (field, resseq, icode).
@@ -173,7 +177,7 @@ class StructureBuilder(object):
                     else:
                         # Make a new residue and add it to the already
                         # present DisorderedResidue
-                        # MODBY: Alexandre Fassio
+                        #
                         # Create a new residue with the new property (idx) added to the Residue class.
                         new_residue = Residue(res_id, resname, self.segid, len(self.chain.child_list), self.line_counter)
                         duplicate_residue.disordered_add(new_residue)
@@ -199,7 +203,6 @@ class StructureBuilder(object):
                             % (resname, field, resseq, icode))
                     self.chain.detach_child(res_id)
 
-                    # MODBY: Alexandre Fassio
                     # Create a new residue with the new property (idx) added to the Residue class.
                     new_residue = Residue(res_id, resname, self.segid, len(self.chain.child_list), self.line_counter)
                     disordered_residue = DisorderedResidue(res_id)
@@ -209,7 +212,6 @@ class StructureBuilder(object):
                     self.residue = disordered_residue
                     return
         else:
-            # MODBY: Alexandre Fassio
             # Identify hetero residues already added to a chain.
             if self.chain.has_id(res_id):
                 # There already is a hetero residue with the id (field, resseq, icode).
@@ -227,30 +229,41 @@ class StructureBuilder(object):
                     self.residue = duplicate_residue
                     return
 
-        # MODBY: Alexandre Fassio
         # Create a new residue with the new property (idx) added to the Residue class.
         self.residue = Residue(res_id, resname, self.segid, len(self.chain.child_list), self.line_counter)
         self.chain.add(self.residue)
 
     def init_atom(self, name, coord, b_factor, occupancy, altloc, fullname,
                   serial_number=None, element=None):
-        """Initiate a new Atom object.
+        """
+        Initialize a new Atom or DisorderedAtom object and add it to the current residue.
 
-        Arguments:
-         - name - string, atom name, e.g. CA, spaces should be stripped
-         - coord - Numeric array (Float0, size 3), atomic coordinates
-         - b_factor - float, B factor
-         - occupancy - float
-         - altloc - string, alternative location specifier
-         - fullname - string, atom name including spaces, e.g. " CA "
-         - element - string, upper case, e.g. "HG" for mercury
-
+        Parameters
+        ----------
+        name : str
+            Atom name (e.g., "CA").
+        coord : np.ndarray
+            Cartesian coordinates.
+        b_factor : float
+            B-factor.
+        occupancy : float
+            Occupancy value.
+        altloc : str
+            Alternate location indicator.
+        fullname : str
+            Atom name with spaces (e.g., " CA ").
+        serial_number : int, optional
+            Atom serial number.
+        element : str, optional
+            Atomic element.
         """
         residue = self.residue
+        
         # if residue is None, an exception was generated during
         # the construction of the residue
         if residue is None:
             return
+            
         # First check if this atom is already present in the residue.
         # If it is, it might be due to the fact that the two atoms have atom
         # names that differ only in spaces (e.g. "CA.." and ".CA.",
@@ -268,8 +281,10 @@ class StructureBuilder(object):
                               % (duplicate_fullname, fullname,
                                  self.line_counter),
                               PDBConstructionWarning)
+                
         self.atom = Atom(name, coord, b_factor, occupancy, altloc,
                          fullname, serial_number, element)
+        
         if altloc != " ":
             # The atom is disordered
             if residue.has_id(name):
@@ -307,26 +322,49 @@ class StructureBuilder(object):
             residue.add(self.atom)
 
     def set_anisou(self, anisou_array):
-        """Set anisotropic B factor of current Atom."""
+        """
+        Set anisotropic B-factor for the current atom.
+
+        Parameters
+        ----------
+        anisou_array : np.ndarray
+            Anisotropic B-factor.
+        """
         self.atom.set_anisou(anisou_array)
 
     def set_siguij(self, siguij_array):
-        """Set standard deviation of anisotropic B factor of current Atom."""
+        """
+        Set standard deviation of anisotropic B-factor for current atom.
+
+        Parameters
+        ----------
+        siguij_array : np.ndarray
+        """
         self.atom.set_siguij(siguij_array)
 
     def set_sigatm(self, sigatm_array):
-        """Set standard deviation of atom position of current Atom."""
+        """
+        Set standard deviation of atomic positions for current atom.
+
+        Parameters
+        ----------
+        sigatm_array : np.ndarray
+        """
         self.atom.set_sigatm(sigatm_array)
 
     def get_structure(self):
-        """Return the structure."""
-        # first sort everything
-        # self.structure.sort()
+        """
+        Finalize and return the constructed Structure.
+
+        Returns
+        -------
+        Bio.PDB.Structure
+            Structure object populated from parsed data.
+        """
         # Add the header dict
         self.structure.header = self.header
 
-        # MODBY: Alexandre Fassio
-        # StructureBuilder now keeps information of CONECT records.
+        # Add the conects dict.
         self.structure.conects = self.conects
 
         return self.structure

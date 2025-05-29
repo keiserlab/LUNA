@@ -15,7 +15,8 @@ except ImportError:
     import Queue as queue  # Python 2.
 
 
-__version__ = '0.2.7'
+# Sentinel
+_SENTINEL = '__YOU_SHALL_NOT_PASS__'  
 
 
 def start_mp_handler(logger=None):
@@ -59,21 +60,22 @@ class MultiProcessingHandler(logging.Handler):
         self.sub_handler.setFormatter(fmt)
 
     def _receive(self):
-        while not (self._is_closed and self.queue.empty()):
-            try:
-                record = self.queue.get(timeout=0.2)
-                self.sub_handler.emit(record)
-            except (KeyboardInterrupt, SystemExit):
-                raise
-            except EOFError:
-                break
-            except queue.Empty:
-                pass  # This periodically checks if the logger is closed.
-            except Exception:
-                traceback.print_exc(file=sys.stderr)
-
-        self.queue.close()
-        self.queue.join_thread()
+        try:
+            while True:
+                try:
+                    record = self.queue.get()
+                    if record == _SENTINEL:
+                        break
+                    self.sub_handler.emit(record)
+                except (KeyboardInterrupt, SystemExit):
+                    raise
+                except EOFError:
+                    break
+                except Exception:
+                    traceback.print_exc(file=sys.stderr)
+        finally:
+            self.queue.close()
+            self.queue.join_thread()
 
     def _send(self, s):
         self.queue.put_nowait(s)
@@ -104,7 +106,7 @@ class MultiProcessingHandler(logging.Handler):
     def close(self):
         if not self._is_closed:
             self._is_closed = True
+            self.queue.put_nowait(_SENTINEL)
             self._receive_thread.join(5.0)  # Waits for receive queue to empty.
-
             self.sub_handler.close()
             super(MultiProcessingHandler, self).close()

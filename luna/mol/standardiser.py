@@ -3,9 +3,10 @@ from enum import Enum, auto
 from collections import defaultdict, Counter
 
 from Bio.PDB.Polypeptide import is_aa
+
 from luna.mol.precomp_data import DefaultResidueData
 from luna.wrappers.base import MolWrapper, BondType, OBBondType
-from luna.MyBio.neighbors import get_residue_neighbors
+from luna.pdb.neighbors.residue import get_residue_neighbors
 
 from openbabel.openbabel import OBSmartsPattern
 
@@ -118,7 +119,7 @@ class Standardizer:
         if missing_atoms:
             logger.warning("The following atoms were not found for "
                            "residue %s: %s."
-                           % (res.full_name,
+                           % (res.hierarchy_name,
                               ", ".join(sorted(missing_atoms))))
 
         # Unexpected atoms found in this residue.
@@ -128,7 +129,7 @@ class Standardizer:
         if other_atoms:
             logger.warning("The following unexpected atoms were found "
                            "for residue %s: %s."
-                           % (res.full_name,
+                           % (res.hierarchy_name,
                               ", ".join(sorted(other_atoms))))
 
     def _resolve_resname(self, res):
@@ -312,7 +313,7 @@ class Standardizer:
         if n_heavy_atoms not in coords:
             msg = ("An unexpected coordination number (%d) has been "
                    "found for metal %s.")
-            logger.warning(msg % (n_heavy_atoms, pdb_atm.full_name))
+            logger.warning(msg % (n_heavy_atoms, pdb_atm.hierarchy_name))
 
     def _get_partner_atm(self, atm_obj, pdb_atm, bond_obj):
         partner_obj = \
@@ -326,7 +327,7 @@ class Standardizer:
 
             msg = ("The atom %s from %s will not be amended "
                    "because an unidentified atom is covalently bound "
-                   "to it." % (pdb_atm.name, pdb_atm.parent.full_name))
+                   "to it." % (pdb_atm.name, pdb_atm.parent.hierarchy_name))
             logger.warning(msg)
 
             return None, None
@@ -433,9 +434,9 @@ class Standardizer:
                 msg = ("The atom %s from %s will not be amended "
                        "because an unexpected atom (%s) from %s is covalently "
                        "bound to it." % (pdb_atm.name,
-                                         pdb_atm.parent.full_name,
+                                         pdb_atm.parent.hierarchy_name,
                                          partner_atm.name,
-                                         partner_atm.parent.full_name))
+                                         partner_atm.parent.hierarchy_name))
                 logger.warning(msg)
                 return
 
@@ -517,7 +518,7 @@ class Standardizer:
                     msg = ("The bond '%s' was not found for residue %s. "
                            "However, it cannot be added because the atom %s "
                            "seems not to exist."
-                           % (bond_key, pdb_atm.parent.full_name,
+                           % (bond_key, pdb_atm.parent.hierarchy_name,
                               partner_atm_name))
                     logger.warning(msg)
                     continue

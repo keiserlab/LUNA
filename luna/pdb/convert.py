@@ -1,9 +1,8 @@
 import tempfile
 import logging
-from io import StringIO
-from os.path import exists
-from shutil import move as rename_pdb_file
 
+from Bio.PDB import Selection
+from Bio.PDB.PDBIO import Select
 
 from openbabel.pybel import readfile
 from openbabel.pybel import Molecule as PybelWrapper
@@ -11,238 +10,21 @@ from openbabel.pybel import Molecule as PybelWrapper
 from rdkit.Chem import (MolFromMolBlock, SanitizeFlags,
                         SanitizeMol, MolToMolFile)
 
-from luna.util.file import (is_directory_valid, new_unique_filename,
-                            remove_files)
-from luna.util.default_values import ENTRY_SEPARATOR, OPENBABEL
-from luna.MyBio.selector import AtomSelector
-from luna.MyBio.PDB.PDBList import PDBList
-from luna.MyBio.PDB.PDBIO import Select
-from luna.MyBio.PDB import Selection
-from luna.MyBio.PDB.PDBIO import PDBIO
-from luna.MyBio.PDB.PDBParser import PDBParser
+
+from luna.pdb.io.helpers import save_to_file
+from luna.pdb.io.selector import AtomSelector
 from luna.mol.validator import MolValidator
 from luna.mol.standardiser import Standardizer
 from luna.wrappers.base import MolWrapper
-from luna.wrappers.obabel import convert_molecule
 from luna.wrappers.rdkit import read_mol_from_file
-
-from luna.util.exceptions import (IllegalArgumentError, MoleculeNotFoundError,
-                                  ChainNotFoundError, FileNotCreated,
-                                  PDBNotReadError, MoleculeSizeError,
+from luna.wrappers.obabel import convert_molecule
+from luna.util.file import new_unique_filename, remove_files
+from luna.util.exceptions import (MoleculeSizeError,
                                   MoleculeObjectError)
+from luna.util.default_values import OPENBABEL
 
 
-logger = logging.getLogger()
-
-
-ENTITY_LEVEL_NAME = {"A": "Atom",
-                     "R": "Residue",
-                     "C": "Chain",
-                     "M": "Model",
-                     "S": "Structure"}
-
-
-def download_pdb(pdb_id, output_path=".", overwrite=False):
-    """Download a PDB file from RCSB.org.
-
-    Parameters
-    ----------
-    pdb_id : str
-        4-symbols structure Id from PDB (e.g. 3J92).
-    output_path : str
-        Put the PDB file in this directory.
-    overwrite : bool
-        If True, overwrite any existing PDB files.
-    """
-    logger.debug("It will try to download the PDB '%s' and store it at the "
-                 "directory '%s'." % (pdb_id, output_path))
-
-    if pdb_id is not None and pdb_id.strip() != "":
-        if is_directory_valid(output_path):
-            new_pdb_file = "%s/%s.pdb" % (output_path, pdb_id)
-            # If the file already exists and is not to overwrite
-            # the file, do nothing.
-            if overwrite is False and not exists(new_pdb_file):
-                pdbl = PDBList()
-                pdbl.retrieve_pdb_file(pdb_id, pdir=output_path,
-                                       file_format="pdb", overwrite=overwrite)
-                logger.debug("Download of the PDB '%s' completed." % pdb_id)
-
-                # Rename files.
-                cur_pdb_file = '%s/pdb%s.ent' % (output_path, pdb_id.lower())
-                rename_pdb_file(cur_pdb_file, new_pdb_file)
-            else:
-                logger.debug("File '%s' already exists. It will not be "
-                             "downloaded again." % new_pdb_file)
-    else:
-        raise IllegalArgumentError("An empty PDB id ('%s') was informed."
-                                   % pdb_id)
-
-
-def parse_from_file(pdb_id, file):
-    """Read a PDB file and return a
-    :class:`~luna.MyBio.PDB.Structure.Structure` object.
-
-    Parameters
-    ----------
-    pdb_id : str
-        The structure identifier.
-    file : str
-        Pathname of the PDB file.
-
-    Returns
-    -------
-    structure : :class:`~luna.MyBio.PDB.Structure.Structure`
-        The parsed PDB file as a
-        :class:`~luna.MyBio.PDB.Structure.Structure` object.
-
-    Raises
-    ------
-    PDBNotReadError
-        If the PDB file could not be parsed.
-    """
-    try:
-        parser = PDBParser(PERMISSIVE=True, QUIET=True, FIX_EMPTY_CHAINS=True,
-                           FIX_ATOM_NAME_CONFLICT=True, FIX_OBABEL_FLAGS=False)
-        structure = parser.get_structure(pdb_id, file)
-        return structure
-    except Exception as e:
-        logger.exception(e)
-        raise PDBNotReadError("File '%s' could not be parsed." % file)
-
-
-def save_to_file(entity, output_file, select=Select(), write_conects=True,
-                 write_end=True, preserve_atom_numbering=True, sort=False):
-    """Write a Structure object (or a subset of a
-    :class:`~luna.MyBio.PDB.Structure.Structure` object) into a file.
-
-    Parameters
-    ----------
-    entity : :class:`~luna.MyBio.PDB.Entity.Entity`
-        The PDB object to be saved.
-    output_file : str
-        Save the selected atoms to this file.
-    select : :class:`~luna.MyBio.PDB.PDBIO.Select`
-        Decide which atoms will be saved at the PDB output.
-        By default, all atoms are accepted.
-    write_conects : bool
-        If True, write CONECT records.
-    write_end : bool
-        If True, write the END record.
-    preserve_atom_numbering : bool
-        If True, preserve the atom numbering.
-        Otherwise, re-enumerate the atom serial numbers.
-    """
-    try:
-        io = PDBIO()
-        io.set_structure(entity)
-        io.save(output_file, select=select,
-                write_conects=write_conects,
-                write_end=write_end,
-                preserve_atom_numbering=preserve_atom_numbering,
-                sort=sort)
-
-    except Exception as e:
-        logger.exception(e)
-        raise FileNotCreated("PDB file '%s' could not be created."
-                             % output_file)
-
-
-def entity_to_string(entity, select=Select(),
-                     write_conects=True,
-                     write_end=True,
-                     preserve_atom_numbering=True):
-    """Convert a Structure object (or a subset of a
-    :class:`~luna.MyBio.PDB.Structure.Structure` object) to string.
-
-    This function works on a structural level. That means if ``entity`` is not
-    a :class:`~luna.MyBio.PDB.Structure.Structure` object, the structure will
-    be recovered directly from ``entity``. Therefore, use ``select`` to select
-    specific chains, residues, and atoms from the structure object.
-
-    Parameters
-    ----------
-    entity : :class:`~luna.MyBio.PDB.Entity.Entity`
-        The PDB object to be converted.
-    select : :class:`~luna.MyBio.PDB.PDBIO.Select`
-        Decides which atoms will be saved at the output.
-        By default, all atoms are accepted.
-    write_conects : bool
-        If True, writes CONECT records.
-    write_end : bool
-        If True, writes the END record.
-    preserve_atom_numbering : bool
-        If True, preserve the atom numbering.
-        Otherwise, re-enumerate the atom serial numbers.
-
-    Returns
-    -------
-    str
-        The converted ``entity``.
-    """
-    fh = StringIO()
-    io = PDBIO()
-    io.set_structure(entity)
-    io.save(fh, select=select,
-            write_conects=write_conects,
-            write_end=write_end,
-            preserve_atom_numbering=preserve_atom_numbering)
-    fh.seek(0)
-    return ''.join(fh.readlines())
-
-
-def get_entity_from_entry(entity, entry, model=0):
-    """Get a :class:`~luna.MyBio.PDB.Entity.Chain` or
-    :class:`~luna.MyBio.PDB.Residue.Residue` instance based on the
-    provided entry ``entry``.
-
-    Parameters
-    ----------
-    entity : :class:`~luna.MyBio.PDB.Entity.Entity`
-        The PDB object to recover the target entry from.
-    entry : :class:`~luna.entry.Entry`
-        The target entry.
-    model : int
-        The PDB model where the entry could be found. The default value is 0.
-
-    Returns
-    -------
-    :class:`~luna.MyBio.PDB.Entity.Entity`
-        The target entry.
-
-    Raises
-    ------
-    MoleculeNotFoundError
-        If the entry's molecule was not found in ``entity``.
-    ChainNotFoundError
-        If the entry's chain was not found in ``entity``.
-    """
-    structure = entity.get_parent_by_level("S")
-    model = structure[model]
-
-    if entry.chain_id in model.child_dict:
-        chain = model[entry.chain_id]
-
-        if entry.comp_name is not None and entry.comp_num is not None:
-            ligand_key = entry.get_biopython_key()
-
-            if ligand_key in chain.child_dict:
-                target_entity = chain[ligand_key]
-            else:
-                error_msg = ("Ligand '%s' does not exist in PDB '%s'."
-                             % (entry.to_string(ENTRY_SEPARATOR),
-                                structure.get_id()))
-                raise MoleculeNotFoundError(error_msg)
-        else:
-            target_entity = chain
-    else:
-        error_msg = ("The informed chain id '%s' for the ligand entry '%s' "
-                     "does not exist in the PDB '%s'."
-                     % (entry.chain_id, entry.to_string(ENTRY_SEPARATOR),
-                        structure.get_id()))
-        raise ChainNotFoundError()
-
-    return target_entity
+logger = logging.getLogger(__name__)
 
 
 def biopython_entity_to_mol(entity,
@@ -265,7 +47,7 @@ def biopython_entity_to_mol(entity,
     entity : :class:`~luna.MyBio.PDB.Entity.Entity`
         The entity to be converted.
     select : :class:`~luna.MyBio.PDB.PDBIO.Select`
-        Decide which atoms will be consired.
+        Decide which atoms will be considered.
         By default, all atoms are accepted.
     amend_mol : bool
         If True, validate and standardize molecules.
@@ -320,6 +102,7 @@ def biopython_entity_to_mol(entity,
 
     logger.debug("First: it will try to create a new PDB file (%s) "
                  "from the provided entity." % pdb_file)
+
     # Apparently, Open Babel creates a bug when it tries to parse a file with
     # CONECTS containing serial numbers with more than 4 digits.
     # E.g.: 1OZH:A:HE3:1406, line CONECT162811627916282.

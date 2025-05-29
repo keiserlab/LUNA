@@ -1,6 +1,7 @@
 from itertools import product
 
-from luna.MyBio.PDB.PDBIO import Select
+from Bio.PDB.PDBIO import Select
+
 from luna.interaction.cov import is_covalently_bound
 
 import logging
@@ -9,6 +10,7 @@ logger = logging.getLogger()
 
 
 class Neighbors:
+    """Represents covalently bound neighbors of a residue."""
 
     def __init__(self, prev_res=None, next_res=None):
 
@@ -23,20 +25,22 @@ class Neighbors:
 
 
 def get_residue_neighbors(residue, select=Select(), verbose=True):
-    """Get all neighbors from a residue.
+    """
+    Identify covalently bound neighbors (previous/next) of a residue.
 
     In the case of an amino acid that is part of a peptide bond, its neighbors
-    are any predecessor or successor residues.
-    The same idea applies to nucleic acids.
+    are any predecessor or successor residues. The same idea applies to nucleic acids.
 
     Parameters
     ----------
-    residue : :class:`~luna.MyBio.PDB.Residue.Residue`
+    residue : :class:`~luna.pdb.core.residue.Residue`
         The residue or other molecule from which covalently bound molecules
         will be recovered.
-    select : :class:`~luna.MyBio.PDB.PDBIO.Select`
-        Decides which atoms will be consired. By default,
+    select : :class:`~Bio.PDB.PDBIO.Select`
+        Decides which atoms will be considered. By default,
         all atoms are accepted.
+    verbose : bool
+        If True, logs detailed debug info.
 
     Returns
     -------

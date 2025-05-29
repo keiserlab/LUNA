@@ -32,10 +32,12 @@ from luna.util.logging import (new_logging_file, load_default_logging_config,
 from luna.util.multiprocessing_logging import (start_mp_handler,
                                                MultiProcessingHandler)
 from luna.util.jobs import ArgsGenerator, ParallelJobs
+from luna.pdb.parser.base import PDBParser
+from luna.pdb.parser.ftmap import FTMapParser
+from luna.pdb.util.fetch import download_pdb 
+from luna.pdb.io.helpers import save_to_file
+from luna.pdb.util.traverse import get_entity_from_entry
 
-from luna.MyBio.PDB.PDBParser import PDBParser
-from luna.MyBio.PDB.FTMapParser import FTMapParser
-from luna.MyBio.util import download_pdb, save_to_file, get_entity_from_entry
 from luna.version import __version__, has_version_compatibility
 
 from sys import setrecursionlimit
@@ -54,11 +56,11 @@ class StructureCache:
         self.compounds = compounds
         self.atm_grps_mngr = atm_grps_mngr
 
-        self._compounds_name = set([c.full_name
+        self._compounds_name = set([c.hierarchy_name
                                     for c in self.compounds])
 
     def is_compound_cached(self, comp):
-        return comp.full_name in self._compounds_name
+        return comp.hierarchy_name in self._compounds_name
 
 
 class EntryResults:
@@ -700,6 +702,7 @@ class Project:
 
             all_pdb_ids.add(entry.pdb_id)
 
+
         logger.info("%d PDB file(s) found at '%s' from a total of %d PDB(s). "
                     "So, %d PDB(s) need to be downloaded."
                     % ((len(all_pdb_ids) - len(to_download)), self.pdb_path,
@@ -711,6 +714,8 @@ class Project:
             job_results = pj.run_jobs(args=args, consumer_func=download_pdb,
                                       job_name="Download PDBs")
             errors = job_results.errors
+
+            print(errors)
 
             # Warn the users for any errors found during
             # the entries processing.

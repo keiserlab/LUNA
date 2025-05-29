@@ -6,10 +6,11 @@ import numpy as np
 import networkx as nx
 from networkx.algorithms.shortest_paths.weighted import single_source_dijkstra
 
-from Bio.KDTree import KDTree
+from Bio.PDB.kdtrees import KDTree
 
-from luna.MyBio.selector import Selector, AtomSelector
-from luna.MyBio.util import biopython_entity_to_mol
+from luna.pdb.io.selector import Selector, AtomSelector
+from luna.pdb.convert import biopython_entity_to_mol
+
 from luna.interaction.contact import get_proximal_compounds
 from luna.interaction.contact import get_contacts_with
 from luna.interaction.type import InteractionType
@@ -1209,13 +1210,13 @@ class AtomGroupPerceiver():
 
             if len(atms) == 0:
                 logger.error("No atom has been found for residue %s."
-                             % metal.full_name)
+                             % metal.hierarchy_name)
                 continue
 
             if len(atms) > 1:
                 logger.error("An unexpected number of atoms (%d) has been "
                              "found for residue %s, while 1 was expected."
-                             % (len(atms), metal.full_name))
+                             % (len(atms), metal.hierarchy_name))
                 continue
 
             # Create/recover an extended atom object
@@ -1347,10 +1348,10 @@ class AtomGroupPerceiver():
 
             return ext_atm
 
-        comp_names = set([c.full_name for c in compounds])
+        comp_names = set([c.hierarchy_name for c in compounds])
 
         for atm_grp in sorted(self.cache.atm_grps_mngr):
-            if any([c.full_name in comp_names for c in atm_grp.compounds]):
+            if any([c.hierarchy_name in comp_names for c in atm_grp.compounds]):
                 atoms = []
                 for atm in atm_grp.atoms:
                     # Copy extended atom, i.e., create a new extended
@@ -1424,52 +1425,3 @@ class AtomGroupPerceiver():
                         and atm not in ignored_atoms]
 
         return mol_obj, target_atoms
-
-
-class AtomGroupNeighborhood:
-    """ Class for fast neighbor atom groups searching.
-
-    ``AtomGroupNeighborhood`` makes use of a KD Tree implemented in C,
-    so it's fast.
-
-    Parameters
-    ----------
-    atm_grps : iterable of `AtomGroup`, optional
-        A sequence of `AtomGroup` objects, which is used in the queries.
-        It can contain atom groups from different molecules.
-    bucket_size : int
-        Bucket size of KD tree.
-        You can play around with this to optimize speed if you feel like it.
-        The default value is 10.
-
-    """
-
-    def __init__(self, atm_grps, bucket_size=10):
-        self.atm_grps = list(atm_grps)
-
-        # get the coordinates
-        coord_list = [ga.centroid for ga in self.atm_grps]
-
-        # to Nx3 array of type float
-        self.coords = np.array(coord_list).astype("f")
-        assert(bucket_size > 1)
-        assert(self.coords.shape[1] == 3)
-        self.kdt = KDTree(3, bucket_size)
-        self.kdt.set_coords(self.coords)
-
-    def search(self, center, radius):
-        """Return all atom groups in ``atm_grps`` that is up to a maximum of
-        ``radius`` away (measured in Å) of ``center``.
-
-        For atom groups with more than one atom, their centroid is used as a
-        reference.
-        """
-        self.kdt.search(center, radius)
-        indices = self.kdt.get_indices()
-        n_grps_list = []
-        atm_grps = self.atm_grps
-        for i in indices:
-            a = atm_grps[i]
-            n_grps_list.append(a)
-
-        return n_grps_list

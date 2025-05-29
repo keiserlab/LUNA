@@ -1,7 +1,6 @@
 from pymol import cmd
 from pymol import util
 
-
 from luna.wrappers.cgo_arrow import cgo_arrow
 from luna.util.exceptions import (PymolSessionNotInitialized,
                                   IllegalArgumentError)
@@ -773,7 +772,7 @@ class PymolSessionManager:
                     comp_repr = "sticks"
 
                 comp_sel = ("%s and %s"
-                            % (main_grp, mybio_to_pymol_selection(compound)))
+                            % (main_grp, bio_to_pymol_selection(compound)))
                 self.wrapper.show([(comp_repr, comp_sel)])
                 carb_color = "green" if compound.is_target() else "gray"
                 self.wrapper.color([(carb_color, comp_sel + " AND elem C")])
@@ -927,14 +926,14 @@ class PymolSessionManager:
         self.wrapper = None
 
 
-def mybio_to_pymol_selection(entity):
-    """Transform an :class:`~luna.MyBio.PDB.Entity.Entity` instance into a
+def bio_to_pymol_selection(entity):
+    """Transform an :class:`~luna.pdb.core.entity.Entity` instance into a
     Pymol selection-expression, which can then be used to select atoms in a
     Pymol session.
 
     Parameters
     ----------
-    entity : :class:`~luna.MyBio.PDB.Entity.Entity`
+    entity : :class:`~luna.pdb.core.entity.Entity`
         An entity to be transformed into a Pymol selection-expression.
 
     Returns
@@ -948,7 +947,7 @@ def mybio_to_pymol_selection(entity):
     First, let's parse a PDB file to work with.
 
     >>> from luna.util.default_values import LUNA_PATH
-    >>> from luna.MyBio.PDB.PDBParser import PDBParser
+    >>> from luna.pdb.parser.base import PDBParser
     >>> pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True)
     >>> structure = pdb_parser.get_structure("Protein",
     ...                                      f"{LUNA_PATH}/tutorial/\
@@ -956,14 +955,14 @@ inputs/3QQK.pdb")
 
     Now, let's get the Pymol selection-expression for the chain A.
 
-    >>> from luna.wrappers.pymol import mybio_to_pymol_selection
-    >>> print(mybio_to_pymol_selection(structure[0]['A']))
+    >>> from luna.wrappers.pymol import bio_to_pymol_selection
+    >>> print(bio_to_pymol_selection(structure[0]['A']))
     chain A
 
     Finally, we can get the Pymol selection-expression for the ligand X02.
 
-    >>> from luna.wrappers.pymol import mybio_to_pymol_selection
-    >>> print(mybio_to_pymol_selection(structure[0]["A"][('H_X02', 497, ' ')]))
+    >>> from luna.wrappers.pymol import bio_to_pymol_selection
+    >>> print(bio_to_pymol_selection(structure[0]["A"][('H_X02', 497, ' ')]))
     resn X02 AND res 497 AND chain A
     """
     params = {}
