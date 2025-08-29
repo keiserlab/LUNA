@@ -24,3 +24,9 @@ class Model(BioModel, Entity):
     def __lt__(self, other):
         """Allow sorting of models by ID."""
         return self.id < other.id
+
+    def get_atoms(self):
+        """Return atoms."""
+        for r in self.get_residues():
+            for a in r.get_unpacked_list():
+                yield a
