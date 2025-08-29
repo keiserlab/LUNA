@@ -48,7 +48,11 @@ class Residue(BioResidue, Entity):
         self._is_target = False
     
     def __repr__(self):
-        return f"<Residue {self.get_resname()} idx={self.idx}>"
+        """Return the residue full id."""
+        resname = self.get_resname()
+        hetflag, resseq, icode = self.get_id()
+        full_id = (resname, hetflag, resseq, icode)
+        return "<Residue %s het=%s resseq=%s icode=%s>" % full_id
 
     def __lt__(self, other):
         return self.idx < other.idx
