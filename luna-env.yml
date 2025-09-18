@@ -10,7 +10,7 @@ dependencies:
   - seaborn
   - openbabel
   - pip
-  - biopython
+  - biopython>=1.77
   - pymol
   - xopen
   - colorlog
