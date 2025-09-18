@@ -1,7 +1,7 @@
-luna\.MyBio\.extractor module
+luna\.pdb\.core.residue module
 ================================
 
-.. automodule:: luna.MyBio.extractor
+.. automodule:: luna.pdb.core.residue
     :members:
     :undoc-members:
     :show-inheritance:

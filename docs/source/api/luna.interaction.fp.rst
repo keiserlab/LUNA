@@ -1,4 +1,4 @@
-luna\.interaction.fp package
+luna\.interaction\.fp package
 =======================
 
 Submodules

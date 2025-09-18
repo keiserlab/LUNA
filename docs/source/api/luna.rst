@@ -11,7 +11,7 @@ Subpackages
     luna.config
     luna.interaction
     luna.mol
-    luna.mybio
+    luna.pdb
     luna.util
     luna.wrappers
 

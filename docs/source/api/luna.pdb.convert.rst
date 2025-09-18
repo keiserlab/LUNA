@@ -1,7 +1,7 @@
-luna\.MyBio\.selector module
+luna\.pdb\.convert module
 ================================
 
-.. automodule:: luna.MyBio.selector
+.. automodule:: luna.pdb.convert
     :members:
     :undoc-members:
     :show-inheritance:

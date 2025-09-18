@@ -1,4 +1,4 @@
-luna\.MyBio package
+luna\.pdb\.parser package
 =======================
 
 Submodules
@@ -6,14 +6,14 @@ Submodules
 
 .. toctree::
 
-   luna.mybio.extractor
-   luna.mybio.selector
-   luna.mybio.util
+   luna.pdb.parser.base
+   luna.pdb.parser.ftmap
+   luna.pdb.parser.helpers
 
 Module contents
 ---------------
 
-.. automodule:: luna.MyBio
+.. automodule:: luna.pdb.parser
     :members:
     :undoc-members:
     :show-inheritance:
