@@ -1,6 +1,6 @@
 from luna.mol.entry import MolFileEntry
 from luna.wrappers.pymol import PymolWrapper, PymolSessionManager
-from luna.pdb.util import entity_to_string
+from luna.pdb.io.helpers import entity_to_string
 from luna.util.exceptions import PymolSessionNotInitialized
 from luna.util.file import is_file_valid
 

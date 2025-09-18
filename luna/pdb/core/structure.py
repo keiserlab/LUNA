@@ -23,4 +23,4 @@ class Structure(BioStructure, Entity):
         self.pdb_file = pdb_file
 
     def __repr__(self):
-        return f"<Structure id={self.id}>"
+        return f"<Structure (LUNA subclass) id={self.id}>"

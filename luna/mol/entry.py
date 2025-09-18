@@ -36,12 +36,12 @@ REGEX_RESNUM_ICODE = re.compile(r'^([\-\+]?\d+)([a-zA-z]?)$')
 
 
 class Entry:
-    """Entries determine the target molecule to which interactions and other
+    """Entries determine the reference molecule to which interactions and other
     properties will be calculated. They can be ligands, chains, etc, and can
     be defined in a number of ways. Each entry has an associated PDB file that
     may contain macromolecules (protein, RNA, DNA) and other small molecules,
     water, and ions. The PDB file provides the context to where the
-    interactions with the target molecule will be calculated.
+    interactions with the reference molecule will be calculated.
 
     Parameters
     ----------

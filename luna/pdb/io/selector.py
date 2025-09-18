@@ -48,7 +48,7 @@ class ChainSelector(Selector):
 
     Parameters
     ----------
-    entries : iterable of :class:`Bio.PDB.Entity.Chain` instances
+    entries : iterable of :class:`~luna.pdb.core.chain.Chain`
         Chains to include in the output.
     """
 
@@ -75,7 +75,7 @@ class ResidueSelector(Selector):
 
     Parameters
     ----------
-    entries : iterable of :class:`~luna.MyBio.PDB.Residue.Residue`
+    entries : iterable of :class:`~luna.pdb.core.residue.Residue`
         Residues to include in the output.
     """
     
@@ -121,7 +121,7 @@ class AtomSelector(Selector):
 
     Parameters
     ----------
-    entries : iterable of Bio.PDB.Atom
+    entries : iterable of :class:`~luna.pdb.core.atom.Atom`
         Atom objects to include in the output.
     """
     

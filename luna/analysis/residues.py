@@ -33,9 +33,9 @@ def generate_residue_matrix(interactions_mngrs, by_interaction=True):
         entry = inter_mngr.entry
 
         for inter in inter_mngr:
-            # Continue if no target is in the interaction.
-            if (not inter.src_grp.has_target()
-                    and not inter.trgt_grp.has_target()):
+            # Continue if no reference is in the interaction.
+            if (not inter.src_grp.has_reference()
+                    and not inter.trgt_grp.has_reference()):
                 continue
             # Ignore interactions involving the same compounds.
             if inter.src_grp.compounds == inter.trgt_grp.compounds:

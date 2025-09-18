@@ -382,8 +382,8 @@ class InteractionType:
         The dict is defined as follows:
             * ``type`` (str): the interaction type;
             * ``is_directional`` (bool`): if it is a directional interaction;
-            * ``is_intramol_interaction`` (bool`): if it is an intramolecular interaction;
-            * ``is_intermol_interaction`` (bool`): if it is an intermolecular interaction;
+            * ``is_intramol_interaction`` (bool): if it is an intramolecular interaction;
+            * ``is_intermol_interaction`` (bool): if it is an intermolecular interaction;
             * ``color`` (str): the default interaction hex color for visual representations;
             * ``src_grp`` (dict): information related to the interaction’s first atom or atom group. The dict structure is defined in :meth:`luna.mol.groups.AtomGroup.as_json`. Additional keys:
 

@@ -6,7 +6,7 @@ logger = logging.getLogger()
 
 
 def count_interaction_types(interactions,
-                            must_have_target=True,
+                            must_have_reference=True,
                             compounds=None,
                             key_map={}):
     """Count the number of each type of interaction in ``interactions``.
@@ -16,8 +16,8 @@ def count_interaction_types(interactions,
     interactions : iterable
             An iterable object containing a sequence of interactions
             (``InteractionType``).
-    must_have_target : bool
-            If True, count only interactions involving the target ligand.
+    must_have_reference : bool
+            If True, count only interactions involving the reference ligand.
             The default value is True.
     compounds: iterable, optional
             Only count interactions involving the compounds in ``compounds``.
@@ -59,11 +59,11 @@ def count_interaction_types(interactions,
     seen_pairs = set()
     for i in interactions:
         is_valid = False
-        if not must_have_target and compounds is None:
+        if not must_have_reference and compounds is None:
             is_valid = True
         else:
-            if must_have_target:
-                if i.src_grp.has_target() or i.trgt_grp.has_target():
+            if must_have_reference:
+                if i.src_grp.has_reference() or i.trgt_grp.has_reference():
                     is_valid = True
 
             if compounds:

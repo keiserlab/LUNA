@@ -228,8 +228,8 @@ class ProjectParams(dict):
                 "add_proximal": ic.add_proximal,
                 "add_atom_atom": ic.add_atom_atom,
                 "add_dependent_inter": ic.add_dependent_inter,
-                "add_h2o_pairs_with_no_target":
-                    ic.add_h2o_pairs_with_no_target,
+                "add_h2o_pairs_with_no_ref":
+                    ic.add_h2o_pairs_with_no_ref,
                 "strict_donor_rules": ic.strict_donor_rules,
                 "strict_weak_donor_rules": ic.strict_weak_donor_rules,
                 "lazy_comps_list": ",".join(ic.lazy_comps_list)}
@@ -374,7 +374,7 @@ class ProjectParams(dict):
                                             bool)
 
             add_h2o_pairs = self._get_value(params,
-                                            "add_h2o_pairs_with_no_target",
+                                            "add_h2o_pairs_with_no_ref",
                                             bool)
 
             sdonor_rules = self._get_value(params, "strict_donor_rules", bool)
@@ -397,7 +397,7 @@ class ProjectParams(dict):
                     "add_proximal": add_proximal,
                     "add_atom_atom": add_atom_atom,
                     "add_dependent_inter": add_dep_inter,
-                    "add_h2o_pairs_with_no_target": add_h2o_pairs,
+                    "add_h2o_pairs_with_no_ref": add_h2o_pairs,
                     "strict_donor_rules": sdonor_rules,
                     "strict_weak_donor_rules": swdonor_rules,
                     "lazy_comps_list": lazy_comps_list,

@@ -38,15 +38,15 @@ def biopython_entity_to_mol(entity,
                             openbabel=OPENBABEL,
                             tmp_path=None,
                             keep_tmp_files=False):
-    """Convert an object :class:`~luna.MyBio.PDB.Entity.Entity` to a
+    """Convert an object :class:`~luna.pdb.core.entity.Entity` to a
     molecular object (:class:`~luna.wrappers.base.MolWrapper`,
     :class:`rdkit.Chem.rdchem.Mol`, or :class:`openbabel.pybel.Molecule`).
 
     Parameters
     ----------
-    entity : :class:`~luna.MyBio.PDB.Entity.Entity`
+    entity : :class:`~luna.pdb.core.entity.Entity`
         The entity to be converted.
-    select : :class:`~luna.MyBio.PDB.PDBIO.Select`
+    select : :class:`Bio.PDB.PDBIO.Select`
         Decide which atoms will be considered.
         By default, all atoms are accepted.
     amend_mol : bool

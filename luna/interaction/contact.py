@@ -4,9 +4,7 @@ from luna.util.default_values import (COV_SEARCH_RADIUS, BOUNDARY_CONFIG)
 from luna.util.exceptions import EntityLevelError, IllegalArgumentError
 from luna.interaction.cov import is_covalently_bound
 
-
 from Bio.PDB import Selection
-
 from Bio.PDB.NeighborSearch import NeighborSearch
 
 from luna.pdb.core.residue import Residue
@@ -24,7 +22,7 @@ def get_all_contacts(entity,
 
     Parameters
     ----------
-    entity : :class:`~luna.MyBio.PDB.Entity.Entity`
+    entity : :class:`~luna.pdb.core.entity.Entity`
         The PDB object from where atoms and residues will be recovered.
     radius : float
         The cutoff distance (in Å) for defining contacts.
@@ -34,10 +32,10 @@ def get_all_contacts(entity,
 
     Returns
     -------
-     : list of tuple of (:class:`~luna.MyBio.PDB.Residue.Residue` or \
-                :class:`~luna.MyBio.PDB.Atom.Atom`, \
-                :class:`~luna.MyBio.PDB.Residue.Residue` or \
-                :class:`~luna.MyBio.PDB.Atom.Atom`)
+     : list of tuple of (:class:`~luna.pdb.core.residue.Residue` or \
+                :class:`~luna.pdb.core.atom.Atom`, \
+                :class:`~luna.pdb.core.residue.Residue` or \
+                :class:`~luna.pdb.core.atom.Atom`)
         Each tuple contains either a pair of residues or atoms in contact.
 
     Raises
@@ -52,7 +50,7 @@ def get_all_contacts(entity,
     within 2.5 Å in the PDB 3QQK. So, let's first parse the PDB file.
 
     >>> from luna.util.default_values import LUNA_PATH
-    >>> from luna.MyBio.PDB.PDBParser import PDBParser
+    >>> from luna.pdb.parser.base import PDBParser
     >>> pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True)
     >>> structure = pdb_parser.get_structure("Protein", \
 f"{LUNA_PATH}/tutorial/inputs/3QQK.pdb")
@@ -100,12 +98,12 @@ def get_contacts_with(source,
 
     Parameters
     ----------
-    source : :class:`~luna.MyBio.PDB.Entity.Entity`
-        The reference, which can be any :class:`~luna.MyBio.PDB.Entity.Entity`
+    source : :class:`~luna.pdb.core.entity.Entity`
+        The reference, which can be any :class:`~luna.pdb.core.entity.Entity`
         instance (structure, model, chain, residue, or atom).
-    target : :class:`~luna.MyBio.PDB.Entity.Entity`, optional
+    target : :class:`~luna.pdb.core.entity.Entity`, optional
         If provided, only contacts with the ``target`` will be considered.
-    entity : :class:`~luna.MyBio.PDB.Entity.Entity`
+    entity : :class:`~luna.pdb.core.entity.Entity`
         The PDB object from where atoms will be recovered.
         If not provided (the default), the model object that contains
         ``source`` will be used instead.
@@ -117,10 +115,10 @@ def get_contacts_with(source,
 
     Returns
     -------
-     : set of tuple of (:class:`~luna.MyBio.PDB.Residue.Residue` or \
-            :class:`~luna.MyBio.PDB.Atom.Atom`, \
-            :class:`~luna.MyBio.PDB.Residue.Residue` or \
-            :class:`~luna.MyBio.PDB.Atom.Atom`)
+     : set of tuple of (:class:`~luna.pdb.core.residue.Residue` or \
+            :class:`~luna.pdb.core.atom.Atom`, \
+            :class:`~luna.pdb.core.residue.Residue` or \
+            :class:`~luna.pdb.core.atom.Atom`)
         Each tuple contains two items:\
             the first corresponds to a residue/atom from the ``source``,\
             and the second corresponds to a residue/atom in contact
@@ -140,7 +138,7 @@ def get_contacts_with(source,
     First, let's parse a PDB file to work with.
 
     >>> from luna.util.default_values import LUNA_PATH
-    >>> from luna.MyBio.PDB.PDBParser import PDBParser
+    >>> from luna.pdb.parser.base import PDBParser
     >>> pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True)
     >>> structure = pdb_parser.get_structure("Protein", \
 f"{LUNA_PATH}/tutorial/inputs/3QQK.pdb")
@@ -175,7 +173,7 @@ f"{LUNA_PATH}/tutorial/inputs/3QQK.pdb")
     First, let's parse a PDB file to work with.
 
     >>> from luna.util.default_values import LUNA_PATH
-    >>> from luna.MyBio.PDB.PDBParser import PDBParser
+    >>> from luna.pdb.parser.base import PDBParser
     >>> pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True)
     >>> structure = pdb_parser.get_structure("Protein", \
 f"{LUNA_PATH}/tutorial/inputs/3QQK.pdb")
@@ -246,7 +244,7 @@ def get_proximal_compounds(source, radius=COV_SEARCH_RADIUS):
 
     Parameters
     ----------
-    source : :class:`~luna.MyBio.PDB.Residue.Residue`
+    source : :class:`~luna.pdb.core.residue.Residue`
         The reference compound.
     radius : float
         The cutoff distance (in Å) for defining proximity.
@@ -255,13 +253,13 @@ def get_proximal_compounds(source, radius=COV_SEARCH_RADIUS):
 
     Returns
     -------
-     : list of :class:`~luna.MyBio.PDB.Residue.Residue`
+     : list of :class:`~luna.pdb.core.residue.Residue`
         The list of proximal compounds always include ``source``.
 
     Raises
     ------
     IllegalArgumentError
-        If ``source`` is not a :class:`~luna.MyBio.PDB.Residue.Residue`
+        If ``source`` is not a :class:`~luna.pdb.core.residue.Residue`
 
     Examples
     --------
@@ -271,7 +269,7 @@ def get_proximal_compounds(source, radius=COV_SEARCH_RADIUS):
     So, let's first parse the PDB file.
 
     >>> from luna.util.default_values import LUNA_PATH
-    >>> from luna.MyBio.PDB.PDBParser import PDBParser
+    >>> from luna.pdb.parser.base import PDBParser
     >>> pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True)
     >>> structure = pdb_parser.get_structure("Protein", \
 f"{LUNA_PATH}/tutorial/inputs/3QQK.pdb")
@@ -317,21 +315,21 @@ def get_cov_contacts_with(source, target=None, entity=None):
 
     Parameters
     ----------
-    source : :class:`~luna.MyBio.PDB.Entity.Entity`
-        The reference, which can be any :class:`~luna.MyBio.PDB.Entity.Entity`
+    source : :class:`~luna.pdb.core.entity.Entity`
+        The reference, which can be any :class:`~luna.pdb.core.entity.Entity`
         instance (structure, model, chain, residue, or atom).
-    target : :class:`~luna.MyBio.PDB.Entity.Entity`, optional
+    target : :class:`~luna.pdb.core.entity.Entity`, optional
         If provided, only covalent bonds with the ``target``
         will be considered.
-    entity : :class:`~luna.MyBio.PDB.Entity.Entity`
+    entity : :class:`~luna.pdb.core.entity.Entity`
         The PDB object from where atoms will be recovered.
         If not provided (the default), the model object that contains
         ``source`` will be used instead.
 
     Returns
     -------
-     : set of tuple of (:class:`~luna.MyBio.PDB.Atom.Atom`, \
-            :class:`~luna.MyBio.PDB.Atom.Atom`)
+     : set of tuple of (:class:`~luna.pdb.core.atom.Atom`, \
+            :class:`~luna.pdb.core.atom.Atom`)
         Pairs of atoms with potential covalent bonds.
 
 
@@ -342,7 +340,7 @@ def get_cov_contacts_with(source, target=None, entity=None):
     residue in the PDB 3QQK. So, let's first parse the PDB file.
 
     >>> from luna.util.default_values import LUNA_PATH
-    >>> from luna.MyBio.PDB.PDBParser import PDBParser
+    >>> from luna.pdb.parser.base import PDBParser
     >>> pdb_parser = PDBParser(PERMISSIVE=True, QUIET=True)
     >>> structure = pdb_parser.get_structure("Protein", \
 f"{LUNA_PATH}/tutorial/inputs/3QQK.pdb")

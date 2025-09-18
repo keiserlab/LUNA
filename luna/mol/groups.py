@@ -76,7 +76,7 @@ class AtomGroupsManager():
 
     @property
     def compounds(self):
-        """set of :class:`~luna.MyBio.PDB.Residue.Residue`, read-only:
+        """set of :class:`~luna.pdb.core.residue.Residue`, read-only:
         Compounds comprising the ``atm_grps``."""
         return self._compounds
 
@@ -510,7 +510,7 @@ class AtomGroup():
 
     @property
     def compounds(self):
-        """set of :class:`~luna.MyBio.PDB.Residue.Residue`, read-only: \
+        """set of :class:`~luna.pdb.core.residue.Residue`, read-only: \
             The set of unique compounds that contain the atoms in ``atoms``.
 
         As an atom group can be formed by the union of two or more compounds
@@ -770,10 +770,10 @@ class AtomGroup():
         nucleotide."""
         return any([a.parent.is_nucleotide() for a in self.atoms])
 
-    def has_target(self):
-        """Return True if at least one compound is the target of LUNA's
+    def has_reference(self):
+        """Return True if at least one compound is the reference of LUNA's
         analysis"""
-        return any([a.parent.is_target() for a in self.atoms])
+        return any([a.parent.is_reference() for a in self.atoms])
 
     def as_json(self):
         """Represent the atom group as a dict containing the atoms, compounds,
@@ -785,7 +785,7 @@ class AtomGroup():
             * ``atoms`` (iterable of :class:`~luna.mol.atom.ExtendedAtom`): \
                     the list of atoms comprising the atom group;
             * ``compounds`` (iterable of \
-                    :class:`~luna.MyBio.PDB.Residue.Residue`): the list of \
+                    :class:`~luna.pdb.core.residue.Residue`): the list of \
                     unique compounds that contain the atoms;
             * ``classes`` (iterable of str): the list of compound classes;
             * ``features`` (iterable of \
@@ -949,7 +949,7 @@ class AtomGroupPerceiver():
 
         Parameters
         ----------
-        compounds : iterable of :class:`~luna.MyBio.PDB.Residue.Residue`
+        compounds : iterable of :class:`~luna.pdb.core.residue.Residue`
             A sequence of molecules.
         mol_objs_dict : dict
             Map a compound, represented by its id, to a molecular object

@@ -1,11 +1,11 @@
 from luna.mol.entry import MolFileEntry
 from luna.interaction.calc import InteractionsManager
 from luna.wrappers.pymol import (PymolWrapper, PymolSessionManager,
-                                 mybio_to_pymol_selection)
+                                 bio_to_pymol_selection)
 from luna.util.file import is_file_valid
 from luna.util.exceptions import PymolSessionNotInitialized
 
-from luna.pdb.util import entity_to_string
+from luna.pdb.io.helpers import entity_to_string
 
 
 class InteractionViewer(PymolSessionManager):
@@ -191,14 +191,14 @@ for im in proj_obj.interactions_mngrs]
                         for comp in atm_grp.compounds:
                             comp_sel = ("%s and %s"
                                         % (main_grp,
-                                           mybio_to_pymol_selection(comp)))
+                                           bio_to_pymol_selection(comp)))
                             self.wrapper.show([("sticks", comp_sel)])
 
                         if len(inters) > 0:
                             for inter in inters:
                                 for atm in (inter.src_grp.atoms
                                             + inter.trgt_grp.atoms):
-                                    sel = mybio_to_pymol_selection(atm)
+                                    sel = bio_to_pymol_selection(atm)
                                     if atm not in interacting_atms:
                                         self.wrapper.color([("pink",
                                                              "%s and %s"
@@ -207,7 +207,7 @@ for im in proj_obj.interactions_mngrs]
 
                                 for atm in (inter.src_interacting_atms
                                             + inter.trgt_interacting_atms):
-                                    sel = mybio_to_pymol_selection(atm)
+                                    sel = bio_to_pymol_selection(atm)
                                     self.wrapper.color([("hotpink",
                                                          "%s and %s"
                                                          % (main_grp, sel))])
@@ -215,7 +215,7 @@ for im in proj_obj.interactions_mngrs]
 
                         else:
                             for atm in atm_grp.atoms:
-                                sel = mybio_to_pymol_selection(atm)
+                                sel = bio_to_pymol_selection(atm)
                                 self.wrapper.color([("wheat",
                                                      "%s and %s"
                                                      % (main_grp, sel))])
@@ -238,14 +238,14 @@ for im in proj_obj.interactions_mngrs]
                             continue
 
                         for atm in inter.src_grp.atoms + inter.trgt_grp.atoms:
-                            sel = mybio_to_pymol_selection(atm)
+                            sel = bio_to_pymol_selection(atm)
                             if atm not in interacting_atms:
                                 self.wrapper.color([("pink", 
                                                      "%s and %s"
                                                      % (main_grp, sel))])
 
                         for atm in inter.src_interacting_atms + inter.trgt_interacting_atms:
-                            sel = mybio_to_pymol_selection(atm)
+                            sel = bio_to_pymol_selection(atm)
                             self.wrapper.color([("hotpink",
                                                  "%s and %s"
                                                  % (main_grp, sel))])

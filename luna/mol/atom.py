@@ -18,7 +18,7 @@ class AtomData:
     bond_type : int
         Bond type.
     full_id : tuple
-        The atom' full id as in :class:`~luna.MyBio.PDB.Atom.Atom`.
+        The atom' full id as in :class:`~luna.pdb.core.atom.Atom`.
     serial_number : int, optional
         Atom serial number.
 
@@ -78,13 +78,13 @@ class AtomData:
         full_atom_name = ""
         if self.full_id is not None:
             full_atom_name = "%s/%s/%s" % self.full_id[0:3]
-            res_name = "%d%s" % (self.full_id[3][1],
+            resname = "%d%s" % (self.full_id[3][1],
                                  self.full_id[3][2].strip())
             atom_name = "%s" % self.full_id[4][0]
 
             if self.full_id[4][1] != " ":
                 atom_name += "-%s" % self.full_id[4][1]
-            full_atom_name += "/%s/%s" % (res_name, atom_name)
+            full_atom_name += "/%s/%s" % (resname, atom_name)
 
         return ("<ExtendedAtomData: atomic number=%d, "
                 "coord=(%.3f, %.3f, %.3f), atom='%s', serial number=%s>"
@@ -112,12 +112,12 @@ class AtomData:
 
 
 class ExtendedAtom:
-    """Extend :class:`~luna.MyBio.PDB.Atom.Atom` with additional properties
+    """Extend :class:`~luna.pdb.core.atom.Atom` with additional properties
     and methods.
 
     Parameters
     ----------
-    atom : :class:`~luna.MyBio.PDB.Atom.Atom`
+    atom : :class:`~luna.pdb.core.atom.Atom`
         An atom.
     nb_info : iterable of `AtomData`, optional
         A sequence of `AtomData` containing information about atoms covalently
@@ -136,7 +136,7 @@ class ExtendedAtom:
 
     @property
     def atom(self):
-        """:class:`~luna.MyBio.PDB.Atom.Atom`, read-only."""
+        """:class:`~luna.pdb.core.atom.Atom`, read-only."""
         return self._atom
 
     @property
@@ -196,13 +196,13 @@ class ExtendedAtom:
                 atom name, and alternate location if available.
                 Fields are slash-separated."""
         full_atom_name = "%s/%s/%s" % self.get_full_id()[0:3]
-        res_name = "%s/%d%s" % (self._atom.parent.resname,
+        resname = "%s/%d%s" % (self._atom.parent.resname,
                                 self._atom.parent.id[1],
                                 self._atom.parent.id[2].strip())
         atom_name = "%s" % self._atom.name
         if self.altloc != " ":
             atom_name += "-%s" % self.altloc
-        full_atom_name += "/%s/%s" % (res_name, atom_name)
+        full_atom_name += "/%s/%s" % (resname, atom_name)
 
         return full_atom_name
 
@@ -242,9 +242,9 @@ class ExtendedAtom:
             * ``pdb_id`` (str): structure id;
             * ``model`` (str): model id;
             * ``chain`` (str): chain id;
-            * ``res_name`` (str): residue name;
-            * ``res_id`` (tuple): residue id (hetflag, sequence identifier, \
-                                              insertion code);
+            * ``resname`` (str): residue name;
+            * ``resid`` (tuple): residue id (hetflag, sequence identifier, \
+                                             insertion code);
             * ``name`` (tuple): atom name (atom name, alternate location).
 
         """
@@ -253,8 +253,8 @@ class ExtendedAtom:
         return {"pdb_id": full_id[0],
                 "model": full_id[1],
                 "chain": full_id[2],
-                "res_name": self.parent.resname,
-                "res_id": full_id[3],
+                "resname": self.parent.resname,
+                "resid": full_id[3],
                 "name": full_id[4]}
 
     def __getattr__(self, attr):

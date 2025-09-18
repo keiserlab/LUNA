@@ -44,7 +44,7 @@ def get_residue_neighbors(residue, select=Select(), verbose=True):
 
     Returns
     -------
-    neighbors : dict of {str : :class:`~luna.MyBio.PDB.Residue.Residue`}
+    neighbors : dict of {str : :class:`~luna.pdb.core.residue.Residue`}
         A dictionary containing the predecessor (``previous``) or
         successor (``next``) molecules.
     """

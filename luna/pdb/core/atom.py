@@ -40,7 +40,7 @@ class Atom(BioAtom):
         self.metal_coordination = set()
 
     def __repr__(self):
-        return f"<Atom {self.get_id()}>"
+        return f"<Atom (LUNA subclass) {self.get_id()}>"
 
     def __lt__(self, other):
         """
@@ -102,3 +102,10 @@ class DisorderedAtom(BioDisorderedAtom):
     """
     def __init__(self, id):
         super().__init__(id)
+
+    def __repr__(self):
+        """Return disordered atom identifier."""
+        if self.child_dict:
+            return f"<DisorderedAtom (LUNA subclass) {self.get_id()}>"
+        else:
+            return f"<Empty DisorderedAtom (LUNA subclass) {self.get_id()}>"

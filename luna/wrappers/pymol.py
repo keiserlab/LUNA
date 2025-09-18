@@ -774,7 +774,7 @@ class PymolSessionManager:
                 comp_sel = ("%s and %s"
                             % (main_grp, bio_to_pymol_selection(compound)))
                 self.wrapper.show([(comp_repr, comp_sel)])
-                carb_color = "green" if compound.is_target() else "gray"
+                carb_color = "green" if compound.is_reference() else "gray"
                 self.wrapper.color([(carb_color, comp_sel + " AND elem C")])
 
                 if compound.is_residue():

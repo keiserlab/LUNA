@@ -111,10 +111,10 @@ def get_parser():
                        action=NegateAction, nargs=0,
                        help="turn on/off dependent interactions.")
     group.add_argument('--awp', '--no-awp',
-                       dest="add_h2o_pairs_with_no_target",
+                       dest="add_h2o_pairs_with_no_ref",
                        action=NegateAction, nargs=0,
                        help="accept or not water that doesn't interact "
-                            "with the target ligand.")
+                            "with the reference ligand.")
     group.add_argument('--sdr', '--no-sdr', dest="strict_donor_rules",
                        action=NegateAction, nargs=0,
                        help="turn on/off strict donor rules.")

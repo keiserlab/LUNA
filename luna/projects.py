@@ -157,7 +157,7 @@ class Project:
     Parameters
     ----------
     entries : iterable of :class:`~luna.mol.entry.Entry`
-        Entries determine the target molecule to which interactions and other
+        Entries determine the reference molecule to which interactions and other
         properties will be calculated. They can be ligands, chains, etc, and
         can be defined in a number of ways. Each entry has an associated PDB
         file that may contain macromolecules (protein, RNA, DNA) and other
@@ -768,7 +768,7 @@ class Project:
             structure = entry.get_biopython_structure(structure, pdb_parser)
 
         ligand = get_entity_from_entry(structure, entry)
-        ligand.set_as_target(is_target=True)
+        ligand.set_as_reference(is_reference=True)
 
         return pdb_parser, structure, ligand
 

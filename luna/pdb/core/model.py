@@ -19,7 +19,7 @@ class Model(BioModel, Entity):
         super().__init__(id, serial_num)
 
     def __repr__(self):
-        return f"<Model id={self.id}>"
+        return f"<Model (LUNA subclass) id={self.id}>"
 
     def __lt__(self, other):
         """Allow sorting of models by ID."""

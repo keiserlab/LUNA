@@ -87,13 +87,13 @@ class InteractionsManager:
             atm_grps.add(inter.trgt_grp)
         return atm_grps
 
-    def count_interations(self, must_have_target=False):
+    def count_interations(self, must_have_reference=False):
         """Count the number of each type of interaction in ``interactions``.
 
         Parameters
         ----------
-        must_have_target : bool
-                If True, count only interactions involving the target ligand.
+        must_have_reference : bool
+                If True, count only interactions involving the reference molecule.
                 The default value is False, which implies all interactions
                 will be considered.
 
@@ -102,7 +102,7 @@ class InteractionsManager:
          : dict
         """
         return count_interaction_types(self.interactions,
-                                       must_have_target=must_have_target)
+                                       must_have_reference=must_have_reference)
 
     def add_interactions(self, interactions):
         """Add one or more :class:`~luna.interaction.type.InteractionType`
@@ -340,12 +340,12 @@ class InteractionCalculator:
         hydrogen bonds, while the second depends on an ionic and a hydrogen
         bond. The default value is False, which implies no dependent
         interaction will be computed.
-    add_h2o_pairs_with_no_target : bool
+    add_h2o_pairs_with_no_ref : bool
         If True, keep interactions of water with atoms and atom groups that
-        do not belong to the target of LUNA's analysis, which are chains or
+        do not belong to the reference of LUNA's analysis, which are chains or
         molecules defined as an :class:`~luna.mol.entry.Entry` instance.
-        For example, if the target is a ligand and
-        ``add_h2o_pairs_with_no_target`` is False, then water-water and
+        For example, if the reference is a ligand and
+        ``add_h2o_pairs_with_no_ref`` is False, then water-water and
         water-residue hydrogen bonds will be removed because the ligand is not
         participating in the interactions. The default value is False.
     strict_donor_rules : bool
@@ -551,7 +551,7 @@ inter_config=custom_config)
                  inter_filter=None, inter_funcs=None, add_non_cov=True,
                  add_cov=True, add_proximal=False, add_atom_atom=True,
                  add_dependent_inter=False,
-                 add_h2o_pairs_with_no_target=False,
+                 add_h2o_pairs_with_no_ref=False,
                  strict_donor_rules=True,
                  strict_weak_donor_rules=True,
                  lazy_comps_list=DEFAULT_LAZY_LIST):
@@ -578,7 +578,7 @@ inter_config=custom_config)
         self.add_atom_atom = add_atom_atom
 
         self.add_dependent_inter = add_dependent_inter
-        self.add_h2o_pairs_with_no_target = add_h2o_pairs_with_no_target
+        self.add_h2o_pairs_with_no_ref = add_h2o_pairs_with_no_ref
 
         self.strict_donor_rules = strict_donor_rules
         self.strict_weak_donor_rules = strict_weak_donor_rules
@@ -726,8 +726,8 @@ inter_config=custom_config)
         # an unfavorable interation between the same atoms.
         self.remove_inconsistencies(all_interactions)
 
-        if not self.add_h2o_pairs_with_no_target:
-            self.remove_h2o_pairs_with_no_target(all_interactions)
+        if not self.add_h2o_pairs_with_no_ref:
+            self.remove_h2o_pairs_with_no_reference(all_interactions)
 
         logger.debug("Number of potential interactions found: %d"
                      % len(all_interactions))
@@ -974,9 +974,9 @@ inter_config=custom_config)
         for inter in inconsistencies:
             inter.clear_refs()
 
-    def remove_h2o_pairs_with_no_target(self, interactions):
+    def remove_h2o_pairs_with_no_reference(self, interactions):
         """Remove interactions of water with atoms and atom groups that do not
-        belong to the target of LUNA's analysis, which are chains or molecules
+        belong to the reference of LUNA's analysis, which are chains or molecules
         defined as an :class:`~luna.mol.entry.Entry` instance.
 
         Parameters
@@ -991,10 +991,10 @@ inter_config=custom_config)
                 h2o_interactions.add(inter)
 
                 # If a water is interacting with the ligand.
-                if inter.src_grp.is_water() and inter.trgt_grp.has_target():
+                if inter.src_grp.is_water() and inter.trgt_grp.has_reference():
                     valid_h2o_set.add(inter.src_grp)
 
-                if inter.trgt_grp.is_water() and inter.src_grp.has_target():
+                if inter.trgt_grp.is_water() and inter.src_grp.has_reference():
                     valid_h2o_set.add(inter.trgt_grp)
 
         inters_to_remove = set()

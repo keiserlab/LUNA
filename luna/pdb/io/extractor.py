@@ -16,7 +16,7 @@ class Extractor():
 
     Parameters
     ----------
-    entity : Bio.PDB.Model.Model or Bio.PDB.Chain.Chain
+    entity : :class:`~luna.pdb.core.model.Model` or :class:`~luna.pdb.core.chain.Chain`
         A model or chain from which entities will be extracted.
     """
 

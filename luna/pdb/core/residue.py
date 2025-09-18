@@ -21,7 +21,7 @@ class Residue(BioResidue, Entity):
 
     Parameters
     ----------
-    res_id : tuple
+    id : tuple
         Biopython residue ID (hetflag, resseq, icode).
     resname : str
         Residue name (e.g., "ALA", "HOH").
@@ -33,8 +33,8 @@ class Residue(BioResidue, Entity):
         Line number in the original PDB.
     """
 
-    def __init__(self, res_id, resname, segid, idx=None, at_line=None):
-        super().__init__(res_id, resname, segid)
+    def __init__(self, id, resname, segid, idx=None, at_line=None):
+        super().__init__(id, resname, segid)
 
         # Store position within parent chain
         self.idx = idx
@@ -44,15 +44,15 @@ class Residue(BioResidue, Entity):
         # Used by FTMapParser, optional.
         self.cluster_id = None
         
-        # By default: no residue is a target for processing.
-        self._is_target = False
+        # By default: no residue is a reference for processing.
+        self._is_reference = False
     
     def __repr__(self):
         """Return the residue full id."""
         resname = self.get_resname()
         hetflag, resseq, icode = self.get_id()
         full_id = (resname, hetflag, resseq, icode)
-        return "<Residue %s het=%s resseq=%s icode=%s>" % full_id
+        return "<Residue (LUNA subclass) %s het=%s resseq=%s icode=%s>" % full_id
 
     def __lt__(self, other):
         return self.idx < other.idx
@@ -73,11 +73,40 @@ class Residue(BioResidue, Entity):
             if getattr(atom, "has_metal_coordination", lambda: False)()
         }
 
-    def is_target(self):
-        return self._is_target
+    def is_reference(self):
+        """
+        Return True if this entity is marked as the reference for interaction analysis.
 
-    def set_as_target(self, is_target=True):
-        self._is_target = is_target
+        This flag indicates that the user selected this entity
+        as the *main subject* of interaction evaluation — interactions will be computed
+        between this entity and others nearby (e.g., ligands, water, ions).
+
+        Returns
+        -------
+        bool
+            True if this entity is marked for interaction reference.
+        """
+        return self._is_reference
+
+    def set_as_reference(self, is_reference=True):
+        """
+        Mark this entity as the reference for interaction analysis.
+
+        This method sets a flag indicating that this residue should be
+        treated as the main subject for calculating interactions 
+        with nearby molecules.
+
+        Parameters
+        ----------
+        is_reference : bool, optional
+            If True, mark the entity as the interaction reference.
+            If False, unmark it. Defaults to True.
+
+        See Also
+        --------
+        is_reference : Check whether this entity is currently marked.
+        """
+        self._is_reference = is_reference
 
     def is_water(self):
         """Return True if the residue is a water molecule."""
@@ -158,3 +187,13 @@ class DisorderedResidue(BioDisorderedResidue):
     """
     def __init__(self, id):
         super().__init__(id)
+
+    def __repr__(self):
+        """Return disordered residue full identifier."""
+        if self.child_dict:
+            resname = self.get_resname()
+            hetflag, resseq, icode = self.get_id()
+            full_id = (resname, hetflag, resseq, icode)
+            return "<DisorderedResidue (LUNA subclass) %s het=%s resseq=%i icode=%s>" % full_id
+        else:
+            return "<Empty DisorderedResidue (LUNA subclass)>"

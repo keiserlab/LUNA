@@ -30,17 +30,17 @@ def get_residue_cov_bonds(residue, select=Select()):
 
     Parameters
     ----------
-    residue : :class:`~luna.MyBio.PDB.Residue.Residue`
+    residue : :class:`~luna.pdb.core.residue.Residue`
         The residue or other molecule from which covalently
         bound atoms will be recovered.
-    select : :class:`~luna.MyBio.PDB.PDBIO.Select`
+    select : :class:`Bio.PDB.PDBIO.Select`
         Decides which atoms will be consired.
         By default, all atoms are accepted.
 
     Returns
     -------
-    list of tuple(:class:`~luna.MyBio.PDB.Atom.Atom`, \
-            :class:`~luna.MyBio.PDB.Atom.Atom`)
+    list of tuple(:class:`~luna.pdb.core.atom.Atom`, \
+            :class:`~luna.pdb.core.atom.Atom`)
         List of pairs of covalently bound atoms.
     """
 

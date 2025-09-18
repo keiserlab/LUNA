@@ -22,7 +22,7 @@ def save_to_file(entity,
 
     Parameters
     ----------
-    entity : :class:`Bio.PDB.Entity.Entity`
+    entity : :class:`~luna.pdb.core.entity.Entity`
          The structure, model, chain, residue, or atom to be written.
     output_file : str
         Path to the output PDB file.
@@ -42,7 +42,8 @@ def save_to_file(entity,
     try:
         io = PDBIO()
         io.set_structure(entity)
-        io.save(output_file, select=select,
+        io.save(output_file, 
+                select=select,
                 write_conects=write_conects,
                 write_end=write_end,
                 preserve_atom_numbering=preserve_atom_numbering,
@@ -53,7 +54,8 @@ def save_to_file(entity,
         raise FileNotCreated(f"PDB file '{output_file}' could not be created.")
 
 
-def entity_to_string(entity, select=Select(),
+def entity_to_string(entity, 
+                     select=Select(),
                      write_conects=True,
                      write_end=True,
                      preserve_atom_numbering=True):
@@ -61,13 +63,13 @@ def entity_to_string(entity, select=Select(),
     Convert a structure, model, chain, residue, or atom to string.
 
     This function works on a structural level. That means if ``entity`` is not
-    a :class:`~luna.MyBio.PDB.Structure.Structure` object, the structure will
+    a :class:`~luna.pdb.core.structure.Structure` object, the structure will
     be recovered directly from ``entity``. Therefore, use ``select`` to select
     specific chains, residues, and atoms from the structure object.
 
     Parameters
     ----------
-    entity : :class:`Bio.PDB.Entity.Entity`
+    entity : :class:`~luna.pdb.core.entity.Entity`
         The object to convert.
     select : :class:`Bio.PDB.PDBIO.Select`
         Selector for filtering atoms/residues/chains. 
